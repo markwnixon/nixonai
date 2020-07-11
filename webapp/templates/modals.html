@@ -1,0 +1,97 @@
+<!-- This section launches modal on page load if being cycled -->
+{% if info[5] %}
+    {% block javascript %}
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+        <script>
+        $(document).ready(function(){
+            $("#requestdemo").modal('show');
+        });
+        </script>
+    {% endblock %}
+{% endif %}
+
+<!-- All the form modals -->
+<div class="modal fade" id="requestdemo" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-notify modal-info" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Request a Demonstration</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>We would love to provide you an in-person demonstration at your site or ours!  Simply Choose the time and place.  We will make the arrangements and confirm.</p>
+    <table class="table table-condensed table-hover"><tbody>
+        <tr>
+            <td> <div class="input-group-text">Date and Time:</div></td>
+            <td colspan="1"><input class="form-control" type="datetime-local" value="{{ info[0] }}" name="date"></td>
+        </tr>
+                <tr>
+            <td> <div class="input-group-text">Location:</div></td>
+            <td colspan="1"><input class="form-control" type="text"  placeholder='Please enter your address' name="location" value = "{{ info[1] }}"></td>
+        </tr>
+        <tr>
+            <td> <div class="input-group-text">Confirmation Email:</div></td>
+            <td colspan="1"><input class="form-control" type="email"  placeholder='Please specify an email' name="email" value = "{{ info[2] }}"></td>
+        </tr>
+        <tr>
+            <td> <div class="input-group-text">Confirmation Phone:</div></td>
+            <td colspan="1"><input class="form-control" type="tel"  placeholder='Optional' name="phone" value = "{{ info[3] }}"></td>
+        </tr>
+        <tr>
+            <td> <div class="input-group-text">Contact Name:</div></td>
+            <td colspan="1"><input class="form-control" type="text"  placeholder='Optional' name="contact" value = "{{ info[4] }}"></td>
+        </tr>
+    </tbody></table>
+
+
+      </div>
+      <div class="modal-footer">
+        <input type="submit" class="btn btn-primary" name="setappt" value="Set Appointment">
+        <button type="button" class="btn btn-black" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="requestcallback" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-notify modal-info" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Modal title</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Modal body text goes here.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary">Save changes</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="bewinedanddined" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-notify modal-info" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Modal title</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Modal body text goes here.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary">Save changes</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

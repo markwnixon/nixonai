@@ -1,0 +1,203 @@
+<br>
+<div class="card">
+<div class="card-header">
+    <div class="d-flex justify-content-around align-items-center">
+        <div class="p-0">Enter New Job Information</div>
+        <div class="p-0">
+            <button type="submit" class="btn btn-md btn-green" name="Create Job">Create Job</button>
+            <button type="submit" class="btn btn-md btn-elegant" name="Cancel">&nbsp; Cancel &nbsp;</button>
+        </div>
+    </div>
+</div>
+
+<div class="card-body">
+<table class="table table-condensed table-hover">
+<tbody>
+{% for entry in entrydata %}
+    {% if entry[5] == 0 %}
+            {%  set colortext = '' %}{% set message = 'ok' %}
+    {% elif entry[5] == 1 %}
+            {%  set colortext = 'yellow' %}
+    {% else %}
+            {%  set colortext = 'red text-white' %}
+    {% endif %}
+    {% if entry[3] == 'select' %}
+            <tr>
+                <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
+
+                <td>
+                    <select class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
+                    <option value='Choose Later'>Choose Later</option>
+
+                        {% if entry[4] == 'customerdata' %}{% set klist = keydata.customerdata %}{% endif %}
+                        {% if entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}{% endif %}
+                        {% if entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}{% endif %}
+                        {% set htest = holdvec[loop.index-1] %}
+                        {% for kdata in klist %}
+                            <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+
+    {%  elif entry[3] == 'multitext' %}
+        {% if entry[4] != 'text' %}
+            {% if entry[4] == 'dropblock1' %}{% set klist = keydata.dropblock1 %}{% endif %}
+            {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% endif %}
+            {% if klist %}
+            <tr>
+                <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
+                <td>
+                    <select class="form-control" type="text" name="{{ entry[4] }}" onchange="this.form.submit()">
+                    <option value="">Optional Choose from Previous</option>
+                    {% for du in klist %}
+                    <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                    {% endfor %}
+                    </select>
+                </td>
+            </tr>
+        {%  endif  %}
+        {% endif %}
+            <tr>
+                <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
+                <td colspan="2"><textarea class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
+            </tr>
+
+    {% elif entry[3] == 'text' or entry[3] == 'date' or entry[3] == 'time' %}
+
+            <tr>
+                <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
+                <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
+            </tr>
+
+    {% endif %}
+
+{% endfor %}
+
+</tbody></table>
+
+<table class="table table-condensed table-hover">
+<tbody>
+<tr>
+<td><div class="input-group-text">Choose Customer:</div></td>
+<td>
+<select class="form-control" type="text" name="Shipper" onchange="this.form.submit()">
+<option value='Choose Later'>Choose Later</option>
+
+{% for data in keydata['customerdata'] %}
+<option value="{{data}}" {% if data == holdvec[0] %} selected {% endif %}> {{ data }} </option>
+{% endfor %}</select>
+</td>
+</tr>
+<tr>
+<td><div class="input-group-text">Order:</div></td>
+<td><input class="form-control" type="text" name="Order" value="{{ holdvec[1] }}"></td>
+</tr>
+<tr>
+<td><div class="input-group-text">Bill of Lading:</div></td>
+<td><input class="form-control" type="text" name="bol" value="{{ holdvec[2] }}"></td>
+</tr>
+<tr>
+<td><div class="input-group-text">Booking:</div></td>
+<td><input class="form-control" type="text" name="Booking" value="{{ holdvec[3] }}"></td>
+</tr>
+<tr>
+<td><div class="input-group-text">Container:</div></td>
+<td><input class="form-control" type="text" name="Container" value="{{ holdvec[13] }}"></td>
+</tr>
+<tr>
+<td> <div class="input-group-text">Containerized:</div></td>
+<td>
+<select class="form-control" type="text" name="Ctype">
+<option     value='None'> None </option>
+{% for contype in contypes %}
+<option  {% if holdvec[14] == contype %} selected {% endif %} value="{{ contype }}"> {{ contype }} </option>
+{% endfor %}
+
+</select>
+</td>
+</tr>
+
+{% set pus = holdvec[4] %}
+{% set thispu = holdvec[6] %}
+{% if pus %}
+    <tr>
+        <td><div class="input-group-text">Previous Load Locs</div></td>
+        <td>
+            <select class="form-control" type="text" name="getpuloc" onchange="this.form.submit()">
+            <option value="">Optional Choose from Previous</option>
+            {% for pu in pus %}
+                <option {% if pu == thispu %} selected {% endif %} value='{{pu}}'>{{pu}}</option>
+            {% endfor %}
+            </select>
+        </td>
+    </tr>
+{% endif %}
+
+<tr>
+<td> <div class="input-group-text" data-toggle="tooltip" title="Enter 1st 3 letters of an existing location and program will load entire address for you on UPDATE">Load At:</div></td>
+<td colspan="2"><textarea class="form-control" type="text" name="dropblock1" rows="4">{% if holdvec[8] != 0 %}{{ holdvec[8]}}{% endif %}</textarea></td>
+</tr>
+
+
+<tr>
+<td><div class="input-group-text">Load Date:</div></td>
+<td><input class="form-control" type="date" name="date" value="{{ holdvec[16] }}"></td>
+</tr>
+{% set dus = holdvec[5] %}
+{% set thisdu = holdvec[7] %}
+{% if dus %}
+    <tr>
+        <td><div class="input-group-text">Previous Delv Locs</div></td>
+        <td>
+            <select class="form-control" type="text" name="getduloc" onchange="this.form.submit()">
+            <option value="">Optional Choose from Previous</option>
+            {% for du in dus %}
+                <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
+            {% endfor %}
+            </select>
+        </td>
+    </tr>
+{% endif %}
+<tr>
+<td> <div class="input-group-text" data-toggle="tooltip" title="Enter 1st 3 letters of an existing location and program will load entire address for you on UPDATE">Deliver To:</div></td>
+<td colspan="2"><textarea class="form-control" type="text" name="dropblock2" rows="4">{% if holdvec[9] != 0 %}{{ holdvec[9]}}{% endif %}</textarea></td>
+</tr>
+<tr>
+<td><div class="input-group-text">Deliver Date:</div></td>
+<td><input class="form-control" type="date" name="date2" value="{{holdvec[17]}}"></td>
+</tr>
+<tr>
+<td><div class="input-group-text">Job Base Charge:</div></td>
+<td><input class="form-control" type="text" name="amount" value="{{ holdvec[18] }}"></td>
+</tr>
+<tr>
+<td colspan="2">OPTIONAL DISPATCH INFORMATION (CAN INPUT LATER UPON MANIFEST CREATION)</td>
+</tr>
+<tr>
+<td align="right"> <div class="input-group-text">Commodity:</div></td> <td><input class="form-control input-sm" type="text" name="commodity" value="{{ holdvec[19] }}"></td>
+</tr>
+
+<tr>
+<td align="right"> <div class="input-group-text">Packing:</div></td> <td><input class="form-control input-sm" type="text" name="packing" value="{{ holdvec[20] }}"></td>
+</tr>
+
+<tr>
+<td  align="right">  <div class="input-group-text">Pickup No.:</div></td> <td><input class="form-control input-sm" type="text" name="pickup" value="{{ holdvec[21] }}"></td>
+</tr>
+
+<tr>
+<td align="right">  <div class="input-group-text">Seal:</div></td> <td><input class="form-control input-sm" type="text" name="seal" value="{{ holdvec[22] }}"></td>
+</tr>
+
+<tr>
+    <td><div class="input-group-text">Special Instructions:</div></td>
+    <td><textarea class="form-control" type="text" name="desc" rows="4">{{holdvec[23]}}</textarea></td>
+</tr>
+
+
+
+</tbody></table>
+
+</div>
+</div>

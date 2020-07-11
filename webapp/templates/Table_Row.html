@@ -1,0 +1,64 @@
+{% set genre = genre_data['table'] %}
+{% set genre_tables = genre_data['genre_tables'] %}
+{% set genre_tables_on = genre_data['genre_tables_on'] %}
+
+<div class="d-flex justify-content-around align-self-baseline">
+    <div class="p-2">
+        <b>{{ genre }} Tables:</b>&nbsp
+        {% for tt in genre_tables %}
+            <div class="custom-control custom-checkbox custom-control-inline">
+                <input type="checkbox" class="custom-control-input" id="inline{{ genre_tables[loop.index - 1] }}" {% if genre_tables_on[loop.index - 1]=='on' %} checked {% endif %} name="{{ tt }}box" onchange="this.form.submit()">
+                <label class="custom-control-label" for="inline{{ genre_tables[loop.index - 1] }}">{{ genre_tables[loop.index - 1] }}</label>
+            </div>
+         {% endfor %}
+    </div>
+</div>
+
+<div class="d-sm-flex justify-content-around align-self-baseline">
+    <div class="p-0">
+    {% for dict_item in table_filters %}
+        {% for key, value in dict_item.items() %}
+
+            <select class="mdb-select md-form" name="{{ key }}" onchange="this.form.submit()">
+            <option value="" disabled selected>{{ key }}</option>
+                {% for case in value %}
+                    <option {% if tfilters[key] == case %} selected {% endif %} value='{{ case }}'>{{ case }}</option>
+                {% endfor %}
+            </select>
+
+             &nbsp; &nbsp;
+        {% endfor %}
+    {% endfor %}
+
+    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New"
+      data-toggle="tooltip" title="Add a NEW JOB from scratch here">   New<br>&nbsp &nbsp Job &nbsp &nbsp  </button>
+->
+          <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Mod"
+        data-toggle="tooltip" title="MODIFY information associated with any selected item">Modify<br>Item</button>
+->
+              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Inv"
+        data-toggle="tooltip" title="Create and Edit an Invoice">Invoice<br>Editor</button>
+->
+            <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Rec"
+        data-toggle="tooltip" title="Receive money and apply toward a selected Job/Invoice">Receive<br>Money</button>
+    </div>
+</div>
+
+<div class="d-sm-flex justify-content-around align-self-baseline">
+    <div class="p-0">
+    {% for dict_item in task_boxes %}
+        {% for key, value in dict_item.items() %}
+            <select class="mdb-select md-form" name="{{ key }}" onchange="this.form.submit()">
+            <option value="" disabled selected>{{ key }}</option>
+                {% for case in value %}
+                    <option {% if tboxes[key] == case %} selected {% endif %} value='{{ case }}'>{{ case }}</option>
+                {% endfor %}
+            </select>
+             &nbsp; &nbsp;
+        {% endfor %}
+    {% endfor %}
+    &nbsp; &nbsp;
+</div>
+</div>
+
+

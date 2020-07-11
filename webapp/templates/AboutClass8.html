@@ -1,0 +1,188 @@
+{% extends 'A_layout_portal.html'  %}
+
+{% block body %}
+
+<form action="{{ url_for ('AboutClass8') }}" method="post">
+
+<div class="table-responsive">
+    <div id="hero">
+        <div id="hero-overlay">
+            <div class="row"><div class="col-sm-12"> &nbsp </div></div>
+            <div class="row"><div class="col-sm-1"></div><div class="col-sm-11 text-blue"><h2> Class8 Cloud-Based AI-Fused Software for Trucking and Port Operations </h2>
+                <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#requestdemo">Request Demo</button>
+                <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#requestcallback">Request Callback</button>
+                <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#bewinedanddined">Be Wined & Dined</button>
+                {% include 'modals.html' %}
+            </div></div>
+            <div class="row"><div class="col-sm-12">&nbsp </div></div>
+
+<div class="row">
+  <div class="col-sm-1"></div>
+  <div class="col-sm-10">
+
+          <div class="card-deck">
+
+          <div class="card">
+            <img class="card-img-top" src="{{srcpath}}pics/class8three.png" alt="class8three.png" height="200">
+            <div class="card-body">
+              <h5 class="card-title text-danger">Overview</h5>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">Class8 is an integrated package for managing operations, compliance, and accounting.  It runs in the cloud on your browser and is free for your use.
+                    </li>
+              </ul>
+              <p class="card-text">Manage your trucking operations, port operations, side businesses, compliance, calendar, emails, and accounting all in one place. </p>
+            </div>
+            <div class="card-footer text-center">
+
+              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
+            </div>
+          </div>
+
+
+          <div class="card">
+            <img class="card-img-top" src="{{srcpath}}pics/card_spreadsheetpict.png" alt="portbaltimore.jpg">
+            <div class="card-body">
+              <h5 class="card-title text-danger">Truck Job Manager</h5>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">Jobs, Proofs, Interchange, Customers, Manifests, Invoicing, and Receive Payments All in One Location</li>
+              </ul>
+              <p class="card-text"> All key tasks are centered on the Truck Job, which makes it easy to find out the status of container movements, invoices, and payments received.</p>
+            </div>
+            <div class="card-footer text-center">
+
+              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
+            </div>
+          </div>
+
+
+        <div class="card">
+          <img class="card-img-top" src="{{srcpath}}pics/card_carsales.png" alt="portbaltimore.jpg">
+          <div class="card-body">
+            <h5 class="card-title text-danger">Side Business Manager</h5>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">Many truck companies have side operations ongoing within their main business area.  For example you may conduct your own shipping operation, or rent equipment. </li>
+            </ul>
+            <p class="card-text">Class 8 provides integrated business managers and automated proper accounting for multiple focus areas or divisions.</p>
+
+          </div>
+          <div class="card-footer text-center">
+            <a href="/JaysAuto" class="btn btn-primary">Launch Video</a>
+          </div>
+        </div>
+
+
+      <div class="card">
+        <img class="card-img-top" src="{{srcpath}}pics/card_compliance.png" alt="portbaltimore.jpg">
+        <div class="card-body">
+          <h5 class="card-title text-danger">Compliance Manager</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Keep Records and Search Data Associated with Compliance</li>
+          </ul>
+          <p class="card-text">Allows you to stay on top of taxes, permits, fees, and filings required at the Federal, State, and Local levels.  Also monitors complicance with DOT and FMCSA filings and drug screen programs, and Human Resources requirements.</p>
+        </div>
+        <div class="card-footer text-center">
+          <a href="/Compliance" class="btn btn-primary">Launch Video</a>
+        </div>
+      </div>
+
+
+
+      </div>
+
+</div>
+<div class="col-sm-1"></div>
+</div>
+
+
+<div class="row"><div class="col-sm-12"> &nbsp </div></div>
+
+
+
+<div class="row">
+  <div class="col-sm-1"></div>
+  <div class="col-sm-10">
+          <div class="card-deck">
+
+               <div class="card">
+        <img class="card-img-top" src="{{srcpath}}pics/card_phonescan.png" alt="portbaltimore.jpg">
+        <div class="card-body">
+          <h5 class="card-title text-danger">General Information Manager</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Centralized Information Collection</li>
+          </ul>
+          <p class="card-text">We all write down important notes and lose them.  With this system just scan or take a pictures of your notes and
+          the automatic uploader with convert the notes to text and file it in a searchable database.</p>
+        </div>
+        <div class="card-footer text-center">
+          <a href="/General" class="btn btn-primary">Launch Video</a>
+        </div>
+      </div>
+
+            <div class="card">
+              <img class="card-img-top" src="{{srcpath}}pics/card_calendar.png" alt="calendar.jpg">
+              <div class="card-body">
+                <h5 class="card-title text-danger">Integrated Jobs Calendar</h5>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">Calendar View of Each Job on Date of Execution</li>
+                </ul>
+                <p class="card-text">Use this feature to get a sense of the ongoing and upcoming work load.
+                  Each job is shown as a 'Button' with key info.  Clicking button allows updating of job
+                information and creation of a manifest.</p>
+              </div>
+              <div class="card-footer text-center">
+                <a href="/CalendarBig" class="btn btn-primary">Launch Video</a>
+              </div>
+            </div>
+
+
+            <div class="card">
+              <img class="card-img-top" src="{{srcpath}}pics/card_double_entry_accounting.png" alt="portbaltimore.jpg">
+              <div class="card-body">
+                <h5 class="card-title text-danger">Integrated Banking</h5>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item">All Business Operations in One Place</li>
+                </ul>
+                <p class="card-text"> By integrating all business operations in one financial system, the system can keep compliant with
+                all companies, even if you end up paying one company's bill from another company's account.</p>
+
+              </div>
+              <div class="card-footer text-center">
+                <a href="/Banking" class="btn btn-primary">Launch Video</a>
+              </div>
+            </div>
+
+
+          <div class="card">
+            <img class="card-img-top" src="{{srcpath}}pics/card_reports.png" >
+            <div class="card-body">
+              <h5 class="card-title text-danger">Financial Reports</h5>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">Profit/Loss, Balance, Cash Flows, Customer Histories</li>
+              </ul>
+              <p class="card-text">Use this section to get comprehensive, up-to-date reports to stay on top of customer open balances.  Review profit and loss to better understand the company operations.
+              Also provides custom reports such as containers out.</p>
+            </div>
+            <div class="card-footer text-center">
+              <a href="/Reports" class="btn btn-primary">Launch Video</a>
+            </div>
+          </div>
+
+
+
+
+
+
+
+
+      </div>
+
+</div>
+<div class="col-sm-1"></div>
+</div>
+
+
+
+</div></div></div>
+
+</form>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="table-responsive">
+            <div class="container">
+                <div class="jumbotron">
+    <div class="row"><div class="col-sm-12"><h3> &nbsp &nbsp Overseas </h3></div></div>
+        <div class="row">
+            <div class="col-sm-4">
+                <div class="col d-flex justify-content-center">
+                <div class="card" style="width: 14rem;">
+                <img class="card-img-top" src="{{srcpath}}pics/intership.jpg" alt="intxxxxx.jpg">
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">International Shipping Application</li>
+                        <li class="list-group-item">Download form or fill out online</li>
+
+                    <li class="list-group-item">
+                       <a class="card-link" href="/static/OSLM/pics/INTERNATIONALSHIPPINGAPPLICATION.pdf" download>
+                        <img src="/static/OSLM/pics/download.png" height="40px"/></a>
+                        </ul>
+
+
+                    </div></div></div>
+
+            </div>
+
+            {% if ptype=='completed' %} <div class="col-sm-4"> Your information has been transmitted successfully. </div>
+            {% else %}
+
+            <div class="col-sm-4"><form action="{{ url_for ('People_Forms') }}" method="post">
+
+
+                            <table>
+                <tbody>
+                <tr>
+                    <td colspan="2" align="center">{% if ptype=='exporter' %} Exporter Information  {% elif ptype=='consignee' %} Consignee Information {% else %} Notify Party {% endif %}</td>
+                </tr>
+                <tr>
+                    <td> <div class="input-group-text" align="right">&nbsp&nbsp First Name:</div></td>
+                    <td><input class="form-control" type="text" name="fname"></td>
+                </tr>
+                <tr>
+                    <td align="right"> <div class="input-group-text">Mid Name(s):</div></td>
+                    <td><input class="form-control" type="text" name="mnames" value=""></td>
+                </tr>
+                <tr>
+                    <td> <div class="input-group-text">&nbsp&nbsp Last Name:</div></td>
+                    <td><input class="form-control" type="text" name="lname" value=""></td>
+                </tr>
+                <tr>
+                    <td align="right"> <div class="input-group-text">&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp Address:</div></td>
+                    <td><input class="form-control" type="text" name="addr1" value=""></td>
+                </tr>
+                <tr>
+                    <td> <div class="input-group-text">&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp :</div></td>
+                    <td><input class="form-control" type="text" name="addr2" value=""></td>
+                </tr>
+                <tr>
+                    <td align="right"> <div class="input-group-text">&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp :</div></td>
+                    <td><input class="form-control" type="text" name="addr3" value=""></td>
+                </tr>
+                {% if ptype == "exporter" %}
+                <tr>
+                    <td colspan="2" align="center">Identification Requirements</td>
+                </tr>
+                <tr>
+                    <td> <div class="input-group-text">&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp ID Type:</div></td>
+                    <td><input class="form-control" type="text" name="idtype" value=""></td>
+                </tr>
+                <tr><td colspan="2" align="center">&nbsp</td></tr>
+                {% endif %}
+                <tr>
+                    <td colspan="2" align="center"><input type="submit" name={{ptype}} value="Submit"></td>
+                </tr>
+
+
+                </tbody></table>
+
+
+
+
+
+
+
+            </div>
+
+            <div class="col-sm-4">
+                          <table>
+                <tbody>
+                <tr><td><f2>&nbsp</f2></td></tr>
+                <tr>
+                    <td align="right"> <div class="input-group-text">Telephone:</div></td>
+                    <td><input class="form-control" type="text" name="tel" value=""></td>
+                </tr>
+                <tr>
+                    <td> <div class="input-group-text">&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp Email:</div></td>
+                    <td><input class="form-control" type="text" name="email" value=""></td>
+                </tr>
+                <tr><td align="right"> &nbsp</td></tr><tr><td align="right"> &nbsp</td></tr><tr><td align="right"> &nbsp</td></tr>
+                {% if ptype == "exporter" %}
+                <tr><td> &nbsp </td></tr>
+                <tr><td><h4>&nbsp</h4></td></tr>
+                <tr><td><h3>&nbsp</h3></td></tr>
+                <tr>
+                    <td> <div class="input-group-text">ID Number:</div></td>
+                    <td><input class="form-control" type="text" name="tid" value=""></td>
+                </tr>
+                <tr><td align="right"> &nbsp </td></tr>
+                {% endif %}
+
+
+                </tbody></table>
+
+            </form>
+            </div>
+
+    {% endif %}
+
+
+
+
+
+            </div></div></div></div>
+{% endblock %}

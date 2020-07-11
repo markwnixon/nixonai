@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+  <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=yes">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>{{cmpdata[1]}}</title>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+  <!-- Material Design Bootstrap -->
+  <link href="/static/css/mdb.min.css" rel="stylesheet">
+  <!-- Your custom styles (optional) -->
+  <link href="/static/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+
+<!-- MDBootstrap Datatables  -->
+<link href="/static/css/addons/datatables.min.css" rel="stylesheet">
+
+
+
+<style>
+.my-small-btn {
+    font-size: 10px;
+    width:70px;
+    padding:3px; !important;
+}
+.my-med-btn {
+    font-size: 12px;
+    width:90px;
+    padding:5px; !important;
+}
+
+.my-verysmall-btn {
+    font-size: 8px;
+    width:15px;
+    padding:1px; !important;
+}
+
+.my-calsmall-btn {
+    font-size: 10px;
+    width:100px;
+    padding:3px; !important;
+}
+
+
+table tr td{
+   font-size: 12px;
+   height: 12px;
+   padding:1px !important;
+}
+
+.table th, .table td {
+    border: 0px !important;
+}
+
+.droparea {
+  width: 200px;
+  height: 200px;
+  border-style: solid;
+  border-width: 3px;
+  border-color: red;
+  float: left;
+  line-height: 200px;
+  text-align: center;
+}
+
+#pics img {
+position:absolute;
+display: none;
+}
+
+
+</style>
+
+    <title>Portal</title>
+</head>
+    <body>
+      {% set navbar = 'companysite/' + scac + '/navbar7.html' %}
+      {% include navbar %}
+      <div class="container-fluid">
+      {% include 'includes/_messages.html' %}
+      {% block body %}{% endblock %}
+      </div>
+
+ <!-- SCRIPTS -->
+  <!-- JQuery -->
+  <script type="text/javascript" src="/static/js/jquery-3.3.1.min.js"></script>
+  <!-- Bootstrap tooltips -->
+  <script type="text/javascript" src="/static/js/popper.min.js"></script>
+  <!-- Bootstrap core JavaScript -->
+  <script type="text/javascript" src="/static/js/bootstrap.min.js"></script>
+  <!-- MDB core JavaScript -->
+  <script type="text/javascript" src="/static/js/mdb.min.js"></script>
+
+<!-- MDBootstrap Datatables  -->
+ <script type="text/javascript" src="/static/js/addons/datatables.min.js"></script>
+
+<script>
+function startBarcodeScanner()
+{
+	alert("Using client JavaScript to start scanner.");
+	window.location.href = 'bwstw://startscanner?field=txtBarcode';
+}
+
+
+$(document).ready(function() {
+    $('#picOne').fadeIn(1500).delay(3500).fadeOut(1500);
+    $('#picTwo').delay(5000).fadeIn(1500);
+});
+
+$(document).ready(function() {
+
+    runslide();
+
+    function runslide() {
+    $('#pic1').fadeIn(1500).delay(3500).fadeOut(1500);
+    $('#pic2').delay(5000).fadeIn(1500).delay(3500).fadeOut(1500);
+
+    setTimeout(runslide, 10000);
+    }
+
+});
+
+
+
+
+
+
+
+var dragHandler = function(evt){
+evt.preventDefault();
+};
+
+function returntoflask(sitelocation)
+{
+    window.location.href = sitelocation;
+}
+
+
+var dropHandler = function(evt){
+    evt.preventDefault();
+    var files = evt.originalEvent.dataTransfer.files;
+    var oid = document.getElementById("passoder").value;
+    var uptype = document.getElementById("uploadtype").value;
+    var user = document.getElementById("username").value;
+
+    var formData = new FormData();
+    formData.append("file2upload", files[0]);
+    formData.append("oid",oid);
+    formData.append("uptype",uptype);
+    formData.append("user",user);
+
+    var req = {
+        url: "/FileUpload",
+        method: "post",
+        processData: false,
+        contentType: false,
+        data: formData
+    };
+
+    var promise = $.ajax(req);
+    promise.then(returntoflask('/Trucking'));
+};
+
+var dropHandlerSet = {
+    dragover: dragHandler,
+    drop: dropHandler
+};
+
+$(".droparea").on(dropHandlerSet);
+
+
+$(document).ready(function () {
+$('#dtH1').DataTable({
+"scrollX": true,
+"scrollY": 40,
+"stateSave": true,
+"paging": false,
+"searching": false // false to disable search (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtH2').DataTable({
+"scrollX": true,
+"scrollY": 90,
+"stateSave": true,
+"paging": false,
+"searching": false // false to disable search (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtH3').DataTable({
+"scrollX": true,
+"scrollY": 40,
+"stateSave": true,
+"paging": false,
+"searching": false // false to disable search (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtH4').DataTable({
+"scrollX": true,
+"scrollY": 90,
+"stateSave": true,
+"paging": false,
+"searching": false // false to disable search (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtH5').DataTable({
+"scrollX": true,
+"scrollY": 50,
+"stateSave": true,
+"paging": false,
+"searching": false // false to disable search (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtH6').DataTable({
+"order": [[ 4, "desc" ]],
+"scrollX": true,
+"scrollY": 400,
+"stateSave": true,
+"paging": false,
+"searching": true // false to disable search (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+
+
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample1').DataTable({
+"order": [[8, "desc" ]],
+"scrollX": true,
+"scrollY": 350,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtTrucking').DataTable({
+"order": [[9, "desc" ]],
+"scrollX": true,
+"scrollY": 400,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample2').DataTable({
+"order": [[ 4, "desc" ]],
+"scrollX": true,
+"scrollY": 300,
+"stateSave": true,
+"paging": false
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample3').DataTable({
+"order": [[ 4, "desc" ]],
+"scrollX": true,
+"scrollY": 300,
+"stateSave": true,
+"paging": false
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample4').DataTable({
+"order": [[ 2, "asc" ]],
+"scrollX": true,
+"scrollY": 200,
+"stateSave": true,
+"paging": false
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample5').DataTable({
+"order": [[ 4, "desc" ]],
+"scrollX": true,
+"scrollY": 200,
+"stateSave": true,
+"paging": false
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample6').DataTable({
+"scrollX": true,
+"scrollY": 200,
+"stateSave": true,
+"paging": false
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample7').DataTable({
+"order": [[ 1, "desc" ]],
+"scrollX": true,
+"scrollY": 350,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtHorizontalVerticalExample8').DataTable({
+"order": [[ 3, "asc" ]],
+"scrollX": true,
+"scrollY": 500,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+
+$('.file-upload').file_upload();
+
+
+</script>
+
+</body>
+
+
+
+</html>
