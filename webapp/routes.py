@@ -3,6 +3,7 @@ from webapp import app
 from webapp.models import users, ChalkBoard, Interchange, Orders, General
 from webapp.models import Services, Drivers, JO, People, OverSeas, Chassis, LastMessage
 from webapp.models import Autos, Bookings, Vehicles, Invoices, Income, Accounts, Bills, Drops, IEroll
+from webapp.forms import RegistrationForm, LoginForm
 
 
 import math
@@ -276,9 +277,17 @@ def Reports():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        from flask_bcrypt import Bcrypt
+        bcrypt = Bcrypt()
+
         # Get Form Fields
         username_input = request.form['username']
         password_candidate = request.form['password']
+
+        #print('My password is:',password_candidate)
+        #hashed_pw = bcrypt.generate_password_hash(password_candidate).decode('utf-8')
+        #print('My hashed password is:', hashed_pw)
+        #saved_hash_pw = '$2b$12$fCdQEGXaIhGi/WuePrVd7e4SFZHtkGwByb7rSbLjb0XPR12O7.xWS'
 
         # Get user by username
         result = users.query.filter_by(username=username_input).first()
@@ -286,11 +295,10 @@ def login():
         if result is not None:
 
             app.logger.info('USER FOUND')
-            # This is temporary, need to encrypt data stored in database
-            # before release
             passhash = result.password
+            passcheck = bcrypt.check_password_hash(passhash, password_candidate)
 
-            if password_candidate == passhash:
+            if passcheck:
                 session['logged_in'] = True
                 session['username'] = username_input
                 return redirect(url_for('EasyStart'))
@@ -311,3 +319,14 @@ def logout():
     session.clear()
     flash('You are now logged out', 'success')
     return redirect(url_for('login'))
+
+@app.route('/Register', methods=['GET', 'POST'])
+def register():
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        print('success')
+        flash(f'New User Created for {form.username.data}:', 'success')
+        return redirect(url_for('login'))
+    else:
+        print('failed')
+    return render_template('register.html', title='Register', form=form, cmpdata=cmpdata, scac=scac)
