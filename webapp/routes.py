@@ -1,9 +1,11 @@
 from flask import render_template, flash, redirect, url_for, session, logging, request, jsonify
-from webapp import app
+
+from webapp import app, db, bcrypt
 from webapp.models import users, ChalkBoard, Interchange, Orders, General
 from webapp.models import Services, Drivers, JO, People, OverSeas, Chassis, LastMessage
 from webapp.models import Autos, Bookings, Vehicles, Invoices, Income, Accounts, Bills, Drops, IEroll
-from webapp.forms import RegistrationForm, LoginForm
+from webapp.forms import RegistrationForm, LoginForm, TruckingFormNew
+from flask_login import login_user, current_user, logout_user, login_required
 
 
 import math
@@ -232,11 +234,13 @@ def AboutClass8():
 
 
 @app.route('/Class8Main/<genre>', methods=['GET', 'POST'])
+@login_required
 
 
 def Class8Main(genre):
 
     from class8_tasks import Table_maker
+    form = TruckingFormNew()
     #genre = 'Trucking'
     print('genre is',genre)
     genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
@@ -245,7 +249,7 @@ def Class8Main(genre):
 
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, oder=oder, modata=modata, leftscreen=leftscreen,
                            leftsize=leftsize, rightsize=rightsize, docref=docref, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
-                           taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre)
+                           taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre, form=form)
 
 
 
@@ -261,6 +265,7 @@ def EasyStart():
 
 
 @app.route('/Reports', methods=['GET', 'POST'])
+@login_required
 def Reports():
 
     from iso_R import isoR
@@ -276,42 +281,27 @@ def Reports():
 # User login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        from flask_bcrypt import Bcrypt
-        bcrypt = Bcrypt()
-
-        # Get Form Fields
-        username_input = request.form['username']
-        password_candidate = request.form['password']
-
-        #print('My password is:',password_candidate)
-        #hashed_pw = bcrypt.generate_password_hash(password_candidate).decode('utf-8')
-        #print('My hashed password is:', hashed_pw)
-        #saved_hash_pw = '$2b$12$fCdQEGXaIhGi/WuePrVd7e4SFZHtkGwByb7rSbLjb0XPR12O7.xWS'
-
-        # Get user by username
-        result = users.query.filter_by(username=username_input).first()
-
-        if result is not None:
-
+    form = LoginForm()
+    if form.validate_on_submit():
+        thisuser = users.query.filter_by(username=form.username.data).first()
+        if thisuser is not None:
             app.logger.info('USER FOUND')
-            passhash = result.password
-            passcheck = bcrypt.check_password_hash(passhash, password_candidate)
+            passhash = thisuser.password
+            passcheck = bcrypt.check_password_hash(passhash, form.password.data)
 
             if passcheck:
                 session['logged_in'] = True
-                session['username'] = username_input
+                session['username'] = thisuser.username
+                session['authority'] = thisuser.authority
+                login_user(thisuser, remember=form.remember.data)
                 return redirect(url_for('EasyStart'))
             else:
-                app.logger.info('PASSWORDS DO NOT MATCH')
-                error = 'Passwords do not match'
-                return render_template('login.html', error=error, cmpdata=cmpdata, scac=scac)
-
+                flash('Passwords do not match', 'danger')
+                return render_template('login.html', error=error, cmpdata=cmpdata, scac=scac, form=form)
         else:
-            error = 'Username not found'
-            return render_template('login.html', error=error, cmpdata=cmpdata, scac=scac)
-
-    return render_template('login.html',cmpdata=cmpdata, scac=scac)
+            flash('Username not found', 'danger')
+    else:
+        return render_template('login.html', cmpdata=cmpdata, scac=scac, form=form)
 
 # Logout
 @app.route('/logout')
@@ -320,13 +310,24 @@ def logout():
     flash('You are now logged out', 'success')
     return redirect(url_for('login'))
 
-@app.route('/Register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])
+@login_required
+
 def register():
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        print('success')
-        flash(f'New User Created for {form.username.data}:', 'success')
-        return redirect(url_for('login'))
+    if session['authority'] == 'superuser':
+        print('user is', session['username'])
+        print('authority is', session['authority'])
+        form = RegistrationForm()
+        if form.validate_on_submit():
+            flash(f'New User Created for {form.fullname.data}:', 'success')
+            hashed_pw = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+            input = users(name=form.fullname.data, email=form.email.data, username=form.username.data, password=hashed_pw, register_date=None, authority=form.authority.data)
+            db.session.add(input)
+            db.session.commit()
+            return redirect(url_for('login'))
+        return render_template('register.html', title='Register', form=form, cmpdata=cmpdata, scac=scac)
     else:
-        print('failed')
-    return render_template('register.html', title='Register', form=form, cmpdata=cmpdata, scac=scac)
+        flash(f'Do not have authority to register new users', 'danger')
+        return redirect(url_for('EasyStart'))
+
+

@@ -13,6 +13,19 @@
 
                     <fieldset>
                         <div class="form-group">
+                            {{  form.fullname.label(class='form-control-label') }}
+                            {% if form.fullname.errors %}
+                                {{ form.fullname(class='form-control form-control-lg is-invalid') }}
+                                <div class='invalid-feedback'>
+                                    {% for error in form.fullname.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                {{  form.fullname(class='form-control form-control-lg') }}
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
                             {{  form.username.label(class='form-control-label') }}
                             {% if form.username.errors %}
                                 {{ form.username(class='form-control form-control-lg is-invalid') }}
@@ -24,8 +37,6 @@
                             {% else %}
                                 {{  form.username(class='form-control form-control-lg') }}
                             {% endif %}
-
-
                         </div>
                         <div class="form-group">
                             {{  form.email.label(class='form-control-label') }}
@@ -67,16 +78,16 @@
                             {% endif %}
                         </div>
                         <div class="form-group">
-                            {{  form.container.label(class='form-control-label') }}
-                            {% if form.container.errors %}
-                                {{ form.container(class='form-control form-control-lg is-invalid') }}
+                            {{  form.authority.label(class='form-control-label') }}
+                            {% if form.authority.errors %}
+                                {{ form.authority(class='form-control form-control-lg is-invalid') }}
                                 <div class='invalid-feedback'>
-                                    {% for error in form.container.errors %}
+                                    {% for error in form.authority.errors %}
                                         <span>{{ error }}</span>
                                     {% endfor %}
                                 </div>
                             {% else %}
-                                {{  form.container(class='form-control form-control-lg') }}
+                                {{  form.authority(class='form-control form-control-lg') }}
                             {% endif %}
                         </div>
                     </fieldset>

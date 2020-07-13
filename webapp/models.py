@@ -1,9 +1,11 @@
 from webapp.CCC_system_setup import purpose
+from datetime import datetime
+from webapp import db, login_manager
+from flask_login import UserMixin
 
-if purpose == 'webapp':
-    from webapp import db
-else:
-    from remote_db_connect import db
+@login_manager.user_loader
+def load_user(user_id):
+    return users.query.get(int(user_id))
 
 class class8(object):
     'An Automated Workflow and Accounting Software Package for Logistics'
@@ -14,13 +16,18 @@ def nodollar(infloat):
     return outstr
 
 
-class users(db.Model):
+class users(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(100))
-    username = db.Column(db.String(30))
-    password = db.Column(db.String(100))
-    register_date = db.Column(db.DateTime)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    username = db.Column(db.String(30), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    register_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    authority = db.Column(db.String(20), nullable=False)
+
+    def __repr__(self):
+        return f"user('{self.name}','{self.username}', '{self.email}')"
+
 
 class KeyInfo(db.Model):
     __tablename__ = 'keyinformation'
@@ -410,18 +417,18 @@ class Focusareas(db.Model):
 class Orders(db.Model):
     __tablename__ = 'orders'
     id = db.Column('id', db.Integer, primary_key=True)
-    Status = db.Column('Status', db.String(200))
-    Jo = db.Column('Jo', db.String(25))
-    Load = db.Column('Load', db.String(50))
-    Order = db.Column('Order', db.String(50))
-    Bid = db.Column('Bid', db.Integer)
-    Lid = db.Column('Lid', db.Integer)
-    Did = db.Column('Did', db.Integer)
-    Company = db.Column('Company', db.String(50))
+    Status = db.Column('Status', db.String(200), default=None)
+    Jo = db.Column('Jo', db.String(25), nullable=False)
+    Load = db.Column('Load', db.String(50), default=None)
+    Order = db.Column('Order', db.String(50), default=Jo)
+    Bid = db.Column('Bid', db.Integer, default=0)
+    Lid = db.Column('Lid', db.Integer, default=0)
+    Did = db.Column('Did', db.Integer, default=0)
+    Company = db.Column('Company', db.String(50), nullable=False)
     Location = db.Column('Location', db.String(99))
-    BOL = db.Column('BOL', db.String(50))
-    Booking = db.Column('Booking', db.String(50))
-    Container = db.Column('Container', db.String(50))
+    BOL = db.Column('BOL', db.String(50), default=None)
+    Booking = db.Column('Booking', db.String(50),nullable=False)
+    Container = db.Column('Container', db.String(50),default=None)
     Driver = db.Column('Driver', db.String(200))
     Pickup = db.Column('Pickup', db.String(50))
     Delivery = db.Column('Delivery', db.String(50))
