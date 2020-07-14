@@ -28,7 +28,10 @@ app.secret_key = dbp[5]
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'authenticate.login'
 
 from webapp import routes
+from webapp.authenticate.routes import authenticate
+
+app.register_blueprint(authenticate)
 

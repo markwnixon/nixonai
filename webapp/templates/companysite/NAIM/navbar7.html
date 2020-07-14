@@ -7,10 +7,10 @@
             <a class="nav-link dropdown-toggle" id="navbarDropdownMenuLink1" data-toggle="dropdown" aria-haspopup="true"
           aria-expanded="false">About Us</a>
             <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdownMenuLink1">
-            <a class="nav-link" href="{{  url_for('.About', _anchor='intermodal') }}">Class8 Trucking</a>
-            <a class="nav-link" href="{{  url_for('.About', _anchor='cost') }}">Custom Intelligent Agents</a>
-            <a class="nav-link" href="{{  url_for('.About', _anchor='by') }}">Automated Business Operations</a>
-            <a class="nav-link" href="{{  url_for('.About', _anchor='port') }}">Sector Data Collection</a>
+            <a class="nav-link" href="{{  url_for('About', _anchor='intermodal') }}">Class8 Trucking</a>
+            <a class="nav-link" href="{{  url_for('About', _anchor='cost') }}">Custom Intelligent Agents</a>
+            <a class="nav-link" href="{{  url_for('About', _anchor='by') }}">Automated Business Operations</a>
+            <a class="nav-link" href="{{  url_for('About', _anchor='port') }}">Sector Data Collection</a>
             </div>
             </li>
 
@@ -82,7 +82,7 @@
                     <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Reports') }}">Business Reports</a>
                     <a class="dropdown-item" href="{{ url_for('Class8Main',genre='General') }}">General Information</a>
                         {% if session['authority'] == 'superuser' %}
-                            <a class="dropdown-item" href="{{ url_for('register') }}">Create New User</a>
+                            <a class="dropdown-item" href="{{ url_for('authenticate.register') }}">Create New User</a>
                         {% endif %}
                     </div>
                     </li>
@@ -100,13 +100,13 @@
 
 
                  <li class="nav-item">
-                   <a class="nav-link" href="/logout">Logout</a>
+                   <a class="nav-link" href="{{ url_for('authenticate.logout') }}">Logout</a>
                  </li>
 
          {% else %}
 
                 <li class="nav-item">
-                    <a class="nav-link" href="/login">Login to Portal</a>
+                    <a class="nav-link" href="{{ url_for('authenticate.login') }}">Login to Portal</a>
                 </li>
 
          {% endif %}
