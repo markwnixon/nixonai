@@ -327,21 +327,29 @@ def make_new_entry(tablesetup,data):
     db.session.add(input)
     db.session.commit()
 
-    def checksplit(entry,dat):
-        if entry == 'Company' or entry == 'Company2':
-            return dat.splitlines()[0]
+    def checkmultisplit(entry,dat):
+        print('entryis',entry,dat)
+        if entry[3] == 'multitext' and len(dat)>0:
+            return [dat.splitlines()[0], dat]
         else:
-            return dat
+            return [dat]
 
 
     newquery = f"{table}.query.filter({table}.{ukey} == '{uidtemp}').first()"
-    print(newquery)
+    print('Getting the new temp entry:',newquery)
     dat = eval(newquery)
     if dat is not None:
         for jx,entry in enumerate(entrydata):
-            tdat = checksplit(entry,data[jx])
-            setattr(dat,f'{entry[0]}',tdat)
-        db.session.commit()
+            tdat = checkmultisplit(entry,data[jx])
+            if len(tdat)==1:
+                print('About to set attribute:',dat,entry[0],tdat[0])
+                setattr(dat,f'{entry[0]}',tdat[0])
+            elif len(tdat)==2:
+                print('About to set attribute:',dat,entry[0],tdat[0])
+                setattr(dat,f'{entry[0]}',tdat[0])
+                print('About to set attribute:',dat,entry[4],tdat[1])
+                setattr(dat,f'{entry[4]}',tdat[1])
+        #db.session.commit()
     else:
         print('Data not found')
 

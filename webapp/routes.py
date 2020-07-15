@@ -237,9 +237,7 @@ def AboutClass8():
 
 def Class8Main(genre):
 
-    from class8_tasks import Table_maker
-    form = TruckingFormNew()
-    #genre = 'Trucking'
+    from webapp.class8_tasks import Table_maker
     print('genre is',genre)
     genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus = Table_maker(genre)
@@ -247,7 +245,7 @@ def Class8Main(genre):
 
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, oder=oder, modata=modata, leftscreen=leftscreen,
                            leftsize=leftsize, rightsize=rightsize, docref=docref, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
-                           taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre, form=form)
+                           taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre)
 
 
 
