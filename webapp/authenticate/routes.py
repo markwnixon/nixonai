@@ -16,6 +16,9 @@ def login():
         thisuser = users.query.filter_by(username=form.username.data).first()
         if thisuser is not None:
             passhash = thisuser.password
+            #Commented out....only needed for startup if no superuser in database
+            #hashed_pw = bcrypt.generate_password_hash(thisuser.password).decode('utf-8')
+            #print(hashed_pw)
             passcheck = bcrypt.check_password_hash(passhash, form.password.data)
 
             if passcheck:

@@ -255,7 +255,7 @@ def EasyStart():
     calbut=request.values.get('calbut')
     if calbut is not None:
         return redirect(url_for('CalendarBig'))
-
+    print('Working the EasyStart route!!')
     srcpath = statpath('')
     return render_template('easystart.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
