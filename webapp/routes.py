@@ -22,7 +22,7 @@ import requests
 import mimetypes
 from urllib.parse import urlparse
 import img2pdf
-from webapp.viewfuncs import make_new_order, nonone, monvals, getmonths, nononestr, hasinput, d2s, erud
+from webapp.viewfuncs import make_new_order, nonone, monvals, getmonths, nononestr, hasinput, d2s, erud, docuploader
 
 from webapp.class8_utils import *
 
@@ -226,11 +226,6 @@ def AboutClass8():
 
 
 
-
-
-
-
-
 @app.route('/Class8Main/<genre>', methods=['GET', 'POST'])
 @login_required
 
@@ -238,14 +233,30 @@ def AboutClass8():
 def Class8Main(genre):
 
     from webapp.class8_tasks import Table_maker
+    viewport = ['tables', 'none','none']
     print('genre is',genre)
     genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus = Table_maker(genre)
-    rightsize = 12 - leftsize
+    if taskon == 'New':
+        print('setting form upload')
+        viewport[0] = 'upload'
+        uploadnow = request.values.get('uploadnow')
+        if uploadnow is not None:
+            viewport[0] = 'show_source_doc'
+            file = request.files['sourceupload']
+            if file.filename == '':
+                err.append('No source file selected for uploading')
+            else:
+                print('file is',file.filename)
 
+
+
+            print('the source doc is....',viewport[2])
+    rightsize = 12 - leftsize
+    print('heading to class8.html')
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, oder=oder, modata=modata, leftscreen=leftscreen,
                            leftsize=leftsize, rightsize=rightsize, docref=docref, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
-                           taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre)
+                           taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre, viewport=viewport)
 
 
 

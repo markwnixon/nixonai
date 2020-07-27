@@ -1189,7 +1189,7 @@ def global_inv(odata,odervec):
 
 def make_new_order():
     sdate = request.values.get('date')
-    if sdate == '':
+    if sdate == '' or sdate == None:
         sdate = today.strftime('%Y-%m-%d')
     nextjo = newjo(jbcode, sdate)
 

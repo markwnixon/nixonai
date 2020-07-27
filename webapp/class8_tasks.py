@@ -50,6 +50,7 @@ def Table_maker(genre):
     jscripts = []
     tfilters = {}
     tboxes = {}
+    keydata = {}
 
     if request.method == 'POST':
 
@@ -60,51 +61,63 @@ def Table_maker(genre):
 
         cancel = request.values.get('Cancel')
         if cancel is not None:
-            taskon = None
-            task_iter = 0
 
-        print('taskon here is', taskon)
-        taskon = nononestr(taskon)
-
-        # Get data only for tables that have been checked on
-        genre_tables_on = checked_tables(genre_tables)
-        tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
-
-        # Only check the launch filter menus if no task is running
-        if not hasinput(taskon):
-            # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
-            launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
-            taskon = launched[0] if launched != [] else None
-            focus = eval(f"{genre}_genre['table']")
-
-        if not hasinput(taskon):
-            # See if a task box has been selected
-            for box in task_boxes:
-                for key, value in box.items():
-                    tboxes[key] = request.values.get(key)
-                    if tboxes[key] is not None:
-                        taskon_list = tboxes[key].split()
-                        taskon = taskon_list[0]
-                        remainder = tboxes[key].replace(taskon,'')
-                        remainder = remainder.strip()
-                        focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
+            # Reset values as if not a Post
+            genre_tables_on = ['off'] * len(genre_tables)
+            genre_tables_on[0] = 'on'
+            tables_on = ['Orders']
+            # Default time filter on entry into table is last 60 days:
+            tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+            jscripts = ['dtTrucking']
+            taskon, task_iter, focus = None, None, None
 
 
-            print('Tboxes:', tboxes)
 
-        # See if a table filter has been selected, this can take place even during a task
-        for filter in table_filters:
-            for key, value in filter.items(): tfilters[key] = request.values.get(key)
-        print(tfilters)
+        else:
 
-        # Reset colors for color filter in primary table:
-        # eval(f"{genre}_genre['table_filters']['Color filters")
-        if tfilters['Color Filter'] == 'Haul':
-            Orders_setup['colorfilter'] = ['Hstat']
-        elif tfilters['Color Filter'] == 'Invoice':
-            Orders_setup['colorfilter'] = ['Istat']
-        elif tfilters['Color Filter'] == 'Both':
-            Orders_setup['colorfilter'] = ['Hstat', 'Istat']
+
+            print('taskon here is', taskon)
+            taskon = nononestr(taskon)
+
+            # Get data only for tables that have been checked on
+            genre_tables_on = checked_tables(genre_tables)
+            tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
+
+            # Only check the launch filter menus if no task is running
+            if not hasinput(taskon):
+                # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
+                launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
+                taskon = launched[0] if launched != [] else None
+                focus = eval(f"{genre}_genre['table']")
+
+            if not hasinput(taskon):
+                # See if a task box has been selected
+                for box in task_boxes:
+                    for key, value in box.items():
+                        tboxes[key] = request.values.get(key)
+                        if tboxes[key] is not None:
+                            taskon_list = tboxes[key].split()
+                            taskon = taskon_list[0]
+                            remainder = tboxes[key].replace(taskon,'')
+                            remainder = remainder.strip()
+                            focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
+
+
+                print('Tboxes:', tboxes)
+
+            # See if a table filter has been selected, this can take place even during a task
+            for filter in table_filters:
+                for key, value in filter.items(): tfilters[key] = request.values.get(key)
+            print(tfilters)
+
+            # Reset colors for color filter in primary table:
+            # eval(f"{genre}_genre['table_filters']['Color filters")
+            if tfilters['Color Filter'] == 'Haul':
+                Orders_setup['colorfilter'] = ['Hstat']
+            elif tfilters['Color Filter'] == 'Invoice':
+                Orders_setup['colorfilter'] = ['Istat']
+            elif tfilters['Color Filter'] == 'Both':
+                Orders_setup['colorfilter'] = ['Hstat', 'Istat']
 
 
     else:

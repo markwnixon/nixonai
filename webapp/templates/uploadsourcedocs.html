@@ -1,0 +1,31 @@
+<br>
+<div class="card">
+    <div class="card-header bg-info text-white" align="left">
+        File Upload of Source Document for Job:{{modata.Jo}} Company:{{modata.Shipper}}
+    </div>
+    <div class="card-body" align = "left">
+        Option 1: Upload Source Document Using File Select
+        <dl>
+            <p>
+            <input type="file" name="sourceupload" autocomplete="off">
+            </p>
+        </dl><p>
+        <input type="submit" name="uploadnow" id="uploadnow" value="Upload Now">
+        </p>
+    </div>
+    {% if modlink != 4 %}
+    <div class="card-body" align = "left">
+        Option 2: Upload Source Document Using Drag and Drop
+        <div class="container" align="center">
+            <div class="droparea" align="center">(Optional) Drop Here</div>
+            <div class="tablearea" id="tablearea" align="center"></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+
+<input type = "hidden" name="passmodlink" value="{{modlink}}">
+<input type = "hidden" name="passoder" value="{{oder}}">
+<input type = "hidden" name="uploadtype" id="uploadtype" value="source">
+<input type = "hidden" name="username" id="username" value="{{ username }}">
