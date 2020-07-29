@@ -16,7 +16,7 @@
                         <div class="col-sm-12" align="right">
                         Looking for: {{viewport[2]}}<br>
 
-                        <embed src="{{viewport[2]}}" width="500px" height="550px"/>
+                        <embed src="{{viewport[2]}}" width="700px" height="850px"/>
                         </div>
                     </div>
             {% endif %}
@@ -56,6 +56,9 @@
 <input type = "hidden" name ="taskon" value= "{{taskon}}">taskon is{{ taskon }}
 <input type = "hidden" name ="task_iter" value= "{{task_iter}}">task_iter is{{ task_iter }}
 <input type = "hidden" name ="focus" value= "{{focus}}">focus is{{ focus }}
+<input type = "hidden" name ="viewport0" value= "{{viewport[0]}}">viewport0 = {{ viewport[0] }}
+<input type = "hidden" name ="viewport1" value= "{{viewport[1]}}">viewport1 = {{ viewport[1] }}
+<input type = "hidden" name ="viewport2" value= "{{viewport[2]}}">viewport2 = {{ viewport[2] }}
 </form>
 
 {% endblock %}

@@ -238,8 +238,12 @@ def Class8Main(genre):
     genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus = Table_maker(genre)
     if taskon == 'New':
-        print('setting form upload')
-        viewport[0] = 'upload'
+        print('setting form upload with task_iter:', task_iter)
+        if task_iter == 1: viewport[0] = 'upload'
+        else:
+            viewport[0] = request.values.get('viewport0')
+            viewport[2] = request.values.get('viewport2')
+
         uploadnow = request.values.get('uploadnow')
         if uploadnow is not None:
             viewport[0] = 'show_source_doc'
@@ -249,11 +253,15 @@ def Class8Main(genre):
             else:
                 print('file is',file.filename)
 
-
-
+            name, ext = os.path.splitext(file.filename)
+            filename1 = f'Source_{name}{ext}'
+            output1 = addpath(tpath('temp', filename1))
+            file.save(output1)
+            viewport[2] = f'/static/{scac}/data/temp/{filename1}'
             print('the source doc is....',viewport[2])
+
     rightsize = 12 - leftsize
-    print('heading to class8.html')
+    print('heading to class8.html with genre:',genre)
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, oder=oder, modata=modata, leftscreen=leftscreen,
                            leftsize=leftsize, rightsize=rightsize, docref=docref, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
                            taskon=taskon, task_iter=task_iter, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, focus = focus, genre=genre, viewport=viewport)

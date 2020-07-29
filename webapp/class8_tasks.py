@@ -8,7 +8,7 @@ from webapp.email_appl import etemplate_truck
 import datetime
 import os
 import subprocess
-from func_cal import calmodalupdate
+#from func_cal import calmodalupdate
 import json
 
 #Python functions that require database access
