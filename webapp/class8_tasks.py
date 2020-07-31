@@ -31,16 +31,15 @@ def Table_maker(genre):
     username = session['username'].capitalize()
     # Gather information about the tables inside the genre
     if genre == 'Trucking':
-        from class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
+        from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
     elif genre == 'Ocean':
-        from class8_dicts import Ocean_genre, OverSeas_setup, Interchange_setup, Customers_setup, Services_setup
+        from webapp.class8_dicts import Ocean_genre, OverSeas_setup, Interchange_setup, Customers_setup, Services_setup
 
     genre_tables = eval(f"{genre}_genre['genre_tables']")
     quick_buttons = eval(f"{genre}_genre['quick_buttons']")
     table_filters = eval(f"{genre}_genre['table_filters']")
     task_boxes = eval(f"{genre}_genre['task_boxes']")
 
-    scac = 'FELA'
     leftsize = 8
     rightsize = 12 - leftsize
     leftscreen = 1

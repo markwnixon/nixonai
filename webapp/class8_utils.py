@@ -105,7 +105,7 @@ def form_check(text,type):
             message = 'Error: must choose a customer'
 
     elif type == 'dropblock1':
-        from class8_tasks import get_drop
+        from webapp.class8_tasks import get_drop
         if not hasinput(text):
             loadname = request.values.get('dropblock1')
             if loadname is not None:
@@ -113,7 +113,7 @@ def form_check(text,type):
         print('got dropblock1',text)
 
     elif type == 'dropblock2':
-        from class8_tasks import get_drop
+        from webapp.class8_tasks import get_drop
         if not hasinput(text):
             loadname = request.values.get('dropblock2')
             if loadname is not None:
