@@ -9,7 +9,11 @@
         <div class="col-sm-{{leftsize}}">
             {% if viewport[0] == 'tables' %}
                 {% include 'the_tables.html' %}
-            {% elif viewport[0] == 'upload' %}
+            {% else %}
+                {% include 'the_tables_hidden.html' %}
+            {% endif %}
+
+            {% if viewport[0] == 'upload' %}
                 {% include 'uploadsourcedocs.html' %}
             {% elif viewport[0] == 'show_source_doc' %}
                     <div class="row">

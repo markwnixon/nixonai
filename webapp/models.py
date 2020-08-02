@@ -303,14 +303,14 @@ class Interchange(db.Model):
     CargoWt = db.Column('CargoWt', db.String(25))
     Time = db.Column('Time', db.String(25))
     Status = db.Column('Status', db.String(25))
-    Original = db.Column('Original', db.String(50))
+    Source = db.Column('Original', db.String(50))
     Path = db.Column('Path', db.String(50))
     Type = db.Column('Type', db.String(25))
     Jo = db.Column('Jo', db.String(25))
     Company = db.Column('Company', db.String(50))
     Other = db.Column('Other', db.String(50))
 
-    def __init__(self, Container, TruckNumber, Driver, Chassis, Date, Release, GrossWt, Seals, ConType, CargoWt, Time, Status, Original, Path, Type, Jo, Company, Other):
+    def __init__(self, Container, TruckNumber, Driver, Chassis, Date, Release, GrossWt, Seals, ConType, CargoWt, Time, Status, Source, Path, Type, Jo, Company, Other):
         self.Container = Container
         self.TruckNumber = TruckNumber
         self.Driver = Driver
@@ -323,7 +323,7 @@ class Interchange(db.Model):
         self.CargoWt = CargoWt
         self.Time = Time
         self.Status = Status
-        self.Original = Original
+        self.Source = Source
         self.Path = Path
         self.Type = Type
         self.Jo = Jo
@@ -440,7 +440,7 @@ class Orders(db.Model):
     Time2 = db.Column('Time2', db.String(20))
     Time3 = db.Column('Time3', db.String(20))
     Path = db.Column('Path', db.String(50))
-    Original = db.Column('Original', db.String(200))
+    Source = db.Column('Original', db.String(200))
     Description = db.Column('Description', db.String(400))
     Chassis = db.Column('Chassis', db.String(50))
     Detention = db.Column('Detention', db.Integer)
@@ -471,7 +471,7 @@ class Orders(db.Model):
     QBi = db.Column('QBi', db.Integer)
 
     def __init__(self, Status, Jo, Load, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
-                 Delivery, Amount, Date, Time, Date2, Time2, Time3, Path, Original, Description, Chassis,
+                 Delivery, Amount, Date, Time, Date2, Time2, Time3, Path, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal):
@@ -493,8 +493,9 @@ class Orders(db.Model):
         self.Time = Time
         self.Date2 = Date2
         self.Time2 = Time2
+        self.Time3 = Time3
         self.Path = Path
-        self.Original = Original
+        self.Source = Source
         self.Description = Description
         self.Chassis = Chassis
         self.Detention = Detention
@@ -706,10 +707,10 @@ class People(db.Model):
     Temp2 = db.Column('Temp2', db.String(200))
     Date1 = db.Column('Date1', db.DateTime)
     Date2 = db.Column('Date2', db.DateTime)
-    Original = db.Column('Original', db.String(200))
+    Source = db.Column('Original', db.String(200))
     Accountid = db.Column('Accountid', db.Integer)
 
-    def __init__(self, Ptype, Company, First, Middle, Last, Addr1, Addr2, Addr3, Idtype, Idnumber, Telephone, Email, Associate1, Associate2, Temp1, Temp2, Date1, Date2, Original, Accountid):
+    def __init__(self, Ptype, Company, First, Middle, Last, Addr1, Addr2, Addr3, Idtype, Idnumber, Telephone, Email, Associate1, Associate2, Temp1, Temp2, Date1, Date2, Source, Accountid):
         self.Ptype = Ptype
         self.Company = Company
         self.First = First
@@ -728,7 +729,7 @@ class People(db.Model):
         self.Temp2 = Temp2
         self.Date1 = Date1
         self.Date2 = Date2
-        self.Original = Original
+        self.Source = Source
         self.Accountid = Accountid
 
 

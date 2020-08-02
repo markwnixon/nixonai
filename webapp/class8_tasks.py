@@ -75,7 +75,7 @@ def Table_maker(genre):
         else:
 
 
-            print('taskon here is', taskon)
+            print('class8_tasks.py 78 Tablemaker() The taskon here is:', taskon)
             taskon = nononestr(taskon)
 
             # Get data only for tables that have been checked on
@@ -102,12 +102,12 @@ def Table_maker(genre):
                             focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
 
 
-                print('Tboxes:', tboxes)
+                print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
 
             # See if a table filter has been selected, this can take place even during a task
             for filter in table_filters:
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
-            print(tfilters)
+            print('class8_tasks.py 110 Tablemaker() The filter settings are:',tfilters)
 
             # Reset colors for color filter in primary table:
             # eval(f"{genre}_genre['table_filters']['Color filters")
@@ -131,16 +131,16 @@ def Table_maker(genre):
     # genre_data = [genre,genre_tables,genre_tables_on,contypes]
     genre_data = eval(f"{genre}_genre")
     genre_data['genre_tables_on'] = genre_tables_on
-    print(genre_data['table'])
-    print(genre_data['genre_tables'])
-    print(genre_data['genre_tables_on'])
-    print(genre_data['container_types'])
-    print(genre_data['load_types'])
+    print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
+    print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
+    print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
+    print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
+    print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
 
     # Execute the task here if a task is on...,,,,
     if taskon != '' and taskon != None:
         rstring = f"{taskon}_task(task_iter,{focus}_setup)"
-        print(rstring)
+        print('class8_tasks.py 143 Tablemaker() Task to run:',rstring)
         holdvec, entrydata, err = eval(rstring)
         task_iter = int(task_iter) + 1
         for e in err:
@@ -176,6 +176,7 @@ def Table_maker(genre):
 
         # For tables that are on get side data required for tasks:
         side_data = eval(f"{tableget}_setup['side data']")
+        print('class8_tasks.py 179 Tablemaker() For tables on get this side data:',side_data)
         keydata = {}
         for side in side_data:
             for key, values in side.items():
@@ -183,7 +184,7 @@ def Table_maker(genre):
                 if 'get_' in select_value:
                     find = select_value.replace('get_','')
                     select_value = request.values.get(find)
-                    print(select_value)
+                    print('class8_tasks.py 187 Tablemaker() select_value:',select_value)
                 if select_value is not None:
                     print(key, values, tableget)
                     dbstats = eval(
@@ -192,7 +193,7 @@ def Table_maker(genre):
                         dblist = []
                         for dbstat in dbstats:
                             nextvalue = eval(f'dbstat.{values[3]}')
-                            nextvalue = nextvalue.strip()
+                            if nextvalue is not None:  nextvalue = nextvalue.strip()
                             if nextvalue not in dblist:
                                 dblist.append(nextvalue)
                         keydata.update({key: dblist})
@@ -308,6 +309,16 @@ def make_new_entry(tablesetup,data):
     filterval = tablesetup['filterval']
     creators = tablesetup['creators']
     ukey = tablesetup['ukey']
+    documents = tablesetup['documents']
+    if 'Source' in documents:
+        sourcekeys = tablesetup['source']
+        newfile = sourcekeys[0]
+        sourcekey = sourcekeys[1:]
+    else:
+        sourcekeys is None
+
+    print(documents)
+    print(sourcekeys)
 
     err = 'No Jo Created'
     from sqlalchemy import inspect
@@ -334,7 +345,7 @@ def make_new_entry(tablesetup,data):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    print('The dbnew phrase is:',dbnew)
+    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
@@ -351,6 +362,7 @@ def make_new_entry(tablesetup,data):
     print('Getting the new temp entry:',newquery)
     dat = eval(newquery)
     if dat is not None:
+        id = dat.id
         for jx,entry in enumerate(entrydata):
             tdat = checkmultisplit(entry,data[jx])
             if len(tdat)==1:
@@ -361,7 +373,31 @@ def make_new_entry(tablesetup,data):
                 setattr(dat,f'{entry[0]}',tdat[0])
                 print('About to set attribute:',dat,entry[4],tdat[1])
                 setattr(dat,f'{entry[4]}',tdat[1])
-        #db.session.commit()
+        db.session.commit()
+        print('')
+
+        if sourcekeys is not None:
+            nextquery = f"{table}.query.get({id})"
+            dat = eval(nextquery)
+            print('Check to see if we need to save a source document:')
+            docsave = request.values.get('viewport2')
+            #newile already set at top of routine to the base name for document
+            for eachsource in sourcekey:
+                keyval = getattr(dat,eachsource)
+                newfile = newfile + f'_{keyval}'
+
+            newfile = newfile + '_c0.pdf'
+            newfile = newfile.replace('None_','')
+            print('Jo, viewport2, newfile', keyval, docsave, newfile)
+            if docsave is not None:
+                newpath = addpath(tpath(table, newfile))
+                print('Need to move file from', addpath(docsave), ' to', newpath)
+                shutil.move(addpath(docsave), newpath)
+                setattr(dat, 'Source', newfile)
+                setattr(dat, 'Scache', 0)
+                db.session.commit()
+
+
     else:
         print('Data not found')
 

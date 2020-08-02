@@ -139,5 +139,5 @@ def checked_tables(tables):
     cks = []
     for table in tables:
         cks.append(request.values.get(f'{table}box'))
-    print(cks)
+    print('class8_utils.py 142 checked_tables() These are the checked tables:',cks)
     return cks

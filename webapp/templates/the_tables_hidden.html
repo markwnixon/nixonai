@@ -1,0 +1,28 @@
+genre_data[table]: {{ genre_data['table'] }}<br>
+{% set contypes = genre_data['container_types'] %}
+{% set genre = genre_data['table'] %}
+{% set genre_tables = genre_data['genre_tables'] %}
+{% set genre_tables_on = genre_data['genre_tables_on'] %}
+
+{% for tt in genre_tables %}
+    <input type = "hidden" name="{{ tt }}box" {% if genre_tables_on[loop.index - 1]=='on' %} value="on" {% endif %}>
+{% endfor %}
+
+{% for dict_item in table_filters %}
+    {% for key, value in dict_item.items() %}
+        {% for case in value %}
+            {% if tfilters[key] == case %}  <input type = "hidden" name="{{ key }}"  value="{{ case }}">  {% endif %}
+        {% endfor %}
+    {% endfor %}
+{% endfor %}
+
+{% for dict_item in task_boxes %}
+    {% for key, value in dict_item.items() %}
+        {% for case in value %}
+            {% if tfilters[key] == case %}  <input type = "hidden" name="{{ key }}"  value="{{ case }}">  {% endif %}
+        {% endfor %}
+    {% endfor %}
+{% endfor %}
+
+
+Copyright NixonAI

@@ -234,11 +234,11 @@ def Class8Main(genre):
 
     from webapp.class8_tasks import Table_maker
     viewport = ['tables', 'none','none']
-    print('genre is',genre)
+    print('routes.py 237: The genre is',genre)
     genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus = Table_maker(genre)
     if taskon == 'New':
-        print('setting form upload with task_iter:', task_iter)
+        print('routes.py 241 Setting form upload with task_iter:', task_iter)
         if task_iter == 1: viewport[0] = 'upload'
         else:
             viewport[0] = request.values.get('viewport0')

@@ -25,7 +25,7 @@ app.config["DEBUG"] = True
 app.config["SECRET_KEY"] = dbp[5]
 app.secret_key = dbp[5]
 
-#print(f'username:{dbp[1]},password:{dbp[2]},hostname:{dbp[3]},databasname:{dbp[4]}')
+print(f'username:{dbp[1]},password:{dbp[2]},hostname:{dbp[3]},databasname:{dbp[4]}')
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)

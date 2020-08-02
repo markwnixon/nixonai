@@ -81,7 +81,10 @@ Orders_setup = {'table': 'Orders',
                 'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
                               {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
                               {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
-                'jscript': 'dtTrucking'}
+                'jscript': 'dtTrucking',
+                'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
+                'source': ['Source', 'Jo']
+                }
 
 Interchange_setup = {'table': 'Interchange',
                      'filter': None,
@@ -106,7 +109,10 @@ Interchange_setup = {'table': 'Interchange',
                      'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
                                    {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
                                    {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
-                     'jscript': 'dtHorizontalVerticalExample2'}
+                     'jscript': 'dtHorizontalVerticalExample2',
+                     'documents': ['Source'],
+                     'source': ['None', 'Container', 'Type']
+                     }
 
 Customers_setup = {'table': 'People',
                    'filter': 'Ptype',
@@ -125,11 +131,17 @@ Customers_setup = {'table': 'People',
                    'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
                                  {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
                                  {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
-                   'jscript': 'dtHorizontalVerticalExample3'}
+                   'jscript': 'dtHorizontalVerticalExample3',
+                   'documents': ['Source'],
+                   'source': ['Source', 'Company']
+                   }
 
 Services_setup = {'table': 'Services',
                   'filter': None,
                   'filterval': None,
                   'headcols': ['Service', 'Price'],
                   'colorfilter': None,
-                  'jscript': 'dtHorizontalVerticalExample4'}
+                  'jscript': 'dtHorizontalVerticalExample4',
+                  'documents': ['None'],
+                  'source': ['None', 'Container', 'Type']
+                  }
