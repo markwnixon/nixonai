@@ -28,7 +28,8 @@ Trucking_genre = {'table': 'Orders',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
-                  'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange'}
+                  'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
+                                   'Source':'Checkbox_Table1', 'Proof':'Checkbox_Table1'}
                   }
 
 #Dictionary terms:

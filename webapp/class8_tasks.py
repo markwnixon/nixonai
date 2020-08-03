@@ -99,7 +99,12 @@ def Table_maker(genre):
                             taskon = taskon_list[0]
                             remainder = tboxes[key].replace(taskon,'')
                             remainder = remainder.strip()
+                            task_focus = f"{genre}_genre['task_mapping']['{remainder}']"
+                            print('The task focus is:', task_focus)
                             focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
+                            print('The task focus is:', focus)
+                            #Check to see if we must use the Table of a Checked Item Here
+                            #if focus == 'Checkbox_Table1': focus, item = get_active_item(focus)
 
 
                 print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
@@ -391,8 +396,9 @@ def make_new_entry(tablesetup,data):
             print('Jo, viewport2, newfile', keyval, docsave, newfile)
             if docsave is not None:
                 newpath = addpath(tpath(table, newfile))
-                print('Need to move file from', addpath(docsave), ' to', newpath)
-                shutil.move(addpath(docsave), newpath)
+                oldpath = addpath(docsave).replace('//','/')
+                print('Need to move file from', oldpath, ' to', newpath)
+                shutil.move(oldpath, newpath)
                 setattr(dat, 'Source', newfile)
                 setattr(dat, 'Scache', 0)
                 db.session.commit()
@@ -445,3 +451,23 @@ def Inv_task(iter):
 
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
+
+
+def Upload_task(iter,tablesetup):
+    err = [f'Running Source task with iter {iter}']
+    print(err)
+    print('tablesetup:',tablesetup)
+    print('genre:',genre)
+
+    def numcheckvec(a1, a2):
+        numchecked = 0
+        avec = []
+        for a in a1:
+            testone = request.values.get(a2 + str(a.id))
+            if testone:
+                numchecked = numchecked + 1
+                avec.append(int(testone))
+        return avec
+
+
+    return holdvec, entrydata, err

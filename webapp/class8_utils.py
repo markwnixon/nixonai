@@ -141,3 +141,29 @@ def checked_tables(tables):
         cks.append(request.values.get(f'{table}box'))
     print('class8_utils.py 142 checked_tables() These are the checked tables:',cks)
     return cks
+
+def checkfor_fileupload(err, task_iter, viewport):
+    print('utils.py 146 Setting form upload with task_iter:', task_iter)
+    if task_iter == 1:
+        viewport[0] = 'upload'
+    else:
+        viewport[0] = request.values.get('viewport0')
+        viewport[2] = request.values.get('viewport2')
+
+    uploadnow = request.values.get('uploadnow')
+    if uploadnow is not None:
+        viewport[0] = 'show_source_doc'
+        file = request.files['sourceupload']
+        if file.filename == '':
+            err.append('No source file selected for uploading')
+        else:
+            print('file is', file.filename)
+
+        name, ext = os.path.splitext(file.filename)
+        filename1 = f'Source_{name}{ext}'
+        output1 = addpath(tpath('temp', filename1))
+        file.save(output1)
+        viewport[2] = f'/static/{scac}/data/temp/{filename1}'
+        print('the source doc is....', viewport[2])
+
+    return err, viewport

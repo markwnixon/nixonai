@@ -2,7 +2,8 @@ from flask import render_template, flash, redirect, url_for, session, logging, r
 
 from webapp import app, db
 from webapp.models import Orders
-from webapp.forms import TruckingFormNew
+#from webapp.forms import TruckingFormNew
+from webapp.class8_tasks import Table_maker
 from flask_login import login_required
 
 
@@ -229,36 +230,13 @@ def AboutClass8():
 @app.route('/Class8Main/<genre>', methods=['GET', 'POST'])
 @login_required
 
-
 def Class8Main(genre):
 
-    from webapp.class8_tasks import Table_maker
     viewport = ['tables', 'none','none']
     print('routes.py 237: The genre is',genre)
     genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus = Table_maker(genre)
-    if taskon == 'New':
-        print('routes.py 241 Setting form upload with task_iter:', task_iter)
-        if task_iter == 1: viewport[0] = 'upload'
-        else:
-            viewport[0] = request.values.get('viewport0')
-            viewport[2] = request.values.get('viewport2')
-
-        uploadnow = request.values.get('uploadnow')
-        if uploadnow is not None:
-            viewport[0] = 'show_source_doc'
-            file = request.files['sourceupload']
-            if file.filename == '':
-                err.append('No source file selected for uploading')
-            else:
-                print('file is',file.filename)
-
-            name, ext = os.path.splitext(file.filename)
-            filename1 = f'Source_{name}{ext}'
-            output1 = addpath(tpath('temp', filename1))
-            file.save(output1)
-            viewport[2] = f'/static/{scac}/data/temp/{filename1}'
-            print('the source doc is....',viewport[2])
+    if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)
 
     rightsize = 12 - leftsize
     print('heading to class8.html with genre:',genre)
