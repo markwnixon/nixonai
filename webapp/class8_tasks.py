@@ -28,6 +28,20 @@ def get_drop(loadname):
     else:
         return ''
 
+def get_checked(thistable, data1id):
+    numchecked = 0
+    avec = []
+    for id in data1id:
+        name = thistable+str(id)
+        ischeck = request.values.get(name)
+        print(name,ischeck)
+        if ischeck:
+            numchecked = numchecked + 1
+            avec.append(int(ischeck))
+
+    print(numchecked, avec)
+    return numchecked, avec
+
 def Table_maker(genre):
     username = session['username'].capitalize()
     # Gather information about the tables inside the genre
@@ -157,6 +171,7 @@ def Table_maker(genre):
     oder = 0
     modata = 0
     modlink = 0
+    checked_data = []
 
     # color_selectors = ['Istat', 'Status']
     for jx, tableget in enumerate(tables_on):
@@ -165,6 +180,12 @@ def Table_maker(genre):
         print(table_setup)
         db_data = get_dbdata(table_setup, tfilters)
         table_data.append(db_data)
+
+        #Section to determine what items have been checked
+        numchecked, avec = get_checked(tableget, db_data[1])
+        checked_data.append([tableget,numchecked,avec])
+        print(checked_data)
+
         jscripts.append(eval(f"{tableget}_setup['jscript']"))
 
         # For tables that are on get side data required for tasks:
@@ -199,9 +220,14 @@ def Table_maker(genre):
 
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-        rstring = f"{taskon}_task(task_iter, {focus}_setup, table_data, tabletitle)"
-        print('class8_tasks.py 143 Tablemaker() Task to run:',rstring)
-        holdvec, entrydata, err = eval(rstring)
+        if taskon == 'New' or taskon == 'Mod':
+            rstring = f"{taskon}_task(task_iter, {focus}_setup, checked_data)"
+            holdvec, entrydata, err = eval(rstring)
+        elif taskon == 'Upload':
+            holdvec, entrydata = [], []
+            rstring = f"{taskon}_task(task_iter, {focus}_setup, checked_data)"
+            eval(rstring)
+
 
 
         task_iter = int(task_iter) + 1
@@ -426,7 +452,7 @@ def make_new_entry(tablesetup,data):
 
     return err
 
-def New_task(genre, iter, tablesetup):
+def New_task(iter, tablesetup, checked_data):
     err = [f'Running New task with iter {iter}']
     print(err)
 
@@ -470,28 +496,18 @@ def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
 
-def Upload_task(task_iter, tablesetup, table_data, tabletitle):
+def Upload_task(task_iter, tablesetup, checked_data):
     err = [f'Running Source task with iter {iter}']
     #print(err)
     #print('tablesetup:',tablesetup)
     #print(table_data)
-    numchecked = 0
-    avec = []
+    l1 = len(checked_data)
+    if l1==1:
+        cd = checked_data[0]
+        table = cd[0]
+        numck = cd[1]
+        avec = cd[2]
+        print(table,numck,avec)
 
-    for jx, db_data in enumerate(table_data):
-        data1id = db_data[1]
-        thistable = tabletitle[jx]
-        print(data1id,thistable)
 
-        for id in data1id:
-            name = thistable+str(id)
-            ischeck = request.values.get(name)
-            print(name,ischeck)
-            if ischeck:
-                numchecked = numchecked + 1
-                avec.append(int(ischeck))
-                thetables.append(thistable)
 
-    print(numchecked, avec)
-
-    return err,numchecked, avec
