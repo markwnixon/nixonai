@@ -146,3 +146,5 @@ Services_setup = {'table': 'Services',
                   'documents': ['None'],
                   'source': ['None', 'Container', 'Type']
                   }
+
+Checkbox_Table1_setup = {'table': '0'}

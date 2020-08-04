@@ -4,6 +4,7 @@ from flask import render_template, flash, redirect, url_for, session, logging, r
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.email_appl import etemplate_truck
+from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Checkbox_Table1_setup
 
 import datetime
 import os
@@ -30,10 +31,10 @@ def get_drop(loadname):
 def Table_maker(genre):
     username = session['username'].capitalize()
     # Gather information about the tables inside the genre
-    if genre == 'Trucking':
-        from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
-    elif genre == 'Ocean':
-        from webapp.class8_dicts import Ocean_genre, OverSeas_setup, Interchange_setup, Customers_setup, Services_setup
+    #if genre == 'Trucking':
+        #from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
+    #elif genre == 'Ocean':
+        #from webapp.class8_dicts import Ocean_genre, OverSeas_setup, Interchange_setup, Customers_setup, Services_setup
 
     genre_tables = eval(f"{genre}_genre['genre_tables']")
     quick_buttons = eval(f"{genre}_genre['quick_buttons']")
@@ -142,27 +143,14 @@ def Table_maker(genre):
     print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
     print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
 
-    # Execute the task here if a task is on...,,,,
-    if taskon != '' and taskon != None:
-        rstring = f"{taskon}_task(task_iter,{focus}_setup)"
-        print('class8_tasks.py 143 Tablemaker() Task to run:',rstring)
-        holdvec, entrydata, err = eval(rstring)
-        task_iter = int(task_iter) + 1
-        for e in err:
-            if 'Created' in e:
-                taskon = None
-                task_iter = 0
-        if request.values.get('Cancel') is not None:
-            err = ['New entry cancelled']
-            taskon = None
-            task_iter = 0
-            holdvec = [''] * 30
-            entrydata = []
-    else:
-        task_iter = 0
-        holdvec = [''] * 30
-        entrydata = []
-        err = ['All is well']
+
+
+
+
+
+
+
+
 
     # print(int(filter(check.isdigit, check)))
     docref = ''
@@ -203,6 +191,35 @@ def Table_maker(genre):
                                 dblist.append(nextvalue)
                         keydata.update({key: dblist})
                         print(keydata)
+
+
+
+    # Execute the task here if a task is on...,,,,
+    if taskon != '' and taskon != None:
+
+        #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
+        #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
+        rstring = f"{taskon}_task(task_iter, {focus}_setup, table_data, tabletitle)"
+        print('class8_tasks.py 143 Tablemaker() Task to run:',rstring)
+        holdvec, entrydata, err = eval(rstring)
+
+
+        task_iter = int(task_iter) + 1
+        for e in err:
+            if 'Created' in e:
+                taskon = None
+                task_iter = 0
+        if request.values.get('Cancel') is not None:
+            err = ['New entry cancelled']
+            taskon = None
+            task_iter = 0
+            holdvec = [''] * 30
+            entrydata = []
+    else:
+        task_iter = 0
+        holdvec = [''] * 30
+        entrydata = []
+        err = ['All is well']
 
     print(jscripts, holdvec)
     err = erud(err)
@@ -409,7 +426,7 @@ def make_new_entry(tablesetup,data):
 
     return err
 
-def New_task(iter,tablesetup):
+def New_task(genre, iter, tablesetup):
     err = [f'Running New task with iter {iter}']
     print(err)
 
@@ -453,21 +470,28 @@ def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
 
-def Upload_task(iter,tablesetup):
+def Upload_task(task_iter, tablesetup, table_data, tabletitle):
     err = [f'Running Source task with iter {iter}']
-    print(err)
-    print('tablesetup:',tablesetup)
-    print('genre:',genre)
+    #print(err)
+    #print('tablesetup:',tablesetup)
+    #print(table_data)
+    numchecked = 0
+    avec = []
 
-    def numcheckvec(a1, a2):
-        numchecked = 0
-        avec = []
-        for a in a1:
-            testone = request.values.get(a2 + str(a.id))
-            if testone:
+    for jx, db_data in enumerate(table_data):
+        data1id = db_data[1]
+        thistable = tabletitle[jx]
+        print(data1id,thistable)
+
+        for id in data1id:
+            name = thistable+str(id)
+            ischeck = request.values.get(name)
+            print(name,ischeck)
+            if ischeck:
                 numchecked = numchecked + 1
-                avec.append(int(testone))
-        return avec
+                avec.append(int(ischeck))
+                thetables.append(thistable)
 
+    print(numchecked, avec)
 
-    return holdvec, entrydata, err
+    return err,numchecked, avec
