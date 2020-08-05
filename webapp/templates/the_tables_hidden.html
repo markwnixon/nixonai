@@ -1,4 +1,4 @@
-genre_data[table]: {{ genre_data['table'] }}<br>
+
 {% set contypes = genre_data['container_types'] %}
 {% set genre = genre_data['table'] %}
 {% set genre_tables = genre_data['genre_tables'] %}
@@ -24,5 +24,18 @@ genre_data[table]: {{ genre_data['table'] }}<br>
     {% endfor %}
 {% endfor %}
 
+{% for db_data in table_data %}
+    {% set data1 = db_data[0] %}
+    {% set data1id = db_data[1] %}
+    {% set most_outer_loop = loop %}
+    {% set thistable = tabletitle[most_outer_loop.index - 1] %}
+    {% set thischeck = checked_data[most_outer_loop.index - 1] %}
+    {% set avec = thischeck[2] %}
+    {{ most_outer_loop.index - 1 }}<br>{{  checked_data[most_outer_loop.index - 1]  }}<br>avec:{{ avec }}
+    {% for tabrow in data1 %}
+        {% set outer_loop = loop %}
+            <input type = "hidden" {% if data1id[outer_loop.index - 1] in avec %} value="on" {% endif %} name="{{ thistable }}{{data1id[outer_loop.index-1]}}">
+    {% endfor %}
+{% endfor %}
 
 Copyright NixonAI

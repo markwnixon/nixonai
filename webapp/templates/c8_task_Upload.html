@@ -1,0 +1,27 @@
+<br>
+{% if viewport[0] == 'uploadsource' %}
+    {% include 'uploadsourcedocs.html' %}
+{% elif viewport[0] == 'show__uploaded_source_doc' %}
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-around align-items-center">
+                <div class="p-0">Viewing {{viewport[2]}}</div>
+                <div class="p-0">
+                    <button type="submit" class="btn btn-md btn-primary" name="Return">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12" align="center">
+                <embed src="{{viewport[2]}}" width="500px" height="650px"/>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+
+<input type = "hidden" name="uploadtype" id="uploadtype" value="source">
+<input type = "hidden" name="username" id="username" value="{{ username }}">

@@ -7,7 +7,7 @@
 <div class="row">
 
         <div class="col-sm-{{leftsize}}">
-            {% if viewport[0] == 'tables' %}
+            {% if viewport[0] != 'show_source_doc' %}
                 {% include 'the_tables.html' %}
             {% else %}
                 {% include 'the_tables_hidden.html' %}

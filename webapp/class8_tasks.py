@@ -35,143 +35,21 @@ def get_checked(thistable, data1id):
         name = thistable+str(id)
         ischeck = request.values.get(name)
         print(name,ischeck)
-        if ischeck:
+        if ischeck == 'on':
             numchecked = numchecked + 1
-            avec.append(int(ischeck))
+            avec.append(int(id))
 
     print(numchecked, avec)
     return numchecked, avec
 
-def Table_maker(genre):
-    username = session['username'].capitalize()
-    # Gather information about the tables inside the genre
-    #if genre == 'Trucking':
-        #from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
-    #elif genre == 'Ocean':
-        #from webapp.class8_dicts import Ocean_genre, OverSeas_setup, Interchange_setup, Customers_setup, Services_setup
-
-    genre_tables = eval(f"{genre}_genre['genre_tables']")
-    quick_buttons = eval(f"{genre}_genre['quick_buttons']")
-    table_filters = eval(f"{genre}_genre['table_filters']")
-    task_boxes = eval(f"{genre}_genre['task_boxes']")
-
-    leftsize = 8
-    rightsize = 12 - leftsize
-    leftscreen = 1
-    err = []
-    table_data = []
-    tabletitle = []
-    jscripts = []
-    tfilters = {}
-    tboxes = {}
-    keydata = {}
-
-    if request.method == 'POST':
-
-        # See if a task is active and ongoing
-        taskon = nononestr(request.values.get('taskon'))
-        focus = nononestr(request.values.get('focus'))
-        task_iter = nonone(request.values.get('task_iter'))
-
-        cancel = request.values.get('Cancel')
-        if cancel is not None:
-
-            # Reset values as if not a Post
-            genre_tables_on = ['off'] * len(genre_tables)
-            genre_tables_on[0] = 'on'
-            tables_on = ['Orders']
-            # Default time filter on entry into table is last 60 days:
-            tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
-            jscripts = ['dtTrucking']
-            taskon, task_iter, focus = None, None, None
-
-
-
-        else:
-
-
-            print('class8_tasks.py 78 Tablemaker() The taskon here is:', taskon)
-            taskon = nononestr(taskon)
-
-            # Get data only for tables that have been checked on
-            genre_tables_on = checked_tables(genre_tables)
-            tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
-
-            # Only check the launch filter menus if no task is running
-            if not hasinput(taskon):
-                # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
-                launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
-                taskon = launched[0] if launched != [] else None
-                focus = eval(f"{genre}_genre['table']")
-
-            if not hasinput(taskon):
-                # See if a task box has been selected
-                for box in task_boxes:
-                    for key, value in box.items():
-                        tboxes[key] = request.values.get(key)
-                        if tboxes[key] is not None:
-                            taskon_list = tboxes[key].split()
-                            taskon = taskon_list[0]
-                            remainder = tboxes[key].replace(taskon,'')
-                            remainder = remainder.strip()
-                            task_focus = f"{genre}_genre['task_mapping']['{remainder}']"
-                            print('The task focus is:', task_focus)
-                            focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
-                            print('The task focus is:', focus)
-                            #Check to see if we must use the Table of a Checked Item Here
-                            #if focus == 'Checkbox_Table1': focus, item = get_active_item(focus)
-
-
-                print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
-
-            # See if a table filter has been selected, this can take place even during a task
-            for filter in table_filters:
-                for key, value in filter.items(): tfilters[key] = request.values.get(key)
-            print('class8_tasks.py 110 Tablemaker() The filter settings are:',tfilters)
-
-            # Reset colors for color filter in primary table:
-            # eval(f"{genre}_genre['table_filters']['Color filters")
-            if tfilters['Color Filter'] == 'Haul':
-                Orders_setup['colorfilter'] = ['Hstat']
-            elif tfilters['Color Filter'] == 'Invoice':
-                Orders_setup['colorfilter'] = ['Istat']
-            elif tfilters['Color Filter'] == 'Both':
-                Orders_setup['colorfilter'] = ['Hstat', 'Istat']
-
-
-    else:
-        genre_tables_on = ['off'] * len(genre_tables)
-        genre_tables_on[0] = 'on'
-        tables_on = ['Orders']
-        # Default time filter on entry into table is last 60 days:
-        tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
-        jscripts = ['dtTrucking']
-        taskon, task_iter, focus = None, None, None
-
-    # genre_data = [genre,genre_tables,genre_tables_on,contypes]
-    genre_data = eval(f"{genre}_genre")
-    genre_data['genre_tables_on'] = genre_tables_on
-    print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
-    print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
-    print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
-    print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
-    print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
-
-
-
-
-
-
-
-
-
-
+def populate(tables_on,tabletitle,tfilters,jscripts):
     # print(int(filter(check.isdigit, check)))
     docref = ''
     oder = 0
     modata = 0
     modlink = 0
     checked_data = []
+    table_data = []
 
     # color_selectors = ['Istat', 'Status']
     for jx, tableget in enumerate(tables_on):
@@ -212,21 +90,137 @@ def Table_maker(genre):
                                 dblist.append(nextvalue)
                         keydata.update({key: dblist})
                         print(keydata)
+    return tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata
+
+def Table_maker(genre):
+    username = session['username'].capitalize()
+    # Gather information about the tables inside the genre
+    genre_tables = eval(f"{genre}_genre['genre_tables']")
+    quick_buttons = eval(f"{genre}_genre['quick_buttons']")
+    table_filters = eval(f"{genre}_genre['table_filters']")
+    task_boxes = eval(f"{genre}_genre['task_boxes']")
+
+    leftsize = 8
+    rightsize = 12 - leftsize
+    leftscreen = 1
+    err = []
+
+    tabletitle = []
+    jscripts = []
+    tfilters = {}
+    tboxes = {}
+    keydata = {}
+    checked_data = []
+    viewport = ['tables', 'none','none']
+    returnhit = None
+
+    if request.method == 'POST':
+
+        # See if a task is active and ongoing
+        taskon = nononestr(request.values.get('taskon'))
+        focus = nononestr(request.values.get('focus'))
+        task_iter = nonone(request.values.get('task_iter'))
+
+        returnhit = request.values.get('Return')
+        if returnhit is not None:
+
+            # Reset values as if not a Post
+            genre_tables_on = ['off'] * len(genre_tables)
+            genre_tables_on[0] = 'on'
+            tables_on = ['Orders']
+            # Default time filter on entry into table is last 60 days:
+            tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+            jscripts = ['dtTrucking']
+            taskon, task_iter, focus = None, None, None
+
+        else:
+
+            print('class8_tasks.py 78 Tablemaker() The taskon here is:', taskon)
+            taskon = nononestr(taskon)
+
+            # Get data only for tables that have been checked on
+            genre_tables_on = checked_tables(genre_tables)
+            tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
+
+            # Only check the launch boxes, filters, and task selections if no task is running
+            if not hasinput(taskon):
+                # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
+                launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
+                taskon = launched[0] if launched != [] else None
+                focus = eval(f"{genre}_genre['table']")
+
+                # See if a task box has been selected
+                for box in task_boxes:
+                    for key, value in box.items():
+                        tboxes[key] = request.values.get(key)
+                        if tboxes[key] is not None:
+                            taskon_list = tboxes[key].split()
+                            taskon = taskon_list[0]
+                            remainder = tboxes[key].replace(taskon,'')
+                            remainder = remainder.strip()
+                            task_focus = f"{genre}_genre['task_mapping']['{remainder}']"
+                            print('The task focus is:', task_focus)
+                            focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
+                            print('The task focus is:', focus)
+                            #Check to see if we must use the Table of a Checked Item Here
+                            #if focus == 'Checkbox_Table1': focus, item = get_active_item(focus)
 
 
+                print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
+
+            # See if a table filter has been selected, this can take place even during a task
+            for filter in table_filters:
+                for key, value in filter.items(): tfilters[key] = request.values.get(key)
+            print('class8_tasks.py 110 Tablemaker() The filter settings are:',tfilters)
+
+            # Reset colors for color filter in primary table:
+            # eval(f"{genre}_genre['table_filters']['Color filters")
+            if tfilters['Color Filter'] == 'Haul':
+                Orders_setup['colorfilter'] = ['Hstat']
+            elif tfilters['Color Filter'] == 'Invoice':
+                Orders_setup['colorfilter'] = ['Istat']
+            elif tfilters['Color Filter'] == 'Both':
+                Orders_setup['colorfilter'] = ['Hstat', 'Istat']
+
+    #First time thru (not a Post)
+    else:
+        genre_tables_on = ['off'] * len(genre_tables)
+        genre_tables_on[0] = 'on'
+        tables_on = ['Orders']
+        # Default time filter on entry into table is last 60 days:
+        tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+        jscripts = ['dtTrucking']
+        taskon, task_iter, focus = None, None, None
+
+
+    # Execute these parts whether it is a Post or Not:
+    # genre_data = [genre,genre_tables,genre_tables_on,contypes]
+    genre_data = eval(f"{genre}_genre")
+    genre_data['genre_tables_on'] = genre_tables_on
+    print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
+    print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
+    print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
+    print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
+    print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
+
+    tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
     if taskon != '' and taskon != None:
 
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
+        print('Ready to run the task:',taskon)
         if taskon == 'New' or taskon == 'Mod':
             rstring = f"{taskon}_task(task_iter, {focus}_setup, checked_data)"
-            holdvec, entrydata, err = eval(rstring)
+            holdvec, entrydata, err, completed = eval(rstring)
+            if completed:
+                tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
+
         elif taskon == 'Upload':
             holdvec, entrydata = [], []
             rstring = f"{taskon}_task(task_iter, {focus}_setup, checked_data)"
-            eval(rstring)
+            err, viewport, docref = eval(rstring)
 
 
 
@@ -249,8 +243,13 @@ def Table_maker(genre):
 
     print(jscripts, holdvec)
     err = erud(err)
-    return genre_data, table_data, err, oder, leftscreen,leftsize,docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
-    taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus
+    if returnhit is not None:
+        checked_data = [0,'0',['0']]
+    return genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
+    taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus, checked_data, viewport
+
+
+
 
 def get_dbdata(table_setup, tfilters):
     today = datetime.date.today()
@@ -453,6 +452,7 @@ def make_new_entry(tablesetup,data):
     return err
 
 def New_task(iter, tablesetup, checked_data):
+    completed = False
     err = [f'Running New task with iter {iter}']
     print(err)
 
@@ -475,6 +475,7 @@ def New_task(iter, tablesetup, checked_data):
             if failed == 0:
                 err.append(make_new_entry(tablesetup,holdvec))
                 err.append(f"Created new entry in {tablesetup['table']}")
+                completed = True
             else:
                 err.append(f'Cannot create entry until input errors shown in red below are resolved')
 
@@ -483,7 +484,7 @@ def New_task(iter, tablesetup, checked_data):
         entrydata = tablesetup['entry data']
 
 
-    return holdvec, entrydata, err
+    return holdvec, entrydata, err, completed
 
 
 def Mod_task(iter):
@@ -497,17 +498,61 @@ def Rec_task(iter):
 
 
 def Upload_task(task_iter, tablesetup, checked_data):
-    err = [f'Running Source task with iter {iter}']
-    #print(err)
-    #print('tablesetup:',tablesetup)
-    #print(table_data)
+    err = [f'Running Source task with iter {task_iter}']
+    docref = ''
+    if task_iter == 0:
+        viewport = ['uploadsource','0','0']
+    else:
+        viewport = ['0']*3
+        viewport[0] = request.values.get('viewport0')
+        viewport[2] = request.values.get('viewport2')
+
     l1 = len(checked_data)
-    if l1==1:
+    if l1 == 1:
         cd = checked_data[0]
-        table = cd[0]
+        thistable = cd[0]
         numck = cd[1]
         avec = cd[2]
-        print(table,numck,avec)
+
+        if numck > 1: err.append('Too many selections made for this task')
+    elif l1 > 1: err.append('Too many selections made for this task')
+    elif l1 == 0: err.append('Must make a single selection for this task')
+
+    uploadnow = request.values.get('uploadnow')
+    if uploadnow is not None and numck == 1:
+
+        sid = avec[0]
+        nextquery = f"{thistable}.query.get({sid})"
+        dat = eval(nextquery)
+
+        viewport[0] = 'show__uploaded_source_doc'
+        file = request.files['sourceupload']
+        if file.filename == '':
+            err.append('No source file selected for uploading')
+        else:
+            print('file is', file.filename)
+
+        name, ext = os.path.splitext(file.filename)
+
+        sn = getattr(dat, 'Scache')
+        try:
+            sn = int(sn)
+        except:
+            sn = 0
+
+        filename1 = f'Source_{name}_c{str(sn)}{ext}'
+        output1 = addpath(tpath(f'{thistable}', filename1))
+        file.save(output1)
+        viewport[2] = '/'+tpath(f'{thistable}', filename1)
+
+        setattr(dat, 'Source', filename1)
+        setattr(dat, 'Scache', 0)
+        db.session.commit()
+
+    return err, viewport, docref
+
+
+
 
 
 
