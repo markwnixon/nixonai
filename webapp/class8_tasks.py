@@ -118,7 +118,8 @@ def Table_maker(genre):
 
         # See if a task is active and ongoing
         taskon = nononestr(request.values.get('taskon'))
-        focus = nononestr(request.values.get('focus'))
+        task_table = nononestr(request.values.get('task_table'))
+        task_focus = nononestr(request.values.get('task_focus'))
         task_iter = nonone(request.values.get('task_iter'))
 
         returnhit = request.values.get('Return')
@@ -131,7 +132,7 @@ def Table_maker(genre):
             # Default time filter on entry into table is last 60 days:
             tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
             jscripts = ['dtTrucking']
-            taskon, task_iter, focus = None, None, None
+            taskon, task_iter, task_table, task_focus = None, None, None, None
 
         else:
 
@@ -146,24 +147,24 @@ def Table_maker(genre):
             if not hasinput(taskon):
                 # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
                 launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
-                taskon = launched[0] if launched != [] else None
-                focus = eval(f"{genre}_genre['table']")
+                taskbase = launched[0].split() if launched != [] else None
+                taskon = taskbase[0]
+                task_focus = taskbase[1]
+                task_table = eval(f"{genre}_genre['table']")
 
-                # See if a task box has been selected
+                # See if a task box has been selected task has a focus and table where focus is the type of information
                 for box in task_boxes:
                     for key, value in box.items():
                         tboxes[key] = request.values.get(key)
                         if tboxes[key] is not None:
                             taskon_list = tboxes[key].split()
                             taskon = taskon_list[0]
-                            remainder = tboxes[key].replace(taskon,'')
-                            remainder = remainder.strip()
-                            task_focus = f"{genre}_genre['task_mapping']['{remainder}']"
-                            print('The task focus is:', task_focus)
-                            focus = eval(f"{genre}_genre['task_mapping']['{remainder}']")
-                            print('The task focus is:', focus)
-                            #Check to see if we must use the Table of a Checked Item Here
-                            #if focus == 'Checkbox_Table1': focus, item = get_active_item(focus)
+                            task_focus = tboxes[key].replace(taskon,'')
+                            task_focus = task_focus.strip()
+                            #task_focus = f"{genre}_genre['task_mapping']['{taskactive}']"
+                            #print('The task focus is:', task_focus)
+                            task_table = eval(f"{genre}_genre['task_mapping']['{task_focus}']")
+                            print('The task_table is:', task_table)
 
 
                 print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
@@ -190,7 +191,7 @@ def Table_maker(genre):
         # Default time filter on entry into table is last 60 days:
         tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
         jscripts = ['dtTrucking']
-        taskon, task_iter, focus = None, None, None
+        taskon, task_iter, task_table, task_focus = None, None, None, None
 
 
     # Execute these parts whether it is a Post or Not:
@@ -210,19 +211,17 @@ def Table_maker(genre):
 
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-        print('Ready to run the task:',taskon)
-        if taskon == 'New' or taskon == 'Mod':
-            rstring = f"{taskon}_task(task_iter, {focus}_setup, checked_data)"
+        print('Ready to run the task:',taskon,'with task focus',task_focus, ' and using table:', task_table)
+        if taskon == 'New' or taskon == 'Edit':
+            rstring = f"{taskon}_task(task_iter, {task_table}_setup, task_focus, checked_data)"
             holdvec, entrydata, err, completed = eval(rstring)
             if completed:
                 tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
         elif taskon == 'Upload':
             holdvec, entrydata = [], []
-            rstring = f"{taskon}_task(task_iter, {focus}_setup, checked_data)"
+            rstring = f"{taskon}_task(task_iter, {focus}_setup, task_focus, checked_data)"
             err, viewport, docref = eval(rstring)
-
-
 
         task_iter = int(task_iter) + 1
         for e in err:
@@ -246,7 +245,7 @@ def Table_maker(genre):
     if returnhit is not None:
         checked_data = [0,'0',['0']]
     return genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
-    taskon, task_iter, holdvec, keydata, entrydata, username, modata, focus, checked_data, viewport
+    taskon, task_focus, task_iter, holdvec, keydata, entrydata, username, modata, task_table, checked_data, viewport
 
 
 
@@ -436,7 +435,7 @@ def make_new_entry(tablesetup,data):
             newfile = newfile + '_c0.pdf'
             newfile = newfile.replace('None_','')
             print('Jo, viewport2, newfile', keyval, docsave, newfile)
-            if docsave is not None:
+            if hasinput(docsave):
                 newpath = addpath(tpath(table, newfile))
                 oldpath = addpath(docsave).replace('//','/')
                 print('Need to move file from', oldpath, ' to', newpath)
@@ -451,12 +450,12 @@ def make_new_entry(tablesetup,data):
 
     return err
 
-def New_task(iter, tablesetup, checked_data):
+def New_task(task_iter, tablesetup, task_focus, checked_data):
     completed = False
-    err = [f'Running New task with iter {iter}']
+    err = [f'Running New task with task_iter {task_iter} and task_focus {task_focus}']
     print(err)
 
-    if iter > 0:
+    if task_iter > 0:
         entrydata = tablesetup['entry data']
         numitems = len(entrydata)
         holdvec = [''] * numitems
@@ -470,8 +469,8 @@ def New_task(iter, tablesetup, checked_data):
             if entry[5] == 1: warned = warned + 1
         err.append(f'There are {failed} input errors and {warned} input warnings')
 
-        create_job = request.values.get('Create Job')
-        if create_job is not None:
+        create_item = request.values.get('Create Item')
+        if create_item is not None:
             if failed == 0:
                 err.append(make_new_entry(tablesetup,holdvec))
                 err.append(f"Created new entry in {tablesetup['table']}")
@@ -487,7 +486,7 @@ def New_task(iter, tablesetup, checked_data):
     return holdvec, entrydata, err, completed
 
 
-def Mod_task(iter):
+def Edit_Item_task(iter):
     print(f'Running Mod task with iter {iter}')
 
 def Inv_task(iter):
@@ -497,7 +496,7 @@ def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
 
-def Upload_task(task_iter, tablesetup, checked_data):
+def Upload_Source_task(task_iter, tablesetup, checked_data):
     err = [f'Running Source task with iter {task_iter}']
     docref = ''
     if task_iter == 0:

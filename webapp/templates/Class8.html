@@ -7,10 +7,10 @@
 <div class="row">
 
         <div class="col-sm-{{leftsize}}">
-            {% if viewport[0] != 'show_source_doc' %}
-                {% include 'the_tables.html' %}
-            {% else %}
+            {% if (viewport[0] == 'show_source_doc') or (viewport[0] == 'upload') %}
                 {% include 'the_tables_hidden.html' %}
+            {% else %}
+                {% include 'the_tables.html' %}
             {% endif %}
 
             {% if viewport[0] == 'upload' %}
@@ -51,17 +51,18 @@
 
 </div>
 </div>
-{{oder}}
-{{modlink}}
-{{ genre }}
-<input type = "hidden" name ="genre" value= "{{genre}}">
-<input type = "hidden" name ="oder" value= "{{oder}}">
-<input type = "hidden" name ="modlink" value= "{{modlink}}">
-<input type = "hidden" name ="taskon" value= "{{taskon}}">taskon is{{ taskon }}
-<input type = "hidden" name ="task_iter" value= "{{task_iter}}">task_iter is{{ task_iter }}
-<input type = "hidden" name ="focus" value= "{{focus}}">focus is{{ focus }}
-<input type = "hidden" name ="viewport0" value= "{{viewport[0]}}">viewport0 = {{ viewport[0] }}
-<input type = "hidden" name ="viewport1" value= "{{viewport[1]}}">viewport1 = {{ viewport[1] }}
+{{oder}}<br>
+{{modlink}}<br>
+{{ genre }}<br>
+<input type = "hidden" name ="genre" value= "{{genre}}"><br>
+<input type = "hidden" name ="oder" value= "{{oder}}"><br>
+<input type = "hidden" name ="modlink" value= "{{modlink}}"><br>
+<input type = "hidden" name ="taskon" value= "{{taskon}}">taskon is{{ taskon }}<br>
+<input type = "hidden" name ="task_focus" value= "{{task_focus}}">task_focus is{{ task_focus }}<br>
+<input type = "hidden" name ="task_iter" value= "{{task_iter}}">task_iter is{{ task_iter }}<br>
+<input type = "hidden" name ="task_table" value= "{{task_table}}">focus is{{ task_table }}<br>
+<input type = "hidden" name ="viewport0" value= "{{viewport[0]}}">viewport0 = {{ viewport[0] }}<br>
+<input type = "hidden" name ="viewport1" value= "{{viewport[1]}}">viewport1 = {{ viewport[1] }}<br>
 <input type = "hidden" name ="viewport2" value= "{{viewport[2]}}">viewport2 = {{ viewport[2] }}
 </form>
 
