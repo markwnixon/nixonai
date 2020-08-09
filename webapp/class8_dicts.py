@@ -29,7 +29,7 @@ Trucking_genre = {'table': 'Orders',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
-                                   'Source':'Checkbox_Table1', 'Proof':'Checkbox_Table1'}
+                                   'Source':'CT', 'Proof':'CT', 'View':'CT'}
                   }
 
 #Dictionary terms:
@@ -140,11 +140,17 @@ Customers_setup = {'table': 'People',
 Services_setup = {'table': 'Services',
                   'filter': None,
                   'filterval': None,
-                  'headcols': ['Service', 'Price'],
+                  'creators': [],
+                  'ukey': 'Service',
+                  'entry data': [['Service', 'Service', 'Service', 'text', 'text', 0, 'ok'],
+                                 ['Price', 'Price', 'Price', 'text', 'dollar', 0, 'ok']],
                   'colorfilter': None,
+                  'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
+                                {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
+                                {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
                   'jscript': 'dtHorizontalVerticalExample4',
                   'documents': ['None'],
-                  'source': ['None', 'Container', 'Type']
+                  'source': ['None']
                   }
 
-Checkbox_Table1_setup = {'table': '0'}
+CT_setup = {'table': '0'}

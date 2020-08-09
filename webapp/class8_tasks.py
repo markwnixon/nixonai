@@ -61,8 +61,9 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
 
         #Section to determine what items have been checked
         numchecked, avec = get_checked(tableget, db_data[1])
+        print('returning checks numc, avec=',numchecked, avec)
         checked_data.append([tableget,numchecked,avec])
-        print(checked_data)
+        print('after',checked_data)
 
         jscripts.append(eval(f"{tableget}_setup['jscript']"))
 
@@ -111,7 +112,8 @@ def Table_maker(genre):
     tboxes = {}
     keydata = {}
     checked_data = []
-    viewport = ['tables', 'none','none']
+    viewport = ['0']*6
+    viewport[0] = 'tables'
     returnhit = None
 
     if request.method == 'POST':
@@ -148,9 +150,10 @@ def Table_maker(genre):
                 # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
                 launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
                 taskbase = launched[0].split() if launched != [] else None
-                taskon = taskbase[0]
-                task_focus = taskbase[1]
-                task_table = eval(f"{genre}_genre['table']")
+                if taskbase:
+                    taskon = taskbase[0]
+                    task_focus = taskbase[1]
+                    task_table = eval(f"{genre}_genre['table']")
 
                 # See if a task box has been selected task has a focus and table where focus is the type of information
                 for box in task_boxes:
@@ -207,7 +210,8 @@ def Table_maker(genre):
     tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
-    if taskon != '' and taskon != None:
+    #if taskon != '' and taskon != None:
+    if hasvalue(taskon):
 
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
@@ -220,10 +224,14 @@ def Table_maker(genre):
 
         elif taskon == 'Upload':
             holdvec, entrydata = [], []
-            rstring = f"{taskon}_task(task_iter, {focus}_setup, task_focus, checked_data)"
-            err, viewport, docref = eval(rstring)
+            rstring = f"{taskon}_task(genre, task_iter, {task_table}_setup, task_focus, checked_data)"
+            err, viewport, docref, completed = eval(rstring)
+            print('returned with:',viewport,docref,completed)
+            if completed:
+                taskon, task_iter, task_table, task_focus = None, 0, None, None
+                tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
-        task_iter = int(task_iter) + 1
+        if not completed: task_iter = int(task_iter) + 1
         for e in err:
             if 'Created' in e:
                 taskon = None
@@ -235,6 +243,7 @@ def Table_maker(genre):
             holdvec = [''] * 30
             entrydata = []
     else:
+        taskon = None
         task_iter = 0
         holdvec = [''] * 30
         entrydata = []
@@ -361,7 +370,7 @@ def make_new_entry(tablesetup,data):
         newfile = sourcekeys[0]
         sourcekey = sourcekeys[1:]
     else:
-        sourcekeys is None
+        sourcekeys = None
 
     print(documents)
     print(sourcekeys)
@@ -430,7 +439,7 @@ def make_new_entry(tablesetup,data):
             #newile already set at top of routine to the base name for document
             for eachsource in sourcekey:
                 keyval = getattr(dat,eachsource)
-                newfile = newfile + f'_{keyval}'
+                newfile = newfile + f'_Jo_{keyval}'
 
             newfile = newfile + '_c0.pdf'
             newfile = newfile.replace('None_','')
@@ -495,60 +504,161 @@ def Inv_task(iter):
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
-
-def Upload_Source_task(task_iter, tablesetup, checked_data):
-    err = [f'Running Source task with iter {task_iter}']
+def View_task(genre, task_iter, tablesetup, task_focus, checked_data):
+    cancel = request.values.get('cancel')
+    viewport = ['0'] * 6
     docref = ''
-    if task_iter == 0:
-        viewport = ['uploadsource','0','0']
+
+    if cancel is not None:
+        completed=True
+        err = ['View has been cancelled']
     else:
-        viewport = ['0']*3
-        viewport[0] = request.values.get('viewport0')
-        viewport[2] = request.values.get('viewport2')
+        completed = False
+        err = [f'Running View task with iter {task_iter}']
+        err.append(f'genre:',genre)
+        err.append(f'task_focus:', task_focus)
 
-    l1 = len(checked_data)
-    if l1 == 1:
-        cd = checked_data[0]
-        thistable = cd[0]
-        numck = cd[1]
-        avec = cd[2]
+        print('checkeddata',checked_data)
 
-        if numck > 1: err.append('Too many selections made for this task')
-    elif l1 > 1: err.append('Too many selections made for this task')
-    elif l1 == 0: err.append('Must make a single selection for this task')
-
-    uploadnow = request.values.get('uploadnow')
-    if uploadnow is not None and numck == 1:
-
-        sid = avec[0]
-        nextquery = f"{thistable}.query.get({sid})"
-        dat = eval(nextquery)
-
-        viewport[0] = 'show__uploaded_source_doc'
-        file = request.files['sourceupload']
-        if file.filename == '':
-            err.append('No source file selected for uploading')
+        if task_iter == 0:
+            viewport[0] = 'view_doc_left'
         else:
-            print('file is', file.filename)
+            viewport[0] = request.values.get('viewport0')
+            viewport[2] = request.values.get('viewport2')
 
-        name, ext = os.path.splitext(file.filename)
+        #See if only one box is checked and if so what table it is from
+        nc = sum(cks[1] for cks in checked_data)
+        tids = (cks[2] for cks in checked_data if cks[2] != [])
+        tabs = (cks[0] for cks in checked_data if cks[1] != 0)
 
-        sn = getattr(dat, 'Scache')
-        try:
-            sn = int(sn)
-        except:
-            sn = 0
+        if nc == 1:
+            thistable = next(tabs)
+            avec = next(tids)
 
-        filename1 = f'Source_{name}_c{str(sn)}{ext}'
-        output1 = addpath(tpath(f'{thistable}', filename1))
-        file.save(output1)
-        viewport[2] = '/'+tpath(f'{thistable}', filename1)
+        elif nc > 1: err.append('Too many selections made for this task')
+        else: err.append('Must make a single selection for this task')
 
-        setattr(dat, 'Source', filename1)
-        setattr(dat, 'Scache', 0)
-        db.session.commit()
+        if nc == 1:
+            sid = avec[0]
+            nextquery = f"{thistable}.query.get({sid})"
+            dat = eval(nextquery)
+            viewport[3] = str(sid)
+            viewport[4] = f'{genre} {thistable} Item'
+            ukey = eval(f"{thistable}_setup['ukey']")
+            print('the ukey=', ukey)
+            viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
+            fileout = ukey + '_' + eval(f"dat.{ukey}")
+            print(viewport)
 
-    return err, viewport, docref
+            viewitem = request.values.get('')
+
+            filename1 = getattr(dat, sname)
+            output1 = addpath(tpath(f'{thistable}', filename1))
+
+            err.append(f'Viewing {filename1}')
+            err.append('Hit Return to End Viewing and Return to Table View')
+            returnhit = request.values.get('Return')
+            if returnhit is not None: completed = True
+        else:
+            completed = True
+
+        return err, viewport, docref, completed
+
+
+
+def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data):
+
+    cancel = request.values.get('cancel')
+    viewport = ['0'] * 6
+    docref = ''
+
+    if cancel is not None:
+        completed=True
+        err = ['Upload has been cancelled']
+    else:
+        completed = False
+        err = [f'Running Source task with iter {task_iter}']
+
+
+        if task_iter == 0:
+            viewport[0] = 'upload_doc_right'
+        else:
+            viewport[0] = request.values.get('viewport0')
+            viewport[2] = request.values.get('viewport2')
+
+        #See if only one box is checked and if so what table it is from
+        nc = sum(cks[1] for cks in checked_data)
+        tids = (cks[2] for cks in checked_data if cks[2] != [])
+        tabs = (cks[0] for cks in checked_data if cks[1] != 0)
+
+        if nc == 1:
+            thistable = next(tabs)
+            avec = next(tids)
+
+        elif nc > 1: err.append('Too many selections made for this task')
+        else: err.append('Must make a single selection for this task')
+
+        if nc == 1:
+            sid = avec[0]
+            nextquery = f"{thistable}.query.get({sid})"
+            dat = eval(nextquery)
+            viewport[3] = str(sid)
+            viewport[4] = f'{genre} {thistable} Item'
+            ukey = eval(f"{thistable}_setup['ukey']")
+            print('the ukey=', ukey)
+            viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
+            fileout = ukey + '_' + eval(f"dat.{ukey}")
+            print(viewport)
+
+            uploadnow = request.values.get('uploadnow')
+            if uploadnow is not None and nc == 1:
+                viewport[0] = 'show_doc_right'
+                file = request.files['docupload']
+                if file.filename == '':
+                    err.append('No file selected for uploading')
+                else:
+                    print('file is', file.filename)
+
+                name, ext = os.path.splitext(file.filename)
+                if task_focus == 'Source':
+                    sname = 'Scache'
+                elif task_focus == 'Proof':
+                    sname = 'Pcache'
+
+                sn = getattr(dat, sname)
+                try:
+                    sn = int(sn)
+                    bn = sn+1
+                except:
+                    sn = 0
+                    bn = 0
+
+                filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
+                output1 = addpath(tpath(f'{thistable}', filename1))
+
+                file.save(output1)
+                viewport[2] = '/'+tpath(f'{thistable}', filename1)
+
+                oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
+                oldoutput = addpath(tpath(f'{thistable}', oldfile))
+                try:
+                    os.remove(oldoutput)
+                    err.append('Cleaning up old files successful')
+                except:
+                    err.append('Cleaning up old files NOT successful')
+                    err.append(f'Could not find {oldoutput}')
+
+                setattr(dat, f'{task_focus}', filename1)
+                setattr(dat, sname, bn)
+                db.session.commit()
+                err.append(f'Viewing {filename1}')
+                err.append('Hit Return to End Viewing and Return to Table View')
+                returnhit = request.values.get('Return')
+                if returnhit is not None: completed = True
+        else:
+            completed = True
+
+    return err, viewport, docref, completed
 
 
 

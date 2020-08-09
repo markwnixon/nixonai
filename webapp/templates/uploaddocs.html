@@ -1,21 +1,26 @@
 <br>
 <div class="card">
     <div class="card-header bg-info text-white" align="left">
-        File Upload of Source Document for Job:{{modata.Jo}} Company:{{modata.Shipper}}
+        {% if viewport[4] != '0' %}
+            File Upload of {{ task_focus }} Document for {{ viewport[4] }} with {{ viewport[5] }}
+        {% else %}
+            Optional File Upload New Document for {{ task_focus }}
+        {% endif %}
     </div>
     <div class="card-body" align = "left">
-        Option 1: Upload Source Document Using File Select
+        Option 1: Upload {{ task_focus }} Document Using File Select
         <dl>
             <p>
-            <input type="file" name="sourceupload" autocomplete="off">
+            <input type="file" name="docupload" autocomplete="off">
             </p>
         </dl><p>
         <input type="submit" name="uploadnow" id="uploadnow" value="Upload Now">
+        {% if viewport[4] != '0' %} <input type="submit" name="cancel" id="cancel" value="Cancel"> {% endif %}
         </p>
     </div>
     {% if modlink != 4 %}
     <div class="card-body" align = "left">
-        Option 2: Upload Source Document Using Drag and Drop
+        Option 2: Upload {{ task_focus }} Document Using Drag and Drop
         <div class="container" align="center">
             <div class="droparea" align="center">(Optional) Drop Here</div>
             <div class="tablearea" id="tablearea" align="center"></div>
