@@ -4,7 +4,7 @@ from flask import render_template, flash, redirect, url_for, session, logging, r
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.email_appl import etemplate_truck
-from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Checkbox_Table1_setup
+from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
 
 import datetime
 import os
@@ -100,6 +100,7 @@ def Table_maker(genre):
     quick_buttons = eval(f"{genre}_genre['quick_buttons']")
     table_filters = eval(f"{genre}_genre['table_filters']")
     task_boxes = eval(f"{genre}_genre['task_boxes']")
+    task_box_map = eval(f"{genre}_genre['task_box_map']")
 
     leftsize = 8
     rightsize = 12 - leftsize
@@ -160,14 +161,15 @@ def Table_maker(genre):
                     for key, value in box.items():
                         tboxes[key] = request.values.get(key)
                         if tboxes[key] is not None:
-                            taskon_list = tboxes[key].split()
-                            taskon = taskon_list[0]
-                            task_focus = tboxes[key].replace(taskon,'')
-                            task_focus = task_focus.strip()
-                            #task_focus = f"{genre}_genre['task_mapping']['{taskactive}']"
-                            #print('The task focus is:', task_focus)
-                            task_table = eval(f"{genre}_genre['task_mapping']['{task_focus}']")
-                            print('The task_table is:', task_table)
+                            tasklist = task_box_map[key][tboxes[key]]
+                            len_task = len(tasklist)
+                            if len_task == 3:
+                                #This is a task with a name, focus, and table with no table specs
+                                print('task box map key keyitem', tasklist, key, tboxes[key])
+                                taskon, task_focus, task_table = tasklist
+                                print('The task is:', taskon)
+                                print('The task focus is:', task_focus)
+                                print('The task_table is:', task_table)
 
 
                 print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
@@ -222,7 +224,7 @@ def Table_maker(genre):
             if completed:
                 tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
-        elif taskon == 'Upload':
+        elif taskon == 'Upload' or taskon == 'View':
             holdvec, entrydata = [], []
             rstring = f"{taskon}_task(genre, task_iter, {task_table}_setup, task_focus, checked_data)"
             err, viewport, docref, completed = eval(rstring)

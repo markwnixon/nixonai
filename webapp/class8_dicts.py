@@ -29,8 +29,17 @@ Trucking_genre = {'table': 'Orders',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
-                                   'Source':'CT', 'Proof':'CT', 'View':'CT'}
-                  }
+                                   'Source':'CT', 'Proof':'CT', 'View':'CT'},
+                  'task_box_map': {'Add Items':
+                                        {'New Job': ['New', 'Job', 'Orders'],
+                                         'New Customer' : ['New', 'Customer', 'People', 'Ptype', 'Trucking'],
+                                         'New Interchange' : ['New', 'Interchange', 'Interchange'],
+                                         'New Service' : ['New', 'Service', 'Services'],
+                                         'New From Copy' : ['NewCopy', 'Selected'],
+                                         'Upload Source' : ['Upload', 'Source', 'Selected'],
+                                         'Upload Proof' : ['Upload', 'Proof', 'Selected']},
+                                         'Upload Source': ['Upload Proof', 'Make Manifest']}
+                                    }
 
 #Dictionary terms:
 #table is name of database table
