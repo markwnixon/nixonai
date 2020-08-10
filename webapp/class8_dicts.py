@@ -31,16 +31,17 @@ Trucking_genre = {'table': 'Orders',
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
                                    'Source':'CT', 'Proof':'CT', 'View':'CT'},
                   'task_box_map': {'Add Items':
-                                        {'New Job': ['New', 'Job', 'Orders'],
-                                         'New Customer' : ['New', 'Customer', 'People', 'Ptype', 'Trucking'],
-                                         'New Interchange' : ['New', 'Interchange', 'Interchange'],
-                                         'New Service' : ['New', 'Service', 'Services'],
-                                         'New From Copy' : ['NewCopy', 'Selected'],
-                                         'Upload Source' : ['Upload', 'Source', 'Selected'],
-                                         'Upload Proof' : ['Upload', 'Proof', 'Selected']},
-                                         'Upload Source': ['Upload Proof', 'Make Manifest']}
-                                    }
-
+                                        {
+                                         'New Job': ['Straight', 'New', 'Job', 'Orders'],
+                                         'New Customer' : ['Straight_TableParam', 'New', 'Customer', 'People', 'Ptype', 'Trucking'],
+                                         'New Interchange' : ['Straight', 'New', 'Interchange', 'Interchange'],
+                                         'New Service' : ['Straight', 'New', 'Service', 'Services'],
+                                         'New From Copy' : ['Single_Selection', 'NewCopy'],
+                                         'Upload Source' : ['Single_Selection_Focus', 'Upload', 'Source'],
+                                         'Upload Proof' : ['Single_Selection_Focus', 'Upload', 'Proof']
+                                         }
+                                   }
+                  }
 #Dictionary terms:
 #table is name of database table
 #filter defines what subdata is required for this data.  Indicate None if there is none
