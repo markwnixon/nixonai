@@ -30,18 +30,28 @@ Trucking_genre = {'table': 'Orders',
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
                                    'Source':'CT', 'Proof':'CT', 'View':'CT'},
-                  'task_box_map': {'Add Items':
+                  'task_box_map': {
+                                    'Add Items':
                                         {
-                                         'New Job': ['Straight', 'New', 'Job', 'Orders'],
-                                         'New Customer' : ['Straight_TableParam', 'New', 'Customer', 'People', 'Ptype', 'Trucking'],
-                                         'New Interchange' : ['Straight', 'New', 'Interchange', 'Interchange'],
-                                         'New Service' : ['Straight', 'New', 'Service', 'Services'],
-                                         'New From Copy' : ['Single_Selection', 'NewCopy'],
-                                         'Upload Source' : ['Single_Selection_Focus', 'Upload', 'Source'],
-                                         'Upload Proof' : ['Single_Selection_Focus', 'Upload', 'Proof']
+                                         'New Job': ['Table_Selected', 'New', 'Job', 'Orders'],
+                                         'New Customer' : ['Table_Selected', 'New', 'Customer', 'People'],
+                                         'New Interchange' : ['Table_Selected', 'New', 'Interchange', 'Interchange'],
+                                         'New Service' : ['Table_Selected', 'New', 'Service', 'Services'],
+                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy'],
+                                         'Upload Source' : ['Single_Item_Selection_Focus', 'Upload', 'Source'],
+                                         'Upload Proof' : ['Single_Item_Selection_Focus', 'Upload', 'Proof']
+                                         },
+
+                                    'View Docs':
+                                        {
+                                         'Source' : ['Single_Item_Selection_Focus', 'View', 'Source'],
+                                         'Manifest' : ['Single_Item_Selection_Focus', 'View', 'Manifest'],
+                                         'Interchange' : ['Single_Item_Selection_Focus', 'View', 'Interchange'],
+                                         'Invoice' : ['Single_Item_Selection_Focus', 'View', 'Invoice'],
+                                         'Paid Invoice' : ['Single_Item_Selection_Focus', 'View', 'Paid Invoice']
                                          }
-                                   }
-                  }
+                                    }
+                    }
 #Dictionary terms:
 #table is name of database table
 #filter defines what subdata is required for this data.  Indicate None if there is none

@@ -120,6 +120,7 @@ def Table_maker(genre):
     if request.method == 'POST':
 
         # See if a task is active and ongoing
+        tasktype = nononestr(request.values.get('tasktype'))
         taskon = nononestr(request.values.get('taskon'))
         task_table = nononestr(request.values.get('task_table'))
         task_focus = nononestr(request.values.get('task_focus'))
@@ -162,16 +163,13 @@ def Table_maker(genre):
                         tboxes[key] = request.values.get(key)
                         if tboxes[key] is not None:
                             tasklist = task_box_map[key][tboxes[key]]
-                            len_task = len(tasklist)
-                            if len_task == 3:
-                                #This is a task with a name, focus, and table with no table specs
-                                print('task box map key keyitem', tasklist, key, tboxes[key])
-                                taskon, task_focus, task_table = tasklist
-                                print('The task is:', taskon)
-                                print('The task focus is:', task_focus)
-                                print('The task_table is:', task_table)
+                            tasktype = tasklist[0]
+                            taskon, task_focus, task_table = tasklist[1:]
 
-
+                print('The task is:', taskon)
+                print('The task focus is:', task_focus)
+                print('The task_table is:', task_table)
+                print('The task_iter is:', task_iter)
                 print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
 
             # See if a table filter has been selected, this can take place even during a task
@@ -218,13 +216,13 @@ def Table_maker(genre):
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
         print('Ready to run the task:',taskon,'with task focus',task_focus, ' and using table:', task_table)
-        if taskon == 'New' or taskon == 'Edit':
-            rstring = f"{taskon}_task(task_iter, {task_table}_setup, task_focus, checked_data)"
+        if tasktype == 'Table_Selected':
+            rstring = f"{taskon}_task(task_focus, {task_table}_setup, task_iter)"
             holdvec, entrydata, err, completed = eval(rstring)
             if completed:
                 tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
-        elif taskon == 'Upload' or taskon == 'View':
+        elif taskon == 'Single_Item_Selection_Focus':
             holdvec, entrydata = [], []
             rstring = f"{taskon}_task(genre, task_iter, {task_table}_setup, task_focus, checked_data)"
             err, viewport, docref, completed = eval(rstring)
@@ -256,7 +254,7 @@ def Table_maker(genre):
     if returnhit is not None:
         checked_data = [0,'0',['0']]
     return genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
-    taskon, task_focus, task_iter, holdvec, keydata, entrydata, username, modata, task_table, checked_data, viewport
+    taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, modata, task_table, checked_data, viewport
 
 
 
@@ -461,10 +459,11 @@ def make_new_entry(tablesetup,data):
 
     return err
 
-def New_task(task_iter, tablesetup, task_focus, checked_data):
+#def New_task(task_iter, tablesetup, task_focus, checked_data):
+
+def New_task(task_focus, tablesetup, task_iter):
     completed = False
     err = [f'Running New task with task_iter {task_iter} and task_focus {task_focus}']
-    print(err)
 
     if task_iter > 0:
         entrydata = tablesetup['entry data']
