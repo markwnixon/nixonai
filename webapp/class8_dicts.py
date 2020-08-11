@@ -37,18 +37,18 @@ Trucking_genre = {'table': 'Orders',
                                          'New Customer' : ['Table_Selected', 'New', 'Customer', 'People'],
                                          'New Interchange' : ['Table_Selected', 'New', 'Interchange', 'Interchange'],
                                          'New Service' : ['Table_Selected', 'New', 'Service', 'Services'],
-                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy'],
-                                         'Upload Source' : ['Single_Item_Selection_Focus', 'Upload', 'Source'],
-                                         'Upload Proof' : ['Single_Item_Selection_Focus', 'Upload', 'Proof']
+                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', '', ''],
+                                         'Upload Source' : ['Single_Item_Selection', 'Upload', 'Source', ''],
+                                         'Upload Proof' : ['Single_Item_Selection', 'Upload', 'Proof', '']
                                          },
 
                                     'View Docs':
                                         {
-                                         'Source' : ['Single_Item_Selection_Focus', 'View', 'Source'],
-                                         'Manifest' : ['Single_Item_Selection_Focus', 'View', 'Manifest'],
-                                         'Interchange' : ['Single_Item_Selection_Focus', 'View', 'Interchange'],
-                                         'Invoice' : ['Single_Item_Selection_Focus', 'View', 'Invoice'],
-                                         'Paid Invoice' : ['Single_Item_Selection_Focus', 'View', 'Paid Invoice']
+                                         'Source' : ['Single_Item_Selection', 'View', 'Source', ''],
+                                         'Manifest' : ['Single_Item_Selection', 'View', 'Manifest', ''],
+                                         'Interchange' : ['Single_Item_Selection', 'View', 'Interchange', ''],
+                                         'Invoice' : ['Single_Item_Selection', 'View', 'Invoice', ''],
+                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'Paid Invoice', '']
                                          }
                                     }
                     }

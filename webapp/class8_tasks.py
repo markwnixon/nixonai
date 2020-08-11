@@ -213,6 +213,7 @@ def Table_maker(genre):
     #if taskon != '' and taskon != None:
     if hasvalue(taskon):
 
+        completed = False
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
         print('Ready to run the task:',taskon,'with task focus',task_focus, ' and using table:', task_table)
@@ -222,14 +223,29 @@ def Table_maker(genre):
             if completed:
                 tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
-        elif taskon == 'Single_Item_Selection_Focus':
+        elif tasktype == 'Single_Item_Selection':
             holdvec, entrydata = [], []
-            rstring = f"{taskon}_task(genre, task_iter, {task_table}_setup, task_focus, checked_data)"
-            err, viewport, docref, completed = eval(rstring)
-            print('returned with:',viewport,docref,completed)
-            if completed:
-                taskon, task_iter, task_table, task_focus = None, 0, None, None
-                tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
+            # See if only one box is checked and if so what table it is from
+            nc = sum(cks[1] for cks in checked_data)
+            tids = (cks[2] for cks in checked_data if cks[2] != [])
+            tabs = (cks[0] for cks in checked_data if cks[1] != 0)
+            if nc == 1:
+                thistable = next(tabs)
+                avec = next(tids)
+                sid = avec[0]
+            elif nc > 1:
+                err.append('Too many selections made for this task')
+                completed = True
+            else:
+                err.append('Must make a single selection for this task')
+                completed = True
+            if nc == 1:
+                rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
+                err, viewport, docref, completed = eval(rstring)
+                print('returned with:',viewport,docref,completed)
+                if completed:
+                    taskon, task_iter, task_table, task_focus = None, 0, None, None
+                    tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
 
         if not completed: task_iter = int(task_iter) + 1
         for e in err:
@@ -245,6 +261,7 @@ def Table_maker(genre):
     else:
         taskon = None
         task_iter = 0
+        tasktype = ''
         holdvec = [''] * 30
         entrydata = []
         err = ['All is well']
@@ -567,7 +584,7 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data):
 
 
 
-def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data):
+def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
@@ -587,59 +604,47 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data):
             viewport[0] = request.values.get('viewport0')
             viewport[2] = request.values.get('viewport2')
 
-        #See if only one box is checked and if so what table it is from
-        nc = sum(cks[1] for cks in checked_data)
-        tids = (cks[2] for cks in checked_data if cks[2] != [])
-        tabs = (cks[0] for cks in checked_data if cks[1] != 0)
+        nextquery = f"{thistable}.query.get({sid})"
+        dat = eval(nextquery)
+        viewport[3] = str(sid)
+        viewport[4] = f'{genre} {thistable} Item'
+        ukey = eval(f"{thistable}_setup['ukey']")
+        print('the ukey=', ukey)
+        viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
+        fileout = ukey + '_' + eval(f"dat.{ukey}")
+        print(viewport)
 
-        if nc == 1:
-            thistable = next(tabs)
-            avec = next(tids)
+        uploadnow = request.values.get('uploadnow')
+        if uploadnow is not None and nc == 1:
+            viewport[0] = 'show_doc_right'
+            file = request.files['docupload']
+            if file.filename == '':
+                err.append('No file selected for uploading')
+            else:
+                print('file is', file.filename)
 
-        elif nc > 1: err.append('Too many selections made for this task')
-        else: err.append('Must make a single selection for this task')
+            name, ext = os.path.splitext(file.filename)
+            if task_focus == 'Source':
+                sname = 'Scache'
+            elif task_focus == 'Proof':
+                sname = 'Pcache'
 
-        if nc == 1:
-            sid = avec[0]
-            nextquery = f"{thistable}.query.get({sid})"
-            dat = eval(nextquery)
-            viewport[3] = str(sid)
-            viewport[4] = f'{genre} {thistable} Item'
-            ukey = eval(f"{thistable}_setup['ukey']")
-            print('the ukey=', ukey)
-            viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
-            fileout = ukey + '_' + eval(f"dat.{ukey}")
-            print(viewport)
+            sn = getattr(dat, sname)
+            try:
+                sn = int(sn)
+                bn = sn+1
+            except:
+                sn = 0
+                bn = 0
 
-            uploadnow = request.values.get('uploadnow')
-            if uploadnow is not None and nc == 1:
-                viewport[0] = 'show_doc_right'
-                file = request.files['docupload']
-                if file.filename == '':
-                    err.append('No file selected for uploading')
-                else:
-                    print('file is', file.filename)
+            filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
+            output1 = addpath(tpath(f'{thistable}', filename1))
+            print('output1=',output1)
 
-                name, ext = os.path.splitext(file.filename)
-                if task_focus == 'Source':
-                    sname = 'Scache'
-                elif task_focus == 'Proof':
-                    sname = 'Pcache'
+            file.save(output1)
+            viewport[2] = '/'+tpath(f'{thistable}', filename1)
 
-                sn = getattr(dat, sname)
-                try:
-                    sn = int(sn)
-                    bn = sn+1
-                except:
-                    sn = 0
-                    bn = 0
-
-                filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
-                output1 = addpath(tpath(f'{thistable}', filename1))
-
-                file.save(output1)
-                viewport[2] = '/'+tpath(f'{thistable}', filename1)
-
+            if bn > 0:
                 oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
                 oldoutput = addpath(tpath(f'{thistable}', oldfile))
                 try:
@@ -649,13 +654,13 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data):
                     err.append('Cleaning up old files NOT successful')
                     err.append(f'Could not find {oldoutput}')
 
-                setattr(dat, f'{task_focus}', filename1)
-                setattr(dat, sname, bn)
-                db.session.commit()
-                err.append(f'Viewing {filename1}')
-                err.append('Hit Return to End Viewing and Return to Table View')
-                returnhit = request.values.get('Return')
-                if returnhit is not None: completed = True
+            setattr(dat, f'{task_focus}', filename1)
+            setattr(dat, sname, bn)
+            db.session.commit()
+            err.append(f'Viewing {filename1}')
+            err.append('Hit Return to End Viewing and Return to Table View')
+            returnhit = request.values.get('Return')
+            if returnhit is not None: completed = True
         else:
             completed = True
 
