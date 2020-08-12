@@ -34,7 +34,7 @@ Trucking_genre = {'table': 'Orders',
                                     'Add Items':
                                         {
                                          'New Job': ['Table_Selected', 'New', 'Job', 'Orders'],
-                                         'New Customer' : ['Table_Selected', 'New', 'Customer', 'People'],
+                                         'New Customer' : ['Table_Selected', 'New', 'Customer', 'Customers'],
                                          'New Interchange' : ['Table_Selected', 'New', 'Interchange', 'Interchange'],
                                          'New Service' : ['Table_Selected', 'New', 'Service', 'Services'],
                                          'New From Copy' : ['Single_Item_Selection', 'NewCopy', '', ''],
@@ -47,9 +47,9 @@ Trucking_genre = {'table': 'Orders',
                                          'Source' : ['Single_Item_Selection', 'View', 'Source', ''],
                                          'Proof' : ['Single_Item_Selection', 'View', 'Proof', ''],
                                          'Manifest' : ['Single_Item_Selection', 'View', 'Manifest', ''],
-                                         'Interchange' : ['Single_Item_Selection', 'View', 'Interchange', ''],
+                                         'Interchange' : ['Single_Item_Selection', 'View', 'Gate', ''],
                                          'Invoice' : ['Single_Item_Selection', 'View', 'Invoice', ''],
-                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'Paid Invoice', '']
+                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'PaidInvoice', '']
                                          }
                                     }
                     }

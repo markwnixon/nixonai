@@ -44,10 +44,6 @@ def get_checked(thistable, data1id):
 
 def populate(tables_on,tabletitle,tfilters,jscripts):
     # print(int(filter(check.isdigit, check)))
-    docref = ''
-    oder = 0
-    modata = 0
-    modlink = 0
     checked_data = []
     table_data = []
 
@@ -91,7 +87,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                                 dblist.append(nextvalue)
                         keydata.update({key: dblist})
                         print(keydata)
-    return tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata
+    return tabletitle, table_data, checked_data, jscripts, keydata
 
 def Table_maker(genre):
     username = session['username'].capitalize()
@@ -207,7 +203,7 @@ def Table_maker(genre):
     print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
     print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
 
-    tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
+    tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
     #if taskon != '' and taskon != None:
@@ -221,7 +217,7 @@ def Table_maker(genre):
             rstring = f"{taskon}_task(task_focus, {task_table}_setup, task_iter)"
             holdvec, entrydata, err, completed = eval(rstring)
             if completed:
-                tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
+                tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
 
         elif tasktype == 'Single_Item_Selection':
             holdvec, entrydata = [], []
@@ -245,11 +241,11 @@ def Table_maker(genre):
             if nc == 1:
                 print('made it here with thistable sid taskiter', thistable, sid, task_iter)
                 rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
-                err, viewport, docref, completed = eval(rstring)
-                print('returned with:',viewport,docref,completed)
+                err, viewport, completed = eval(rstring)
+                print('returned with:',viewport, completed)
                 if completed:
                     taskon, task_iter, task_table, task_focus = None, 0, None, None
-                    tabletitle, table_data, checked_data, jscripts, keydata, oder, docref, modata = populate(tables_on,tabletitle,tfilters,jscripts)
+                    tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
 
         if not completed: task_iter = int(task_iter) + 1
         for e in err:
@@ -274,8 +270,8 @@ def Table_maker(genre):
     err = erud(err)
     if returnhit is not None:
         checked_data = [0,'0',['0']]
-    return genre_data, table_data, err, oder, leftscreen, leftsize, docref, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
-    taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, modata, task_table, checked_data, viewport
+    return genre_data, table_data, err, leftscreen, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
+    taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, task_table, checked_data, viewport
 
 
 
@@ -529,7 +525,6 @@ def Rec_task(iter):
 def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
-    docref = ''
 
     if cancel is not None:
         completed = True
@@ -553,14 +548,10 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         except:
             err.append(f'{thistable} has no attribute {task_focus}')
 
-
-
-
-
         returnhit = request.values.get('Return')
         if returnhit is not None: completed = True
 
-    return err, viewport, docref, completed
+    return err, viewport, completed
 
 
 
@@ -568,7 +559,6 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
-    docref = ''
 
     if cancel is not None:
         completed=True
@@ -643,7 +633,7 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
             returnhit = request.values.get('Return')
             if returnhit is not None: completed = True
 
-    return err, viewport, docref, completed
+    return err, viewport, completed
 
 
 

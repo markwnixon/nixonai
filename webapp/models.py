@@ -439,7 +439,7 @@ class Orders(db.Model):
     Date2 = db.Column('Date2', db.DateTime)
     Time2 = db.Column('Time2', db.String(20))
     Time3 = db.Column('Time3', db.String(20))
-    Path = db.Column('Path', db.String(50))
+    PaidInvoice = db.Column('Path', db.String(100))
     Source = db.Column('Original', db.String(200))
     Description = db.Column('Description', db.String(400))
     Chassis = db.Column('Chassis', db.String(50))
@@ -471,7 +471,7 @@ class Orders(db.Model):
     QBi = db.Column('QBi', db.Integer)
 
     def __init__(self, Status, Jo, Load, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
-                 Delivery, Amount, Date, Time, Date2, Time2, Time3, Path, Source, Description, Chassis,
+                 Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal):
@@ -494,7 +494,7 @@ class Orders(db.Model):
         self.Date2 = Date2
         self.Time2 = Time2
         self.Time3 = Time3
-        self.Path = Path
+        self.PaidInvoice = PaidInvoice
         self.Source = Source
         self.Description = Description
         self.Chassis = Chassis
