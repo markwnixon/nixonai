@@ -229,6 +229,9 @@ def Table_maker(genre):
             nc = sum(cks[1] for cks in checked_data)
             tids = (cks[2] for cks in checked_data if cks[2] != [])
             tabs = (cks[0] for cks in checked_data if cks[1] != 0)
+            print('nc=', nc)
+            print(tids)
+            print(tabs)
             if nc == 1:
                 thistable = next(tabs)
                 avec = next(tids)
@@ -240,6 +243,7 @@ def Table_maker(genre):
                 err.append('Must make a single selection for this task')
                 completed = True
             if nc == 1:
+                print('made it here with thistable sid taskiter', thistable, sid, task_iter)
                 rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
                 err, viewport, docref, completed = eval(rstring)
                 print('returned with:',viewport,docref,completed)
@@ -522,65 +526,41 @@ def Inv_task(iter):
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
-def View_task(genre, task_iter, tablesetup, task_focus, checked_data):
+def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
     docref = ''
 
     if cancel is not None:
-        completed=True
-        err = ['View has been cancelled']
+        completed = True
     else:
         completed = False
         err = [f'Running View task with iter {task_iter}']
-        err.append(f'genre:',genre)
-        err.append(f'task_focus:', task_focus)
 
-        print('checkeddata',checked_data)
+        viewport[0] = 'show_doc_left'
+        nextquery = f"{thistable}.query.get({sid})"
+        dat = eval(nextquery)
 
-        if task_iter == 0:
-            viewport[0] = 'view_doc_left'
-        else:
-            viewport[0] = request.values.get('viewport0')
-            viewport[2] = request.values.get('viewport2')
+        print('The task focus is:', task_focus)
+        try:
+            docref = getattr(dat, f'{task_focus}')
+            try:
+                viewport[2] = '/' + tpath(f'{thistable}', docref)
+                err.append(f'Viewing {viewport[2]}')
+                err.append('Hit Return to End Viewing and Return to Table View')
+            except:
+                err.append(f'Pathname {viewport[2]} not found')
+        except:
+            err.append(f'{thistable} has no attribute {task_focus}')
 
-        #See if only one box is checked and if so what table it is from
-        nc = sum(cks[1] for cks in checked_data)
-        tids = (cks[2] for cks in checked_data if cks[2] != [])
-        tabs = (cks[0] for cks in checked_data if cks[1] != 0)
 
-        if nc == 1:
-            thistable = next(tabs)
-            avec = next(tids)
 
-        elif nc > 1: err.append('Too many selections made for this task')
-        else: err.append('Must make a single selection for this task')
 
-        if nc == 1:
-            sid = avec[0]
-            nextquery = f"{thistable}.query.get({sid})"
-            dat = eval(nextquery)
-            viewport[3] = str(sid)
-            viewport[4] = f'{genre} {thistable} Item'
-            ukey = eval(f"{thistable}_setup['ukey']")
-            print('the ukey=', ukey)
-            viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
-            fileout = ukey + '_' + eval(f"dat.{ukey}")
-            print(viewport)
 
-            viewitem = request.values.get('')
+        returnhit = request.values.get('Return')
+        if returnhit is not None: completed = True
 
-            filename1 = getattr(dat, sname)
-            output1 = addpath(tpath(f'{thistable}', filename1))
-
-            err.append(f'Viewing {filename1}')
-            err.append('Hit Return to End Viewing and Return to Table View')
-            returnhit = request.values.get('Return')
-            if returnhit is not None: completed = True
-        else:
-            completed = True
-
-        return err, viewport, docref, completed
+    return err, viewport, docref, completed
 
 
 
@@ -595,7 +575,7 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
         err = ['Upload has been cancelled']
     else:
         completed = False
-        err = [f'Running Source task with iter {task_iter}']
+        err = [f'Running Upload task with iter {task_iter}']
 
 
         if task_iter == 0:
@@ -615,7 +595,8 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
         print(viewport)
 
         uploadnow = request.values.get('uploadnow')
-        if uploadnow is not None and nc == 1:
+
+        if uploadnow is not None:
             viewport[0] = 'show_doc_right'
             file = request.files['docupload']
             if file.filename == '':
@@ -661,8 +642,6 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
             err.append('Hit Return to End Viewing and Return to Table View')
             returnhit = request.values.get('Return')
             if returnhit is not None: completed = True
-        else:
-            completed = True
 
     return err, viewport, docref, completed
 

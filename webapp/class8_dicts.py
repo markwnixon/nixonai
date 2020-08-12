@@ -45,6 +45,7 @@ Trucking_genre = {'table': 'Orders',
                                     'View Docs':
                                         {
                                          'Source' : ['Single_Item_Selection', 'View', 'Source', ''],
+                                         'Proof' : ['Single_Item_Selection', 'View', 'Proof', ''],
                                          'Manifest' : ['Single_Item_Selection', 'View', 'Manifest', ''],
                                          'Interchange' : ['Single_Item_Selection', 'View', 'Interchange', ''],
                                          'Invoice' : ['Single_Item_Selection', 'View', 'Invoice', ''],
