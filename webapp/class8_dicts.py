@@ -33,23 +33,46 @@ Trucking_genre = {'table': 'Orders',
                   'task_box_map': {
                                     'Add Items':
                                         {
-                                         'New Job': ['Table_Selected', 'New', 'Job', 'Orders'],
-                                         'New Customer' : ['Table_Selected', 'New', 'Customer', 'Customers'],
-                                         'New Interchange' : ['Table_Selected', 'New', 'Interchange', 'Interchange'],
-                                         'New Service' : ['Table_Selected', 'New', 'Service', 'Services'],
-                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', '', ''],
-                                         'Upload Source' : ['Single_Item_Selection', 'Upload', 'Source', ''],
-                                         'Upload Proof' : ['Single_Item_Selection', 'Upload', 'Proof', '']
+                                         'New Job': ['Table_Selected', 'New', 'Orders'],
+                                         'New Customer' : ['Table_Selected', 'New', 'Customers'],
+                                         'New Interchange' : ['Table_Selected', 'New', 'Interchange'],
+                                         'New Service' : ['Table_Selected', 'New', 'Services'],
+                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', ''],
+                                         'Upload Source' : ['Single_Item_Selection', 'Upload', 'Source'],
+                                         'Upload Proof' : ['Single_Item_Selection', 'Upload', 'Proof']
                                          },
+
+                                    'Edit Items':
+                                        {
+                                         'Edit Item' : ['Single_Item_Selection', 'EditItem', ''],
+                                         'Match': ['Two_Item_Selection', 'Match', ''],
+                                         'Accept': ['All_Item_Selection', 'Accept', ''],
+                                         'Haul+1': ['Single_Item_Selection', 'Status', '1'],
+                                         'Haul-1': ['Single_Item_Selection', 'Haul', ''],
+                                         'Haul Done': ['Single_Item_Selection', 'NewCopy', ''],
+                                         'Inv+1': ['Single_Item_Selection', 'NewCopy', ''],
+                                         'Inv-1': ['Single_Item_Selection', 'NewCopy', ''],
+                                         'Inv Emailed': ['Single_Item_Selection', 'NewCopy', ''],
+                                         'Set Col To': ['Single_Item_Selection', 'NewCopy', '']
+                                        },
+
+                                    'Money Items':
+                                        {
+                                         'Inv Edit',
+                                         'Quote Edit',
+                                         'Package Send',
+                                         'Rec Payment',
+                                         'Rec by Acct'
+                                        },
 
                                     'View Docs':
                                         {
-                                         'Source' : ['Single_Item_Selection', 'View', 'Source', ''],
-                                         'Proof' : ['Single_Item_Selection', 'View', 'Proof', ''],
-                                         'Manifest' : ['Single_Item_Selection', 'View', 'Manifest', ''],
-                                         'Interchange' : ['Single_Item_Selection', 'View', 'Gate', ''],
-                                         'Invoice' : ['Single_Item_Selection', 'View', 'Invoice', ''],
-                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'PaidInvoice', '']
+                                         'Source' : ['Single_Item_Selection', 'View', 'Source'],
+                                         'Proof' : ['Single_Item_Selection', 'View', 'Proof'],
+                                         'Manifest' : ['Single_Item_Selection', 'View', 'Manifest'],
+                                         'Interchange' : ['Single_Item_Selection', 'View', 'Gate'],
+                                         'Invoice' : ['Single_Item_Selection', 'View', 'Invoice'],
+                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'PaidInvoice']
                                          }
                                     }
                     }
@@ -77,7 +100,8 @@ Trucking_genre = {'table': 'Orders',
 #           5 - initial value of success for error check.  =0 presumes fail unless suceeds.  Program changes to 1 if successful.
 #           6 - error check message to provide if successful, for multiline text involving dropblocks this provides the data for
 #               providing a drop history
-Orders_setup = {'table': 'Orders',
+Orders_setup = {'name' : 'Trucking Job',
+                'table': 'Orders',
                 'filter': None,
                 'filterval': None,
                 'creators': ['Jo'],
@@ -108,7 +132,8 @@ Orders_setup = {'table': 'Orders',
                 'source': ['Source', 'Jo']
                 }
 
-Interchange_setup = {'table': 'Interchange',
+Interchange_setup = {'name' : 'Interchange Ticket',
+                     'table': 'Interchange',
                      'filter': None,
                      'filterval': None,
                      'creators': [],
@@ -136,7 +161,8 @@ Interchange_setup = {'table': 'Interchange',
                      'source': ['None', 'Container', 'Type']
                      }
 
-Customers_setup = {'table': 'People',
+Customers_setup = {'name' : 'Customer',
+                   'table': 'People',
                    'filter': 'Ptype',
                    'filterval': 'Trucking',
                    'creators': [],
@@ -158,7 +184,8 @@ Customers_setup = {'table': 'People',
                    'source': ['Source', 'Company']
                    }
 
-Services_setup = {'table': 'Services',
+Services_setup = {'name' : 'Service',
+                  'table': 'Services',
                   'filter': None,
                   'filterval': None,
                   'creators': [],

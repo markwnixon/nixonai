@@ -118,7 +118,6 @@ def Table_maker(genre):
         # See if a task is active and ongoing
         tasktype = nononestr(request.values.get('tasktype'))
         taskon = nononestr(request.values.get('taskon'))
-        task_table = nononestr(request.values.get('task_table'))
         task_focus = nononestr(request.values.get('task_focus'))
         task_iter = nonone(request.values.get('task_iter'))
 
@@ -132,7 +131,7 @@ def Table_maker(genre):
             # Default time filter on entry into table is last 60 days:
             tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
             jscripts = ['dtTrucking']
-            taskon, task_iter, task_table, task_focus = None, None, None, None
+            taskon, task_iter, task_focus = None, None, None
 
         else:
 
@@ -150,8 +149,10 @@ def Table_maker(genre):
                 taskbase = launched[0].split() if launched != [] else None
                 if taskbase:
                     taskon = taskbase[0]
-                    task_focus = taskbase[1]
-                    task_table = eval(f"{genre}_genre['table']")
+                    #task_focus = taskbase[1]
+                    task_focus = eval(f"{genre}_genre['table']")
+                    tasktype = 'Table_Selected'
+                    #tablesetup = eval(f'{task_focus}_setup')
 
                 # See if a task box has been selected task has a focus and table where focus is the type of information
                 for box in task_boxes:
@@ -160,11 +161,10 @@ def Table_maker(genre):
                         if tboxes[key] is not None:
                             tasklist = task_box_map[key][tboxes[key]]
                             tasktype = tasklist[0]
-                            taskon, task_focus, task_table = tasklist[1:]
+                            taskon, task_focus = tasklist[1:]
 
                 print('The task is:', taskon)
                 print('The task focus is:', task_focus)
-                print('The task_table is:', task_table)
                 print('The task_iter is:', task_iter)
                 print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
 
@@ -190,7 +190,7 @@ def Table_maker(genre):
         # Default time filter on entry into table is last 60 days:
         tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
         jscripts = ['dtTrucking']
-        taskon, task_iter, task_table, task_focus = None, None, None, None
+        taskon, task_iter, task_focus = None, None, None
 
 
     # Execute these parts whether it is a Post or Not:
@@ -212,9 +212,10 @@ def Table_maker(genre):
         completed = False
         #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
         #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-        print('Ready to run the task:',taskon,'with task focus',task_focus, ' and using table:', task_table)
+        print('Ready to run the task:',taskon,'with task focus',task_focus)
         if tasktype == 'Table_Selected':
-            rstring = f"{taskon}_task(task_focus, {task_table}_setup, task_iter)"
+            tablesetup = eval(f'{task_focus}_setup')
+            rstring = f"{taskon}_task({task_focus}_setup, task_iter)"
             holdvec, entrydata, err, completed = eval(rstring)
             if completed:
                 tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
@@ -235,17 +236,21 @@ def Table_maker(genre):
             elif nc > 1:
                 err.append('Too many selections made for this task')
                 completed = True
+                tablesetup = None
             else:
                 err.append('Must make a single selection for this task')
                 completed = True
+                tablesetup = None
             if nc == 1:
                 print('made it here with thistable sid taskiter', thistable, sid, task_iter)
+                tablesetup = eval(f'{thistable}_setup')
                 rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
                 err, viewport, completed = eval(rstring)
                 print('returned with:',viewport, completed)
                 if completed:
-                    taskon, task_iter, task_table, task_focus = None, 0, None, None
+                    taskon, task_iter, task_focus = None, 0, None
                     tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
+
 
         if not completed: task_iter = int(task_iter) + 1
         for e in err:
@@ -265,13 +270,15 @@ def Table_maker(genre):
         holdvec = [''] * 30
         entrydata = []
         err = ['All is well']
+        tablesetup = None
 
     print(jscripts, holdvec)
     err = erud(err)
     if returnhit is not None:
         checked_data = [0,'0',['0']]
+    if tablesetup: print('the tablesetup for name is:', tablesetup['name'])
     return genre_data, table_data, err, leftscreen, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
-    taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, task_table, checked_data, viewport
+    taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
 
 
 
@@ -478,9 +485,9 @@ def make_new_entry(tablesetup,data):
 
 #def New_task(task_iter, tablesetup, task_focus, checked_data):
 
-def New_task(task_focus, tablesetup, task_iter):
+def New_task(tablesetup, task_iter):
     completed = False
-    err = [f'Running New task with task_iter {task_iter} and task_focus {task_focus}']
+    err = [f"Running New task with task_iter {task_iter} using {tablesetup['table']}"]
 
     if task_iter > 0:
         entrydata = tablesetup['entry data']
@@ -576,62 +583,71 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
         nextquery = f"{thistable}.query.get({sid})"
         dat = eval(nextquery)
-        viewport[3] = str(sid)
-        viewport[4] = f'{genre} {thistable} Item'
-        ukey = eval(f"{thistable}_setup['ukey']")
-        print('the ukey=', ukey)
-        viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
-        fileout = ukey + '_' + eval(f"dat.{ukey}")
-        print(viewport)
 
-        uploadnow = request.values.get('uploadnow')
+        try:
+            getattr(dat, f'{task_focus}')
+        except:
+            err.append(f'{thistable} has no attribute {task_focus}')
+            completed = True
 
-        if uploadnow is not None:
-            viewport[0] = 'show_doc_right'
-            file = request.files['docupload']
-            if file.filename == '':
-                err.append('No file selected for uploading')
-            else:
-                print('file is', file.filename)
+        if not completed:
 
-            name, ext = os.path.splitext(file.filename)
-            if task_focus == 'Source':
-                sname = 'Scache'
-            elif task_focus == 'Proof':
-                sname = 'Pcache'
+            viewport[3] = str(sid)
+            viewport[4] = f'{genre} {thistable} Item'
+            ukey = eval(f"{thistable}_setup['ukey']")
+            print('the ukey=', ukey)
+            viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
+            fileout = ukey + '_' + eval(f"dat.{ukey}")
+            print(viewport)
 
-            sn = getattr(dat, sname)
-            try:
-                sn = int(sn)
-                bn = sn+1
-            except:
-                sn = 0
-                bn = 0
+            uploadnow = request.values.get('uploadnow')
 
-            filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
-            output1 = addpath(tpath(f'{thistable}', filename1))
-            print('output1=',output1)
+            if uploadnow is not None:
+                viewport[0] = 'show_doc_right'
+                file = request.files['docupload']
+                if file.filename == '':
+                    err.append('No file selected for uploading')
+                else:
+                    print('file is', file.filename)
 
-            file.save(output1)
-            viewport[2] = '/'+tpath(f'{thistable}', filename1)
+                name, ext = os.path.splitext(file.filename)
+                if task_focus == 'Source':
+                    sname = 'Scache'
+                elif task_focus == 'Proof':
+                    sname = 'Pcache'
 
-            if bn > 0:
-                oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
-                oldoutput = addpath(tpath(f'{thistable}', oldfile))
+                sn = getattr(dat, sname)
                 try:
-                    os.remove(oldoutput)
-                    err.append('Cleaning up old files successful')
+                    sn = int(sn)
+                    bn = sn+1
                 except:
-                    err.append('Cleaning up old files NOT successful')
-                    err.append(f'Could not find {oldoutput}')
+                    sn = 0
+                    bn = 0
 
-            setattr(dat, f'{task_focus}', filename1)
-            setattr(dat, sname, bn)
-            db.session.commit()
-            err.append(f'Viewing {filename1}')
-            err.append('Hit Return to End Viewing and Return to Table View')
-            returnhit = request.values.get('Return')
-            if returnhit is not None: completed = True
+                filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
+                output1 = addpath(tpath(f'{thistable}', filename1))
+                print('output1=',output1)
+
+                file.save(output1)
+                viewport[2] = '/'+tpath(f'{thistable}', filename1)
+
+                if bn > 0:
+                    oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
+                    oldoutput = addpath(tpath(f'{thistable}', oldfile))
+                    try:
+                        os.remove(oldoutput)
+                        err.append('Cleaning up old files successful')
+                    except:
+                        err.append('Cleaning up old files NOT successful')
+                        err.append(f'Could not find {oldoutput}')
+
+                setattr(dat, f'{task_focus}', filename1)
+                setattr(dat, sname, bn)
+                db.session.commit()
+                err.append(f'Viewing {filename1}')
+                err.append('Hit Return to End Viewing and Return to Table View')
+                returnhit = request.values.get('Return')
+                if returnhit is not None: completed = True
 
     return err, viewport, completed
 
