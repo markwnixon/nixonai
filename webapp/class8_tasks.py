@@ -652,6 +652,59 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
     return err, viewport, completed
 
 
+def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+
+    completed = False
+    err = [f'Running NewCopy task with iter {task_iter}']
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    creators = tablesetup['creators']
+    ukey = tablesetup['ukey']
+    documents = tablesetup['documents']
+    viewport = None
+
+    nextquery = f"{thistable}.query.get({sid})"
+    olddat = eval(nextquery)
+
+    from sqlalchemy import inspect
+    inst = eval(f"inspect({table})")
+    attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+
+    for jx, entry in enumerate(entrydata):
+        if entry[0] in creators:
+            creation = [ix for ix in creators if ix == entry[0]][0]
+            thisitem = eval(f"get_new_{creation}('{entry[3]}')")
+            err = [f'New {creation} {thisitem} created']
+
+    print('The attr_names are:', attr_names)
+    for c_attr in inst.mapper.column_attrs:
+        print('Attrloop:', c_attr)
+
+    dbnew = f'{table}('
+    for col in attr_names:
+        if col != 'id':
+            if col == ukey:
+                uidtemp = uuid.uuid1().node
+                dbnew = dbnew + f", {col}='{uidtemp}'"
+            elif col == filter:
+                dbnew = dbnew + f", {col}='{filterval}'"
+            else:
+                thisvalue = getattr(olddat, f'{col}')
+                dbnew = dbnew + f', {col}={thisvalue}'
+    dbnew = dbnew + ')'
+    dbnew = dbnew.replace('(, ', '(')
+    print('dbnew = ',dbnew)
+    input = eval(dbnew)
+    db.session.add(input)
+    db.session.commit()
+
+    completed = True
+
+    return err, viewport, completed
+
 
 
 

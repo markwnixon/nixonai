@@ -44,25 +44,25 @@ Trucking_genre = {'table': 'Orders',
 
                                     'Edit Items':
                                         {
-                                         'Edit Item' : ['Single_Item_Selection', 'EditItem', ''],
+                                         'Edit Item' : ['Single_Item_Selection', 'EditItem', 'Form'],
                                          'Match': ['Two_Item_Selection', 'Match', ''],
                                          'Accept': ['All_Item_Selection', 'Accept', ''],
-                                         'Haul+1': ['Single_Item_Selection', 'Status', '1'],
-                                         'Haul-1': ['Single_Item_Selection', 'Haul', ''],
-                                         'Haul Done': ['Single_Item_Selection', 'NewCopy', ''],
-                                         'Inv+1': ['Single_Item_Selection', 'NewCopy', ''],
-                                         'Inv-1': ['Single_Item_Selection', 'NewCopy', ''],
-                                         'Inv Emailed': ['Single_Item_Selection', 'NewCopy', ''],
-                                         'Set Col To': ['Single_Item_Selection', 'NewCopy', '']
+                                         'Haul+1': ['All_Item_Selection', 'Status', 'Haul+1'],
+                                         'Haul-1': ['All_Item_Selection', 'Status', 'Haul-1'],
+                                         'Haul Done': ['All_Item_Selection', 'Status', 'Haul Done'],
+                                         'Inv+1': ['All_Item_Selection', 'Status', 'Inv+1'],
+                                         'Inv-1': ['All_Item_Selection', 'Status', 'Inv-1'],
+                                         'Inv Emailed': ['All_Item_Selection', 'Status', 'Inv Emailed'],
+                                         'Set Col To': ['All_Item_Selection', 'SetCol', '']
                                         },
 
                                     'Money Items':
                                         {
-                                         'Inv Edit',
-                                         'Quote Edit',
-                                         'Package Send',
-                                         'Rec Payment',
-                                         'Rec by Acct'
+                                         'Inv Edit' : ['Single_Item_Selection', 'EditItem', 'Invoice'],
+                                         'Quote Edit' : ['Single_Item_Selection', 'EditItem', 'Quote'],
+                                         'Package Send' : ['Single_Item_Selection', 'EditItem', 'Package'],
+                                         'Rec Payment' : ['Single_Item_Selection', 'EditItem', 'PayInvoice'],
+                                         'Rec by Acct' : ['Pure_Task', 'Receive_on_Account', '']
                                         },
 
                                     'View Docs':
