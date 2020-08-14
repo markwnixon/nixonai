@@ -670,30 +670,38 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     olddat = eval(nextquery)
 
     from sqlalchemy import inspect
-    inst = eval(f"inspect({table})")
+    inst = eval(f"inspect({thistable})")
     attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+
+    tabletest = inspect(Orders)
+    testlist = list(tabletest.columns)
+    for testout in testlist:
+        print(testout)
+    print('testlist=', testlist)
+    print('1test:', tabletest.columns.id)
+    for column in tabletest.c:
+        item = f'tabletest.columns.{column.name}'
+        print('item is:', item)
+        print('Name',column.name)
+        thisvalue = getattr(olddat, f'{column.name}')
+        print('thisvalue=', thisvalue)
 
     for jx, entry in enumerate(entrydata):
         if entry[0] in creators:
             creation = [ix for ix in creators if ix == entry[0]][0]
             thisitem = eval(f"get_new_{creation}('{entry[3]}')")
             err = [f'New {creation} {thisitem} created']
-
-    print('The attr_names are:', attr_names)
-    for c_attr in inst.mapper.column_attrs:
-        print('Attrloop:', c_attr)
+            print(f'New {creation} {thisitem} created')
 
     dbnew = f'{table}('
     for col in attr_names:
         if col != 'id':
             if col == ukey:
-                uidtemp = uuid.uuid1().node
-                dbnew = dbnew + f", {col}='{uidtemp}'"
-            elif col == filter:
-                dbnew = dbnew + f", {col}='{filterval}'"
+                #uidtemp = uuid.uuid1().node
+                dbnew = dbnew + f", {col}='{thisitem}'"
             else:
                 thisvalue = getattr(olddat, f'{col}')
-                dbnew = dbnew + f', {col}={thisvalue}'
+                dbnew = dbnew + f", {col}='{thisvalue}'"
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
     print('dbnew = ',dbnew)
