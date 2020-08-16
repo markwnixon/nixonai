@@ -439,8 +439,8 @@ class Orders(db.Model):
     Date2 = db.Column('Date2', db.DateTime)
     Time2 = db.Column('Time2', db.String(20))
     Time3 = db.Column('Time3', db.String(20))
-    PaidInvoice = db.Column('Path', db.String(100))
-    Source = db.Column('Original', db.String(200))
+    PaidInvoice = db.Column('PaidInvoice', db.String(100))
+    Source = db.Column('Source', db.String(200))
     Description = db.Column('Description', db.String(400))
     Chassis = db.Column('Chassis', db.String(50))
     Detention = db.Column('Detention', db.Integer)
@@ -463,18 +463,19 @@ class Orders(db.Model):
     Gate = db.Column('Gate', db.String(100))
     Package = db.Column('Package', db.String(100))
     Manifest = db.Column('Manifest', db.String(100))
-    Scache = db.Column('scache', db.Integer)
-    Pcache = db.Column('pcache', db.Integer)
-    Icache = db.Column('icache', db.Integer)
-    Mcache = db.Column('mcache', db.Integer)
-    Pkcache = db.Column('pkcache', db.Integer)
+    Scache = db.Column('Scache', db.Integer)
+    Pcache = db.Column('Pcache', db.Integer)
+    Icache = db.Column('Icache', db.Integer)
+    Mcache = db.Column('Mcache', db.Integer)
+    Pkcache = db.Column('Pkcache', db.Integer)
     QBi = db.Column('QBi', db.Integer)
+    Truck = db.Column('Truck', db.String(45))
 
     def __init__(self, Status, Jo, Load, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
-                 Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal):
+                 Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck):
         self.Status = Status
         self.Jo = Jo
         self.Load = Load
@@ -527,6 +528,7 @@ class Orders(db.Model):
         self.Mcache = Mcache
         self.Pkcache = Pkcache
         self.QBi = QBi
+        self.Truck = Truck
 
 
 class Drops(db.Model):
@@ -994,8 +996,9 @@ class Vehicles(db.Model):
     Portxponder = db.Column('Portxponder', db.String(45))
     ServStr = db.Column('StartedService', db.Date)
     ServStp = db.Column('StoppedService', db.Date)
+    Active = db.Column('Active', db.Integer)
 
-    def __init__(self, Unit, Year, Make, Model, Color, VIN, Title, Plate, EmpWeight, GrossWt, DOTNum, ExpDate, Odometer, Owner, Status, Ezpassxponder, Portxponder, ServStr, ServStp):
+    def __init__(self, Unit, Year, Make, Model, Color, VIN, Title, Plate, EmpWeight, GrossWt, DOTNum, ExpDate, Odometer, Owner, Status, Ezpassxponder, Portxponder, ServStr, ServStp, Active):
         self.Unit = Unit
         self.Year = Year
         self.Make = Make
@@ -1015,6 +1018,7 @@ class Vehicles(db.Model):
         self.Portxponder = Portxponder
         self.ServStr = ServStr
         self.ServStp = ServStp
+        self.Active = Active
 
 class Trucklog(db.Model):
     __tablename__ = 'trucklog'
@@ -1424,11 +1428,12 @@ class Drivers(db.Model):
     TwicNum = db.Column('TwicNum', db.String(45))
     PreScreen = db.Column('PreScreen', db.DateTime)
     LastTested = db.Column('LastTested', db.DateTime)
+    Active = db.Column('Active', db.Integer)
 
 
     def __init__(self, Name, Addr1, Addr2, Phone, Email, Truck, Tag, ScanCDL, ScanMed, ScanMVR, ScanTwic, JobStart,
                  JobEnd, Tagid, Pin, CDLnum, CDLstate, CDLissue, CDLexpire, DOB, MedExpire, TwicExpire, TwicNum,
-                 PreScreen, LastTested):
+                 PreScreen, LastTested, Active):
         self.Name = Name
         self.Addr1 = Addr1
         self.Addr2 = Addr2
@@ -1454,3 +1459,4 @@ class Drivers(db.Model):
         self.TwicNum = TwicNum
         self.PreScreen = PreScreen
         self.LastTested = LastTested
+        self.Active = Active

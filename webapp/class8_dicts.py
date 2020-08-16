@@ -13,11 +13,11 @@ Trucking_genre = {'table': 'Orders',
                                     {'Haul Filter': ['Not Started', 'In-Progress', 'Incomplete', 'Completed',
                                                      'Show All']},
                                     {'Color Filter': ['Haul', 'Invoice', 'Both']}],
-                  'task_boxes': [{'Add Items': ['New Job', 'New Customer', 'New Interchange', 'New Service', 'New From Copy',
-                                                'Upload Source', 'Upload Proof', 'Make Manifest']},
-                                 {'Edit Items': ['Edit Item', 'Match', 'Accept', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
+                  'task_boxes': [{'Adding': ['New Job', 'New Customer', 'New Interchange', 'New Service', 'New From Copy',
+                                             'New Manifest', 'Upload Source', 'Upload Proof']},
+                                 {'Editing': ['Edit Item', 'Match', 'Accept', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
                                                  'Inv-1', 'Inv Emailed', 'Set Col To']},
-                                 {'Money Items': ['Inv Edit', 'Quote Edit', 'Package Send', 'Rec Payment',
+                                 {'Money Flow': ['Inv Edit', 'Quote Edit', 'Package Send', 'Rec Payment',
                                                   'Rec by Acct']},
                                  {'View Docs': ['Source', 'Proof', 'Manifest', 'Interchange', 'Invoice',
                                                 'Paid Invoice']},
@@ -31,20 +31,26 @@ Trucking_genre = {'table': 'Orders',
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
                                    'Source':'CT', 'Proof':'CT', 'View':'CT'},
                   'task_box_map': {
-                                    'Add Items':
+                                    'Quick' :
+                                        {
+                                            'New Job' : ['Table_Selected', 'New', 'Orders'],
+                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form']
+                                        },
+                                    'Adding':
                                         {
                                          'New Job': ['Table_Selected', 'New', 'Orders'],
                                          'New Customer' : ['Table_Selected', 'New', 'Customers'],
                                          'New Interchange' : ['Table_Selected', 'New', 'Interchange'],
                                          'New Service' : ['Table_Selected', 'New', 'Services'],
                                          'New From Copy' : ['Single_Item_Selection', 'NewCopy', ''],
+                                         'New Manifest' : ['Single_Item_Selection', 'New_Manifest', ''],
                                          'Upload Source' : ['Single_Item_Selection', 'Upload', 'Source'],
                                          'Upload Proof' : ['Single_Item_Selection', 'Upload', 'Proof']
                                          },
 
-                                    'Edit Items':
+                                    'Editing':
                                         {
-                                         'Edit Item' : ['Single_Item_Selection', 'EditItem', 'Form'],
+                                         'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
                                          'Match': ['Two_Item_Selection', 'Match', ''],
                                          'Accept': ['All_Item_Selection', 'Accept', ''],
                                          'Haul+1': ['All_Item_Selection', 'Status', 'Haul+1'],
@@ -56,7 +62,7 @@ Trucking_genre = {'table': 'Orders',
                                          'Set Col To': ['All_Item_Selection', 'SetCol', '']
                                         },
 
-                                    'Money Items':
+                                    'Money Flow':
                                         {
                                          'Inv Edit' : ['Single_Item_Selection', 'EditItem', 'Invoice'],
                                          'Quote Edit' : ['Single_Item_Selection', 'EditItem', 'Quote'],
@@ -118,18 +124,24 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Date', 'Load Date', 'Load Date', 'date', 'date', 0, 'ok'],
                                ['Company2', 'Deliver To', 'Deliver To', 'multitext', 'dropblock2', 0, 'Shipper'],
                                ['Date2', 'Del Date', 'Del Date', 'date', 'date', 0, 'ok'],
+                               ['Driver', 'Driver', 'Select Driver',  'select', 'driverdata', 0, 'ok'],
+                               ['Truck', 'Truck', 'Select Truck', 'select', 'truckdata', 0, 'ok'],
                                ['Commodity', 'Commodity', 'Commodity', 'text', 'text', 0, 'ok'],
                                ['Packing', 'Packing', 'Packing', 'text', 'text', 0, 'ok'],
                                ['Seal', 'Seal', 'Seal', 'text', 'text', 0, 'ok'],
                                ['Pickup', 'Pickup', 'Pickup No.', 'text', 'text', 0, 'ok'],
-                               ['Description', 'Description', 'Special Instructions', 'multitext', 'text', 0, 'ok']],
+                               ['Description', 'Description', 'Special Instructions', 'multitext', 'text', 0, 'ok']
+                               ],
                 'colorfilter': ['Hstat'],
                 'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
+                              {'driverdata': ['Drivers', 'Active', 1, 'Name']},
+                              {'truckdata': ['Vehicles', 'Active', 1, 'Unit']},
                               {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
                               {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
                 'jscript': 'dtTrucking',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
-                'source': ['Source', 'Jo']
+                'source': ['Source', 'Jo'],
+                'copyswaps' : {}
                 }
 
 Interchange_setup = {'name' : 'Interchange Ticket',
@@ -158,7 +170,13 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                                    {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
                      'jscript': 'dtHorizontalVerticalExample2',
                      'documents': ['Source'],
-                     'source': ['None', 'Container', 'Type']
+                     'source': ['None', 'Container', 'Type'],
+                     'copyswaps' : {
+                                    'Load In' : 'Empty Out',
+                                    'Empty Out' : 'Load In',
+                                    'Load Out' : 'Empty In',
+                                    'Empty In' : 'Load Out'
+                                    }
                      }
 
 Customers_setup = {'name' : 'Customer',
@@ -181,7 +199,8 @@ Customers_setup = {'name' : 'Customer',
                                  {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
                    'jscript': 'dtHorizontalVerticalExample3',
                    'documents': ['Source'],
-                   'source': ['Source', 'Company']
+                   'source': ['Source', 'Company'],
+                   'copyswaps' : {}
                    }
 
 Services_setup = {'name' : 'Service',
@@ -198,7 +217,8 @@ Services_setup = {'name' : 'Service',
                                 {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
                   'jscript': 'dtHorizontalVerticalExample4',
                   'documents': ['None'],
-                  'source': ['None']
+                  'source': ['None'],
+                  'copyswaps' : {}
                   }
 
 CT_setup = {'table': '0'}

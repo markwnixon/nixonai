@@ -2,10 +2,10 @@
 <div class="card">
 <div class="card-header">
     <div class="d-flex justify-content-around align-items-center">
-        <div class="p-0">Enter New Job Information</div>
+        <div class="p-0">Enter New {{ task_focus }} Information</div>
         <div class="p-0">
-            <button type="submit" class="btn btn-md btn-green" name="Create Job">Create Job</button>
-            <button type="submit" class="btn btn-md btn-elegant" name="Cancel">&nbsp; Cancel &nbsp;{{ keydata.customerdata[0] }}</button>
+            <button type="submit" class="btn btn-md btn-green" name="Update Item">Update {{ tablesetup['name'] }}</button>
+            <button type="submit" class="btn btn-md btn-elegant" name="Cancel">&nbsp; Cancel </button>
         </div>
     </div>
 </div>
@@ -29,9 +29,12 @@
                     <select class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
                     <option value='Choose Later'>Choose Later</option>
 
-                        {% if entry[4] == 'customerdata' %}{% set klist = keydata.customerdata %}{% endif %}
-                        {% if entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}{% endif %}
-                        {% if entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}{% endif %}
+                        {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
+                        {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
+                        {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
+                        {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                        {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}{% endif %}
+
                         {% set htest = holdvec[loop.index-1] %}
                         {% for kdata in klist %}
                             <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>

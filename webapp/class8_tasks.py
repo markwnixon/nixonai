@@ -6,11 +6,13 @@ from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, 
 from webapp.email_appl import etemplate_truck
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
 
+from sqlalchemy import inspect
 import datetime
 import os
 import subprocess
 #from func_cal import calmodalupdate
 import json
+import numbers
 
 #Python functions that require database access
 from webapp.class8_utils import *
@@ -46,6 +48,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
     # print(int(filter(check.isdigit, check)))
     checked_data = []
     table_data = []
+    keydata = {}
 
     # color_selectors = ['Istat', 'Status']
     for jx, tableget in enumerate(tables_on):
@@ -70,14 +73,19 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
         for side in side_data:
             for key, values in side.items():
                 select_value = values[2]
-                if 'get_' in select_value:
-                    find = select_value.replace('get_','')
-                    select_value = request.values.get(find)
-                    print('class8_tasks.py 187 Tablemaker() select_value:',select_value)
+                if isinstance(select_value, str):
+                    if 'get_' in select_value:
+                        find = select_value.replace('get_','')
+                        select_value = request.values.get(find)
+                        print('class8_tasks.py 187 Tablemaker() select_value:',select_value)
                 if select_value is not None:
                     print(key, values, tableget)
-                    dbstats = eval(
+                    if isinstance(select_value, str):
+                        dbstats = eval(
                         f"{values[0]}.query.filter({values[0]}.{values[1]}=='{select_value}').order_by({values[0]}.{values[3]}).all()")
+                    if isinstance(select_value, int):
+                        dbstats = eval(
+                        f"{values[0]}.query.filter({values[0]}.{values[1]}=={select_value}).order_by({values[0]}.{values[3]}).all()")
                     if dbstats is not None:
                         dblist = []
                         for dbstat in dbstats:
@@ -132,6 +140,9 @@ def Table_maker(genre):
             tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
             jscripts = ['dtTrucking']
             taskon, task_iter, task_focus = None, None, None
+            for box in task_boxes:
+                for key, value in box.items():
+                    tboxes[key] = key
 
         else:
 
@@ -146,13 +157,11 @@ def Table_maker(genre):
             if not hasinput(taskon):
                 # See if a new task has been launched from quick buttons; set launched to New/Mod/Inv/Ret else set launched to None
                 launched = [ix for ix in quick_buttons if request.values.get(ix) is not None]
-                taskbase = launched[0].split() if launched != [] else None
+                taskbase = launched[0] if launched != [] else None
                 if taskbase:
-                    taskon = taskbase[0]
-                    #task_focus = taskbase[1]
-                    task_focus = eval(f"{genre}_genre['table']")
-                    tasktype = 'Table_Selected'
-                    #tablesetup = eval(f'{task_focus}_setup')
+                    tasklist = task_box_map['Quick'][taskbase]
+                    tasktype = tasklist[0]
+                    taskon, task_focus = tasklist[1:]
 
                 # See if a task box has been selected task has a focus and table where focus is the type of information
                 for box in task_boxes:
@@ -245,11 +254,14 @@ def Table_maker(genre):
                 print('made it here with thistable sid taskiter', thistable, sid, task_iter)
                 tablesetup = eval(f'{thistable}_setup')
                 rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
-                err, viewport, completed = eval(rstring)
+                holdvec, entrydata, err, viewport, completed = eval(rstring)
                 print('returned with:',viewport, completed)
                 if completed:
-                    taskon, task_iter, task_focus = None, 0, None
+                    taskon, task_iter, task_focus, tasktype = None, 0, None, None
                     tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
+                    for box in task_boxes:
+                        for key, value in box.items():
+                            tboxes[key] = key
 
 
         if not completed: task_iter = int(task_iter) + 1
@@ -520,8 +532,51 @@ def New_task(tablesetup, task_iter):
     return holdvec, entrydata, err, completed
 
 
-def Edit_Item_task(iter):
-    print(f'Running Mod task with iter {iter}')
+def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    err = [f"Running Edit task with task_iter {task_iter} using {tablesetup['table']}"]
+    completed = False
+    viewport = ['0'] * 6
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    numitems = len(entrydata)
+    holdvec = [''] * numitems
+
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    creators = tablesetup['creators']  # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    olddat = eval(nextquery)
+
+    if task_iter > 0:
+        failed = 0
+        warned = 0
+
+        for jx, entry in enumerate(entrydata):
+            holdvec[jx] = request.values.get(f'{entry[0]}')
+            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+            if entry[5] > 1: failed = failed + 1
+            if entry[5] == 1: warned = warned + 1
+        err.append(f'There are {failed} input errors and {warned} input warnings')
+
+        update_item = request.values.get('Update Item')
+        if update_item is not None:
+            if failed == 0:
+                for jx, entry in enumerate(entrydata): setattr(olddat, f'{entry[0]}', holdvec[jx])
+                db.session.commit()
+                err.append(f"Updated entry in {tablesetup['table']}")
+                completed = True
+            else:
+                err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+    else:
+        # Gather the data for the selected row
+        nextquery = f"{table}.query.get({sid})"
+        olddat = eval(nextquery)
+
+        for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
+
+    return holdvec, entrydata, err, viewport, completed
 
 def Inv_task(iter):
     print(f'Running Inv task with iter {iter}')
@@ -529,9 +584,18 @@ def Inv_task(iter):
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
+
+
+
+
+
+
 def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
+    holdvec = []
+    entrydata = []
+    table = tablesetup['table']
 
     if cancel is not None:
         completed = True
@@ -540,25 +604,33 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         err = [f'Running View task with iter {task_iter}']
 
         viewport[0] = 'show_doc_left'
-        nextquery = f"{thistable}.query.get({sid})"
+        nextquery = f"{table}.query.get({sid})"
         dat = eval(nextquery)
 
         print('The task focus is:', task_focus)
         try:
             docref = getattr(dat, f'{task_focus}')
             try:
-                viewport[2] = '/' + tpath(f'{thistable}', docref)
+                viewport[2] = '/' + tpath(f'{table}', docref)
                 err.append(f'Viewing {viewport[2]}')
                 err.append('Hit Return to End Viewing and Return to Table View')
             except:
                 err.append(f'Pathname {viewport[2]} not found')
         except:
-            err.append(f'{thistable} has no attribute {task_focus}')
+            err.append(f'{table} has no attribute {task_focus}')
 
         returnhit = request.values.get('Return')
         if returnhit is not None: completed = True
 
-    return err, viewport, completed
+    return holdvec, entrydata, err, viewport, completed
+
+
+
+
+
+
+
+
 
 
 
@@ -566,6 +638,8 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
+    holdvec = []
+    entrydata = []
 
     if cancel is not None:
         completed=True
@@ -649,43 +723,49 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 returnhit = request.values.get('Return')
                 if returnhit is not None: completed = True
 
-    return err, viewport, completed
+    return holdvec, entrydata, err, viewport, completed
+
+
+
+
+
+
+
+
+
+
+
 
 
 def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
     completed = False
     err = [f'Running NewCopy task with iter {task_iter}']
+    today = datetime.date.today()
+    holdvec = []
+    entrydata = []
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
-    creators = tablesetup['creators']
+    creators = tablesetup['creators']    # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    olddat = eval(nextquery)
+
+    from sqlalchemy import inspect
+    inst = eval(f"inspect({table})")
+    attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
     ukey = tablesetup['ukey']
     documents = tablesetup['documents']
     viewport = None
 
-    nextquery = f"{thistable}.query.get({sid})"
-    olddat = eval(nextquery)
+    #Swaps are to auto-change the copy to have compliment values to the original value
+    swaps = tablesetup['copyswaps']
+    ckswaps = [key for key, value in swaps.items()]
 
-    from sqlalchemy import inspect
-    inst = eval(f"inspect({thistable})")
-    attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
 
-    tabletest = inspect(Orders)
-    testlist = list(tabletest.columns)
-    for testout in testlist:
-        print(testout)
-    print('testlist=', testlist)
-    print('1test:', tabletest.columns.id)
-    for column in tabletest.c:
-        item = f'tabletest.columns.{column.name}'
-        print('item is:', item)
-        print('Name',column.name)
-        thisvalue = getattr(olddat, f'{column.name}')
-        print('thisvalue=', thisvalue)
-
+    # Get a new JO or other creator value required for a table (can be none)
     for jx, entry in enumerate(entrydata):
         if entry[0] in creators:
             creation = [ix for ix in creators if ix == entry[0]][0]
@@ -693,25 +773,105 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
             err = [f'New {creation} {thisitem} created']
             print(f'New {creation} {thisitem} created')
 
+    # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    olddat = eval(nextquery)
+
+    from sqlalchemy import inspect
+    inst = eval(f"inspect({table})")
+    attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+
+    # Create the new entry dynamically
     dbnew = f'{table}('
     for col in attr_names:
         if col != 'id':
-            if col == ukey:
-                #uidtemp = uuid.uuid1().node
+            if col in creators:
                 dbnew = dbnew + f", {col}='{thisitem}'"
             else:
                 thisvalue = getattr(olddat, f'{col}')
-                dbnew = dbnew + f", {col}='{thisvalue}'"
+                # Check if thisvalue requires a compliment value
+                if thisvalue in ckswaps:
+                    thisvalue = swaps[thisvalue]
+                if isinstance(thisvalue, numbers.Number): dbnew = dbnew + f", {col}={thisvalue}"
+                # String requires the triple single quotes because of the container type 45'96" quotes
+                elif isinstance(thisvalue, str): dbnew = dbnew + f", {col}='''{thisvalue}'''"
+                elif isinstance(thisvalue, datetime.date): dbnew = dbnew + f", {col}=today"
+                else: dbnew = dbnew + f", {col}=None"
+
+    #Clean up db string for evaluation
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    print('dbnew = ',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
 
     completed = True
 
-    return err, viewport, completed
+    return holdvec, entrydata, err, viewport, completed
+
+
+def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+
+    err = [f"Running Edit task with task_iter {task_iter} using {tablesetup['table']}"]
+    completed = False
+    viewport = ['0'] * 6
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    numitems = len(entrydata)
+    holdvec = [''] * numitems
+
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    creators = tablesetup['creators']  # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    modata = eval(nextquery)
+
+    if task_iter > 0:
+        failed = 0
+        warned = 0
+
+        for jx, entry in enumerate(entrydata):
+            holdvec[jx] = request.values.get(f'{entry[0]}')
+            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+            if entry[5] > 1: failed = failed + 1
+            if entry[5] == 1: warned = warned + 1
+        err.append(f'There are {failed} input errors and {warned} input warnings')
+
+        update_item = request.values.get('Update Item')
+        if update_item is not None:
+            if failed == 0:
+                for jx, entry in enumerate(entrydata): setattr(modata, f'{entry[0]}', holdvec[jx])
+                db.session.commit()
+                err.append(f"Updated entry in {tablesetup['table']}")
+                completed = True
+            else:
+                err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+    else:
+        # Gather the data for the selected row
+        nextquery = f"{table}.query.get({sid})"
+        modata = eval(nextquery)
+
+        for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(modata, f'{entry[0]}')
+
+    from webapp.class8_tasks_manifest import makemanifest
+    docref=makemanifest(modata)
+
+    err.append(f'Viewing {docref}')
+    err.append('Hit Return to End Viewing and Return to Table View')
+    returnhit = request.values.get('Return')
+    if returnhit is not None: completed = True
+
+    return holdvec, entrydata, err, viewport, completed
+
+
+
+
+
+
+
+
 
 
 

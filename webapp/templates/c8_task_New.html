@@ -29,9 +29,12 @@
                     <select class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
                     <option value='Choose Later'>Choose Later</option>
 
-                        {% if entry[4] == 'customerdata' %}{% set klist = keydata.customerdata %}{% endif %}
-                        {% if entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}{% endif %}
-                        {% if entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}{% endif %}
+                        {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
+                        {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
+                        {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
+                        {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                        {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}{% endif %}
+
                         {% set htest = holdvec[loop.index-1] %}
                         {% for kdata in klist %}
                             <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>
