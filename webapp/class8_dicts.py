@@ -141,7 +141,13 @@ Orders_setup = {'name' : 'Trucking Job',
                 'jscript': 'dtTrucking',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
                 'source': ['Source', 'Jo'],
-                'copyswaps' : {}
+                'copyswaps' : {},
+                'matchfrom' : {
+                                'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
+                                'Interchange': ['Single_Item_Selection', 'View', 'Proof'],
+                                'Customers': ['Single_Item_Selection', 'View', 'Manifest'],
+                                'Services': ['Single_Item_Selection', 'View', 'Gate'],
+                              }
                 }
 
 Interchange_setup = {'name' : 'Interchange Ticket',

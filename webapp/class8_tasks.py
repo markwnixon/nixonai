@@ -5,6 +5,7 @@ from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.email_appl import etemplate_truck
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
+from webapp.class8_tasks_manifest import makemanifest
 
 from sqlalchemy import inspect
 import datetime
@@ -256,12 +257,56 @@ def Table_maker(genre):
                 rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
                 holdvec, entrydata, err, viewport, completed = eval(rstring)
                 print('returned with:',viewport, completed)
-                if completed:
-                    taskon, task_iter, task_focus, tasktype = None, 0, None, None
-                    tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
-                    for box in task_boxes:
-                        for key, value in box.items():
-                            tboxes[key] = key
+            if completed:
+                taskon, task_iter, task_focus, tasktype = None, 0, None, None
+                tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
+                for box in task_boxes:
+                    for key, value in box.items():
+                        tboxes[key] = key
+
+        elif tasktype == 'Two_Item_Selection':
+            holdvec, entrydata = [], []
+            # See if only one box is checked and if so what table it is from
+            nc = sum(cks[1] for cks in checked_data)
+            tids = [cks[2] for cks in checked_data if cks[2] != []]
+            tabs = [cks[0] for cks in checked_data if cks[1] != 0]
+            print('nc=', nc)
+            print(tids)
+            print(tabs)
+            if nc == 2:
+                thistable1 = tabs[0]
+                try:
+                    thistable2 = tabs[1]
+                except:
+                    thistable2 = thistable1
+                avec1 = tids[0]
+                sid1 = avec1[0]
+                try:
+                    avec2 = tids[1]
+                    sid2 = avec2[0]
+                except:
+                    sid2 = avec1[1]
+
+            elif nc > 2:
+                err.append('Too many selections made for this task')
+                completed = True
+                tablesetup = None
+            else:
+                err.append('Must make exactly two selection for this task')
+                completed = True
+                tablesetup = None
+            if nc == 2:
+                tablesetup1 = eval(f'{thistable1}_setup')
+                tablesetup2 = eval(f'{thistable2}_setup')
+                rstring = f"{taskon}_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2)"
+                holdvec, entrydata, err, viewport, completed = eval(rstring)
+                print('returned with:',viewport, completed)
+            if completed:
+                taskon, task_iter, task_focus, tasktype, tablesetup = None, 0, None, None, None
+                tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
+                for box in task_boxes:
+                    for key, value in box.items():
+                        tboxes[key] = key
 
 
         if not completed: task_iter = int(task_iter) + 1
@@ -288,7 +333,7 @@ def Table_maker(genre):
     err = erud(err)
     if returnhit is not None:
         checked_data = [0,'0',['0']]
-    if tablesetup: print('the tablesetup for name is:', tablesetup['name'])
+
     return genre_data, table_data, err, leftscreen, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
 
@@ -813,61 +858,105 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
 def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
     err = [f"Running Edit task with task_iter {task_iter} using {tablesetup['table']}"]
-    completed = False
     viewport = ['0'] * 6
-
-    table = tablesetup['table']
     entrydata = tablesetup['entry data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
 
-    filter = tablesetup['filter']
-    filterval = tablesetup['filterval']
-    creators = tablesetup['creators']  # Gather the data for the selected row
-    nextquery = f"{table}.query.get({sid})"
-    modata = eval(nextquery)
-
-    if task_iter > 0:
-        failed = 0
-        warned = 0
-
-        for jx, entry in enumerate(entrydata):
-            holdvec[jx] = request.values.get(f'{entry[0]}')
-            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
-            if entry[5] > 1: failed = failed + 1
-            if entry[5] == 1: warned = warned + 1
-        err.append(f'There are {failed} input errors and {warned} input warnings')
-
-        update_item = request.values.get('Update Item')
-        if update_item is not None:
-            if failed == 0:
-                for jx, entry in enumerate(entrydata): setattr(modata, f'{entry[0]}', holdvec[jx])
-                db.session.commit()
-                err.append(f"Updated entry in {tablesetup['table']}")
-                completed = True
-            else:
-                err.append(f'Cannot update entry until input errors shown in red below are resolved')
-
+    returnhit = request.values.get('Finished')
+    if returnhit is not None: completed = True
     else:
-        # Gather the data for the selected row
+
+        completed = False
+        table = tablesetup['table']
+        filter = tablesetup['filter']
+        filterval = tablesetup['filterval']
+        creators = tablesetup['creators']  # Gather the data for the selected row
         nextquery = f"{table}.query.get({sid})"
         modata = eval(nextquery)
 
-        for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(modata, f'{entry[0]}')
+        if task_iter > 0:
+            failed = 0
+            warned = 0
 
-    from webapp.class8_tasks_manifest import makemanifest
-    docref=makemanifest(modata)
+            for jx, entry in enumerate(entrydata):
+                holdvec[jx] = request.values.get(f'{entry[0]}')
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+                if entry[5] > 1: failed = failed + 1
+                if entry[5] == 1: warned = warned + 1
+            err.append(f'There are {failed} input errors and {warned} input warnings')
 
-    err.append(f'Viewing {docref}')
-    err.append('Hit Return to End Viewing and Return to Table View')
-    returnhit = request.values.get('Return')
-    if returnhit is not None: completed = True
+            update_item = request.values.get('Update Item')
+            if update_item is not None:
+                if failed == 0:
+                    for jx, entry in enumerate(entrydata): setattr(modata, f'{entry[0]}', holdvec[jx])
+                    db.session.commit()
+                    err.append(f"Updated entry in {tablesetup['table']}")
+                    completed = True
+                else:
+                    err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+        else:
+            # Gather the data for the selected row
+            nextquery = f"{table}.query.get({sid})"
+            modata = eval(nextquery)
+            for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(modata, f'{entry[0]}')
+
+        docref = makemanifest(modata)
+        viewport[0] = 'show_doc_left'
+        viewport[2] = '/' + tpath(f'manifest', docref)
+        print('viewport=', viewport)
+
+        err.append(f'Viewing {docref}')
+        err.append('Hit Finished to End Viewing and Return to Table View')
 
     return holdvec, entrydata, err, viewport, completed
 
 
 
+def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2):
 
+    completed = False
+    err = [f'Running Match task with iter {task_iter}']
+    today = datetime.date.today()
+    holdvec = []
+    entrydata = []
+
+    table1 = tablesetup1['table']
+    entrydata1 = tablesetup1['entry data']
+    filter1 = tablesetup1['filter']
+    filterval1 = tablesetup1['filterval']
+    creators1 = tablesetup1['creators']    # Gather the data for the selected row
+    nextquery1 = f"{table1}.query.get({sid1})"
+    olddat1 = eval(nextquery1)
+    colmatch1 = tablesetup1['matchfrom'][table1]
+
+    table2 = tablesetup2['table']
+    entrydata2 = tablesetup2['entry data']
+    filter2 = tablesetup1['filter']
+    filterval2 = tablesetup2['filterval']
+    creators2 = tablesetup2['creators']    # Gather the data for the selected row
+    nextquery2 = f"{table2}.query.get({sid2})"
+    olddat2 = eval(nextquery2)
+    colmatch2 = tablesetup2['matchfrom'][table2]
+
+    viewport = None
+
+    for col in colmatch1:
+        if col != 'id':
+            thisvalue1 = getattr(olddat1, f'{col}')
+            try:
+                thisvalue2 = getattr(olddat2, f'{col}')
+                print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
+            except:
+                print(f'Second table does not have attribute {col}')
+
+            setattr(olddat2, f'{col}', thisvalue1)
+
+    db.session.commit()
+    completed = True
+
+    return holdvec, entrydata, err, viewport, completed
 
 
 
