@@ -144,9 +144,9 @@ Orders_setup = {'name' : 'Trucking Job',
                 'copyswaps' : {},
                 'matchfrom' : {
                                 'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
-                                'Interchange': ['Single_Item_Selection', 'View', 'Proof'],
-                                'Customers': ['Single_Item_Selection', 'View', 'Manifest'],
-                                'Services': ['Single_Item_Selection', 'View', 'Gate'],
+                                'Interchange': [['Booking', 'Release'], ['Container','Container'],['Type', 'ConType'], ['Chassis', 'Chassis']],
+                                'Customers': [['Shipper', 'Shipper']],
+                                'Services': []
                               }
                 }
 
@@ -182,6 +182,12 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                                     'Empty Out' : 'Load In',
                                     'Load Out' : 'Empty In',
                                     'Empty In' : 'Load Out'
+                                    },
+                     'matchfrom': {
+                         'Orders': [['Jo', 'Jo'], ['Company', 'Shipper'] ],
+                         'Interchange': [],
+                         'Customers': [],
+                         'Services': [],
                                     }
                      }
 

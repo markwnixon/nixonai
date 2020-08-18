@@ -923,36 +923,45 @@ def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_d
     entrydata = []
 
     table1 = tablesetup1['table']
+    table2 = tablesetup2['table']
+
     entrydata1 = tablesetup1['entry data']
     filter1 = tablesetup1['filter']
     filterval1 = tablesetup1['filterval']
     creators1 = tablesetup1['creators']    # Gather the data for the selected row
     nextquery1 = f"{table1}.query.get({sid1})"
     olddat1 = eval(nextquery1)
-    colmatch1 = tablesetup1['matchfrom'][table1]
+    colmatch1 = tablesetup1['matchfrom'][table2]
+    print('colmatch1',colmatch1)
+    c11 = [colm[0] for colm in colmatch1]
+    c12 = [colm[1] for colm in colmatch1]
 
-    table2 = tablesetup2['table']
     entrydata2 = tablesetup2['entry data']
     filter2 = tablesetup1['filter']
     filterval2 = tablesetup2['filterval']
     creators2 = tablesetup2['creators']    # Gather the data for the selected row
     nextquery2 = f"{table2}.query.get({sid2})"
     olddat2 = eval(nextquery2)
-    colmatch2 = tablesetup2['matchfrom'][table2]
+    colmatch2 = tablesetup2['matchfrom'][table1]
+    c21 = [colm[0] for colm in colmatch2]
+    c22 = [colm[1] for colm in colmatch2]
 
     viewport = None
+    print('c11, c12', c11, c12)
+    print('c21, c22', c21, c22)
 
-    for col in colmatch1:
-        if col != 'id':
-            thisvalue1 = getattr(olddat1, f'{col}')
-            try:
-                thisvalue2 = getattr(olddat2, f'{col}')
-                print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
-            except:
-                print(f'Second table does not have attribute {col}')
+    for jx, col in enumerate(c11):
+        thisvalue1 = getattr(olddat1, f'{col}')
+        thisvalue2 = getattr(olddat2, f'{c12[jx]}')
+        print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
+        setattr(olddat1, f'{col}', thisvalue2)
+    db.session.commit()
 
-            setattr(olddat2, f'{col}', thisvalue1)
-
+    for jx, col in enumerate(c22):
+        thisvalue1 = getattr(olddat1, f'{col}')
+        thisvalue2 = getattr(olddat2, f'{c21[jx]}')
+        print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
+        setattr(olddat2, f'{col}', thisvalue2)
     db.session.commit()
     completed = True
 
