@@ -98,8 +98,102 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                         print(keydata)
     return tabletitle, table_data, checked_data, jscripts, keydata
 
+def reset_state(task_boxes, genre_tables):
+    tboxes={}
+    genre_tables_on = ['off'] * len(genre_tables)
+    genre_tables_on[0] = 'on'
+    tables_on = ['Orders']
+    # Default time filter on entry into table is last 60 days:
+    tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+    jscripts = ['dtTrucking']
+    taskon, task_iter, task_focus = None, None, None
+    for box in task_boxes:
+        for key, value in box.items():
+            tboxes[key] = key
+    return genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes
+
+def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err):
+    completed = False
+    viewport = ['tables'] + ['0'] * 5
+    # This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
+    # If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
+    print('Ready to run the task:', taskon, 'with task focus', task_focus)
+
+    if tasktype == 'Table_Selected':
+        tablesetup = eval(f'{task_focus}_setup')
+        rstring = f"{taskon}_task({task_focus}_setup, task_iter)"
+        holdvec, entrydata, err, completed = eval(rstring)
+
+    elif tasktype == 'Single_Item_Selection':
+        holdvec, entrydata = [], []
+        # See if only one box is checked and if so what table it is from
+        nc = sum(cks[1] for cks in checked_data)
+        tids = [cks[2] for cks in checked_data if cks[2] != []]
+        tabs = [cks[0] for cks in checked_data if cks[1] != 0]
+        print('nc=', nc)
+        print(tids)
+        print(tabs)
+        if nc == 1:
+            thistable = tabs[0]
+            sid = tids[0][0]
+            print('made it here with thistable sid taskiter', thistable, sid, task_iter)
+            tablesetup = eval(f'{thistable}_setup')
+            rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
+            holdvec, entrydata, err, viewport, completed = eval(rstring)
+            print('returned with:', viewport, completed)
+        elif nc > 1:
+            err.append('Too many selections made for this task')
+            completed = True
+            tablesetup = None
+        else:
+            err.append('Must make a single selection for this task')
+            completed = True
+            tablesetup = None
+
+    elif tasktype == 'Two_Item_Selection':
+        holdvec, entrydata = [], []
+        # See if only one box is checked and if so what table it is from
+        nc = sum(cks[1] for cks in checked_data)
+        tids = [cks[2] for cks in checked_data if cks[2] != []]
+        tabs = [cks[0] for cks in checked_data if cks[1] != 0]
+        print('nc=', nc)
+        print(tids)
+        print(tabs)
+        if nc == 2:
+            thistable1 = tabs[0]
+            try:
+                thistable2 = tabs[1]
+            except:
+                thistable2 = thistable1
+            avec1 = tids[0]
+            sid1 = avec1[0]
+            try:
+                avec2 = tids[1]
+                sid2 = avec2[0]
+            except:
+                sid2 = avec1[1]
+
+        elif nc > 2:
+            err.append('Too many selections made for this task')
+            completed = True
+            tablesetup = None
+        else:
+            err.append('Must make exactly two selection for this task')
+            completed = True
+            tablesetup = None
+        if nc == 2:
+            tablesetup1 = eval(f'{thistable1}_setup')
+            tablesetup2 = eval(f'{thistable2}_setup')
+            rstring = f"{taskon}_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2)"
+            holdvec, entrydata, err, viewport, completed = eval(rstring)
+            print('returned with:', viewport, completed)
+
+    return holdvec, entrydata, err, completed, viewport, tablesetup
+
+
 def Table_maker(genre):
     username = session['username'].capitalize()
+
     # Gather information about the tables inside the genre
     genre_tables = eval(f"{genre}_genre['genre_tables']")
     quick_buttons = eval(f"{genre}_genre['quick_buttons']")
@@ -107,19 +201,12 @@ def Table_maker(genre):
     task_boxes = eval(f"{genre}_genre['task_boxes']")
     task_box_map = eval(f"{genre}_genre['task_box_map']")
 
+    # Left size is the portion out of 12 devoted to table and document display
     leftsize = 8
-    rightsize = 12 - leftsize
-    leftscreen = 1
-    err = []
-
-    tabletitle = []
-    jscripts = []
-    tfilters = {}
-    tboxes = {}
-    keydata = {}
-    checked_data = []
-    viewport = ['0']*6
+    # Define list variables even if not used in some tasks
+    err, tabletitle, checked_data, jscripts, viewport = [], [], [], [], ['0']*6
     viewport[0] = 'tables'
+    tfilters, tboxes = {}, {}
     returnhit = None
 
     if request.method == 'POST':
@@ -132,22 +219,9 @@ def Table_maker(genre):
 
         returnhit = request.values.get('Return')
         if returnhit is not None:
-
-            # Reset values as if not a Post
-            genre_tables_on = ['off'] * len(genre_tables)
-            genre_tables_on[0] = 'on'
-            tables_on = ['Orders']
-            # Default time filter on entry into table is last 60 days:
-            tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
-            jscripts = ['dtTrucking']
-            taskon, task_iter, task_focus = None, None, None
-            for box in task_boxes:
-                for key, value in box.items():
-                    tboxes[key] = key
-
+            # Asked to reset, so reset values as if not a Post
+            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes = reset_state(task_boxes, genre_tables)
         else:
-
-            print('class8_tasks.py 78 Tablemaker() The taskon here is:', taskon)
             taskon = nononestr(taskon)
 
             # Get data only for tables that have been checked on
@@ -164,7 +238,7 @@ def Table_maker(genre):
                     tasktype = tasklist[0]
                     taskon, task_focus = tasklist[1:]
 
-                # See if a task box has been selected task has a focus and table where focus is the type of information
+                # See if a task box has been selected, if so get task name, type, and focus
                 for box in task_boxes:
                     for key, value in box.items():
                         tboxes[key] = request.values.get(key)
@@ -176,7 +250,6 @@ def Table_maker(genre):
                 print('The task is:', taskon)
                 print('The task focus is:', task_focus)
                 print('The task_iter is:', task_iter)
-                print('class8_tasks.py 105 Tablemaker() Tboxes:', tboxes)
 
             # See if a table filter has been selected, this can take place even during a task
             for filter in table_filters:
@@ -207,109 +280,23 @@ def Table_maker(genre):
     # genre_data = [genre,genre_tables,genre_tables_on,contypes]
     genre_data = eval(f"{genre}_genre")
     genre_data['genre_tables_on'] = genre_tables_on
-    print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
-    print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
-    print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
-    print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
-    print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
+    #print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
+    #print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
+    #print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
+    #print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
+    #print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
 
+    # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
-    #if taskon != '' and taskon != None:
     if hasvalue(taskon):
+        holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
+        if completed:
+            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes = reset_state(task_boxes, genre_tables)
+            tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on, tabletitle, tfilters, jscripts)
+        else: task_iter = int(task_iter) + 1
 
-        completed = False
-        #This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
-        #If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-        print('Ready to run the task:',taskon,'with task focus',task_focus)
-        if tasktype == 'Table_Selected':
-            tablesetup = eval(f'{task_focus}_setup')
-            rstring = f"{taskon}_task({task_focus}_setup, task_iter)"
-            holdvec, entrydata, err, completed = eval(rstring)
-            if completed:
-                tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
-
-        elif tasktype == 'Single_Item_Selection':
-            holdvec, entrydata = [], []
-            # See if only one box is checked and if so what table it is from
-            nc = sum(cks[1] for cks in checked_data)
-            tids = (cks[2] for cks in checked_data if cks[2] != [])
-            tabs = (cks[0] for cks in checked_data if cks[1] != 0)
-            print('nc=', nc)
-            print(tids)
-            print(tabs)
-            if nc == 1:
-                thistable = next(tabs)
-                avec = next(tids)
-                sid = avec[0]
-            elif nc > 1:
-                err.append('Too many selections made for this task')
-                completed = True
-                tablesetup = None
-            else:
-                err.append('Must make a single selection for this task')
-                completed = True
-                tablesetup = None
-            if nc == 1:
-                print('made it here with thistable sid taskiter', thistable, sid, task_iter)
-                tablesetup = eval(f'{thistable}_setup')
-                rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
-                holdvec, entrydata, err, viewport, completed = eval(rstring)
-                print('returned with:',viewport, completed)
-            if completed:
-                taskon, task_iter, task_focus, tasktype = None, 0, None, None
-                tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
-                for box in task_boxes:
-                    for key, value in box.items():
-                        tboxes[key] = key
-
-        elif tasktype == 'Two_Item_Selection':
-            holdvec, entrydata = [], []
-            # See if only one box is checked and if so what table it is from
-            nc = sum(cks[1] for cks in checked_data)
-            tids = [cks[2] for cks in checked_data if cks[2] != []]
-            tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-            print('nc=', nc)
-            print(tids)
-            print(tabs)
-            if nc == 2:
-                thistable1 = tabs[0]
-                try:
-                    thistable2 = tabs[1]
-                except:
-                    thistable2 = thistable1
-                avec1 = tids[0]
-                sid1 = avec1[0]
-                try:
-                    avec2 = tids[1]
-                    sid2 = avec2[0]
-                except:
-                    sid2 = avec1[1]
-
-            elif nc > 2:
-                err.append('Too many selections made for this task')
-                completed = True
-                tablesetup = None
-            else:
-                err.append('Must make exactly two selection for this task')
-                completed = True
-                tablesetup = None
-            if nc == 2:
-                tablesetup1 = eval(f'{thistable1}_setup')
-                tablesetup2 = eval(f'{thistable2}_setup')
-                rstring = f"{taskon}_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2)"
-                holdvec, entrydata, err, viewport, completed = eval(rstring)
-                print('returned with:',viewport, completed)
-            if completed:
-                taskon, task_iter, task_focus, tasktype, tablesetup = None, 0, None, None, None
-                tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
-                for box in task_boxes:
-                    for key, value in box.items():
-                        tboxes[key] = key
-
-
-        if not completed: task_iter = int(task_iter) + 1
         for e in err:
             if 'Created' in e:
                 taskon = None
@@ -334,7 +321,7 @@ def Table_maker(genre):
     if returnhit is not None:
         checked_data = [0,'0',['0']]
 
-    return genre_data, table_data, err, leftscreen, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
+    return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
 
 
@@ -915,7 +902,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
 
 def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2):
-
+    #The match task copies key items from one selection in a table to another selection in another table
     completed = False
     err = [f'Running Match task with iter {task_iter}']
     today = datetime.date.today()
