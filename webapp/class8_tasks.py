@@ -957,11 +957,11 @@ def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_d
         setattr(olddat1, f'{col}', thisvalue2)
     db.session.commit()
 
-    for jx, col in enumerate(c22):
-        thisvalue1 = getattr(olddat1, f'{col}')
-        thisvalue2 = getattr(olddat2, f'{c21[jx]}')
+    for jx, col in enumerate(c21):
+        thisvalue1 = getattr(olddat1, f'{c22[jx]}')
+        thisvalue2 = getattr(olddat2, f'{col}')
         print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
-        setattr(olddat2, f'{col}', thisvalue2)
+        setattr(olddat2, f'{col}', thisvalue1)
     db.session.commit()
     completed = True
 
