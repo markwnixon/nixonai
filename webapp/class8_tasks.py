@@ -922,29 +922,16 @@ def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_d
     holdvec = []
     entrydata = []
 
-    table1 = tablesetup1['table']
-    table2 = tablesetup2['table']
-
-    entrydata1 = tablesetup1['entry data']
-    filter1 = tablesetup1['filter']
-    filterval1 = tablesetup1['filterval']
-    creators1 = tablesetup1['creators']    # Gather the data for the selected row
-    nextquery1 = f"{table1}.query.get({sid1})"
-    olddat1 = eval(nextquery1)
-    colmatch1 = tablesetup1['matchfrom'][table2]
-    print('colmatch1',colmatch1)
-    c11 = [colm[0] for colm in colmatch1]
-    c12 = [colm[1] for colm in colmatch1]
-
-    entrydata2 = tablesetup2['entry data']
-    filter2 = tablesetup1['filter']
-    filterval2 = tablesetup2['filterval']
-    creators2 = tablesetup2['creators']    # Gather the data for the selected row
-    nextquery2 = f"{table2}.query.get({sid2})"
-    olddat2 = eval(nextquery2)
-    colmatch2 = tablesetup2['matchfrom'][table1]
-    c21 = [colm[0] for colm in colmatch2]
-    c22 = [colm[1] for colm in colmatch2]
+    table1, table2 = tablesetup1['table'], tablesetup2['table']
+    entrydata1, entrydata2 = tablesetup1['entry data'], tablesetup2['entry data']
+    filter1, filter2 = tablesetup1['filter'], tablesetup2['filter']
+    filterval1, filterval2 = tablesetup1['filterval'], tablesetup2['filterval']
+    creators1, creators2 = tablesetup1['creators'], tablesetup2['creators']    # Gather the data for the selected row
+    nextquery1, nextquery2 = f"{table1}.query.get({sid1})", f"{table2}.query.get({sid2})"
+    olddat1, olddat2 = eval(nextquery1), eval(nextquery2)
+    colmatch1, colmatch2 = tablesetup1['matchfrom'][table2], tablesetup2['matchfrom'][table1]
+    c11, c12 = [colm[0] for colm in colmatch1], [colm[1] for colm in colmatch1]
+    c21, c22 = [colm[0] for colm in colmatch2], [colm[1] for colm in colmatch2]
 
     viewport = None
     print('c11, c12', c11, c12)
@@ -963,8 +950,8 @@ def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_d
         print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
         setattr(olddat2, f'{col}', thisvalue1)
     db.session.commit()
-    completed = True
 
+    completed = True
     return holdvec, entrydata, err, viewport, completed
 
 
