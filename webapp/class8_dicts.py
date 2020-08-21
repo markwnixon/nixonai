@@ -64,11 +64,11 @@ Trucking_genre = {'table': 'Orders',
 
                                     'Money Flow':
                                         {
-                                         'Inv Edit' : ['Single_Item_Selection', 'EditItem', 'Invoice'],
-                                         'Quote Edit' : ['Single_Item_Selection', 'EditItem', 'Quote'],
-                                         'Package Send' : ['Single_Item_Selection', 'EditItem', 'Package'],
-                                         'Rec Payment' : ['Single_Item_Selection', 'EditItem', 'PayInvoice'],
-                                         'Rec by Acct' : ['Pure_Task', 'Receive_on_Account', '']
+                                         'Inv Edit' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
+                                         'Quote Edit' : ['Single_Item_Selection', 'MakeQuote', 'Quote'],
+                                         'Package Send' : ['Single_Item_Selection', 'MakePackage', 'Package'],
+                                         'Rec Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
+                                         'Rec by Acct' : ['Pure_Task', 'ReceiveByAccount', '']
                                         },
 
                                     'View Docs':
