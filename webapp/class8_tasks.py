@@ -107,10 +107,11 @@ def reset_state(task_boxes, genre_tables):
     tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
     jscripts = ['dtTrucking']
     taskon, task_iter, task_focus = None, None, None
+    viewport = ['tables'] + ['0'] * 5
     for box in task_boxes:
         for key, value in box.items():
             tboxes[key] = key
-    return genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes
+    return genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport
 
 def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err):
     completed = False
@@ -182,9 +183,9 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             completed = True
             tablesetup = None
         if nc == 2:
-            tablesetup1 = eval(f'{thistable1}_setup')
+            tablesetup = eval(f'{thistable1}_setup')
             tablesetup2 = eval(f'{thistable2}_setup')
-            rstring = f"{taskon}_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2)"
+            rstring = f"{taskon}_task(genre, task_iter, tablesetup, tablesetup2, task_focus, checked_data, sid1, sid2)"
             holdvec, entrydata, err, viewport, completed = eval(rstring)
             print('returned with:', viewport, completed)
 
@@ -204,8 +205,8 @@ def Table_maker(genre):
     # Left size is the portion out of 12 devoted to table and document display
     leftsize = 8
     # Define list variables even if not used in some tasks
-    err, tabletitle, checked_data, jscripts, viewport = [], [], [], [], ['0']*6
-    viewport[0] = 'tables'
+    err, tabletitle, checked_data, jscripts = [], [], [], []
+    viewport = ['tables'] + ['0']*5
     tfilters, tboxes = {}, {}
     returnhit = None
 
@@ -220,7 +221,7 @@ def Table_maker(genre):
         returnhit = request.values.get('Return')
         if returnhit is not None:
             # Asked to reset, so reset values as if not a Post
-            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes = reset_state(task_boxes, genre_tables)
+            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
         else:
             taskon = nononestr(taskon)
 
@@ -293,7 +294,7 @@ def Table_maker(genre):
     if hasvalue(taskon):
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
-            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes = reset_state(task_boxes, genre_tables)
+            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
             tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
 
@@ -302,11 +303,14 @@ def Table_maker(genre):
                 taskon = None
                 task_iter = 0
         if request.values.get('Cancel') is not None:
-            err = ['New entry cancelled']
+            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(
+                task_boxes, genre_tables)
+            err = ['Entry canceled']
             taskon = None
             task_iter = 0
             holdvec = [''] * 30
             entrydata = []
+            viewport = ['tables'] + ['0']*5
     else:
         taskon = None
         task_iter = 0
@@ -608,6 +612,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
         for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
 
+    viewport[0] = 'show_doc_left'
+    docref = getattr(olddat, 'Source')
+    viewport[2] = '/' + tpath(f'{table}', docref)
+
     return holdvec, entrydata, err, viewport, completed
 
 def Inv_task(iter):
@@ -615,8 +623,6 @@ def Inv_task(iter):
 
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
-
-
 
 
 
@@ -655,14 +661,6 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         if returnhit is not None: completed = True
 
     return holdvec, entrydata, err, viewport, completed
-
-
-
-
-
-
-
-
 
 
 
@@ -756,16 +754,6 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 if returnhit is not None: completed = True
 
     return holdvec, entrydata, err, viewport, completed
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -902,6 +890,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
 
 def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2):
+
     #The match task copies key items from one selection in a table to another selection in another table
     completed = False
     err = [f'Running Match task with iter {task_iter}']
