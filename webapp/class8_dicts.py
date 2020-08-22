@@ -233,4 +233,22 @@ Services_setup = {'name' : 'Service',
                   'copyswaps' : {}
                   }
 
+Invoices_setup = {'name' : 'Invoice',
+                  'table': 'Invoices',
+                  'filter': None,
+                  'filterval': None,
+                  'creators': [],
+                  'ukey': 'Jo',
+                  'entry data': [['Service', 'Service', 'Service', 'text', 'text', 0, 'ok'],
+                                 ['Price', 'Price', 'Price', 'text', 'dollar', 0, 'ok']],
+                  'colorfilter': None,
+                  'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
+                                {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
+                                {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                  'jscript': 'dtHorizontalVerticalExample4',
+                  'documents': ['None'],
+                  'source': ['None'],
+                  'copyswaps' : {}
+                  }
+
 CT_setup = {'table': '0'}

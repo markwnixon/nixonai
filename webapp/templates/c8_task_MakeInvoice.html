@@ -1,0 +1,63 @@
+
+{% set update = 'invoUpdate'%}
+{% set logonly = 'logInvo'%}
+{% set etype = 'Invoice' %}
+{% set jo = holdvec[0] %}
+{% set invodate = holdvec[1] %}
+{% set sdata = holdvec[2] %}
+
+<br>
+<div class="card">
+
+    <div class="card-header">
+        Edit Invoice {{ jo }}
+        <button type="submit" class="btn btn-elegant btn-sm" name="{{update}}">Update<br>Data</button>
+        <button class="btn  btn-blue btn-sm" type ="submit" name="Return">Return<br>No Log</button>
+        <button type="submit" class="btn btn-green btn-sm" name="{{logonly}}">&nbsp; &nbsp; Log &nbsp; &nbsp;<br>Only</button>
+        <button type="submit" class="btn btn-green btn-sm" name="emailInvo">&nbsp; &nbsp; Log &nbsp; &nbsp;<br>Email</button>
+    </div>
+
+<div class="card-body">
+
+    <div class="p-0">
+        <select class="mdb-select md-form" name="invoserv" onchange="this.form.submit()">
+            <option value="" disabled selected>Add Services to Invoice</option>
+            {% for sd in sdata %}
+                <option value="{{ sd.id }}">{{ sd.Service }} ${{ sd.Price }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+
+<table class="table table-condensed table-hover">
+<tbody>
+<tr><td><div class="input-group-text">Invoice Date:</div></td><td colspan="3"><input class="form-control" type="date" value={{invodate}} name="invodate"></td></tr>
+
+{% for data in ldata %}
+    <tr><td colspan="4'"></td></tr>
+        <tr><td><div class="input-group-text">Item:</div></td><td colspan="3"><div class="input-group-text">{{data.Service}}</div></td></tr>
+        <tr><td><div class="input-group-text">Quantity:</div></td><td><input class="form-control" type="text" value={{data.Qty}} name="qty{{data.id}}"></td>
+            <td><div class="input-group-text">Cost Each:</div></td><td><input class="form-control" type="text" value={{data.Ea}} name="cost{{data.id}}"></td></tr>
+        <tr><td><div class="input-group-text">Description:</div></td><td colspan="3"><textarea class="form-control" type="text" name="desc{{data.id}}" rows="2">{{data.Description}}</textarea></td></tr>
+{% endfor %}
+</tbody></table>
+
+<br>
+
+<button type="submit" class="btn btn-elegant btn-sm" name="{{update}}">Update<br>Data</button>
+<button class="btn  btn-blue btn-sm" type ="submit" name="Return">Return<br>No Log</button>
+<button type="submit" class="btn btn-green btn-sm" name="{{logonly}}">&nbsp; &nbsp; Log &nbsp; &nbsp;<br>Only</button>
+<button type="submit" class="btn btn-green btn-sm" name="emailInvo">&nbsp; &nbsp; Log &nbsp; &nbsp;<br>Email</button>
+
+<input type = "hidden" name="inco" value="{{inco}}">
+<input type = "hidden" name="invo" value="{{invo}}">
+<input type = "hidden" name="invooder" value="{{invooder}}">
+
+</div>
+</div>
+
+
+<input type = "hidden" name ="invooder" value= {{invooder}}>
+<input type = "hidden" name ="invo" value= {{invo}}>
+<input type = "hidden" name ="odor" value= {{odor}}>
+<input type = "hidden" name ="cache" value= {{cache}}>
