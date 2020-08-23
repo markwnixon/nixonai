@@ -299,10 +299,10 @@ def Table_maker(genre):
             tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
 
-        for e in err:
-            if 'Created' in e:
-                taskon = None
-                task_iter = 0
+        #for e in err:
+            #if 'Created' in e:
+                #taskon = None
+                #task_iter = 0
         if request.values.get('Cancel') is not None:
             genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(
                 task_boxes, genre_tables)

@@ -5,6 +5,7 @@
 {% set jo = holdvec[0] %}
 {% set invodate = holdvec[1] %}
 {% set sdata = holdvec[2] %}
+Made it to c8_task_MakeInvoice.html<br>
 
 <br>
 <div class="card">
@@ -33,7 +34,7 @@
 <tbody>
 <tr><td><div class="input-group-text">Invoice Date:</div></td><td colspan="3"><input class="form-control" type="date" value={{invodate}} name="invodate"></td></tr>
 
-{% for data in ldata %}
+{% for data in entrydata %}
     <tr><td colspan="4'"></td></tr>
         <tr><td><div class="input-group-text">Item:</div></td><td colspan="3"><div class="input-group-text">{{data.Service}}</div></td></tr>
         <tr><td><div class="input-group-text">Quantity:</div></td><td><input class="form-control" type="text" value={{data.Qty}} name="qty{{data.id}}"></td>

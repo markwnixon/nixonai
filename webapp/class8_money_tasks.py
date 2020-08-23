@@ -60,6 +60,35 @@ def initialize_invoice(myo, err):
             db.session.commit()
     return err
 
+def add_service(myo):
+    # These are the services we wish to add to the invoice
+    invoserv = request.values.get('invoserv')
+    if invoserv is not None:
+        servid = nonone(invoserv)
+        print('servid=',servid)
+        if servid > 0:
+            mys = Services.query.get(servid)
+            print('service is',mys.Service)
+            if mys is not None:
+                qty = 1
+                descript = ' '
+                if mys.Service == 'Line Haul':
+                    try:
+                        descript = 'Order ' + myo.Order + ' Line Haul ' + myo.Company + ' to ' + myo.Company2
+                    except:
+                        descript = 'Order, Load Comp, or Delv Comp Missing'
+                elif mys.Service == 'Detention':
+                    descript = 'Actual Time of Load = ' + str(2 + qty) + ' Hours'
+                elif mys.Service == 'Storage':
+                    descript = 'Days of Storage'
+                elif mys.Service == 'Chassis Fees':
+                    descript = 'Days of Chassis'
+                amount = float(mys.Price)
+                input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service=mys.Service, Description=descript, Ea=d2s(
+                    amount), Qty=qty, Amount=d2s(amount), Total=0.00, Date=today, Original=None, Status='New')
+                db.session.add(input)
+                db.session.commit()
+
 def update_invoice(myo, err):
     # Now we have an initial invoice, and may have added parts so we need to update the totals for all the components of the invoice:
     # updateinvo(myo.Jo, myo.Date)
@@ -88,12 +117,7 @@ def update_invoice(myo, err):
         pdata3 = Drops.query.filter(Drops.id == myo.Did).first()
         cache = myo.Icache
 
-        docfile = make_invo_doc(myo, ldata, pdata1, pdata2, pdata3, cache, invodate, 0)
-        if cache > 1:
-            docref = f'tmp/{scac}/data/vinvoice/INV' + myo.Jo + 'c' + str(cache) + '.pdf'
-            # Store for future use
-        else:
-            docref = f'tmp/{scac}/data/vinvoice/INV' + myo.Jo + '.pdf'
+        docref = make_invo_doc(myo, ldata, pdata1, pdata2, pdata3, cache, invodate, 0)
 
         for ldatl in ldata:
             ldatl.Pid = pdata1.id
@@ -101,16 +125,16 @@ def update_invoice(myo, err):
             db.session.commit()
 
         myo.Invoice = os.path.basename(docref)
-        myo.Icache = cache
+        myo.Icache = cache + 1
         myo.InvoTotal = d2s(total)
         db.session.commit()
 
         err.append('Viewing ' + docref)
         idata = Invoices.query.filter(Invoices.Jo == jo).all()
 
-    return idata, docref, err
+    return idata, docref, err, total
 
-def rehash_invoice(myo, err):
+def rehash_invoice(myo, err, invodate):
     jo = myo.Jo
     ldata = Invoices.query.filter(Invoices.Jo == jo).all()
     itotal = 0
@@ -144,8 +168,7 @@ def rehash_invoice(myo, err):
     Invoices.query.filter(Invoices.Qty == 0).delete()
     db.session.commit()
 
-    ldata = Invoices.query.filter(Invoices.Jo == jo).all()
-    return ldata, err
+    return err
 
 
 def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
@@ -180,7 +203,14 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 invodate = datetime.datetime.strptime(invodate, '%Y-%m-%d')
             holdvec[1] = invodate
 
-            entrydata, docref, err = update_invoice(odata1, err)
+            invoserv = request.values.get('invoserv')
+            if invoserv is not None:
+                add_service(odata1)
+            else:
+                err = rehash_invoice(odata1, err, invodate)
+
+            entrydata, docref, err, itotal = update_invoice(odata1, err)
+
 
             # Create invoice code for order
             odata1.Istat = 1
@@ -188,15 +218,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
             db.session.commit()
 
-            update_item = request.values.get('Update Item')
-            if update_item is not None:
-                if failed == 0:
-                    for jx, entry in enumerate(entrydata): setattr(modata, f'{entry[0]}', holdvec[jx])
-                    db.session.commit()
-                    err.append(f"Updated entry in {tablesetup['table']}")
-                    completed = True
-                else:
-                    err.append(f'Cannot update entry until input errors shown in red below are resolved')
+            print('entrydata=', entrydata)
 
         else:
             invodate = today
@@ -208,11 +230,11 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             entrydata, docref, err = update_invoice(odata1, err)
             #emaildata = etemplate_truck('invoice', 0, modata)
 
-        odata1.Invoice = docref
+        odata1.Invoice = os.path.basename(docref)
         db.session.commit()
         print('docref=',docref)
         viewport[0] = 'show_doc_left'
-        viewport[2] = '/' + tpath(f'manifest', docref)
+        viewport[2] = '/' + tpath('invoice',odata1.Invoice)
         print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')
