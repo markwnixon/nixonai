@@ -89,7 +89,7 @@ def add_service(myo):
                 db.session.add(input)
                 db.session.commit()
 
-def update_invoice(myo, err):
+def update_invoice(myo, err, tablesetup, invostyle):
     # Now we have an initial invoice, and may have added parts so we need to update the totals for all the components of the invoice:
     # updateinvo(myo.Jo, myo.Date)
     docref = ''
@@ -117,7 +117,7 @@ def update_invoice(myo, err):
         pdata3 = Drops.query.filter(Drops.id == myo.Did).first()
         cache = myo.Icache
 
-        docref = make_invo_doc(myo, ldata, pdata1, pdata2, pdata3, cache, invodate, 0)
+        docref = make_invo_doc(myo, ldata, pdata1, pdata2, pdata3, cache, invodate, 0, tablesetup, invostyle)
 
         for ldatl in ldata:
             ldatl.Pid = pdata1.id
@@ -178,6 +178,16 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     #entrydata = tablesetup['entry data']
     #numitems = len(entrydata)
     #holdvec = [''] * numitems
+    invoicetypes_allowed = tablesetup['invoicetypes']
+    invoicetypes = [key for key, value in invoicetypes_allowed.items()]
+    holdvec[3] = invoicetypes
+    # set the invoice style:
+    invostyle = request.values.get('invoicestyle')
+    if invostyle is None:
+        invostyle = 'Drayage Import'
+    headers = tablesetup['invoicetypes'][invostyle]
+    print('the headers are:', headers)
+    holdvec[4] = invostyle
 
     returnhit = request.values.get('Finished')
     if returnhit is not None: completed = True
@@ -209,7 +219,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             else:
                 err = rehash_invoice(odata1, err, invodate)
 
-            entrydata, docref, err, itotal = update_invoice(odata1, err)
+            entrydata, docref, err, itotal = update_invoice(odata1, err, tablesetup, invostyle)
 
 
             # Create invoice code for order
@@ -227,7 +237,8 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             holdvec[1] = invodate
 
             err = initialize_invoice(odata1, err)
-            entrydata, docref, err = update_invoice(odata1, err)
+            entrydata, docref, err, itotal = update_invoice(odata1, err, tablesetup, invostyle)
+
             #emaildata = etemplate_truck('invoice', 0, modata)
 
         odata1.Invoice = os.path.basename(docref)

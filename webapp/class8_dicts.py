@@ -147,7 +147,37 @@ Orders_setup = {'name' : 'Trucking Job',
                                 'Interchange': [['Booking', 'Release'], ['Container','Container'],['Type', 'ConType'], ['Chassis', 'Chassis']],
                                 'Customers': [['Shipper', 'Shipper']],
                                 'Services': []
-                              }
+                              },
+                'invoicetypes' : {
+                                    'Drayage Import' : {
+                                                        'Top Blocks' : ['Bill To', 'Pickup and Return', 'Deliver To'],
+                                                        'Middle Blocks' : ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
+                                                        'Middle Items' : ['Order', 'BOL', 'Container', 'Date', 'Date2'],
+                                                        'Lower Blocks' : ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                                        } ,
+
+                                    'Drayage Export': {
+                                        'Top Blocks': ['Bill To', 'Pickup and Return', 'Load At'],
+                                        'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Job Start', 'Job Finished'],
+                                        'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                                      },
+                                    'Trailer Moves': {
+                                        'Top Blocks': ['Bill To', 'Location Start', 'Location Included'],
+                                        'Middle Blocks': ['Order #', 'Trailer #', 'Trailer #', 'Job Start', 'Job Finished'],
+                                        'Middle Items' : ['Order', 'Container', 'Booking', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                                     },
+                                     'OTR':         {
+                                          'Top Blocks': ['Bill To', 'Pickup Location', 'Delivery Location'],
+                                          'Middle Blocks': ['Order #', 'Unit #', 'Trailer #', 'Job Start',
+                                                            'Job Finished'],
+                                          'Middle Items' : ['Order', 'Truck', 'Container', 'Date', 'Date2'],
+                                          'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each',
+                                                           'Amount']
+                                                    }
+
+                                }
                 }
 
 Interchange_setup = {'name' : 'Interchange Ticket',

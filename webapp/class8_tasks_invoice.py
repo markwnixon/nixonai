@@ -3,14 +3,52 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import Image
 from reportlab.lib.units import inch
+from reportlab.pdfbase.pdfmetrics import stringWidth
+
 from webapp.viewfuncs import nonone, nononef, nononestr, dollar, avg, comporname, fullname, address
 import csv
 import math
 import datetime
 import shutil
 from webapp.CCC_system_setup import addpath, bankdata, scac
+import numbers
 
-def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment):
+def writelines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, lineheight):
+    textWidth = stringWidth(thistext, thisfont, thisfontsize)
+    if textWidth > fixed_width:
+        breaklines = thistext.split()
+        newlines = []
+        currentline = 0
+        newlines.append('')
+        for word in breaklines:
+            testline = newlines[currentline] + word
+            textWidth = stringWidth(testline, thisfont, thisfontsize)
+            if textWidth < fixed_width:
+                newlines[currentline] = testline + ' '
+            else:
+                newlines.append(word + ' ')
+                currentline = currentline + 1
+        for thisline in newlines:
+            c.drawString(xdist, ydist, thisline)
+            ydist = ydist - lineheight
+        ydist = ydist + lineheight
+    else:
+        c.drawString(xdist, ydist, thistext)
+
+    return xdist, ydist
+
+
+def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment, tablesetup, invostyle):
+
+    table = tablesetup['table']
+    header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
+    header2 = tablesetup['invoicetypes'][invostyle]['Middle Blocks']
+    header3 = tablesetup['invoicetypes'][invostyle]['Lower Blocks']
+    print('3headers',header1, header2, header3)
+    lh1 = len(header1)
+    lh2 = len(header2)
+    lh3 = len(header3)
+    header2items = tablesetup['invoicetypes'][invostyle]['Middle Items']
 
     # pdata1:Bid (Bill To)
     # pdata2:Lid (Load At)
@@ -71,17 +109,20 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
         for i in range(5):
             shipto[i] = ' '
 
-    if type == 'T':
-        line1 = ['Order #', 'Booking #', 'Job Start',
-                 'Job Finish', 'Bill of Lading', 'Container No.']
-    line2 = ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+    line1 = header2
+    line2 = header3
+    line3 = []
+    for header in header2items:
+        thisvalue = getattr(odata,header)
+        if thisvalue is None: thisvalue = ''
+        if isinstance(thisvalue, numbers.Number):
+            thisvalue = str(thisvalue)
+        elif isinstance(thisvalue, datetime.date):
+            thisvalue = thisvalue.strftime('%m/%d/%Y')
+        line3.append(thisvalue)
 
-    if type == 'T':
-        chassis = ' '
-        try:
-            line3 = [odata.Order, odata.Booking, date1, date2, odata.BOL, odata.Container]
-        except:
-            line3 = [odata.Order, odata.Booking, date1, date2, ' ', ' ']
+    print('line3',line3)
+
 
     qnote, note, bank, us, lab, logoi = bankdata('FC')
     lab1=lab[0]
@@ -125,7 +166,12 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     c = canvas.Canvas(file1, pagesize=letter)
     c.setLineWidth(1)
 
-    c.drawImage(logoi, 180, 670, mask='auto')
+    logo = logoi[0]
+    logo_width = logoi[1]
+    logo_height = logoi[2]
+    logox = 300-logo_width/2.0
+
+    c.drawImage(logo, logox, 670, mask='auto')
 
     # Date and JO boxes
     dateline = m1+8.2*dl
@@ -265,14 +311,14 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
             c.drawCentredString(ctr[j], top, i)
             j = j+1
 
-        c.drawString(n2+tb, top, line5)
+        xdist, top = writelines(c, 260, line5, 'Helvetica', 9, n2 + tb, top, dh)
 
         j = 0
         for i in line6:
             ctr = [n4-tb*2, rtm-tb*2]
             c.drawRightString(ctr[j], top, dollar(i))
             j = j+1
-        top = top-dh
+        top = top-1.5*dh
 
     if payment != 0:
         c.setFont('Helvetica-Bold', 18, leading=None)

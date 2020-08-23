@@ -5,6 +5,7 @@
 {% set jo = holdvec[0] %}
 {% set invodate = holdvec[1] %}
 {% set sdata = holdvec[2] %}
+{% set invdata = holdvec[3] %}
 Made it to c8_task_MakeInvoice.html<br>
 
 <br>
@@ -25,6 +26,12 @@ Made it to c8_task_MakeInvoice.html<br>
             <option value="" disabled selected>Add Services to Invoice</option>
             {% for sd in sdata %}
                 <option value="{{ sd.id }}">{{ sd.Service }} ${{ sd.Price }}</option>
+            {% endfor %}
+        </select>
+        <select class="mdb-select md-form" name="invoicestyle" onchange="this.form.submit()">
+            <option value="" disabled selected>Change Invoice Style</option>
+            {% for ld in invdata %}
+                <option {% if holdvec[4] == ld %} selected {% endif %} value="{{ ld }}">{{ ld }}</option>
             {% endfor %}
         </select>
     </div>
