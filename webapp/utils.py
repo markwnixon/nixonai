@@ -201,13 +201,14 @@ def nons(input):
     return input
 
 def nononef(input):
-    if input is None:
-        output = 0.00
-    elif input=='' or input==' ' or input=='None':
-        output=0.00
-    else:
+    if hasvalue(input):
         input=input.replace('$','').replace(',','')
-        output=float(input)
+        try:
+            output=float(input)
+        except:
+            output = 0.00
+    else:
+        output = 0.00
     return output
 
 def erud(err):

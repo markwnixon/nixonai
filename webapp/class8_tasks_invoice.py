@@ -40,15 +40,14 @@ def writelines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, li
 
 def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment, tablesetup, invostyle):
 
-    table = tablesetup['table']
-    header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
-    header2 = tablesetup['invoicetypes'][invostyle]['Middle Blocks']
+
+
     header3 = tablesetup['invoicetypes'][invostyle]['Lower Blocks']
     print('3headers',header1, header2, header3)
-    lh1 = len(header1)
+
     lh2 = len(header2)
     lh3 = len(header3)
-    header2items = tablesetup['invoicetypes'][invostyle]['Middle Items']
+
 
     # pdata1:Bid (Bill To)
     # pdata2:Lid (Load At)
@@ -75,121 +74,33 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
         except:
             paydate = payment[2]
 
-    billto = list(range(5))
-    if pdata1 is not None:
-        billto[0] = comporname(pdata1.Company, fullname(pdata1.First, pdata1.Middle, pdata1.Last))
-        billto[1] = nononestr(pdata1.Addr1)
-        billto[2] = nononestr(pdata1.Addr2)
-        billto[3] = nononestr(pdata1.Telephone)
-        # billto[4]=nononestr(pdata1.Email)
-        billto[4] = ' '
-    else:
-        for i in range(5):
-            billto[i] = ' '
-
-    loadat = list(range(5))
-    if pdata2 is not None:
-        loadat[0] = pdata2.Entity.title()
-        loadat[1] = nononestr(pdata2.Addr1).title()
-        loadat[2] = nononestr(pdata2.Addr2).title()
-        loadat[3] = ''
-        loadat[4] = ''
-    else:
-        for i in range(5):
-            loadat[i] = ' '
-
-    shipto = list(range(5))
-    if pdata3 is not None:
-        shipto[0] = pdata3.Entity.title()
-        shipto[1] = nononestr(pdata3.Addr1).title()
-        shipto[2] = nononestr(pdata3.Addr2).title()
-        shipto[3] = ''
-        shipto[4] = ''
-    else:
-        for i in range(5):
-            shipto[i] = ' '
-
-    line1 = header2
-    line2 = header3
-    line3 = []
-    for header in header2items:
-        thisvalue = getattr(odata,header)
-        if thisvalue is None: thisvalue = ''
-        if isinstance(thisvalue, numbers.Number):
-            thisvalue = str(thisvalue)
-        elif isinstance(thisvalue, datetime.date):
-            thisvalue = thisvalue.strftime('%m/%d/%Y')
-        line3.append(thisvalue)
-
-    print('line3',line3)
-
-
-    qnote, note, bank, us, lab, logoi = bankdata('FC')
-    lab1=lab[0]
-    lab2=lab[1]
-
-# ___________________________________________________________
-
-    ltm = 36
-    rtm = 575
-    ctrall = 310
-    left_ctr = 170
-    right_ctr = 480
-    dl = 17.6
-    tdl = dl*2
-    hls = 530
-    m1 = hls-dl
-    m2 = hls-2*dl
-    m3 = hls-3*dl
-    m4 = hls-4*dl
-    m5 = hls-18*dl
-    m6 = hls-23*dl
-    m7 = hls-27*dl
+    # Set numberical formatting values:
+    ltm, ctrall, rtm = 36, 310, 575
+    dl, hls = 17.6, 530
+    m1, m2, m3, m4, m5, m6, m7 = hls - dl, hls - 2 * dl, hls - 3 * dl, hls - 4 * dl, hls - 18 * dl, hls - 23 * dl, hls - 27 * dl
     fulllinesat = [m1, m2, m3, m4, m5, m6, m7]
-    p1 = ltm+87
-    p2 = ltm+180
-    p3 = ctrall
-    p4 = rtm-180
-    p5 = rtm-100
+    p1, p2, p3, p4 p5 = ltm + 87, ltm + 180, ctrall, rtm - 180, rtm - 100
     sds1 = [p1, p2, p3, p4, p5]
-    n1 = ltm+58
-    n2 = ltm+128
-    n3 = rtm-140
-    n4 = rtm-70
+    n1, n2, n3, n4 = ltm + 58, ltm + 128, rtm - 140, rtm - 70
     sds2 = [n1, n2, n3, n4]
-    q1 = ltm+180
-    q2 = rtm-180
+    q1, q2 = ltm + 180, rtm - 180
     sds3 = [q1, q2]
     bump = 2.5
-    tb = bump*2
-
+    tb = bump * 2
     c = canvas.Canvas(file1, pagesize=letter)
     c.setLineWidth(1)
 
+    #Create background logo
+    qnote, note, bank, us, lab, logoi = bankdata('FC')
+    lab1=lab[0]
+    lab2=lab[1]
     logo = logoi[0]
     logo_width = logoi[1]
     logo_height = logoi[2]
-    logox = 300-logo_width/2.0
-
+    logox = 300 - logo_width / 2.0
     c.drawImage(logo, logox, 670, mask='auto')
 
-    # Date and JO boxes
-    dateline = m1+8.2*dl
-    c.rect(rtm-150, m1+7*dl, 150, 2*dl, stroke=1, fill=0)
-    c.line(rtm-150, dateline, rtm, dateline)
-    c.line(rtm-75, m1+7*dl, rtm-75, m1+9*dl)
-
-    if type == 'T':
-        # Address boxes
-        ctm = 218
-        c.rect(ltm, m1+dl, 175, 5*dl, stroke=1, fill=0)
-        c.rect(ctm, m1+dl, 175, 5*dl, stroke=1, fill=0)
-        c.rect(rtm-175, m1+dl, 175, 5*dl, stroke=1, fill=0)
-        level1 = m1+5*dl
-        c.line(ltm, level1, ltm+175, level1)
-        c.line(ctm, level1, ctm+175, level1)
-        c.line(rtm-175, level1, rtm, level1)
-
+    #create background lines
     for i in fulllinesat:
         c.line(ltm, i, rtm, i)
     for k in sds1:
@@ -203,25 +114,114 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     h1 = avg(m6, m7)-3
     c.line(q2, h1, rtm, h1)
 
+    # Write the document title
     c.setFont('Helvetica-Bold', 24, leading=None)
     c.drawCentredString(rtm-75, dateline+1.5*dl, 'Invoice')
 
+    # Set default font
     c.setFont('Helvetica', 11, leading=None)
 
+
+    # Date and JO boxes
+    dateline = m1+8.2*dl
+    c.rect(rtm-150, m1+7*dl, 150, 2*dl, stroke=1, fill=0)
+    c.line(rtm-150, dateline, rtm, dateline)
+    c.line(rtm-75, m1+7*dl, rtm-75, m1+9*dl)
     c.drawCentredString(rtm-112.5, dateline+bump, 'Date')
     c.drawCentredString(rtm-37.7, dateline+bump, 'Invoice #')
 
-    c.drawString(ltm+bump*3, m1+5*dl+bump*2, 'Bill To')
-    c.drawString(ctm+bump*3, m1+5*dl+bump*2, 'Load At')
-    c.drawString(rtm-170+bump*2, m1+5*dl+bump*2, 'Deliver To')
+    # Top Boxes (Address boxes)
+    ctm = 218
+    level1 = m1+5*dl
+    header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
+    lh1 = len(header1)
+
+    if lh1 > 0:
+        c.rect(ltm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
+        c.line(ltm, level1, ltm + 175, level1)
+        c.drawString(ltm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[0]}')
+        billto = list(range(5))
+        if pdata1 is not None:
+            billto[0] = comporname(pdata1.Company, fullname(pdata1.First, pdata1.Middle, pdata1.Last))
+            billto[1] = nononestr(pdata1.Addr1)
+            billto[2] = nononestr(pdata1.Addr2)
+            billto[3] = nononestr(pdata1.Telephone)
+            # billto[4]=nononestr(pdata1.Email)
+            billto[4] = ' '
+        else:
+            for i in range(5):
+                billto[i] = ' '
+
+    if lh1 > 1:
+        c.rect(ctm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
+        c.line(ctm, level1, ctm + 175, level1)
+        c.drawString(ctm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[1]}')
+        loadat = list(range(5))
+        if pdata2 is not None:
+            loadat[0] = pdata2.Entity.title()
+            loadat[1] = nononestr(pdata2.Addr1).title()
+            loadat[2] = nononestr(pdata2.Addr2).title()
+            loadat[3] = ''
+            loadat[4] = ''
+        else:
+            for i in range(5):
+                loadat[i] = ' '
+
+    if lh1 > 2:
+        c.rect(rtm - 175, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
+        c.line(rtm - 175, level1, rtm, level1)
+        c.drawString(rtm - 170 + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[2]}')
+        shipto = list(range(5))
+        if pdata3 is not None:
+            shipto[0] = pdata3.Entity.title()
+            shipto[1] = nononestr(pdata3.Addr1).title()
+            shipto[2] = nononestr(pdata3.Addr2).title()
+            shipto[3] = ''
+            shipto[4] = ''
+        else:
+            for i in range(5):
+                shipto[i] = ' '
+
+
+    #Create the middle row headers
+    header2 = tablesetup['invoicetypes'][invostyle]['Middle Blocks']
+    header2items = tablesetup['invoicetypes'][invostyle]['Middle Items']
+    lh2 = len(header2)
+
+    line1 = header2
+    line3 = []
+    for header in header2items:
+        thisvalue = getattr(odata,header)
+        if thisvalue is None: thisvalue = ''
+        if isinstance(thisvalue, numbers.Number):
+            thisvalue = str(thisvalue)
+        elif isinstance(thisvalue, datetime.date):
+            thisvalue = thisvalue.strftime('%m/%d/%Y')
+        line3.append(thisvalue)
 
     ctr = [avg(ltm, p1), avg(p1, p2), avg(p2, p3), avg(p3, p4), avg(p4, p5), avg(p5, rtm)]
     for j, i in enumerate(line1):
         c.drawCentredString(ctr[j], m2+tb, i)
 
+
+
+
+# ___________________________________________________________
+
+    line2 = header3
     ctr = [avg(ltm, n1), avg(n1, n2), avg(n2, n3), avg(n3, n4), avg(n4, rtm)]
     for j, i in enumerate(line2):
         c.drawCentredString(ctr[j], m4+tb, i)
+
+
+
+
+
+
+
+
+
+
 
     dh = 12
     ct = 305

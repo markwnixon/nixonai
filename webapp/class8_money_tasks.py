@@ -34,9 +34,7 @@ def initialize_invoice(myo, err):
         bid = myo.Bid
         lid = myo.Lid
         did = myo.Did
-        con = myo.Container
 
-        print(bid, lid, did)
         if not hasinput(bid):
             pdat = People.query.filter(People.Company==myo.Shipper).first()
             bid = pdat.id
@@ -144,15 +142,13 @@ def rehash_invoice(myo, err, invodate):
         iqty = nononef(iqty)
         data.Description = request.values.get('desc' + str(data.id))
         deach = request.values.get('cost' + str(data.id))
-        if deach is not None:
-            damount = float(iqty) * float(deach)
-            itotal = itotal + damount
-            deach = "{:.2f}".format(float(deach))
-            damount = "{:.2f}".format(damount)
-        else:
-            damount = "{:.2f}".format(0.00)
-            deach = "{:.2f}".format(0.00)
-        print('iqtyhere=', iqty)
+        deach = nononef(deach)
+
+        damount = float(iqty) * float(deach)
+        itotal = itotal + damount
+        deach = "{:.2f}".format(deach)
+        damount = "{:.2f}".format(damount)
+
         data.Qty = iqty
         data.Ea = deach
         icode = icode + '+' + str(data.Qty) + '*' + str(data.Ea)
