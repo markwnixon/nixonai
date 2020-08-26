@@ -79,7 +79,7 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     dl, hls = 17.6, 530
     m1, m2, m3, m4, m5, m6, m7 = hls - dl, hls - 2 * dl, hls - 3 * dl, hls - 4 * dl, hls - 18 * dl, hls - 23 * dl, hls - 27 * dl
     fulllinesat = [m1, m2, m3, m4, m5, m6, m7]
-    p1, p2, p3, p4 p5 = ltm + 87, ltm + 180, ctrall, rtm - 180, rtm - 100
+    p1, p2, p3, p4. p5 = ltm + 87, ltm + 180, ctrall, rtm - 180, rtm - 100
     sds1 = [p1, p2, p3, p4, p5]
     n1, n2, n3, n4 = ltm + 58, ltm + 128, rtm - 140, rtm - 70
     sds2 = [n1, n2, n3, n4]
