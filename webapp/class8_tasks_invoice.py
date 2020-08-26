@@ -40,19 +40,6 @@ def writelines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, li
 
 def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment, tablesetup, invostyle):
 
-
-
-    header3 = tablesetup['invoicetypes'][invostyle]['Lower Blocks']
-    print('3headers',header1, header2, header3)
-
-    lh2 = len(header2)
-    lh3 = len(header3)
-
-
-    # pdata1:Bid (Bill To)
-    # pdata2:Lid (Load At)
-    # pdata3:Did (Delv To)
-
 # All dates must begin in datetime format and will be converted to strings as required
 
     joborder = odata.Jo
@@ -79,7 +66,8 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     dl, hls = 17.6, 530
     m1, m2, m3, m4, m5, m6, m7 = hls - dl, hls - 2 * dl, hls - 3 * dl, hls - 4 * dl, hls - 18 * dl, hls - 23 * dl, hls - 27 * dl
     fulllinesat = [m1, m2, m3, m4, m5, m6, m7]
-    p1, p2, p3, p4. p5 = ltm + 87, ltm + 180, ctrall, rtm - 180, rtm - 100
+    dateline = m1+8.2*dl
+    p1, p2, p3, p4, p5 = ltm + 87, ltm + 180, ctrall, rtm - 180, rtm - 100
     sds1 = [p1, p2, p3, p4, p5]
     n1, n2, n3, n4 = ltm + 58, ltm + 128, rtm - 140, rtm - 70
     sds2 = [n1, n2, n3, n4]
@@ -103,8 +91,7 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     #create background lines
     for i in fulllinesat:
         c.line(ltm, i, rtm, i)
-    for k in sds1:
-        c.line(k, m1, k, m3)
+
     for l in sds2:
         c.line(l, m3, l, m5)
     for m in sds3:
@@ -123,7 +110,7 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
 
 
     # Date and JO boxes
-    dateline = m1+8.2*dl
+
     c.rect(rtm-150, m1+7*dl, 150, 2*dl, stroke=1, fill=0)
     c.line(rtm-150, dateline, rtm, dateline)
     c.line(rtm-75, m1+7*dl, rtm-75, m1+9*dl)
@@ -183,44 +170,61 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
                 shipto[i] = ' '
 
 
-    #Create the middle row headers
+    #Create the middle row headers and auto fit the width for the items
+
+    header_font = 'Helvetica'
+    header_fontsize = 11
+    headerval_font = 'Helvetica'
+    headerval_fontsize = 9
     header2 = tablesetup['invoicetypes'][invostyle]['Middle Blocks']
     header2items = tablesetup['invoicetypes'][invostyle]['Middle Items']
     lh2 = len(header2)
+    header2_value = []
+    maxw = []
 
-    line1 = header2
-    line3 = []
-    for header in header2items:
+
+    for ix, header in enumerate(header2items):
         thisvalue = getattr(odata,header)
         if thisvalue is None: thisvalue = ''
         if isinstance(thisvalue, numbers.Number):
             thisvalue = str(thisvalue)
         elif isinstance(thisvalue, datetime.date):
             thisvalue = thisvalue.strftime('%m/%d/%Y')
-        line3.append(thisvalue)
+        header_width = stringWidth(header, header_font, header_fontsize)
+        headerval_width = stringWidth(thisvalue, headerval_font, headerval_fontsize)
+        maxval = max(header_width,headerval_width)
+        header2_value.append(thisvalue)
+        maxw.append(maxval)
 
+    print('maxw=',maxw)
+    total_width = rtm - ltm
+    total_need = sum(maxw)
+    allocation = []
+    thislft = ltm
+    newctr = []
+    newlft = []
+    for each in maxw:
+        thisw = each * total_width/total_need
+        allocation.append(thisw)
+        newctr.append(thislft+thisw/2)
+        thislft = thislft + thisw
+        newlft.append(thislft)
+
+    print('allocation newctr',allocation,newctr)
     ctr = [avg(ltm, p1), avg(p1, p2), avg(p2, p3), avg(p3, p4), avg(p4, p5), avg(p5, rtm)]
-    for j, i in enumerate(line1):
-        c.drawCentredString(ctr[j], m2+tb, i)
+    for jx, header in enumerate(header2):
+        c.drawCentredString(newctr[jx], m2+tb, header)
+    c.setFont('Helvetica', 9, leading=None)
+    for jx, header in enumerate(header2_value):
+        c.drawCentredString(newctr[jx], m3+tb, nononestr(header))
+    for lft in newlft:
+        c.line(lft, m1, lft, m3)
 
-
-
-
-# ___________________________________________________________
-
-    line2 = header3
+    # Create the lower row headers
+    header3 = tablesetup['invoicetypes'][invostyle]['Lower Blocks']
     ctr = [avg(ltm, n1), avg(n1, n2), avg(n2, n3), avg(n3, n4), avg(n4, rtm)]
-    for j, i in enumerate(line2):
+    for j, i in enumerate(header3):
         c.drawCentredString(ctr[j], m4+tb, i)
-
-
-
-
-
-
-
-
-
 
 
     dh = 12
@@ -285,14 +289,7 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     x = avg(rtm-75, rtm-150)
     c.drawCentredString(x, y, invodate)
 
-    c.setFont('Helvetica', 9, leading=None)
 
-    j = 0
-    for i in line3:
-        ctr = [avg(ltm, p1), avg(p1, p2), avg(p2, p3), avg(p3, p4), avg(p4, p5), avg(p5, rtm)]
-        i = nononestr(i)
-        c.drawCentredString(ctr[j], m3+tb, i)
-        j = j+1
 
     total = 0
     top = m4-dh
