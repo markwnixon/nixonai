@@ -62,13 +62,17 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
             paydate = payment[2]
 
     # Set numberical formatting values:
+    header_font = 'Helvetica'
+    header_fontsize = 11
+    headerval_font = 'Helvetica'
+    headerval_fontsize = 9
+
     ltm, ctrall, rtm = 36, 310, 575
     dl, hls = 17.6, 530
     m1, m2, m3, m4, m5, m6, m7 = hls - dl, hls - 2 * dl, hls - 3 * dl, hls - 4 * dl, hls - 18 * dl, hls - 23 * dl, hls - 27 * dl
     fulllinesat = [m1, m2, m3, m4, m5, m6, m7]
     dateline = m1+8.2*dl
     p1, p2, p3, p4, p5 = ltm + 87, ltm + 180, ctrall, rtm - 180, rtm - 100
-    sds1 = [p1, p2, p3, p4, p5]
     n1, n2, n3, n4 = ltm + 58, ltm + 128, rtm - 140, rtm - 70
     sds2 = [n1, n2, n3, n4]
     q1, q2 = ltm + 180, rtm - 180
@@ -172,43 +176,39 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
 
     #Create the middle row headers and auto fit the width for the items
 
-    header_font = 'Helvetica'
-    header_fontsize = 11
-    headerval_font = 'Helvetica'
-    headerval_fontsize = 9
+
     header2 = tablesetup['invoicetypes'][invostyle]['Middle Blocks']
     header2items = tablesetup['invoicetypes'][invostyle]['Middle Items']
-    lh2 = len(header2)
-    header2_value = []
-    maxw = []
 
+    center_write(header2,header2items,11,9,rtm-ltm)
 
-    for ix, header in enumerate(header2items):
-        thisvalue = getattr(odata,header)
-        if thisvalue is None: thisvalue = ''
-        if isinstance(thisvalue, numbers.Number):
-            thisvalue = str(thisvalue)
-        elif isinstance(thisvalue, datetime.date):
-            thisvalue = thisvalue.strftime('%m/%d/%Y')
-        header_width = stringWidth(header, header_font, header_fontsize)
-        headerval_width = stringWidth(thisvalue, headerval_font, headerval_fontsize)
-        maxval = max(header_width,headerval_width)
-        header2_value.append(thisvalue)
-        maxw.append(maxval)
+    def center_write(headers,headeritems, f1, f2, total_width):
 
-    print('maxw=',maxw)
-    total_width = rtm - ltm
-    total_need = sum(maxw)
-    allocation = []
-    thislft = ltm
-    newctr = []
-    newlft = []
-    for each in maxw:
-        thisw = each * total_width/total_need
-        allocation.append(thisw)
-        newctr.append(thislft+thisw/2)
-        thislft = thislft + thisw
-        newlft.append(thislft)
+        header_value = []
+        maxw = []
+        for ix, item in enumerate(headeritems):
+            thisvalue = getattr(odata,item)
+            if thisvalue is None: thisvalue = ''
+            if isinstance(thisvalue, numbers.Number):
+                thisvalue = str(thisvalue)
+            elif isinstance(thisvalue, datetime.date):
+                thisvalue = thisvalue.strftime('%m/%d/%Y')
+            header_width = stringWidth(headers[ix], 'Helvetica', f1)
+            headerval_width = stringWidth(thisvalue, 'Helvetica', f2)
+            maxval = max(header_width,headerval_width)
+            header_value.append(thisvalue)
+            maxw.append(maxval)
+
+        print('maxw=',maxw)
+        total_need = sum(maxw)
+        allocation, newctr, newlft = [], [], []
+        thislft = ltm
+        for each in maxw:
+            thisw = each * total_width/total_need
+            allocation.append(thisw)
+            newctr.append(thislft+thisw/2)
+            thislft = thislft + thisw
+            newlft.append(thislft)
 
     print('allocation newctr',allocation,newctr)
     ctr = [avg(ltm, p1), avg(p1, p2), avg(p2, p3), avg(p3, p4), avg(p4, p5), avg(p5, rtm)]
