@@ -13,6 +13,44 @@ import shutil
 from webapp.CCC_system_setup import addpath, bankdata, scac
 import numbers
 
+
+def scrollwrite(c, fonttype, fontsize, top, left, dsp, itemlist):
+    c.setFont(fonttype, fontsize, leading=None)
+    for item in itemlist:
+        c.drawString(left, top, item)
+        top = top - dsp
+    return top
+
+def center_write(odata, headers, headeritems, fs1, fs2, ltm, rtm):
+    total_width = rtm - ltm
+    header_values, maxw = [], []
+    # headeritems are the database column names where values are stored
+    # headers are the labels for the column data to be shown on the invoice
+    for ix, item in enumerate(headeritems):
+        thisvalue = getattr(odata, item)
+        if thisvalue is None: thisvalue = ''
+        if isinstance(thisvalue, numbers.Number):
+            thisvalue = str(thisvalue)
+        elif isinstance(thisvalue, datetime.date):
+            thisvalue = thisvalue.strftime('%m/%d/%Y')
+        header_width = stringWidth(headers[ix], 'Helvetica', fs1)
+        headerval_width = stringWidth(thisvalue, 'Helvetica', fs2)
+        maxval = max(header_width, headerval_width)
+        # Store the values and their lengths in a list
+        header_values.append(thisvalue)
+        maxw.append(maxval)
+
+    total_need = sum(maxw)
+    newctr, newlft = [], []
+    thislft = ltm
+    for each in maxw:
+        thisw = each * total_width / total_need
+        newctr.append(thislft + thisw / 2)
+        thislft = thislft + thisw
+        newlft.append(thislft)
+
+    return newctr, newlft, header_values
+
 def writelines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, lineheight):
     textWidth = stringWidth(thistext, thisfont, thisfontsize)
     if textWidth > fixed_width:
@@ -79,6 +117,8 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     sds3 = [q1, q2]
     bump = 2.5
     tb = bump * 2
+    dh = 12
+    ct = 305
     c = canvas.Canvas(file1, pagesize=letter)
     c.setLineWidth(1)
 
@@ -109,19 +149,22 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     c.setFont('Helvetica-Bold', 24, leading=None)
     c.drawCentredString(rtm-75, dateline+1.5*dl, 'Invoice')
 
-    # Set default font
-    c.setFont('Helvetica', 11, leading=None)
-
-
     # Date and JO boxes
-
+    c.setFont('Helvetica', 11, leading=None)
     c.rect(rtm-150, m1+7*dl, 150, 2*dl, stroke=1, fill=0)
     c.line(rtm-150, dateline, rtm, dateline)
     c.line(rtm-75, m1+7*dl, rtm-75, m1+9*dl)
     c.drawCentredString(rtm-112.5, dateline+bump, 'Date')
     c.drawCentredString(rtm-37.7, dateline+bump, 'Invoice #')
+    x = avg(rtm - 75, rtm)
+    y = dateline - dh - bump
+    c.setFont('Helvetica', 10, leading=None)
+    c.drawCentredString(x, y, joborder)
+    x = avg(rtm - 75, rtm - 150)
+    c.drawCentredString(x, y, invodate)
 
     # Top Boxes (Address boxes)
+    c.setFont('Helvetica', 11, leading=None)
     ctm = 218
     level1 = m1+5*dl
     header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
@@ -142,6 +185,7 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
         else:
             for i in range(5):
                 billto[i] = ' '
+        top = scrollwrite(c,'Helvetica',10,level1-dh,ltm+bump*3,13,billto)
 
     if lh1 > 1:
         c.rect(ctm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
@@ -157,6 +201,7 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
         else:
             for i in range(5):
                 loadat[i] = ' '
+        top = scrollwrite(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat)
 
     if lh1 > 2:
         c.rect(rtm - 175, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
@@ -172,72 +217,40 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
         else:
             for i in range(5):
                 shipto[i] = ' '
+        top = scrollwrite(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto)
 
 
     #Create the middle row headers and auto fit the width for the items
-
-
     header2 = tablesetup['invoicetypes'][invostyle]['Middle Blocks']
     header2items = tablesetup['invoicetypes'][invostyle]['Middle Items']
-
-    center_write(header2,header2items,11,9,rtm-ltm)
-
-    def center_write(headers,headeritems, f1, f2, total_width):
-
-        header_value = []
-        maxw = []
-        for ix, item in enumerate(headeritems):
-            thisvalue = getattr(odata,item)
-            if thisvalue is None: thisvalue = ''
-            if isinstance(thisvalue, numbers.Number):
-                thisvalue = str(thisvalue)
-            elif isinstance(thisvalue, datetime.date):
-                thisvalue = thisvalue.strftime('%m/%d/%Y')
-            header_width = stringWidth(headers[ix], 'Helvetica', f1)
-            headerval_width = stringWidth(thisvalue, 'Helvetica', f2)
-            maxval = max(header_width,headerval_width)
-            header_value.append(thisvalue)
-            maxw.append(maxval)
-
-        print('maxw=',maxw)
-        total_need = sum(maxw)
-        allocation, newctr, newlft = [], [], []
-        thislft = ltm
-        for each in maxw:
-            thisw = each * total_width/total_need
-            allocation.append(thisw)
-            newctr.append(thislft+thisw/2)
-            thislft = thislft + thisw
-            newlft.append(thislft)
-
-    print('allocation newctr',allocation,newctr)
-    ctr = [avg(ltm, p1), avg(p1, p2), avg(p2, p3), avg(p3, p4), avg(p4, p5), avg(p5, rtm)]
+    thisctr, thislft, header2vals = center_write(odata, header2, header2items, 11, 9, ltm, rtm)
+    c.setFont('Helvetica', 11, leading=None)
     for jx, header in enumerate(header2):
-        c.drawCentredString(newctr[jx], m2+tb, header)
+        c.drawCentredString(thisctr[jx], m2+tb, header)
     c.setFont('Helvetica', 9, leading=None)
-    for jx, header in enumerate(header2_value):
-        c.drawCentredString(newctr[jx], m3+tb, nononestr(header))
-    for lft in newlft:
+    for jx, header in enumerate(header2vals):
+        c.drawCentredString(thisctr[jx], m3+tb, nononestr(header))
+    for lft in thislft:
         c.line(lft, m1, lft, m3)
 
     # Create the lower row headers
+    c.setFont('Helvetica', 11, leading=None)
     header3 = tablesetup['invoicetypes'][invostyle]['Lower Blocks']
     ctr = [avg(ltm, n1), avg(n1, n2), avg(n2, n3), avg(n3, n4), avg(n4, rtm)]
-    for j, i in enumerate(header3):
-        c.drawCentredString(ctr[j], m4+tb, i)
+    for jx, header in enumerate(header3):
+        c.drawCentredString(ctr[jx], m4+tb, header)
 
 
-    dh = 12
-    ct = 305
+
 
     top = m6-1.5*dh
-    for i in bank:
-        c.drawCentredString(ct, top, i)
+    for bline in bank:
+        c.drawCentredString(ct, top, bline)
         top = top-dh
 
     top = m1+9*dl-5
-    for i in us:
-        c.drawString(ltm+bump, top, i)
+    for usline in us:
+        c.drawString(ltm+bump, top, usline)
         top = top-dh
 
     bottomline = m6-23
@@ -251,46 +264,14 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
     j = 0
     dh = 9.95
     top = m5-dh
-    for i in note:
-        c.drawString(ltm+tb, top, note[j])
-        j = j+1
+    for noteline in note:
+        c.drawString(ltm+tb, top, noteline)
         top = top-dh
 
 
 # _______________________________________________________________________
     # Insert data here
 # _______________________________________________________________________
-
-    c.setFont('Helvetica', 10, leading=None)
-
-    if type == 'T':
-        dh = 13
-        top = level1-dh
-        lft = ltm+bump*3
-        for i in billto:
-            c.drawString(lft, top, i)
-            top = top-dh
-
-        top = level1-dh
-        lft = ctm+bump*3
-        for i in loadat:
-            c.drawString(lft, top, i)
-            top = top-dh
-
-        top = level1-dh
-        lft = rtm-175+bump*3
-        for i in shipto:
-            c.drawString(lft, top, i)
-            top = top-dh
-
-    x = avg(rtm-75, rtm)
-    y = dateline-dh-bump
-    c.drawCentredString(x, y, joborder)
-    x = avg(rtm-75, rtm-150)
-    c.drawCentredString(x, y, invodate)
-
-
-
     total = 0
     top = m4-dh
     for data in ldata:

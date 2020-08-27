@@ -590,16 +590,28 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            holdvec[jx] = request.values.get(f'{entry[0]}')
-            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
-            if entry[5] > 1: failed = failed + 1
-            if entry[5] == 1: warned = warned + 1
+            testskip = entry[1]
+            if testskip != 'hidden':
+                holdvec[jx] = request.values.get(f'{entry[0]}')
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+                if entry[5] > 1: failed = failed + 1
+                if entry[5] == 1: warned = warned + 1
         err.append(f'There are {failed} input errors and {warned} input warnings')
 
         update_item = request.values.get('Update Item')
         if update_item is not None:
             if failed == 0:
-                for jx, entry in enumerate(entrydata): setattr(olddat, f'{entry[0]}', holdvec[jx])
+                for jx, entry in enumerate(entrydata):
+                    if entry[1] != 'hidden':
+                        print('Updating Entry with', entry[0], holdvec[jx])
+                        setattr(olddat, f'{entry[0]}', holdvec[jx])
+                db.session.commit()
+                for jx, entry in enumerate(entrydata):
+                    if entry[1] == 'hidden':
+                        thisvalue = getattr(olddat,entry[2])
+                        thissubvalue = thisvalue[0]
+                        print('Updating Entry with', entry[0], thissubvalue)
+                        setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
                 err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
