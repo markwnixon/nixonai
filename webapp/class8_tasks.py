@@ -430,7 +430,7 @@ def get_new_Jo(input):
     return newjo(input, sdate)
 
 
-def make_new_entry(tablesetup,data):
+def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
     filter = tablesetup['filter']
@@ -448,7 +448,8 @@ def make_new_entry(tablesetup,data):
     print(documents)
     print(sourcekeys)
 
-    err = 'No Jo Created'
+    err = []
+    #err = ['No Jo Created']
     from sqlalchemy import inspect
     inst = eval(f"inspect({table})")
     attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
@@ -456,8 +457,8 @@ def make_new_entry(tablesetup,data):
     for jx,entry in enumerate(entrydata):
         if entry[0] in creators:
             creation = [ix for ix in creators if ix == entry[0]][0]
-            data[jx] = eval(f"get_new_{creation}('{entry[3]}')")
-            err = f'New {creation} {data[jx]} created'
+            holdvec[jx] = eval(f"get_new_{creation}('{entry[3]}')")
+            #err = [f'New {creation} {holdvec[jx]} created']
 
     print('The attr_names are:',attr_names)
     for c_attr in inst.mapper.column_attrs:
@@ -492,17 +493,16 @@ def make_new_entry(tablesetup,data):
     if dat is not None:
         id = dat.id
         for jx,entry in enumerate(entrydata):
-            tdat = checkmultisplit(entry,data[jx])
-            if len(tdat)==1:
-                print('About to set attribute:',dat,entry[0],tdat[0])
-                setattr(dat,f'{entry[0]}',tdat[0])
-            elif len(tdat)==2:
-                print('About to set attribute:',dat,entry[0],tdat[0])
-                setattr(dat,f'{entry[0]}',tdat[0])
-                print('About to set attribute:',dat,entry[4],tdat[1])
-                setattr(dat,f'{entry[4]}',tdat[1])
+            if entry[1] != 'hidden':
+                setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
-        print('')
+        for jx, entry in enumerate(entrydata):
+            if entry[1] == 'hidden':
+                thisvalue = getattr(dat, entry[2])
+                thissubvalue = thisvalue[0]
+                setattr(dat, f'{entry[0]}', thissubvalue)
+        db.session.commit()
+        #err.append(f"Updated entry in {tablesetup['table']}")
 
         if sourcekeys is not None:
             nextquery = f"{table}.query.get({id})"
@@ -521,7 +521,10 @@ def make_new_entry(tablesetup,data):
                 newpath = addpath(tpath(table, newfile))
                 oldpath = addpath(docsave).replace('//','/')
                 print('Need to move file from', oldpath, ' to', newpath)
-                shutil.move(oldpath, newpath)
+                try:
+                    shutil.move(oldpath, newpath)
+                except:
+                    print('File already moved')
                 setattr(dat, 'Source', newfile)
                 setattr(dat, 'Scache', 0)
                 db.session.commit()
@@ -546,16 +549,17 @@ def New_task(tablesetup, task_iter):
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            holdvec[jx] = request.values.get(f'{entry[0]}')
-            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
-            if entry[5] > 1: failed = failed + 1
-            if entry[5] == 1: warned = warned + 1
+            if entry[1] != 'hidden':
+                holdvec[jx] = request.values.get(f'{entry[0]}')
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+                if entry[5] > 1: failed = failed + 1
+                if entry[5] == 1: warned = warned + 1
         err.append(f'There are {failed} input errors and {warned} input warnings')
 
         create_item = request.values.get('Create Item')
         if create_item is not None:
             if failed == 0:
-                err.append(make_new_entry(tablesetup,holdvec))
+                err = make_new_entry(tablesetup,holdvec)
                 err.append(f"Created new entry in {tablesetup['table']}")
                 completed = True
             else:
@@ -590,8 +594,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            testskip = entry[1]
-            if testskip != 'hidden':
+            if entry[1] != 'hidden':
                 holdvec[jx] = request.values.get(f'{entry[0]}')
                 holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
                 if entry[5] > 1: failed = failed + 1
@@ -613,7 +616,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         print('Updating Entry with', entry[0], thissubvalue)
                         setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
-                err.append(f"Updated entry in {tablesetup['table']}")
+                #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
             else:
                 err.append(f'Cannot update entry until input errors shown in red below are resolved')
@@ -625,9 +628,12 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
         for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
 
-    viewport[0] = 'show_doc_left'
+
     docref = getattr(olddat, 'Source')
-    viewport[2] = '/' + tpath(f'{table}', docref)
+    if docref is not None:
+        viewport[0] = 'show_doc_left'
+        viewport[2] = '/' + tpath(f'{table}', docref)
+
 
     return holdvec, entrydata, err, viewport, completed
 
@@ -879,7 +885,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 if failed == 0:
                     for jx, entry in enumerate(entrydata): setattr(modata, f'{entry[0]}', holdvec[jx])
                     db.session.commit()
-                    err.append(f"Updated entry in {tablesetup['table']}")
+                    #err.append(f"Updated entry in {tablesetup['table']}")
                     completed = True
                 else:
                     err.append(f'Cannot update entry until input errors shown in red below are resolved')

@@ -212,6 +212,7 @@ def nononef(input):
     return output
 
 def erud(err):
+    print('err is for function:', err)
     errup = ''
     for e in err:
         if len(e) > 0:
