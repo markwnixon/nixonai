@@ -433,6 +433,7 @@ def get_new_Jo(input):
 def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
+    hiddendata = tablesetup['hidden data']
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
     creators = tablesetup['creators']
@@ -479,27 +480,21 @@ def make_new_entry(tablesetup,holdvec):
     db.session.add(input)
     db.session.commit()
 
-    def checkmultisplit(entry,dat):
-        print('entryis',entry,dat)
-        if entry[3] == 'multitext' and len(dat)>0:
-            return [dat.splitlines()[0], dat]
-        else:
-            return [dat]
-
-
     newquery = f"{table}.query.filter({table}.{ukey} == '{uidtemp}').first()"
     print('Getting the new temp entry:',newquery)
     dat = eval(newquery)
     if dat is not None:
         id = dat.id
         for jx,entry in enumerate(entrydata):
-            if entry[1] != 'hidden':
-                setattr(dat, f'{entry[0]}', holdvec[jx])
+            setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
-        for jx, entry in enumerate(entrydata):
-            if entry[1] == 'hidden':
+        for jx, entry in enumerate(hiddendata):
                 thisvalue = getattr(dat, entry[2])
-                thissubvalue = thisvalue[0]
+                try:
+                    thisvalue = thisvalue.splitlines()
+                    thissubvalue = thisvalue[0]
+                except:
+                    thissubvalue = ''
                 setattr(dat, f'{entry[0]}', thissubvalue)
         db.session.commit()
         #err.append(f"Updated entry in {tablesetup['table']}")
@@ -580,6 +575,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
+    hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
 
@@ -594,27 +590,29 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            if entry[1] != 'hidden':
-                holdvec[jx] = request.values.get(f'{entry[0]}')
-                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
-                if entry[5] > 1: failed = failed + 1
-                if entry[5] == 1: warned = warned + 1
+            holdvec[jx] = request.values.get(f'{entry[0]}')
+            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+            if entry[5] > 1: failed = failed + 1
+            if entry[5] == 1: warned = warned + 1
         err.append(f'There are {failed} input errors and {warned} input warnings')
 
         update_item = request.values.get('Update Item')
         if update_item is not None:
             if failed == 0:
                 for jx, entry in enumerate(entrydata):
-                    if entry[1] != 'hidden':
+                    if entry[0] not in creators:
                         print('Updating Entry with', entry[0], holdvec[jx])
                         setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
-                for jx, entry in enumerate(entrydata):
-                    if entry[1] == 'hidden':
-                        thisvalue = getattr(olddat,entry[2])
+                for jx, entry in enumerate(hiddendata):
+                    thisvalue = getattr(olddat,entry[2])
+                    try:
+                        thisvalue = thisvalue.splitlines()
                         thissubvalue = thisvalue[0]
-                        print('Updating Entry with', entry[0], thissubvalue)
-                        setattr(olddat, f'{entry[0]}', thissubvalue)
+                    except:
+                        thissubvalue = ''
+                    print('Updating Entry with', entry[0], thissubvalue)
+                    setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
                 #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True

@@ -111,11 +111,9 @@ def update_invoice(myo, err, tablesetup, invostyle):
         err.append('Created invoice for JO= ' + myo.Jo)
         ldata = Invoices.query.filter(Invoices.Jo == myo.Jo).order_by(Invoices.Ea.desc()).all()
         pdata1 = People.query.filter(People.id == myo.Bid).first()
-        pdata2 = Drops.query.filter(Drops.id == myo.Lid).first()
-        pdata3 = Drops.query.filter(Drops.id == myo.Did).first()
         cache = myo.Icache
 
-        docref = make_invo_doc(myo, ldata, pdata1, pdata2, pdata3, cache, invodate, 0, tablesetup, invostyle)
+        docref = make_invo_doc(myo, ldata, pdata1, cache, invodate, 0, tablesetup, invostyle)
 
         for ldatl in ldata:
             ldatl.Pid = pdata1.id

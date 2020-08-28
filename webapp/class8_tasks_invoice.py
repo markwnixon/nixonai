@@ -76,7 +76,7 @@ def writelines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, li
     return xdist, ydist
 
 
-def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment, tablesetup, invostyle):
+def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, invostyle):
 
 # All dates must begin in datetime format and will be converted to strings as required
 
@@ -191,32 +191,30 @@ def make_invo_doc(odata, ldata, pdata1, pdata2, pdata3, cache, invodate, payment
         c.rect(ctm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
         c.line(ctm, level1, ctm + 175, level1)
         c.drawString(ctm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[1]}')
-        loadat = list(range(5))
-        if pdata2 is not None:
-            loadat[0] = pdata2.Entity.title()
-            loadat[1] = nononestr(pdata2.Addr1).title()
-            loadat[2] = nononestr(pdata2.Addr2).title()
-            loadat[3] = ''
-            loadat[4] = ''
-        else:
+        pdata2 = odata.Dropblock1
+        pdata2 = pdata2.splitlines()
+        loadat = []
+        for dat in pdata2:
+            loadat.append(dat)
+        if loadat is None:
+            loadat = []
             for i in range(5):
-                loadat[i] = ' '
+                loadat.append('')
         top = scrollwrite(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat)
 
     if lh1 > 2:
         c.rect(rtm - 175, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
         c.line(rtm - 175, level1, rtm, level1)
         c.drawString(rtm - 170 + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[2]}')
-        shipto = list(range(5))
-        if pdata3 is not None:
-            shipto[0] = pdata3.Entity.title()
-            shipto[1] = nononestr(pdata3.Addr1).title()
-            shipto[2] = nononestr(pdata3.Addr2).title()
-            shipto[3] = ''
-            shipto[4] = ''
-        else:
+        pdata3 = odata.Dropblock2
+        pdata3 = pdata3.splitlines()
+        shipto = []
+        for dat in pdata3:
+            shipto.append(dat)
+        if shipto is None:
+            shipto = []
             for i in range(5):
-                shipto[i] = ' '
+                shipto.append('')
         top = scrollwrite(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto)
 
 

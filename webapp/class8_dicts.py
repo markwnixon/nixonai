@@ -130,10 +130,12 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Packing', 'Packing', 'Packing', 'text', 'text', 0, 'ok'],
                                ['Seal', 'Seal', 'Seal', 'text', 'text', 0, 'ok'],
                                ['Pickup', 'Pickup', 'Pickup No.', 'text', 'text', 0, 'ok'],
-                               ['Description', 'Description', 'Special Instructions', 'multitext', 'text', 0, 'ok'],
-                               ['Company', 'hidden', 'Dropblock1'],
-                               ['Company2','hidden', 'Dropblock2']
+                               ['Description', 'Description', 'Special Instructions', 'multitext', 'text', 0, 'ok']
                                ],
+                'hidden data' : [
+                                ['Company', 'hidden', 'Dropblock1'],
+                                ['Company2','hidden', 'Dropblock2']
+                                ],
                 'colorfilter': ['Hstat'],
                 'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
                               {'driverdata': ['Drivers', 'Active', 1, 'Name']},
