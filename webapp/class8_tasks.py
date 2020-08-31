@@ -674,11 +674,36 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
             elif task_focus == 'Undo Invoice':
                 # Need to add the undo of the journal entries
                 rstring = f'{table}.query.filter({table}.id == {sid})'
-                dat = eval(rsting)
-                dat.Invoice = None
-                jo = dat.Jo
-                qstring =  f'Invoices.query.filter(Invoices.Jo == {jo}).delete()'
-                eval(qstring)
+                odat = eval(rstring)
+                odat.Invoice = None
+                odat.Istat = 0
+                odat.Links = None
+                db.session.commit()
+                Invoices.query.filter(Invoices.Jo == odat.Jo).delete()
+                Income.query.filter(Income.Jo == odat.Jo).delete()
+                Gledger.query.filter(Gledger.Tcode == odat.Jo).delete()
+                db.session.commit()
+
+            elif task_focus == 'Undo Payment':
+                rstring = f'{table}.query.filter({table}.id == {sid})'
+                odat = eval(rstring)
+                odat.Istat = 3
+                if odat.Hstat == 4:
+                    odat.Hstat = 3
+                db.session.commit()
+                jo = odat.Jo
+                idata = Invoices.query.filter(Invoices.Jo == jo).all()
+                for data in idata:
+                    data.Status = 'New'
+                db.session.commit()
+                Income.query.filter(Income.Jo == jo).delete()
+                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
+                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
+                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
+                db.session.commit()
+
+
+
     db.session.commit()
 
     holdvec, entrydata, err = [], [], []
