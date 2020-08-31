@@ -22,6 +22,36 @@ from webapp.utils import *
 from webapp.viewfuncs import newjo
 import uuid
 
+def loginvo_m(odat,ix):
+    #if ix = 2 we are not emailing
+    #if ix = 3 we ARE emailing
+    from gledger_write import gledger_write
+    alink = odat.Links
+    print(ix,alink)
+    if alink is not None:
+        if 1 == 1:
+            alist = json.loads(alink)
+            for aoder in alist:
+                aoder = nonone(aoder)
+                thisodat = Orders.query.get(aoder)
+                print(aoder,thisodat.Istat)
+                jo = thisodat.Jo
+                gledger_write('invoice', jo, 0, 0)
+                thisodat.Istat = ix
+                db.session.commit()
+        if 1 == 2:
+            odat.Links = None
+            jo = odat.Jo
+            gledger_write('invoice', jo, 0, 0)
+            odat.Istat = ix
+            db.session.commit()
+    else:
+        jo = odat.Jo
+        err = gledger_write('invoice', jo, 0, 0)
+        odat.Istat = ix
+        db.session.commit()
+    return err
+
 
 def initialize_invoice(myo, err):
     # First time through: have an order to invoice
@@ -184,6 +214,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     holdvec[4] = invostyle
 
     returnhit = request.values.get('Finished')
+
     if returnhit is not None: completed = True
     else:
 
@@ -191,6 +222,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         table = tablesetup['table']
         nextquery = f"{table}.query.get({sid})"
         odata1 = eval(nextquery)
+        jo = getattr(odata1, 'Jo')
 
         #Need to jump over to invoice database
         jo = getattr(odata1, 'Jo')
@@ -245,6 +277,13 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
         holdvec[2] = Services.query.all()
+
+        loginvo = request.values.get('logInvo')
+        if loginvo is not None:
+            odata1 = eval(nextquery)
+            err = loginvo_m(odata1, 2)
+            if 'Error' not in err:
+                completed = True
 
     return holdvec, entrydata, err, viewport, completed
 
