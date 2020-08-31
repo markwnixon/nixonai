@@ -79,7 +79,15 @@ Trucking_genre = {'table': 'Orders',
                                          'Interchange' : ['Single_Item_Selection', 'View', 'Gate'],
                                          'Invoice' : ['Single_Item_Selection', 'View', 'Invoice'],
                                          'Paid Invoice' : ['Single_Item_Selection', 'View', 'PaidInvoice']
-                                         }
+                                         },
+
+                                    'Undo':
+                                        {
+                                          'Delete Item': ['All_Item_Selection', 'Undo', 'Delete'],
+                                          'Undo Invoice': ['All_Item_Selection', 'Undo', 'Invoice'],
+                                          'Undo Payment': ['All_Item_Selection', 'Undo', 'Payment']
+                                        }
+
                                     }
                     }
 #Dictionary terms:

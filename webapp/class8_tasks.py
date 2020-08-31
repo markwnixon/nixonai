@@ -190,6 +190,25 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             holdvec, entrydata, err, viewport, completed = eval(rstring)
             print('returned with:', viewport, completed)
 
+    elif tasktype == 'All_Item_Selection':
+        holdvec, entrydata, err = [], [], []
+        # See if only one box is checked and if so what table it is from
+        nc = sum(cks[1] for cks in checked_data)
+        tids = [cks[2] for cks in checked_data if cks[2] != []]
+        tabs = [cks[0] for cks in checked_data if cks[1] != 0]
+        print('nc=', nc)
+        print(tids)
+        print(tabs)
+        if nc > 0:
+            rstring = f"{taskon}_task(genre, task_focus, task_iter, nc, tids, tabs)"
+            holdvec, entrydata, err, viewport, completed = eval(rstring)
+            completed = True
+            tablesetup = None
+        else:
+            err.append('Need to select item(s) to undo')
+            completed = True
+            tablesetup = None
+
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
 
@@ -641,11 +660,37 @@ def Inv_task(iter):
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
+def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
+    print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
+    for jx, thistable in enumerate(tabs):
+        tablesetup = eval(f'{thistable}_setup')
+        table = tablesetup['table']
+        print('table', table)
+        for sid in tids[jx]:
+            if task_focus == 'Delete':
+                print('made it here with jx, thistable sid', jx, thistable, sid)
+                rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
+                eval(rstring)
+            elif task_focus == 'Undo Invoice':
+                # Need to add the undo of the journal entries
+                rstring = f'{table}.query.filter({table}.id == {sid})'
+                dat = eval(rsting)
+                dat.Invoice = None
+                jo = dat.Jo
+                qstring =  f'Invoices.query.filter(Invoices.Jo == {jo}).delete()'
+                eval(qstring)
+    db.session.commit()
+
+    holdvec, entrydata, err = [], [], []
+    viewport = ['0'] * 6
+    completed = True
 
 
+    return holdvec, entrydata, err, viewport, completed
 
 
 def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    print(f'Running View Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, sid={sid}')
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
     holdvec = []
@@ -658,7 +703,6 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         completed = False
         err = [f'Running View task with iter {task_iter}']
 
-        viewport[0] = 'show_doc_left'
         nextquery = f"{table}.query.get({sid})"
         dat = eval(nextquery)
 
@@ -666,12 +710,15 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         try:
             docref = getattr(dat, f'{task_focus}')
             try:
+                viewport[0] = 'show_doc_left'
                 viewport[2] = '/' + tpath(f'{table}', docref)
                 err.append(f'Viewing {viewport[2]}')
                 err.append('Hit Return to End Viewing and Return to Table View')
             except:
-                err.append(f'Pathname {viewport[2]} not found')
+                completed = True
+                err.append(f'Selection has no {task_focus} document')
         except:
+            completed = True
             err.append(f'{table} has no attribute {task_focus}')
 
         returnhit = request.values.get('Return')
