@@ -660,6 +660,37 @@ def Inv_task(iter):
 def Rec_task(iter):
     print(f'Running Rec task with iter {iter}')
 
+def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
+    print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
+    for jx, thistable in enumerate(tabs):
+        tablesetup = eval(f'{thistable}_setup')
+        table = tablesetup['table']
+        print('table', table)
+        for sid in tids[jx]:
+            rstring = f'{table}.query.get({sid})'
+            odat = eval(rstring)
+            if 'Haul' in task_focus:
+                nstat = odat.Hstat
+                if task_focus == 'Haul+1':
+                    if nstat+1 < 5: odat.Hstat = nstat+1
+                if task_focus == 'Haul-1':
+                    if nstat-1 > -1: odat.Hstat = nstat-1
+                if task_focus == 'Haul Done': odat.Hstat = 3
+            if 'Inv' in task_focus:
+                nstat = odat.Istat
+                if task_focus == 'Inv+1':
+                    if nstat+1 < 5: odat.Istat = nstat+1
+                if task_focus == 'Inv-1':
+                    if nstat-1 > -1: odat.Istat = nstat-1
+                if task_focus == 'Inv Emailed': odat.Istat = 3
+    db.session.commit()
+    holdvec, entrydata, err = [], [], []
+    viewport = ['0'] * 6
+    completed = True
+
+
+    return holdvec, entrydata, err, viewport, completed
+
 def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
     print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
     for jx, thistable in enumerate(tabs):
@@ -673,7 +704,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 eval(rstring)
             elif task_focus == 'Undo Invoice':
                 # Need to add the undo of the journal entries
-                rstring = f'{table}.query.filter({table}.id == {sid})'
+                rstring = f'{table}.query.get({sid})'
                 odat = eval(rstring)
                 odat.Invoice = None
                 odat.Istat = 0

@@ -7,7 +7,7 @@ jobcode = co[10] + genre[0]
 Trucking_genre = {'table': 'Orders',
                   'genre_tables': ['Orders', 'Interchange', 'Customers', 'Services'],
                   'genre_tables_on': ['on', 'off', 'off', 'off'],
-                  'quick_buttons': ['New Job', 'Edit Item', 'Inv Job', 'Rec Pay'],
+                  'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice', 'Rec Pay'],
                   'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 180 Days', 'Show All']},
                                     {'Pay Filter': ['Uninvoiced', 'Unrecorded', 'Unpaid', 'Show All']},
                                     {'Haul Filter': ['Not Started', 'In-Progress', 'Incomplete', 'Completed',
@@ -17,8 +17,8 @@ Trucking_genre = {'table': 'Orders',
                                              'New Manifest', 'Upload Source', 'Upload Proof']},
                                  {'Editing': ['Edit Item', 'Match', 'Accept', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
                                                  'Inv-1', 'Inv Emailed', 'Set Col To']},
-                                 {'Money Flow': ['Inv Edit', 'Quote Edit', 'Package Send', 'Rec Payment',
-                                                  'Rec by Acct']},
+                                 {'Money Flow': ['Edit Invoice', 'Edit Quote', 'Send Package', 'Receive Payment',
+                                                  'Receive by Acct']},
                                  {'View Docs': ['Source', 'Proof', 'Manifest', 'Interchange', 'Invoice',
                                                 'Paid Invoice']},
                                  {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment']},
@@ -34,7 +34,8 @@ Trucking_genre = {'table': 'Orders',
                                     'Quick' :
                                         {
                                             'New Job' : ['Table_Selected', 'New', 'Orders'],
-                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form']
+                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
+                                            'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice']
                                         },
                                     'Adding':
                                         {
@@ -64,11 +65,11 @@ Trucking_genre = {'table': 'Orders',
 
                                     'Money Flow':
                                         {
-                                         'Inv Edit' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
-                                         'Quote Edit' : ['Single_Item_Selection', 'MakeQuote', 'Quote'],
-                                         'Package Send' : ['Single_Item_Selection', 'MakePackage', 'Package'],
-                                         'Rec Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
-                                         'Rec by Acct' : ['Pure_Task', 'ReceiveByAccount', '']
+                                         'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
+                                         'Edit Quote' : ['Single_Item_Selection', 'MakeQuote', 'Quote'],
+                                         'Send Package' : ['Single_Item_Selection', 'MakePackage', 'Package'],
+                                         'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
+                                         'Receive by Acct' : ['Pure_Task', 'ReceiveByAccount', '']
                                         },
 
                                     'View Docs':

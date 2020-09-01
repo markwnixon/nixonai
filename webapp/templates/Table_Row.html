@@ -1,6 +1,7 @@
 {% set genre = genre_data['table'] %}
 {% set genre_tables = genre_data['genre_tables'] %}
 {% set genre_tables_on = genre_data['genre_tables_on'] %}
+{% set qbuttons = genre_data['quick_buttons'] %}
 
 <div class="d-flex justify-content-around align-self-baseline">
     <div class="p-2">
@@ -31,12 +32,12 @@
     {% endfor %}
 
     <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Job"
-      data-toggle="tooltip" title="Add a NEW JOB from scratch here">   New<br>&nbsp &nbsp Job &nbsp &nbsp  </button>
+      data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Job  </button>
 ->
           <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Item"
         data-toggle="tooltip" title="MODIFY information associated with any selected item">Edit<br>Item</button>
 ->
-              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Inv Job"
+              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Invoice"
         data-toggle="tooltip" title="Create and Edit an Invoice">Invoice<br>Editor</button>
 ->
             <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Rec Pay"

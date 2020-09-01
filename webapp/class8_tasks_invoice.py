@@ -192,12 +192,14 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
         c.line(ctm, level1, ctm + 175, level1)
         c.drawString(ctm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[1]}')
         pdata2 = odata.Dropblock1
-        pdata2 = pdata2.splitlines()
+        try:
+            pdata2 = pdata2.splitlines()
+        except:
+            pdata2 = []
         loadat = []
         for dat in pdata2:
             loadat.append(dat)
-        if loadat is None:
-            loadat = []
+        if loadat == []:
             for i in range(5):
                 loadat.append('')
         top = scrollwrite(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat)
@@ -207,12 +209,14 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
         c.line(rtm - 175, level1, rtm, level1)
         c.drawString(rtm - 170 + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[2]}')
         pdata3 = odata.Dropblock2
-        pdata3 = pdata3.splitlines()
+        try:
+            pdata3 = pdata3.splitlines()
+        except:
+            pdata3 = []
         shipto = []
         for dat in pdata3:
             shipto.append(dat)
-        if shipto is None:
-            shipto = []
+        if shipto == []:
             for i in range(5):
                 shipto.append('')
         top = scrollwrite(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto)
