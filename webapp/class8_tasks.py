@@ -105,14 +105,14 @@ def reset_state(task_boxes, genre_tables):
     genre_tables_on[0] = 'on'
     tables_on = ['Orders']
     # Default time filter on entry into table is last 60 days:
-    tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+    #tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
     jscripts = ['dtTrucking']
     taskon, task_iter, task_focus = None, None, None
     viewport = ['tables'] + ['0'] * 5
     for box in task_boxes:
         for key, value in box.items():
             tboxes[key] = key
-    return genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport
+    return genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport
 
 def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err):
     completed = False
@@ -238,10 +238,15 @@ def Table_maker(genre):
         task_focus = nononestr(request.values.get('task_focus'))
         task_iter = nonone(request.values.get('task_iter'))
 
+        #Gather filter settings to keep them set as desired
+
+
         returnhit = request.values.get('Return')
         if returnhit is not None:
-            # Asked to reset, so reset values as if not a Post
-            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
+            # Asked to reset, so reset values as if not a Post (except the table filters which will be kept)
+            genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
+            for filter in table_filters:
+                for key, value in filter.items(): tfilters[key] = request.values.get(key)
         else:
             taskon = nononestr(taskon)
 
@@ -314,7 +319,7 @@ def Table_maker(genre):
     if hasvalue(taskon):
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
-            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
+            genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
             tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
 
@@ -323,7 +328,7 @@ def Table_maker(genre):
                 #taskon = None
                 #task_iter = 0
         if request.values.get('Cancel') is not None:
-            genre_tables_on, tables_on, tfilters, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(
+            genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(
                 task_boxes, genre_tables)
             err = ['Entry canceled']
             taskon = None
