@@ -3,7 +3,7 @@ from webapp.models import Orders, Invoices, People, Services, Drops
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
-from webapp.email_appl import etemplate_truck
+from webapp.class8_email import etemplate_truck, emaildata_update
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
 from webapp.class8_tasks_manifest import makemanifest
 from webapp.class8_tasks_invoice import make_invo_doc
@@ -255,6 +255,8 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             db.session.commit()
 
             print('entrydata=', entrydata)
+            holdvec[4] = emaildata_update()
+            print('emaildata is:', holdvec[4])
 
         else:
             invodate = today
@@ -265,13 +267,16 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             err = initialize_invoice(odata1, err)
             entrydata, docref, err, itotal = update_invoice(odata1, err, tablesetup, invostyle)
 
-            #emaildata = etemplate_truck('invoice', 0, modata)
+            holdvec[4] = etemplate_truck('invoice', 0, odata1)
+            print('emaildata is:', holdvec[4])
 
         odata1.Invoice = os.path.basename(docref)
         db.session.commit()
         print('docref=',docref)
-        viewport[0] = 'show_doc_left'
-        viewport[2] = '/' + tpath('invoice',odata1.Invoice)
+        viewport[0] = 'split panel left'
+        viewport[1] = 'email setup'
+        viewport[2] = 'show_doc_left'
+        viewport[3] = '/' + tpath('invoice',odata1.Invoice)
         print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')

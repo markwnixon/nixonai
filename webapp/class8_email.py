@@ -1,3 +1,4 @@
+from flask import request
 import smtplib
 import mimetypes
 from email.mime.multipart import MIMEMultipart
@@ -15,11 +16,21 @@ from webapp.CCC_system_setup import usernames as em
 from webapp.models import People, Orders
 from webapp.viewfuncs import stripper
 
+def emaildata_update():
+    etitle = request.values.get('edat0')
+    ebody = request.values.get('edat1')
+    aname = request.values.get('edat6')
+    emailin1 = request.values.get('edat2')
+    emailin2 = request.values.get('edat3')
+    emailcc1 = request.values.get('edat4')
+    emailcc2 = request.values.get('edat5')
+    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+    return emaildata
+
 def etemplate_truck(viewtype,eprof,odat):
     cdata = companydata()
     bid = odat.Bid
     jo = odat.Jo
-    order = odat.Order
     signature = cdata[2] + '\n' + cdata[5] + '\n' + cdata[6] + '\n' + cdata[7]
 
     print('templated to:',viewtype,eprof)

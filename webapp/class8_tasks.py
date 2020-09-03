@@ -3,7 +3,7 @@ from webapp.models import DriverAssign, Gledger, Vehicles, Invoices, JO, Income,
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
-from webapp.email_appl import etemplate_truck
+from webapp.class8_email import etemplate_truck
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
 from webapp.class8_tasks_manifest import makemanifest
 from webapp.class8_money_tasks import MakeInvoice_task

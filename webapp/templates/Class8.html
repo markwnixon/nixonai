@@ -5,24 +5,51 @@
 <div class="table-responsive">
 
 <div class="row">
+        {% if viewport[0] == 'split panel left' %}
+            <div class="col-sm-4">
+                {% if viewport[1] == 'email setup' %}
+                    Write some stuff here {{ viewport[1] }}
+                    {% set emaildata = holdvec[4] %}
+                    {% include 'emailprep.html' %}
+                {% endif %}
+            </div>
+            <div class="col-sm-4">
+                {% if (viewport[2] == 'show_doc_left') or (viewport[2] == 'upload_doc_left') %}
+                    {% include 'the_tables_hidden.html' %}
+                {% else %}
+                    {% include 'the_tables.html' %}
+                {% endif %}
 
-        <div class="col-sm-{{leftsize}}">
-            {% if (viewport[0] == 'show_doc_left') or (viewport[0] == 'upload_doc_left') %}
-                {% include 'the_tables_hidden.html' %}
-            {% else %}
-                {% include 'the_tables.html' %}
-            {% endif %}
+                {% if viewport[2] == 'upload_doc_left' %}
+                    {% include 'uploaddocs.html' %}
+                {% elif viewport[2] == 'show_doc_left' %}
+                    <div class="row"><div class="col-sm-12" align="right">
+                            Looking for: {{viewport[3]}}<br>
+                            <embed src="{{viewport[3]}}" width="575px" height="750px"/>
+                    </div></div>
+                {% endif %}
+            </div>
 
-            {% if viewport[0] == 'upload_doc_left' %}
-                {% include 'uploaddocs.html' %}
-            {% elif viewport[0] == 'show_doc_left' %}
-                <div class="row"><div class="col-sm-12" align="right">
-                        Looking for: {{viewport[2]}}<br>
-                        <embed src="{{viewport[2]}}" width="700px" height="850px"/>
-                </div></div>
-            {% endif %}
-        </div>
+        {% else %}
 
+            <div class="col-sm-{{leftsize}}">
+                {% if (viewport[0] == 'show_doc_left') or (viewport[0] == 'upload_doc_left') %}
+                    {% include 'the_tables_hidden.html' %}
+                {% else %}
+                    {% include 'the_tables.html' %}
+                {% endif %}
+
+                {% if viewport[0] == 'upload_doc_left' %}
+                    {% include 'uploaddocs.html' %}
+                {% elif viewport[0] == 'show_doc_left' %}
+                    <div class="row"><div class="col-sm-12" align="right">
+                            Looking for: {{viewport[2]}}<br>
+                            <embed src="{{viewport[2]}}" width="700px" height="850px"/>
+                    </div></div>
+                {% endif %}
+            </div>
+
+        {% endif %}
 
         <div class="col-sm-{{rightsize}}" align = "left">
             <div class="row">
