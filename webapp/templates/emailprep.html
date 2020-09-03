@@ -1,0 +1,59 @@
+{% set emailin1=emaildata[2] %}
+{% set emailin2=emaildata[3] %}
+{% set emailcc1=emaildata[4] %}
+{% set emailcc2=emaildata[5] %}
+{% set etitle = emaildata[0] %}
+{% set ebody = emaildata[1] %}
+{% set attachname = emaildata[6] %}
+{% if holdvec %}
+    {% set eprof = holdvec[0] %}
+{% else %}
+    {% set eprof = 0 %}
+{% endif %}
+<br>
+
+<div class="card">
+  <div class="card-header" align = "center">
+    Enter Email Associated with this {{ etype }}<br>
+      {% if stamp %}
+      {% if stamp > 0 %}
+            <div class="d-sm-flex justify-content-center small">
+                <div class="p-0">
+                    <select class="mdb-select md-form" name="emlprofile" onchange="this.form.submit()">
+                        <option value="" disabled selected>Choose Email Profile</option>
+                        <option {% if eprof == '1' %} selected {% endif %} value='1'>Update No Attachments</option>
+                        <option {% if eprof == '2' %} selected {% endif %} value='2'>Update with Interchange</option>
+                        <option {% if eprof == '3' %} selected {% endif %} value='3'>Completion with Invoice</option>
+                        <option {% if eprof == '4' %} selected {% endif %} value='4'>Completion with POD</option>
+                        <option {% if eprof == '5' %} selected {% endif %} value='5'>Completion Package</option>
+                        <option {% if eprof == '6' %} selected {% endif %} value='6'>Custom Completed Package</option>
+                    </select>
+                </div>
+            </div>
+    {% endif %}
+  {% endif %}
+  </div>
+<div class="card-body">
+<div class="input-group-text">E-Title:</div>
+<input class="form-control" type="text" value="{{etitle}}" name="edat0">
+
+<div class="input-group-text">E-Body:</div>
+<textarea class="form-control" type="text" name="edat1" rows="5">{{ebody | safe}}</textarea>
+
+<div class="input-group-text">Email To1:</div>
+<input class="form-control" type="text" value="{{emailin1}}" name="edat2">
+
+<div class="input-group-text">Email To2:</div>
+<input class="form-control" type="text" value="{{emailin2}}" name="edat3">
+
+<div class="input-group-text">Email CC1:</div>
+<input class="form-control" type="text" value="{{emailcc1}}" name="edat4">
+
+<div class="input-group-text">Email CC2:</div>
+<input class="form-control" type="text" value="{{emailcc2}}" name="edat5">
+
+<div class="input-group-text">Attachment Name:</div>
+<input class="form-control" type="text" value="{{attachname}}" name="edat6">
+
+</div>
+</div>

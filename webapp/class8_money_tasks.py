@@ -7,6 +7,7 @@ from webapp.class8_email import etemplate_truck, emaildata_update
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
 from webapp.class8_tasks_manifest import makemanifest
 from webapp.class8_tasks_invoice import make_invo_doc
+from webapp.invoice_mimemail import invoice_mimemail
 
 from sqlalchemy import inspect
 import datetime
@@ -287,6 +288,14 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         if loginvo is not None:
             odata1 = eval(nextquery)
             err = loginvo_m(odata1, 2)
+            if 'Error' not in err:
+                completed = True
+        logemail = request.values.get('emailInvo')
+        if logemail is not None:
+            odat = eval(nextquery)
+            docref = odat.Invoice
+            emailin1 = invoice_mimemail(docref)
+            print('emailin1=', emailin1)
             if 'Error' not in err:
                 completed = True
 
