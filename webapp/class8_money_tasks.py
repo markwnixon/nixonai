@@ -294,10 +294,9 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         if logemail is not None:
             odat = eval(nextquery)
             docref = odat.Invoice
-            emailin1 = invoice_mimemail(docref)
-            print('emailin1=', emailin1)
-            if 'Error' not in err:
-                completed = True
+            err = invoice_mimemail(docref, err)
+            #if 'Error' not in err:
+                #completed = True
 
     return holdvec, entrydata, err, viewport, completed
 
