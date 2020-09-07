@@ -30,6 +30,21 @@ def emaildata_update():
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
     return emaildata
 
+def email_template(type, info):
+    if type == 'class8demo':
+        etitle = 'Demonstration Request for Class8 Software'
+        ebody = f'Your request for a demonstration has been received. We will confirm your appointment upon receipt and reveiw.' \
+                f'<br><br>Date and Time: {info[0]}<br>Address: {info[1]}<br>Your email: {info[2]}<br>Your phone:{info[3]}<br>' \
+                f'Contact Name: {info[4]}<br><br>We appreciate this opportunity and look forward t speaking with you.'
+        emailin1 = f'{info[2]}'
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        aname = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+    return emaildata
+
+
 def etemplate_truck(viewtype,eprof,odat):
     cdata = companydata()
     bid = odat.Bid
@@ -405,6 +420,48 @@ def invoice_mimemail(docref, err):
         msg.attach(part)
         attachment.close()
         os.remove(newfile)
+
+    server = smtplib.SMTP(ourserver)
+    server.starttls()
+    code, check = server.login(username,password)
+    print('check', code, check.decode("utf-8"))
+    err.append(f"Email Login: {check.decode('utf-8')}")
+    err.append(f"Email To: {emailin1} sent")
+    err.append(f"Email From: {emailfrom}")
+    server.sendmail(emailfrom, emailto, msg.as_string())
+
+    server.quit()
+
+    return err
+
+def info_mimemail(emaildata):
+    err=[]
+    cdata = companydata()
+    signature_block = cdata[2] + '<br>' + cdata[5] + '<br>' + cdata[6] + '<br>' + cdata[7]
+    signature = f'<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><br><br><table><tr><td><div>'\
+                + f'<img src = "{cdata[11]}" width="120" height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
+
+    ourserver = websites['mailserver']
+    etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname = emaildata
+
+    #emailto = "export@firsteaglelogistics.com"
+    emailfrom = em['invo']
+    username = em['invo']
+    password = passwords['invo']
+
+    msg = MIMEMultipart()
+    msg["From"] = emailfrom
+    msg["To"] = emailin1
+    emailto=[emailin1]
+    if emailcc1 is not None:
+        msg["CC"] = emailcc1
+        emailto.append(emailcc1)
+    msg["Subject"] = etitle
+
+    ebody = ebody.replace('\n', '<br>') + signature
+
+    msg.attach(MIMEText(ebody, 'html'))
+    #msg.attach(MIMEText(signature, 'html'))
 
     server = smtplib.SMTP(ourserver)
     server.starttls()

@@ -7,6 +7,7 @@ from webapp.class8_tasks import Table_maker
 from flask_login import login_required
 
 
+
 import math
 from decimal import Decimal
 from random import sample
@@ -24,6 +25,7 @@ import mimetypes
 from urllib.parse import urlparse
 import img2pdf
 from webapp.viewfuncs import make_new_order, nonone, monvals, getmonths, nononestr, hasinput, d2s, erud, docuploader
+from webapp.class8_utils_email import email_template, info_mimemail
 
 from webapp.class8_utils import *
 
@@ -206,9 +208,10 @@ def Whatapp():
 
 @app.route('/AboutClass8', methods=['GET', 'POST'])
 def AboutClass8():
-    info = ['']*6
+    info = ['']*7
     thisnow = now + timedelta(1)
     info[0] = thisnow.strftime("%Y-%m-%dT%H:%M")
+
     if request.method == 'POST':
         setappt = request.values.get('setappt')
         if setappt is not None:
@@ -218,6 +221,13 @@ def AboutClass8():
             info[3] = request.values.get('phone')
             info[4] = request.values.get('contact')
             info[5] = True
+            info[6] = f'Email Sent To {info[2]} at {info[1]} confirming appointment on {info[0]} at {info[1]}'
+            emaildata = email_template('class8demo', info)
+            print('Sending Email to', emaildata)
+            info_mimemail(emaildata)
+
+        cancel = request.values.get('cancel')
+        if cancel is not None: info = ['']*7
 
     for i in info:
         print(i)

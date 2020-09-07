@@ -22,6 +22,9 @@
         </button>
       </div>
       <div class="modal-body">
+      {% if info[5] == True %}
+          {{ info[6] }}
+          {% else %}
         <p>We would love to provide you an in-person demonstration at your site or ours!  Simply Choose the time and place.  We will make the arrangements and confirm.</p>
     <table class="table table-condensed table-hover"><tbody>
         <tr>
@@ -45,12 +48,17 @@
             <td colspan="1"><input class="form-control" type="text"  placeholder='Optional' name="contact" value = "{{ info[4] }}"></td>
         </tr>
     </tbody></table>
+          {% endif %}
 
 
       </div>
       <div class="modal-footer">
+          {% if info[5] == True %}
+          <button type="button" class="btn btn-black" name="cancel" data-dismiss="modal">Close</button
+          {% else %}
         <input type="submit" class="btn btn-primary" name="setappt" value="Set Appointment">
-        <button type="button" class="btn btn-black" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-black" name="cancel" data-dismiss="modal">Cancel</button>
+          {% endif %}
       </div>
     </div>
   </div>
