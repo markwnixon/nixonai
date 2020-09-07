@@ -12,11 +12,13 @@ import datetime
 import shutil
 from webapp.CCC_system_setup import addpath, bankdata, scac
 import numbers
+from webapp.utils import *
 
 
-def scrollwrite(c, fonttype, fontsize, top, left, dsp, itemlist):
+def scroll_write(c, fonttype, fontsize, top, left, dsp, itemlist):
     c.setFont(fonttype, fontsize, leading=None)
     for item in itemlist:
+        item = text_ready(item)
         c.drawString(left, top, item)
         top = top - dsp
     return top
@@ -51,7 +53,7 @@ def center_write(odata, headers, headeritems, fs1, fs2, ltm, rtm):
 
     return newctr, newlft, header_values
 
-def writelines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, lineheight):
+def write_lines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, lineheight):
     textWidth = stringWidth(thistext, thisfont, thisfontsize)
     if textWidth > fixed_width:
         breaklines = thistext.split()
@@ -185,7 +187,7 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
         else:
             for i in range(5):
                 billto[i] = ' '
-        top = scrollwrite(c,'Helvetica',10,level1-dh,ltm+bump*3,13,billto)
+        top = scroll_write(c,'Helvetica',10,level1-dh,ltm+bump*3,13,billto)
 
     if lh1 > 1:
         c.rect(ctm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
@@ -202,7 +204,7 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
         if loadat == []:
             for i in range(5):
                 loadat.append('')
-        top = scrollwrite(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat)
+        top = scroll_write(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat)
 
     if lh1 > 2:
         c.rect(rtm - 175, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
@@ -219,7 +221,7 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
         if shipto == []:
             for i in range(5):
                 shipto.append('')
-        top = scrollwrite(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto)
+        top = scroll_write(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto)
 
 
     #Create the middle row headers and auto fit the width for the items
@@ -291,7 +293,7 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
             c.drawCentredString(ctr[j], top, i)
             j = j+1
 
-        xdist, top = writelines(c, 260, line5, 'Helvetica', 9, n2 + tb, top, dh)
+        xdist, top = write_lines(c, 260, line5, 'Helvetica', 9, n2 + tb, top, dh)
 
         j = 0
         for i in line6:

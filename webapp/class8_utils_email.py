@@ -11,10 +11,13 @@ from email.mime.text import MIMEText
 import ntpath
 import shutil
 import os
-from webapp.CCC_system_setup import websites, passwords, companydata, scac
+from webapp.CCC_system_setup import websites, passwords, companydata, scac, addpath
 from webapp.CCC_system_setup import usernames as em
 from webapp.models import People, Orders
 from webapp.viewfuncs import stripper
+
+import datetime
+today = datetime.datetime.today()
 
 def emaildata_update():
     etitle = request.values.get('edat0')
@@ -122,7 +125,7 @@ def etemplate_truck(viewtype,eprof,odat):
 
     elif viewtype == 'invoice':
         etitle = f'Invoice for Completed Order: {od} | {keyval} | {con}'
-        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice for services is attached.\n\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice for services is attached.\n\nWe greatly appreciate your business.'
         aname = odat.Invoice
         aname = aname.replace('INV','Invoice_')
         emailin1 = estatus
@@ -338,3 +341,80 @@ def email_app(pdat):
     server.quit()
     
     #os.remove(newfile)
+
+def invoice_mimemail(docref, err):
+    cdata = companydata()
+    signature_block = cdata[2] + '<br>' + cdata[5] + '<br>' + cdata[6] + '<br>' + cdata[7]
+    signature = f'<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><br><br><table><tr><td><div>'\
+                + f'<img src = "{cdata[11]}" width="120" height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
+
+    ourserver = websites['mailserver']
+
+    emailin1=request.values.get('edat2')
+    emailin2=request.values.get('edat3')
+    emailcc1=request.values.get('edat4')
+    emailcc2=request.values.get('edat5')
+    etitle=request.values.get('edat0')
+    ebody=request.values.get('edat1')
+    newfile = request.values.get('edat6')
+
+    lastpath = 'vpackages'
+    if 'INV' in docref:
+        lastpath = 'vinvoice'
+    elif 'Proof' in docref:
+        lastpath = 'vproofs'
+    elif 'Manifest' in docref:
+        lastpath = 'vmanifest'
+
+    if newfile != 'none':
+        cfrom = addpath(f'static/{scac}/data/{lastpath}/{docref}')
+        print(cfrom,newfile)
+        shutil.copy(cfrom,newfile)
+
+    #emailto = "export@firsteaglelogistics.com"
+    emailfrom = em['invo']
+    username = em['invo']
+    password = passwords['invo']
+
+    msg = MIMEMultipart()
+    msg["From"] = emailfrom
+    msg["To"] = emailin1
+    emailto=[emailin1]
+    if emailin2 is not None:
+        msg["To"] = emailin2
+        emailto.append(emailin2)
+    if emailcc1 is not None:
+        msg["CC"] = emailcc1
+        emailto.append(emailcc1)
+    if emailcc2 is not None:
+        msg["Cc"] = emailcc2
+        emailto.append(emailcc2)
+    msg["Subject"] = etitle
+
+    ebody = ebody.replace('\n', '<br>') + signature
+
+    msg.attach(MIMEText(ebody, 'html'))
+    #msg.attach(MIMEText(signature, 'html'))
+
+    if newfile != 'none':
+        attachment = open(newfile, "rb")
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload((attachment).read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', "attachment; filename= %s" % newfile)
+        msg.attach(part)
+        attachment.close()
+        os.remove(newfile)
+
+    server = smtplib.SMTP(ourserver)
+    server.starttls()
+    code, check = server.login(username,password)
+    print('check', code, check.decode("utf-8"))
+    err.append(f"Email Login: {check.decode('utf-8')}")
+    err.append(f"Email To: {emailin1} sent")
+    err.append(f"Email From: {emailfrom}")
+    server.sendmail(emailfrom, emailto, msg.as_string())
+
+    server.quit()
+
+    return err

@@ -3,10 +3,10 @@ from webapp.models import DriverAssign, Gledger, Vehicles, Invoices, JO, Income,
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
-from webapp.class8_email import etemplate_truck
+from webapp.class8_utils_email import etemplate_truck
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
-from webapp.class8_tasks_manifest import makemanifest
-from webapp.class8_money_tasks import MakeInvoice_task
+from webapp.class8_utils_manifest import makemanifest
+from webapp.class8_tasks_money import MakeInvoice_task
 
 from sqlalchemy import inspect
 import datetime
@@ -457,7 +457,10 @@ def get_new_Jo(input):
 def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
-    hiddendata = tablesetup['hidden data']
+    try:
+        hiddendata = tablesetup['hidden data']
+    except:
+        hiddendata = []
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
     creators = tablesetup['creators']
@@ -957,24 +960,26 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
 
 def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
-    err = [f"Running Edit task with task_iter {task_iter} using {tablesetup['table']}"]
+    err = [f"Running Manifest task with task_iter {task_iter} using {tablesetup['table']}"]
+    completed = False
     viewport = ['0'] * 6
+
+    table = tablesetup['table']
     entrydata = tablesetup['entry data']
+    hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
+
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    creators = tablesetup['creators']  # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    modata = eval(nextquery)
+
 
     returnhit = request.values.get('Finished')
     if returnhit is not None: completed = True
     else:
-
-        completed = False
-        table = tablesetup['table']
-        filter = tablesetup['filter']
-        filterval = tablesetup['filterval']
-        creators = tablesetup['creators']  # Gather the data for the selected row
-        nextquery = f"{table}.query.get({sid})"
-        modata = eval(nextquery)
-
         if task_iter > 0:
             failed = 0
             warned = 0
@@ -986,13 +991,24 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 if entry[5] == 1: warned = warned + 1
             err.append(f'There are {failed} input errors and {warned} input warnings')
 
-            update_item = request.values.get('Update Item')
+            update_item = request.values.get('Update Manifest')
             if update_item is not None:
                 if failed == 0:
-                    for jx, entry in enumerate(entrydata): setattr(modata, f'{entry[0]}', holdvec[jx])
+                    for jx, entry in enumerate(entrydata):
+                        if entry[0] not in creators:
+                            print('Updating Entry with', entry[0], holdvec[jx])
+                            setattr(modata, f'{entry[0]}', holdvec[jx])
                     db.session.commit()
-                    #err.append(f"Updated entry in {tablesetup['table']}")
-                    completed = True
+                    for jx, entry in enumerate(hiddendata):
+                        thisvalue = getattr(modata, entry[2])
+                        try:
+                            thisvalue = thisvalue.splitlines()
+                            thissubvalue = thisvalue[0]
+                        except:
+                            thissubvalue = ''
+                        print('Updating Entry with', entry[0], thissubvalue)
+                        setattr(modata, f'{entry[0]}', thissubvalue)
+                    db.session.commit()
                 else:
                     err.append(f'Cannot update entry until input errors shown in red below are resolved')
 
@@ -1003,12 +1019,19 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
             for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(modata, f'{entry[0]}')
 
         docref = makemanifest(modata)
+        try:
+            modata.Mcache = int(modata.Mcache) + 1
+        except:
+            modata.Mcache = 1
+        db.session.commit()
         viewport[0] = 'show_doc_left'
         viewport[2] = '/' + tpath(f'manifest', docref)
         print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
+        finished = request.values.get('Finished')
+        if finished is not None: completed = True
 
     return holdvec, entrydata, err, viewport, completed
 

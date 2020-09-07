@@ -146,6 +146,15 @@ def hasinput(input):
     else:
         return 1
 
+def text_ready(input):
+    if input is None: input = ''
+    if input == 'None': input = ''
+    if hasinput(input):
+        input = str(input)
+    else:
+        input = ''
+    return input
+
 def txtfile(infile):
     base=os.path.splitext(infile)[0]
     tf=base+'.txt'

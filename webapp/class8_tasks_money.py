@@ -3,30 +3,17 @@ from webapp.models import Orders, Invoices, People, Services, Drops
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
-from webapp.class8_email import etemplate_truck, emaildata_update
+from webapp.class8_utils_email import etemplate_truck, emaildata_update, invoice_mimemail
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
-from webapp.class8_tasks_manifest import makemanifest
-from webapp.class8_tasks_invoice import make_invo_doc
-from webapp.invoice_mimemail import invoice_mimemail
-
-from sqlalchemy import inspect
-import datetime
-import os
-import subprocess
-#from func_cal import calmodalupdate
-import json
-import numbers
+from webapp.class8_utils_manifest import makemanifest
+from webapp.class8_utils_invoice import make_invo_doc
 
 #Python functions that require database access
 from webapp.class8_utils import *
 from webapp.utils import *
-from webapp.viewfuncs import newjo
-import uuid
+from webapp.class8_tasks_gledger import gledger_write
 
 def loginvo_m(odat,ix):
-    #if ix = 2 we are not emailing
-    #if ix = 3 we ARE emailing
-    from gledger_write import gledger_write
     alink = odat.Links
     print(ix,alink)
     if alink is not None:
@@ -295,8 +282,8 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             odat = eval(nextquery)
             docref = odat.Invoice
             err = invoice_mimemail(docref, err)
-            #if 'Error' not in err:
-                #completed = True
+            if 'Error' not in err:
+                completed = True
 
     return holdvec, entrydata, err, viewport, completed
 

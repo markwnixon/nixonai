@@ -419,7 +419,7 @@ class Orders(db.Model):
     id = db.Column('id', db.Integer, primary_key=True)
     Status = db.Column('Status', db.String(200), default=None)
     Jo = db.Column('Jo', db.String(25), nullable=False)
-    Load = db.Column('Load', db.String(50), default=None)
+    HaulType = db.Column('HaulType', db.String(50), default=None)
     Order = db.Column('Order', db.String(50), default=Jo)
     Bid = db.Column('Bid', db.Integer, default=0)
     Lid = db.Column('Lid', db.Integer, default=0)
