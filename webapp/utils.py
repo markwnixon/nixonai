@@ -8,66 +8,30 @@ import shutil
 import subprocess
 import img2pdf
 import json
+import numbers
 
-def requester(alist):
-    areturn = ['0']*len(alist)
-    for ix, al in enumerate(alist):
-        areturn[ix] = request.values.get(al)
-    return areturn
-
-def hv_capture(ilist):
-    hvhere = [0]*18
-    for ib,il in enumerate(ilist):
-        hvhere[ib] = request.values.get(il)
-
-def viewbuttons():
-    match    =  request.values.get('Match')
-    modify   =  request.values.get('Modify')
-    vmod     =  request.values.get('Vmod')
-    minvo    =  request.values.get('MakeI')
-    mpack    =  request.values.get('MakeP')
-    viewo     =  request.values.get('ViewO')
-    viewi     =  request.values.get('ViewI')
-    viewp     =  request.values.get('ViewP')
-    print    =  request.values.get('Print')
-    addE     = request.values.get('addentity')
-    addS     = request.values.get('addservice')
-    slim     = request.values.get('slim')
-    stayslim = request.values.get('stayslim')
-    unslim = request.values.get('unslim')
-    limitptype = request.values.get('limitptype')
-    returnhit = request.values.get('Return')
-    deletehit = request.values.get('Delete')
-    # hidden values
-    update   =  request.values.get('Update')
-    invoupdate = request.values.get('invoUpdate')
-    emailnow = request.values.get('emailnow')
-    emailinvo = request.values.get('emailInvo')
-    newjob=request.values.get('NewJ')
-    thisjob=request.values.get('ThisJob')
-    recpay   = request.values.get('RecPay')
-    hispay   = request.values.get('HisPay')
-    recupdate = request.values.get('recUpdate')
-    calendar=request.values.get('Calendar')
-    calupdate=request.values.get('calupdate')
-    return match,modify,vmod,minvo,mpack,viewo,viewi,viewp,print,addE,addS,slim,stayslim,unslim,limitptype,returnhit,deletehit,update,invoupdate,emailnow,emailinvo,newjob,thisjob,recpay,hispay,recupdate,calendar,calupdate
-
-
-def last_day_of_month(any_day):
-    next_month = any_day.replace(day=28) + datetime.timedelta(days=4)  # this will never fail
-    return next_month - datetime.timedelta(days=next_month.day)
-
+#Convert float to string with 2 decimals and no dollar sign
 def nodollar(infloat):
-    outstr="%0.2f" % infloat
+    if isinstance(infloat, numbers.Number):
+        outstr="%0.2f" % infloat
+    else: outstr = '0.00'
     return outstr
 
+#Convert float to string with 2 decimals and $ sign
 def dollar(infloat):
-    outstr='$'+"%0.2f" % infloat
+    if isinstance(infloat, numbers.Number):
+        outstr='$'+"%0.2f" % infloat
+    else: outstr = '$0.00'
     return outstr
 
+#Calculate avg of 2 numbers, return 0 if non-numbers provided
 def avg(in1,in2):
-    out=(in1+in2)/2
-    return out
+    if isinstance(in1,numbers.Number) and isinstance(in2, numbers.Number):
+        out=(in1+in2)/2.0
+        return out
+    else:
+        return 0.00
+
 
 def d2s(instr):
     try:

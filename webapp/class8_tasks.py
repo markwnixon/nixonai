@@ -1035,6 +1035,226 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
     return holdvec, entrydata, err, viewport, completed
 
+def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+
+    err = [f"Running Package task with task_iter {task_iter} using {tablesetup['table']}"]
+    completed = False
+    viewport = ['0'] * 6
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    hiddendata = tablesetup['hidden data']
+    numitems = len(entrydata)
+    holdvec = [''] * numitems
+
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    creators = tablesetup['creators']  # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    modata = eval(nextquery)
+
+
+    returnhit = request.values.get('Finished')
+    if returnhit is not None: completed = True
+    else:
+        if task_iter > 0:
+            failed = 0
+            warned = 0
+
+            for jx, entry in enumerate(entrydata):
+                holdvec[jx] = request.values.get(f'{entry[0]}')
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+                if entry[5] > 1: failed = failed + 1
+                if entry[5] == 1: warned = warned + 1
+            err.append(f'There are {failed} input errors and {warned} input warnings')
+
+            update_item = request.values.get('Update Manifest')
+            if update_item is not None:
+                if failed == 0:
+                    for jx, entry in enumerate(entrydata):
+                        if entry[0] not in creators:
+                            print('Updating Entry with', entry[0], holdvec[jx])
+                            setattr(modata, f'{entry[0]}', holdvec[jx])
+                    db.session.commit()
+                    for jx, entry in enumerate(hiddendata):
+                        thisvalue = getattr(modata, entry[2])
+                        try:
+                            thisvalue = thisvalue.splitlines()
+                            thissubvalue = thisvalue[0]
+                        except:
+                            thissubvalue = ''
+                        print('Updating Entry with', entry[0], thissubvalue)
+                        setattr(modata, f'{entry[0]}', thissubvalue)
+                    db.session.commit()
+                else:
+                    err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+        else:
+            # Gather the data for the selected row
+            nextquery = f"{table}.query.get({sid})"
+            modata = eval(nextquery)
+            for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(modata, f'{entry[0]}')
+
+        docref = makepackage(modata)
+        try:
+            modata.Pkcache = int(modata.Pkcache) + 1
+        except:
+            modata.Pkcache = 1
+        db.session.commit()
+        viewport[0] = 'show_doc_left'
+        viewport[2] = '/' + tpath(f'manifest', docref)
+        print('viewport=', viewport)
+
+        err.append(f'Viewing {docref}')
+        err.append('Hit Finished to End Viewing and Return to Table View')
+        finished = request.values.get('Finished')
+        if finished is not None: completed = True
+
+    return holdvec, entrydata, err, viewport, completed
+
+def makepackage(odat):
+    fexist = [0] * 5
+    dockind = ['Source', 'Proofs', 'Invoice', 'Gate']
+    doclist = [0]*8
+    cache2 = int(odat.Pkcache)
+    cache2 = cache2 + 1
+    docref = f'static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
+    doclist[7] = f'static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
+    pdat = People.query.get(odat.Bid)
+    if pdat is not None:
+        stampstring = pdat.Temp2
+        try:
+            stampdata = json.loads(stampstring)
+            if isinstance(stampdata, list):
+                print('stampdata is', stampdata)
+            else:
+                stampdata = None
+        except:
+            stampdata = None
+
+    print(stampdata)
+
+    if stampdata is None:
+        packitems = []
+        stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
+        doclist[0] = f'static/{scac}/data/vorders/{odat.Original}'
+        doclist[1] = f'static/{scac}/data/vproofs/{odat.Proof}'
+        doclist[2] = f'static/{scac}/data/vinvoice/{odat.Invoice}'
+        doclist[3] = f'static/{scac}/data/vinterchange/{odat.Gate}'
+
+        # Package output file
+
+        odat.Package = f'P_c{cache2}_{odat.Jo}.pdf'
+        db.session.commit()
+
+        for ix in range(4):
+            if dockind[ix] != 'none':
+                fexist[ix] = os.path.isfile(addpath(doclist[ix]))
+                if fexist[ix] == 0:
+                    print(f'{addpath(doclist[ix])} does not exist')
+                    err.append(f'No {dockind[ix]} Document Exists')
+                else:
+                    packitems.append(addpath(doclist[ix]))
+                    stampdata.append(dockind[ix])
+
+        if len(stampdata) < 13:
+            for ix in range(len(stampdata), 13):
+                stampdata.append('none')
+
+        print('packitems final:', packitems)
+        print('stampdata final:', stampdata)
+        stampstring = json.dumps(stampdata)
+        print(len(stampstring))
+        print(stampstring)
+        odat.Status = stampstring
+        db.session.commit()
+    else:
+        packitems = []
+        subdata = stampdata[9:13]
+        stampdata = stampdata[0:9]
+        if len(subdata) == 0:
+
+            doclist[0] = f'tmp/{scac}/data/vorders/{odat.Original}'
+            doclist[1] = f'tmp/{scac}/data/vproofs/{odat.Proof}'
+            doclist[2] = f'tmp/{scac}/data/vinvoice/{odat.Invoice}'
+            doclist[3] = f'tmp/{scac}/data/vinterchange/{odat.Gate}'
+
+            for ix in range(4):
+                if dockind[ix] != 'none':
+                    fexist[ix] = os.path.isfile(addpath(doclist[ix]))
+                    if fexist[ix] == 0:
+                        print(f'{addpath(doclist[ix])} does not exist')
+                        err.append(f'No {dockind[ix]} Document Exists')
+                    else:
+                        packitems.append(addpath(doclist[ix]))
+                        stampdata.append(dockind[ix])
+        else:
+            for test in subdata:
+                if test != 'none':
+                    if test == 'Source':
+                        fa = addpath(f'static/{scac}/data/vorders/{odat.Original}')
+                        if os.path.isfile(fa):
+                            packitems.append(fa)
+                            stampdata.append(test)
+                    if test == 'Invoice':
+                        fa = addpath(f'static/{scac}/data/vinvoice/{odat.Invoice}')
+                        if os.path.isfile(fa):
+                            packitems.append(fa)
+                            stampdata.append(test)
+                    if test == 'Proofs':
+                        fa = addpath(f'static/{scac}/data/vproofs/{odat.Proof}')
+                        if os.path.isfile(fa):
+                            packitems.append(fa)
+                            stampdata.append(test)
+                    if test == 'Ticks':
+                        idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
+                        if idata is not None:
+                            if len(idata) > 1:
+                                # Get a blended ticket
+                                con = idata[0].Container
+                                newdoc = f'static/{scac}/data/vinterchange/{con}_Blended.pdf'
+                                if os.path.isfile(addpath(newdoc)):
+                                    print(f'{newdoc} exists already')
+                                else:
+                                    g1 = f'static/{scac}/data/vinterchange/{idata[0].Original}'
+                                    g2 = f'static/{scac}/data/vinterchange/{idata[1].Original}'
+                                    blendticks(addpath(g1), addpath(g2), addpath(newdoc))
+                                packitems.append(addpath(newdoc))
+                                stampdata.append(test)
+                            else:
+                                packitems.append(addpath(f'tmp/{scac}/data/vinterchange/{idata[0].Original}'))
+                                stampdata.append(test)
+
+        if len(stampdata) < 13:
+            for ix in range(len(stampdata), 13):
+                stampdata.append('none')
+
+        # Get the email data also in case changes occur there
+        emaildata = [0] * 7
+        for i in range(7):
+            emaildata[i] = request.values.get('edat' + str(i))
+
+    print('packitems final:', packitems)
+    print('stampdata final:', stampdata)
+
+    if len(packitems) >= 1:
+        pdflist = ['pdfunite'] + packitems + [addpath(docref)]
+        tes = subprocess.check_output(pdflist)
+
+        if eprof is not None:
+            thisprofile = 'eprof' + eprof
+            viewtype = 'packages'
+        else:
+            viewtype = 'packages'
+            thisprofile = 0
+        emaildata = etemplate_truck(viewtype, thisprofile, odat)
+        invo = 3
+        doclist[0] = docref
+    else:
+        err.append('No documents available for this selection')
+        viewtype, mpack, stamp, leftscreen = 0, 0, 0, 1
+
+
 
 
 def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2):
