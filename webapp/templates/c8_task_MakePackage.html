@@ -1,0 +1,148 @@
+{% set emaildata = holdvec[4] %}
+{% set stampdata = holdvec[5] %}
+{% set emailin1=emaildata[0] %}
+{% set emailin2=emaildata[1] %}
+{% set emailcc1=emaildata[2] %}
+{% set emailcc2=emaildata[3] %}
+<div class="card">
+<div class="card-header">
+Invoice Package Can be Reordered and Stamped
+</div>
+<div class="card-body">
+<table>
+<tr>
+<td colspan="4">
+<button type="submit" class="btn btn-mdb-color btn-sm" name="reorder"
+data-toggle="tooltip" title="Use to change documentation order among tenders, proofs, invoice, etc">Reorder</button>
+<button type="submit" class="btn btn-primary btn-sm" name="stampnow"
+data-toggle="tooltip" title="Use to place an electronic mark, signature, and/or date...use zero for page number to skip">Stamp</button>
+<button type="submit" class="btn btn-dark-green btn-sm" name="emailnow"
+data-toggle="tooltip" title="Email the Packaged material using email setup shown on left">Email</button>
+<button type="submit" class="btn btn-blue btn-sm" name="Return"
+data-toggle="tooltip" title="Return to Tables without further execution of options">Return</button>
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="card">
+<div class="card-header">
+First, select order of items and then hit REORDER button
+</div>
+<div class="card-body">
+<table>
+<tr>
+<td> <div class="input-group-text">1st Section:</div></td>
+<td>
+<select class="form-control" type="text" name="section1">
+<option {% if stampdata[9] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
+<option {% if stampdata[9] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
+<option {% if stampdata[9] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
+<option {% if stampdata[9] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
+<option {% if stampdata[9] == 'none' %} selected {% endif %} value='none'> Nothing </option>
+</select>
+</td>
+</tr>
+<tr>
+<td> <div class="input-group-text">2nd Section:</div></td>
+<td>
+<select class="form-control" type="text" name="section2">
+<option {% if stampdata[10] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
+<option {% if stampdata[10] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
+<option {% if stampdata[10] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
+<option {% if stampdata[10] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
+<option {% if stampdata[10] == 'none' %} selected {% endif %} value='none'> Nothing </option>
+</select>
+</td>
+</tr>
+<tr>
+<td> <div class="input-group-text">3rd Section:</div></td>
+<td>
+<select class="form-control" type="text" name="section3">
+<option {% if stampdata[11] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
+<option {% if stampdata[11] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
+<option {% if stampdata[11] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
+<option {% if stampdata[11] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
+<option {% if stampdata[11] == 'none' %} selected {% endif %} value='none'> Nothing </option>
+</select>
+</td>
+</tr>
+<tr>
+<td> <div class="input-group-text">4th Section:</div></td>
+<td>
+<select class="form-control" type="text" name="section4">
+<option {% if stampdata[12] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
+<option {% if stampdata[12] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
+<option {% if stampdata[12] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
+<option {% if stampdata[12] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
+<option {% if stampdata[12] == 'none' %} selected {% endif %} value='none'> Nothing </option>
+</select>
+</td>
+</tr>
+</table>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+Select location to mark with an X (Page, Height, Right)
+</div>
+<div class="card-body">
+<table>
+<tr>
+<td><div class="input-group-text">P:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[0]}} name="stampdata0"
+data-toggle="tooltip" title="Match this value to the page you want the mark, use zero to skip using"></td>
+
+<td><div class="input-group-text">H:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[1]}} name="stampdata1"></td>
+
+<td><div class="input-group-text">R:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[2]}} name="stampdata2"></td>
+</tr>
+</table>
+</div>
+</div>
+<div class="card">
+<div class="card-header">
+Select location to mark with a Signature (Page, Height, Right)
+</div>
+<div class="card-body">
+<table>
+
+<tr><td><div class="input-group-text">P:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[3]}} name="stampdata3"
+data-toggle="tooltip" title="Match this value to the page you want the signature, use zero to skip using"></td>
+
+<td><div class="input-group-text">H:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[4]}} name="stampdata4"></td>
+
+<td><div class="input-group-text">R:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[5]}} name="stampdata5"></td></tr>
+</table>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+Select location to place the date (Page, Height, Right)
+</div>
+<div class="card-body">
+<table>
+<tr><td><div class="input-group-text">P:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[6]}} name="stampdata6"
+data-toggle="tooltip" title="Match this value to the page you want the date, use zero to skip using"></td>
+
+<td><div class="input-group-text">H:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[7]}} name="stampdata7"></td>
+
+<td><div class="input-group-text">R:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[8]}} name="stampdata8"></td></tr>
+
+
+</table>
+</div>
+</div>
+<input type = "hidden" name ="stamp" value= {{stamp}}>
+<input type = "hidden" name ="invooder" value= "{{invooder}}">
+<input type = "hidden" name="oder" value="{{oder}}">

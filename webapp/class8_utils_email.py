@@ -45,13 +45,11 @@ def email_template(type, info):
     return emaildata
 
 
-def etemplate_truck(viewtype,eprof,odat):
+def etemplate_truck(eprof,odat):
     cdata = companydata()
     bid = odat.Bid
     jo = odat.Jo
     signature = cdata[2] + '\n' + cdata[5] + '\n' + cdata[6] + '\n' + cdata[7]
-
-    print('templated to:',viewtype,eprof)
 
     od, bol, con, bk = odat.Order, odat.BOL, odat.Container, odat.Booking
     od, bol, con, bk = stripper(od), stripper(bol), stripper(con), stripper(bk)
@@ -138,7 +136,7 @@ def etemplate_truck(viewtype,eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
-    elif viewtype == 'invoice':
+    elif eprof == 'invoice':
         etitle = f'Invoice for Completed Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice for services is attached.\n\nWe greatly appreciate your business.'
         aname = odat.Invoice
@@ -151,7 +149,7 @@ def etemplate_truck(viewtype,eprof,odat):
         return emaildata
 
 
-    elif viewtype == 'paidinvoice':
+    elif eprof == 'paidinvoice':
         etitle = f'Payment Received on Invoice {odat.Jo} for Completed Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nYour payment has been received, and your stamped invoice is attached.\n\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
         aname = odat.Invoice
@@ -163,7 +161,7 @@ def etemplate_truck(viewtype,eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
-    elif viewtype == 'packages':
+    elif eprof == 'packages':
         etitle = f'{scac} Invoice Package for Completed Orders: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nAn invoice package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
         aname = f'Package_{odat.Jo}.pdf'
@@ -174,7 +172,7 @@ def etemplate_truck(viewtype,eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
-    elif viewtype == 'invopackage':
+    elif eprof == 'invopackage':
         etitle = f'{scac} Invoice Package {odat.Package}'
         ebody = f'Dear {odat.Shipper},\n\nAn invoice package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
         aname = odat.Package
@@ -185,7 +183,7 @@ def etemplate_truck(viewtype,eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
-    elif viewtype == 'quote':
+    elif eprof == 'quote':
         etitle = cdata[2] + ' Quote: ' + jo
         ebody = 'Dear Customer:\n\nYour quote is attached. Please sign and return at your earliest convenience.\n\nWe look forward to doing business with you.\n\nSincerely,\n\n' + \
                 cdata[3] + '\n\n\n' + cdata[4] + '\n' + cdata[2] + '\n' + cdata[5] + '\n' + cdata[6] + '\n' + cdata[7]
