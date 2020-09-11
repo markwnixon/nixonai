@@ -471,14 +471,14 @@ class Orders(db.Model):
     QBi = db.Column('QBi', db.Integer)
     Truck = db.Column('Truck', db.String(45))
 
-    def __init__(self, Status, Jo, Load, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
+    def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck):
         self.Status = Status
         self.Jo = Jo
-        self.Load = Load
+        self.HaulType = HaulType
         self.Order = Order
         self.Company = Company
         self.Location = Location

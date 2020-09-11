@@ -48,6 +48,7 @@ def email_template(type, info):
 def etemplate_truck(eprof,odat):
     cdata = companydata()
     bid = odat.Bid
+    shipper = odat.Shipper
     jo = odat.Jo
     signature = cdata[2] + '\n' + cdata[5] + '\n' + cdata[6] + '\n' + cdata[7]
 
@@ -66,8 +67,13 @@ def etemplate_truck(eprof,odat):
     else:
         dblk = ['','','','','']
     pdat = People.query.get(bid)
-    estatus, epod, eaccts = pdat.Email, pdat.Associate1, pdat.Associate2
-    estatus, epod, eaccts = stripper(estatus), stripper(epod), stripper(eaccts)
+    if pdat is None:
+        pdat = People.query.filter(People.Company == shipper).first()
+    if pdat is not None:
+        estatus, epod, eaccts = pdat.Email, pdat.Associate1, pdat.Associate2
+        estatus, epod, eaccts = stripper(estatus), stripper(epod), stripper(eaccts)
+    else:
+        estatus, epod, eaccts = '', '', ''
 
     if eprof== 'eprof1':
         etitle = f'Update on Order: {od} | {keyval} | {con}'

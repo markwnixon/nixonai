@@ -1,4 +1,5 @@
 from flask import request
+from webapp import db
 from webapp.models import People, Drops, Drivers, Vehicles
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -11,9 +12,12 @@ from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
 from webapp.utils import *
 
-def call_stamp(odat):
+def call_stamp(odat, doclist):
+    doclist = [0] * 8
     packitems = []
     pdat = People.query.get(odat.Bid)
+    if pdat is None:
+        pdat = People.query.filter(People.Company == odat.Shipper).first()
     if pdat is not None:
         stampstring = pdat.Temp2
         try:
@@ -24,12 +28,15 @@ def call_stamp(odat):
                 stampdata = None
         except:
             stampdata = None
+    else:
+        stampdata = None
 
-    print(stampdata)
+    print('The stampdata is:', stampdata)
 
     if stampdata is not None:
 
         packitems = []
+        doclist = []
         subdata = stampdata[9:13]
         stampdata = stampdata[0:9]
 
@@ -99,12 +106,13 @@ def call_stamp(odat):
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
 
-    return stampdata, emaildata, packitems
+    return stampdata, emaildata, packitems, doclist
 
 
 
 def makepackage(odat):
     err = []
+    packitems = []
     fexist = [0] * 5
     dockind = ['Source', 'Proofs', 'Invoice', 'Gate']
     doclist = [0]*8
@@ -113,46 +121,41 @@ def makepackage(odat):
         cache2 = cache2 + 1
     except:
         cache2 = 1
-    docref = f'static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
-    doclist[7] = f'static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
+    basefile = f'P_c{cache2}_{odat.Jo}.pdf'
+    odat.Package = basefile
+    db.session.commit()
+    doclist[7] = f'static/{scac}/data/vpackages/{basefile}'
+    docref = doclist[7]
 
-    stampdata, emaildata, packitems = call_stamp(odat)
+    stampdata, emaildata, packitems, doclist = call_stamp(odat, doclist)
     if stampdata is None:
-        packitems = []
         stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
         doclist[0] = f'static/{scac}/data/vorders/{odat.Source}'
         doclist[1] = f'static/{scac}/data/vproofs/{odat.Proof}'
         doclist[2] = f'static/{scac}/data/vinvoice/{odat.Invoice}'
         doclist[3] = f'static/{scac}/data/vinterchange/{odat.Gate}'
 
-    else:
+    for ix in range(4):
+        if dockind[ix] != 'none':
+            fexist[ix] = os.path.isfile(addpath(doclist[ix]))
+            if fexist[ix] == 0:
+                print(f'{addpath(doclist[ix])} does not exist')
+                err.append(f'No {dockind[ix]} Document Exists')
+            else:
+                packitems.append(addpath(doclist[ix]))
+                stampdata.append(dockind[ix])
 
-        # Create the Package output file
+    if len(stampdata) < 13:
+        for ix in range(len(stampdata), 13):
+            stampdata.append('none')
 
-        odat.Package = f'P_c{cache2}_{odat.Jo}.pdf'
-        db.session.commit()
-
-        for ix in range(4):
-            if dockind[ix] != 'none':
-                fexist[ix] = os.path.isfile(addpath(doclist[ix]))
-                if fexist[ix] == 0:
-                    print(f'{addpath(doclist[ix])} does not exist')
-                    err.append(f'No {dockind[ix]} Document Exists')
-                else:
-                    packitems.append(addpath(doclist[ix]))
-                    stampdata.append(dockind[ix])
-
-        if len(stampdata) < 13:
-            for ix in range(len(stampdata), 13):
-                stampdata.append('none')
-
-        print('packitems final:', packitems)
-        print('stampdata final:', stampdata)
-        stampstring = json.dumps(stampdata)
-        print(len(stampstring))
-        print(stampstring)
-        odat.Status = stampstring
-        db.session.commit()
+    print('packitems final:', packitems)
+    print('stampdata final:', stampdata)
+    stampstring = json.dumps(stampdata)
+    print(len(stampstring))
+    print(stampstring)
+    odat.Status = stampstring
+    db.session.commit()
 
 
     if len(packitems) >= 1:
@@ -172,4 +175,4 @@ def makepackage(odat):
         err.append('No documents available for this selection')
         viewtype, mpack, stamp, leftscreen = 0, 0, 0, 1
 
-    return stampdata
+    return stampdata, docref

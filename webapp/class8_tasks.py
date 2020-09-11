@@ -1087,14 +1087,16 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             odat.Pkcache = 1
         db.session.commit()
 
+        holdvec[5], docref = makepackage(odat)
+
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'
         viewport[2] = 'show_doc_left'
-        viewport[3] = '/' + tpath('package', odat.Package)
+        viewport[3] = '/' + tpath('package', docref)
         print('viewport=', viewport)
 
 
-        holdvec[5] = makepackage(odat)
+
 
 
         err.append(f'Viewing {docref}')
