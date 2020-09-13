@@ -1,0 +1,58 @@
+       <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav">
+            <div class="container">
+                <a class="navbar-brand js-scroll-trigger" href="#page-top"><img src="/static/assets/img/home.png" alt="" /></a>
+                <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+                    Menu
+                    <i class="fas fa-bars ml-1"></i>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarResponsive">
+                    <ul class="navbar-nav text-uppercase ml-auto">
+                        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="#services">Services</a></li>
+                        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="#portfolio">Portfolio</a></li>
+                        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="#clients">Clients</a></li>
+                        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="#contact">Contact</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('AboutClass8') }}">Class8</a></li>
+
+                        {% if session.logged_in %}
+
+                    <!-- Dropdown -->
+                    <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" id="navbarDropdownMenuLink" data-toggle="dropdown" aria-haspopup="true"
+                  aria-expanded="false">WorkArea</a>
+                    <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdownMenuLink">
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Trucking') }}">Truck Job Manager</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Auto') }}">Auto Sales Manager</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Billing') }}">Bill Payments</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='IncomeMaint') }}">Revenues & Deposits</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='InvoiceMaint') }}">Invoices Review</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='DriverMaint') }}">Driver Logs</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='VehicleMaint') }}">Vehicle Logs</a>
+                    </div>
+                    </li>
+
+                                                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" id="navbarDropdownMenuLink2" data-toggle="dropdown" aria-haspopup="true"
+                  aria-expanded="false">AdminArea</a>
+                    <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdownMenuLink2">
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Calendar') }}">Calendar View</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Banking') }}">Banking</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Accounts') }}">Chart of Accounts</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Compliance') }}">Compliance Review</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='Reports') }}">Business Reports</a>
+                    <a class="dropdown-item" href="{{ url_for('Class8Main',genre='General') }}">General Information</a>
+                        {% if session['authority'] == 'superuser' %}
+                            <a class="dropdown-item" href="{{ url_for('authenticate.register') }}">Create New User</a>
+                        {% endif %}
+                    </div>
+                    </li>
+
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('authenticate.logout') }}">Logout</a></li>
+
+                        {% else %}
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('authenticate.login') }}">Login to Portal</a></li>
+
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </nav>

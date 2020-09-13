@@ -13,11 +13,32 @@ import shutil
 import os
 from webapp.CCC_system_setup import websites, passwords, companydata, scac, addpath
 from webapp.CCC_system_setup import usernames as em
+from webapp import db
 from webapp.models import People, Orders
 from webapp.viewfuncs import stripper
 
 import datetime
 today = datetime.datetime.today()
+
+def check_person(info):
+    name = info[4]
+    email = info[2]
+    phone = info[3]
+    message = info[1]
+    pdata = People.query.filter((People.Ptype == 'Contact') & (People.Company == name)).all()
+    return len(pdata)
+
+def add_person(info):
+    name = info[4]
+    email = info[2]
+    phone = info[3]
+    message = info[1]
+    input = People(Company=name, First=None, Middle=None, Last=None, Addr1=None, Addr2=None, Addr3=None,
+                   Idtype=None, Idnumber=None, Telephone=phone,
+                   Email=email, Associate1=None, Associate2=None, Date1=today, Date2=None, Source=message,
+                   Ptype='Contact', Temp1=None, Temp2=None, Accountid=None)
+    db.session.add(input)
+    db.session.commit()
 
 def emaildata_update():
     etitle = request.values.get('edat0')
@@ -42,7 +63,21 @@ def email_template(type, info):
         emailcc2 = ''
         aname = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+
+    if type == 'contact':
+        etitle = 'Message to NixonAI Received'
+        ebody = f'This is a confirmation that your contact information has been received. We will be in touch as soon as possible after we receive this notification.' \
+                f'<br><br>Date and Time: {info[0]}<br>Contact Name: {info[4]}<br>Your email: {info[2]}<br>Your phone:{info[3]}<br>' \
+                f'Your Message: {info[1]}<br><brWe appreciate this opportunity and look forward t speaking with you.'
+        emailin1 = f'{info[2]}'
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        aname = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+
     return emaildata
+
 
 
 def etemplate_truck(eprof,odat):

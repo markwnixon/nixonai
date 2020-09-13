@@ -25,7 +25,7 @@ import mimetypes
 from urllib.parse import urlparse
 import img2pdf
 from webapp.viewfuncs import make_new_order, nonone, monvals, getmonths, nononestr, hasinput, d2s, erud, docuploader
-from webapp.class8_utils_email import email_template, info_mimemail
+from webapp.class8_utils_email import email_template, info_mimemail, check_person, add_person
 
 from webapp.class8_utils import *
 
@@ -34,6 +34,7 @@ year = str(today.year)
 day = str(today.day)
 month = str(today.month)
 now = datetime.datetime.now()
+today_str = today.strftime('%Y-%m-%d')
 
 from webapp.CCC_system_setup import companydata, statpath, addpath, scac, tpath
 cmpdata = companydata()
@@ -152,10 +153,37 @@ def chartdata():
                         })
 
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    info = [''] * 9
+    if request.method == 'POST':
+        sendnow = request.values.get('sendnow')
+        if sendnow is not None:
+            name = request.values.get('name')
+            email = request.values.get('email')
+            phone = request.values.get('phone')
+            message = request.values.get('message')
+            print(f'Sending email from {name}, {email}, {phone}, {message}')
+            info[0] = today_str
+            info[1] = message
+            info[2] = email
+            info[3] = phone
+            info[4] = name
+            info[5] = True
+            info[6] = f'Your contact request has been sent'
+            num_finds = check_person(info)
+            if num_finds < 2:
+                add_person(info)
+                emaildata = email_template('contact', info)
+                print('Sending Email to', emaildata)
+                info_mimemail(emaildata)
+            else:
+                print('Too many attempts to contact')
+                info[5] = True
+                info[6] = f'Already received request, please allow time to respond'
+
     srcpath = statpath('')
-    return render_template(f'companysite/{scac}/about.html',srcpath=srcpath, cmpdata=cmpdata, scac=scac)
+    return render_template(f'companysite/{scac}/index.html',srcpath=srcpath, cmpdata=cmpdata, scac=scac,info=info)
 
 @app.route('/About')
 def About():
