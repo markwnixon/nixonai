@@ -1092,7 +1092,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'
         viewport[2] = 'show_doc_left'
-        viewport[3] = '/' + tpath('package', docref)
+        viewport[3] = '/' + docref
         print('viewport=', viewport)
 
 
