@@ -112,13 +112,11 @@ def call_stamp(odat, doclist):
 
 def makepackage(odat):
     err = []
-    packitems = []
     fexist = [0] * 5
     dockind = ['Source', 'Proofs', 'Invoice', 'Gate']
     doclist = [0]*8
     try:
-        cache2 = int(odat.Pkcache)
-        cache2 = cache2 + 1
+        cache2 = int(odat.Pkcache) + 1
     except:
         cache2 = 1
     basefile = f'P_c{cache2}_{odat.Jo}.pdf'
@@ -161,15 +159,6 @@ def makepackage(odat):
     if len(packitems) >= 1:
         pdflist = ['pdfunite'] + packitems + [addpath(docref)]
         tes = subprocess.check_output(pdflist)
-
-        if eprof is not None:
-            thisprofile = 'eprof' + eprof
-            viewtype = 'packages'
-        else:
-            viewtype = 'packages'
-            thisprofile = 0
-        emaildata = etemplate_truck(viewtype, thisprofile, odat)
-        invo = 3
         doclist[0] = docref
     else:
         err.append('No documents available for this selection')

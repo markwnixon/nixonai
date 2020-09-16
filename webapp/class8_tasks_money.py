@@ -255,7 +255,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             err = initialize_invoice(odata1, err)
             entrydata, docref, err, itotal = update_invoice(odata1, err, tablesetup, invostyle)
 
-            holdvec[4] = etemplate_truck('invoice', 0, odata1)
+            holdvec[4] = etemplate_truck('invoice', odata1)
             print('emaildata is:', holdvec[4])
 
         odata1.Invoice = os.path.basename(docref)
