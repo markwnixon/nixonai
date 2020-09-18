@@ -12,8 +12,8 @@ from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
 from webapp.utils import *
 
-def call_stamp(odat, doclist):
-    doclist = [0] * 8
+def call_stamp(odat, doclist, dockind, task_iter):
+    fexist = [0] * 5
     packitems = []
     pdat = People.query.get(odat.Bid)
     if pdat is None:
@@ -39,11 +39,12 @@ def call_stamp(odat, doclist):
         stampdata = stampdata[0:9]
         subdata = stampdata[9:13]
     # If have no selected documents put all the documents available in it
-    if len(subdata) == 0:
+    if task_iter == 1 or len(subdata) == 0:
         doclist[0] = f'tmp/{scac}/data/vorders/{odat.Source}'
         doclist[1] = f'tmp/{scac}/data/vproofs/{odat.Proof}'
         doclist[2] = f'tmp/{scac}/data/vinvoice/{odat.Invoice}'
         doclist[3] = f'tmp/{scac}/data/vinterchange/{odat.Gate}'
+
 
     for ix in range(4):
         if dockind[ix] != 'none':
@@ -108,10 +109,13 @@ def call_stamp(odat, doclist):
 
 
 
-def makepackage(odat):
+def makepackage(odat, task_iter, document_types):
     err = []
-    fexist = [0] * 5
+    print(document_types)
     dockind = ['Source', 'Proofs', 'Invoice', 'Gate']
+    if task_iter > 1:
+        for i in range(4):
+            dockind[i] = request.values.get('section'+str(i+1))
     doclist = [0]*8
     try:
         cache2 = int(odat.Pkcache) + 1
@@ -127,7 +131,8 @@ def makepackage(odat):
     #emaildata comes from the email profile but can be amended here
     #packitems are the items chosen to be included in the package
     #doclist are the items available to be added to the package
-    stampdata, emaildata, packitems, doclist = call_stamp(odat, doclist)
+    #dockind is the kind of documents we want for this package
+    stampdata, emaildata, packitems, doclist = call_stamp(odat, doclist, dockind)
 
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)

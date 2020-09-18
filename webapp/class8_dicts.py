@@ -29,6 +29,14 @@ Trucking_genre = {'table': 'Orders',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'haul_types': ['Import Standard', 'Export Standard', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
+                  'document_types'  : {
+                                        'all_types' : ['Source', 'Proofs', 'Invoice', 'Gate'],
+                                        'update with source'    : ['Source'],
+                                        'update with interchange' : ['Interchange'],
+                                        'completion' : ['Invoice', 'Proofs'],
+                                        'completion with source' : ['Invoice', 'Proofs', 'Source'],
+                                        'custom' : ['Invoice', 'Proofs']
+                                      },
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
                                    'Source':'CT', 'Proof':'CT', 'View':'CT'},
                   'task_box_map': {

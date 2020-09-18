@@ -1052,6 +1052,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     err = [f"Running Package task with task_iter {task_iter} using {tablesetup['table']}"]
     completed = False
     viewport = ['0'] * 6
+    document_types = eval(f"{genre}_genre['document_types']")
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -1080,14 +1081,14 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             else: holdvec[4] = emaildata_update()
             holdvec[6] = eprof
 
-        docref = makepackage(odat)
+        docref = makepackage(odat, task_iter, document_types)
         try:
             modata.Pkcache = int(odat.Pkcache) + 1
         except:
             odat.Pkcache = 1
         db.session.commit()
 
-        holdvec[5], docref = makepackage(odat)
+        holdvec[5], docref = makepackage(odat,document_types)
 
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'
