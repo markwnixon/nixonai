@@ -29,13 +29,15 @@ Trucking_genre = {'table': 'Orders',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'haul_types': ['Import Standard', 'Export Standard', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
-                  'document_types'  : {
-                                        'all_types' : ['Source', 'Proofs', 'Invoice', 'Gate'],
-                                        'update with source'    : ['Source'],
-                                        'update with interchange' : ['Interchange'],
-                                        'completion' : ['Invoice', 'Proofs'],
-                                        'completion with source' : ['Invoice', 'Proofs', 'Source'],
-                                        'custom' : ['Invoice', 'Proofs']
+                  'document_profiles'  : {
+                                        'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
+                                        'Update w/Source'   : ['Source',0,0,0],
+                                        'Update w/Proof'    : ['Proof',0,0,0],
+                                        'Update w/Invoice'    : ['Invoice',0,0,0],
+                                        'Update w/Gate' : ['Gate Tickets',0,0,0],
+                                        'Completed Min' : ['Invoice', 'Proofs',0,0],
+                                        'Completed Std' : ['Invoice', 'Proofs', 'Source',0],
+                                        'Completed All' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
                                       },
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
                                    'Source':'CT', 'Proof':'CT', 'View':'CT'},

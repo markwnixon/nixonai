@@ -6,6 +6,7 @@
 {% set ebody = emaildata[1] %}
 {% set attachname = emaildata[6] %}
 {% set eprof = holdvec[6] %}
+{% set enames = holdvec[7] %}
 <br>
 
 <div class="card">
@@ -16,13 +17,11 @@
                 <div class="p-0">
                    <select class="form-control" type="text" name="emlprofile" onchange="this.form.submit()">
                    <!-- <select class="mdb-select md-form" name="emlprofile" onchange="this.form.submit()">-->
-                        <option value="" disabled selected>Choose Email Profile</option>
-                        <option {% if eprof == 'eprof1' %} selected {% endif %} value='eprof1'>Update No Attachments</option>
-                        <option {% if eprof == 'eprof2'%} selected {% endif %} value='eprof2'>Update with Interchange</option>
-                        <option {% if eprof == 'eprof3' %} selected {% endif %} value='eprof3'>Completion with Invoice</option>
-                        <option {% if eprof == 'eprof4' %} selected {% endif %} value='eprof4'>Completion with POD</option>
-                        <option {% if eprof == 'eprof5' %} selected {% endif %} value='eprof5'>Completion Package</option>
-                        <option {% if eprof == 'eprof6' %} selected {% endif %} value='eprof6'>Custom Completed Package</option>
+                        <option value="" disabled selected>Choose Document/Email Profile</option>
+                        {% for ename in enames %}
+                            <option {% if eprof == ename %} selected {% endif %} value='{{ ename }}'>{{ ename }}</option>
+                        {% endfor %}
+
                     </select> <input class="form-control" type="checkbox" checked  name="prolock">Profile Locked
                 </div>
             </div>

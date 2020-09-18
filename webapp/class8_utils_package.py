@@ -12,7 +12,7 @@ from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
 from webapp.utils import *
 
-def call_stamp(odat, doclist, dockind, task_iter):
+def call_stamp(odat, doclist, dockind, task_iter, err):
     fexist = [0] * 5
     packitems = []
     pdat = People.query.get(odat.Bid)
@@ -132,7 +132,7 @@ def makepackage(odat, task_iter, document_types):
     #packitems are the items chosen to be included in the package
     #doclist are the items available to be added to the package
     #dockind is the kind of documents we want for this package
-    stampdata, emaildata, packitems, doclist = call_stamp(odat, doclist, dockind)
+    stampdata, emaildata, packitems, doclist = call_stamp(odat, doclist, dockind, task_iter, err)
 
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)

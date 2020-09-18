@@ -4,6 +4,9 @@
 {% set emailin2=emaildata[1] %}
 {% set emailcc1=emaildata[2] %}
 {% set emailcc2=emaildata[3] %}
+{% set docs = holdvec[8] %}
+{% set sections = ['1st Section', '2nd Section', '3rd Section', '4th Section'] %}
+{% set docall = ['Source', 'Proofs', 'Invoice', 'Gate Tickets'] %}
 <div class="card">
 <div class="card-header">
 Invoice Package Can be Reordered and Stamped
@@ -31,54 +34,20 @@ First, select order of items and then hit REORDER button
 </div>
 <div class="card-body">
 <table>
-<tr>
-<td> <div class="input-group-text">1st Section:</div></td>
-<td>
-<select class="form-control" type="text" name="section1">
-<option {% if stampdata[9] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
-<option {% if stampdata[9] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
-<option {% if stampdata[9] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
-<option {% if stampdata[9] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
-<option {% if stampdata[9] == 'none' %} selected {% endif %} value='none'> Nothing </option>
-</select>
-</td>
-</tr>
-<tr>
-<td> <div class="input-group-text">2nd Section:</div></td>
-<td>
-<select class="form-control" type="text" name="section2">
-<option {% if stampdata[10] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
-<option {% if stampdata[10] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
-<option {% if stampdata[10] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
-<option {% if stampdata[10] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
-<option {% if stampdata[10] == 'none' %} selected {% endif %} value='none'> Nothing </option>
-</select>
-</td>
-</tr>
-<tr>
-<td> <div class="input-group-text">3rd Section:</div></td>
-<td>
-<select class="form-control" type="text" name="section3">
-<option {% if stampdata[11] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
-<option {% if stampdata[11] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
-<option {% if stampdata[11] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
-<option {% if stampdata[11] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
-<option {% if stampdata[11] == 'none' %} selected {% endif %} value='none'> Nothing </option>
-</select>
-</td>
-</tr>
-<tr>
-<td> <div class="input-group-text">4th Section:</div></td>
-<td>
-<select class="form-control" type="text" name="section4">
-<option {% if stampdata[12] == 'Source' %} selected {% endif %} value='Source'> Source Document </option>
-<option {% if stampdata[12] == 'Invoice' %} selected {% endif %} value='Invoice'> Invoice </option>
-<option {% if stampdata[12] == 'Proofs' %} selected {% endif %} value='Proofs'> Proofs </option>
-<option {% if stampdata[12] == 'Ticks' %} selected {% endif %} value='Ticks'> Interchange Tickets </option>
-<option {% if stampdata[12] == 'none' %} selected {% endif %} value='none'> Nothing </option>
-</select>
-</td>
-</tr>
+{% for section in sections %}
+{% set outerloop = loop %}
+    <tr>
+        <td> <div class="input-group-text">{{ section }}:</div></td>
+        <td>
+        <select class="form-control" type="text" name="{{ section }}">
+        {% for thisdoc in docall %}
+            <option {% if docs[outerloop.index-1] == thisdoc %} selected {% endif %} value='{{ thisdoc }}'> {{ thisdoc }} </option>
+        {% endfor %}
+        <option {% if docs[outerloop.index-1] == 0 %} selected {% endif %} value=0> Nothing </option>
+        </select>
+        </td>
+    </tr>
+{% endfor %}
 </table>
 </div>
 </div>
