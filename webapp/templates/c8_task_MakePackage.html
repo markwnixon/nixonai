@@ -7,6 +7,7 @@
 {% set docs = holdvec[8] %}
 {% set sections = ['1st Section', '2nd Section', '3rd Section', '4th Section'] %}
 {% set docall = ['Source', 'Proofs', 'Invoice', 'Gate Tickets'] %}
+{% set fexist = holdvec[9] %}
 <div class="card">
 <div class="card-header">
 Invoice Package Can be Reordered and Stamped
@@ -43,9 +44,10 @@ First, select order of items and then hit REORDER button
         {% for thisdoc in docall %}
             <option {% if docs[outerloop.index-1] == thisdoc %} selected {% endif %} value='{{ thisdoc }}'> {{ thisdoc }} </option>
         {% endfor %}
-        <option {% if docs[outerloop.index-1] == 0 %} selected {% endif %} value=0> Nothing </option>
+        <option {% if docs[outerloop.index-1] == '0' %} selected {% endif %} value='0'> Nothing </option>
         </select>
         </td>
+        <td><font color="red"> {% if docs[outerloop.index-1] != '0' %}{% if fexist[outerloop.index-1] == 0 %}This file type does not exist{% endif %}{% endif %}</font></td>
     </tr>
 {% endfor %}
 </table>

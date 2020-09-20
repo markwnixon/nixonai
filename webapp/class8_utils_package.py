@@ -12,8 +12,8 @@ from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
 from webapp.utils import *
 
-def call_stamp(odat, doclist, dockind, task_iter, err):
-    fexist = [0] * 5
+def call_stamp(odat, dockind, task_iter, err):
+    fexist = [0] * 4
     packitems = []
     pdat = People.query.get(odat.Bid)
     if pdat is None:
@@ -34,68 +34,44 @@ def call_stamp(odat, doclist, dockind, task_iter, err):
     print('The stampdata is:', stampdata)
     if stampdata is None:
         stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
-        subdata = []
-    else:
-        stampdata = stampdata[0:9]
-        subdata = stampdata[9:13]
-    # If have no selected documents put all the documents available in it
-    if task_iter == 1 or len(subdata) == 0:
-        doclist[0] = f'tmp/{scac}/data/vorders/{odat.Source}'
-        doclist[1] = f'tmp/{scac}/data/vproofs/{odat.Proof}'
-        doclist[2] = f'tmp/{scac}/data/vinvoice/{odat.Invoice}'
-        doclist[3] = f'tmp/{scac}/data/vinterchange/{odat.Gate}'
 
+    for jx, thisdoc in enumerate(dockind):
+        if thisdoc != '0':
+            if thisdoc == 'Source':
+                fa = addpath(f'static/{scac}/data/vorders/{odat.Source}')
+                if os.path.isfile(fa):
+                    packitems.append(fa)
+                    fexist[jx] = 1
+            if thisdoc == 'Invoice':
+                fa = addpath(f'static/{scac}/data/vinvoice/{odat.Invoice}')
+                if os.path.isfile(fa):
+                    packitems.append(fa)
+                    fexist[jx] = 1
+            if thisdoc == 'Proofs':
+                fa = addpath(f'static/{scac}/data/vproofs/{odat.Proof}')
+                if os.path.isfile(fa):
+                    packitems.append(fa)
+                    fexist[jx] = 1
+            if thisdoc == 'Ticks':
+                idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
+                if idata is not None:
+                    if len(idata) > 1:
+                        # Get a blended ticket
+                        con = idata[0].Container
+                        newdoc = f'static/{scac}/data/vinterchange/{con}_Blended.pdf'
+                        if os.path.isfile(addpath(newdoc)):
+                            print(f'{newdoc} exists already')
+                        else:
+                            g1 = f'static/{scac}/data/vinterchange/{idata[0].Original}'
+                            g2 = f'static/{scac}/data/vinterchange/{idata[1].Original}'
+                            blendticks(addpath(g1), addpath(g2), addpath(newdoc))
+                        packitems.append(addpath(newdoc))
+                        fexist[jx] = 1
+                    else:
+                        packitems.append(addpath(f'tmp/{scac}/data/vinterchange/{idata[0].Original}'))
+                        fexist[jx] = 1
 
-    for ix in range(4):
-        if dockind[ix] != 'none':
-            fexist[ix] = os.path.isfile(addpath(doclist[ix]))
-            if fexist[ix] == 0:
-                print(f'{addpath(doclist[ix])} does not exist')
-                err.append(f'No {dockind[ix]} Document Exists')
-            else:
-                packitems.append(addpath(doclist[ix]))
-                stampdata.append(dockind[ix])
-        else:
-            for thisdoc in subdata:
-                if thisdoc != 'none':
-                    if thisdoc == 'Source':
-                        fa = addpath(f'static/{scac}/data/vorders/{odat.Source}')
-                        if os.path.isfile(fa):
-                            packitems.append(fa)
-                            stampdata.append(thisdoc)
-                    if thisdoc == 'Invoice':
-                        fa = addpath(f'static/{scac}/data/vinvoice/{odat.Invoice}')
-                        if os.path.isfile(fa):
-                            packitems.append(fa)
-                            stampdata.append(thisdoc)
-                    if thisdoc == 'Proofs':
-                        fa = addpath(f'static/{scac}/data/vproofs/{odat.Proof}')
-                        if os.path.isfile(fa):
-                            packitems.append(fa)
-                            stampdata.append(thisdoc)
-                    if thisdoc == 'Ticks':
-                        idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
-                        if idata is not None:
-                            if len(idata) > 1:
-                                # Get a blended ticket
-                                con = idata[0].Container
-                                newdoc = f'static/{scac}/data/vinterchange/{con}_Blended.pdf'
-                                if os.path.isfile(addpath(newdoc)):
-                                    print(f'{newdoc} exists already')
-                                else:
-                                    g1 = f'static/{scac}/data/vinterchange/{idata[0].Original}'
-                                    g2 = f'static/{scac}/data/vinterchange/{idata[1].Original}'
-                                    blendticks(addpath(g1), addpath(g2), addpath(newdoc))
-                                packitems.append(addpath(newdoc))
-                                stampdata.append(thisdoc)
-                            else:
-                                packitems.append(addpath(f'tmp/{scac}/data/vinterchange/{idata[0].Original}'))
-                                stampdata.append(thisdoc)
-
-        if len(stampdata) < 13:
-            for ix in range(len(stampdata), 13):
-                stampdata.append('none')
-
+    print('fexist is',fexist)
     # Get the email data also in case changes occur there
     emaildata = [0] * 7
     for i in range(7):
@@ -105,34 +81,37 @@ def call_stamp(odat, doclist, dockind, task_iter, err):
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
 
-    return stampdata, emaildata, packitems, doclist
+    return stampdata, emaildata, packitems, fexist
 
 
 
-def makepackage(odat, task_iter, document_types):
+def makepackage(odat, task_iter, document_types, eprof, err):
     err = []
-    print(document_types)
-    dockind = ['Source', 'Proofs', 'Invoice', 'Gate']
-    if task_iter > 1:
-        for i in range(4):
-            dockind[i] = request.values.get('section'+str(i+1))
-    doclist = [0]*8
+    dockind = ['']*4
+    if task_iter > 1 and eprof == 'Custom':
+        sections = ['1st Section', '2nd Section', '3rd Section', '4th Section']
+        for jx, section in enumerate(sections):
+            dockind[jx] = request.values.get(section)
+    else:
+        dockind = document_types[eprof]
+    print('dockind=',dockind)
     try:
         cache2 = int(odat.Pkcache) + 1
     except:
         cache2 = 1
+    print('cache2',cache2)
     basefile = f'P_c{cache2}_{odat.Jo}.pdf'
     odat.Package = basefile
+    odat.Pkcache = cache2
     db.session.commit()
-    doclist[7] = f'static/{scac}/data/vpackages/{basefile}'
-    docref = doclist[7]
+    docref = f'static/{scac}/data/vpackages/{basefile}'
 
     #stampdata defines marks we want to add to the document and their location
     #emaildata comes from the email profile but can be amended here
     #packitems are the items chosen to be included in the package
     #doclist are the items available to be added to the package
     #dockind is the kind of documents we want for this package
-    stampdata, emaildata, packitems, doclist = call_stamp(odat, doclist, dockind, task_iter, err)
+    stampdata, emaildata, packitems, fexist = call_stamp(odat, dockind, task_iter, err)
 
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
@@ -145,9 +124,7 @@ def makepackage(odat, task_iter, document_types):
     if len(packitems) >= 1:
         pdflist = ['pdfunite'] + packitems + [addpath(docref)]
         tes = subprocess.check_output(pdflist)
-        doclist[0] = docref
     else:
         err.append('No documents available for this selection')
-        viewtype, mpack, stamp, leftscreen = 0, 0, 0, 1
 
-    return stampdata, docref
+    return stampdata, dockind, docref, err, fexist

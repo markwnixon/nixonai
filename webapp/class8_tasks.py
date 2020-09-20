@@ -1057,8 +1057,6 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     for key in document_profiles:
         doc_profile_names.append(key)
 
-
-
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
     hiddendata = tablesetup['hidden data']
@@ -1077,33 +1075,24 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     else:
         if task_iter == 0:
             holdvec[4] = get_company(odat, 'packages')
-            holdvec[6] = 'Custom'
-            holdvec[8] = document_profiles['Custom']
+            eprof = 'Custom'
         else:
             eprof = request.values.get('emlprofile')
             lock = request.values.get('prolock')
             if lock:
                 holdvec[4] = get_company(odat, eprof)
             else: holdvec[4] = emaildata_update()
-            holdvec[6] = eprof
-            holdvec[8] = document_profiles[eprof]
 
-        holdvec[5], docref = makepackage(odat, task_iter, document_profiles)
-        try:
-            modata.Pkcache = int(odat.Pkcache) + 1
-        except:
-            odat.Pkcache = 1
-        db.session.commit()
+        holdvec[5], dockind, docref, err, fexist = makepackage(odat, task_iter, document_profiles, eprof, err)
+        holdvec[6] = eprof
+        holdvec[8] = dockind
+        holdvec[9] = fexist
 
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'
         viewport[2] = 'show_doc_left'
         viewport[3] = '/' + docref
         print('viewport=', viewport)
-
-
-
-
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
