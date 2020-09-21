@@ -12,29 +12,23 @@ from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
 from webapp.utils import *
 
-def call_stamp(odat, dockind, task_iter, err):
+def call_stamp(odat, task_iter):
+    stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
+    if task_iter > 1:
+        for i in range(9):
+            stampdata[i] = request.values.get(f'stampdata{i}')
+    else:
+        stampstring = odat.Status
+        if isinstance(stampstring, str):
+            print('stampstring is:', stampstring)
+            stampdata = json.loads(stampstring)
+            if isinstance(stampdata, list): print('json loads stampdata is', stampdata)
+            else: stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
+    return stampdata
+
+def get_doclist(odat, dockind):
     fexist = [0] * 4
     packitems = []
-    pdat = People.query.get(odat.Bid)
-    if pdat is None:
-        pdat = People.query.filter(People.Company == odat.Shipper).first()
-    if pdat is not None:
-        stampstring = pdat.Temp2
-        try:
-            stampdata = json.loads(stampstring)
-            if isinstance(stampdata, list):
-                print('json loads stampdata is', stampdata)
-            else:
-                stampdata = None
-        except:
-            stampdata = None
-    else:
-        stampdata = None
-
-    print('The stampdata is:', stampdata)
-    if stampdata is None:
-        stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
-
     for jx, thisdoc in enumerate(dockind):
         if thisdoc != '0':
             if thisdoc == 'Source':
@@ -70,18 +64,7 @@ def call_stamp(odat, dockind, task_iter, err):
                     else:
                         packitems.append(addpath(f'tmp/{scac}/data/vinterchange/{idata[0].Original}'))
                         fexist[jx] = 1
-
-    print('fexist is',fexist)
-    # Get the email data also in case changes occur there
-    emaildata = [0] * 7
-    for i in range(7):
-        emaildata[i] = request.values.get('edat' + str(i))
-
-
-    print('packitems final:', packitems)
-    print('stampdata final:', stampdata)
-
-    return stampdata, emaildata, packitems, fexist
+    return fexist, packitems
 
 
 
@@ -90,8 +73,7 @@ def makepackage(odat, task_iter, document_types, eprof, err):
     dockind = ['']*4
     if task_iter > 1 and eprof == 'Custom':
         sections = ['1st Section', '2nd Section', '3rd Section', '4th Section']
-        for jx, section in enumerate(sections):
-            dockind[jx] = request.values.get(section)
+        for jx, section in enumerate(sections): dockind[jx] = request.values.get(section)
     else:
         dockind = document_types[eprof]
     print('dockind=',dockind)
@@ -99,7 +81,6 @@ def makepackage(odat, task_iter, document_types, eprof, err):
         cache2 = int(odat.Pkcache) + 1
     except:
         cache2 = 1
-    print('cache2',cache2)
     basefile = f'P_c{cache2}_{odat.Jo}.pdf'
     odat.Package = basefile
     odat.Pkcache = cache2
@@ -111,13 +92,17 @@ def makepackage(odat, task_iter, document_types, eprof, err):
     #packitems are the items chosen to be included in the package
     #doclist are the items available to be added to the package
     #dockind is the kind of documents we want for this package
-    stampdata, emaildata, packitems, fexist = call_stamp(odat, dockind, task_iter, err)
+    stampdata = call_stamp(odat, task_iter)
+    fexist, packitems = get_doclist(odat, dockind)
+
+    # Get the email data also in case changes occur there
+    emaildata = [0] * 7
+    for i in range(7):
+        emaildata[i] = request.values.get('edat' + str(i))
 
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
     stampstring = json.dumps(stampdata)
-    print(len(stampstring))
-    print(stampstring)
     odat.Status = stampstring
     db.session.commit()
 
