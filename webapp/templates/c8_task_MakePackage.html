@@ -56,7 +56,7 @@ First, select order of items and then hit REORDER button
 
 <div class="card">
 <div class="card-header">
-Select location to mark with an X (Page, Height, Right)
+Select location to mark with an X (Page, Height, Right, Image Scale)
 </div>
 <div class="card-body">
 <table>
@@ -70,6 +70,9 @@ data-toggle="tooltip" title="Match this value to the page you want the mark, use
 
 <td><div class="input-group-text">R:</div></td>
 <td colspan="3"><input class="form-control" type="text" value={{stampdata[2]}} name="stampdata2"></td>
+
+<td><div class="input-group-text">Scale:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[3]}} name="stampdata3"></td>
 </tr>
 </table>
 </div>
@@ -82,14 +85,18 @@ Select location to mark with a Signature (Page, Height, Right)
 <table>
 
 <tr><td><div class="input-group-text">P:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[3]}} name="stampdata3"
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[4]}} name="stampdata4"
 data-toggle="tooltip" title="Match this value to the page you want the signature, use zero to skip using"></td>
 
 <td><div class="input-group-text">H:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[4]}} name="stampdata4"></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[5]}} name="stampdata5"></td>
 
 <td><div class="input-group-text">R:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[5]}} name="stampdata5"></td></tr>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[6]}} name="stampdata6"></td>
+
+<td><div class="input-group-text">Scale:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[7]}} name="stampdata7"></td></tr>
+
 </table>
 </div>
 </div>
@@ -101,14 +108,17 @@ Select location to place the date (Page, Height, Right)
 <div class="card-body">
 <table>
 <tr><td><div class="input-group-text">P:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[6]}} name="stampdata6"
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[8]}} name="stampdata8"
 data-toggle="tooltip" title="Match this value to the page you want the date, use zero to skip using"></td>
 
 <td><div class="input-group-text">H:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[7]}} name="stampdata7"></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[9]}} name="stampdata9"></td>
 
 <td><div class="input-group-text">R:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[8]}} name="stampdata8"></td></tr>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[10]}} name="stampdata10"></td>
+
+<td><div class="input-group-text">Font:</div></td>
+<td colspan="3"><input class="form-control" type="text" value={{stampdata[11]}} name="stampdata11"></td></tr>
 
 
 </table>

@@ -16,7 +16,7 @@ def pagemerger(filelist, cache):
         if j == 0:
             firstfile = filelist[0]
         else:
-            firstfile = addpath(f'tmp/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
+            firstfile = addpath(f'static/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
 
         reader = PdfFileReader(open(firstfile, 'rb'))
         first_page = reader.getPage(0)
@@ -33,9 +33,9 @@ def pagemerger(filelist, cache):
         writer.addPage(sup_page)
 
         if j == lfs-1:
-            outfile = addpath(f'tmp/{scac}/data/vreport/report'+str(cache)+'.pdf')
+            outfile = addpath(f'static/{scac}/data/vreport/report'+str(cache)+'.pdf')
         else:
-            outfile = addpath(f'tmp/{scac}/data/vreport/temp'+str(j)+'.pdf')
+            outfile = addpath(f'static/{scac}/data/vreport/temp'+str(j)+'.pdf')
 
         print('lfs and j are:', j, lfs)
         print('firstfile=', firstfile)
@@ -47,8 +47,8 @@ def pagemerger(filelist, cache):
 
         f.close()
 
-    docref = f'tmp/{scac}/data/vreport/report'+str(cache)+'.pdf'
-    killfile = addpath(f'tmp/{scac}/data/vreport/report'+str(cache-1)+'.pdf')
+    docref = f'static/{scac}/data/vreport/report'+str(cache)+'.pdf'
+    killfile = addpath(f'static/{scac}/data/vreport/report'+str(cache-1)+'.pdf')
     try:
         os.remove(killfile)
     except:
@@ -70,7 +70,7 @@ def pagemergerx(filelist, page, cache):
         if j == 0:
             firstfile = filelist[0]
         else:
-            firstfile = addpath(f'tmp/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
+            firstfile = addpath(f'static/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
 
         reader = PdfFileReader(open(firstfile, 'rb'))
         first_page = reader.getPage(page)
@@ -87,9 +87,9 @@ def pagemergerx(filelist, page, cache):
         writer.addPage(sup_page)
 
         if j == lfs-1:
-            outfile = addpath(f'tmp/{scac}/data/vreport/report'+str(cache)+'.pdf')
+            outfile = addpath(f'static/{scac}/data/vreport/report'+str(cache)+'.pdf')
         else:
-            outfile = addpath(f'tmp/{scac}/data/vreport/temp'+str(j)+'.pdf')
+            outfile = addpath(f'static/{scac}/data/vreport/temp'+str(j)+'.pdf')
 
         print('lfs and j are:', j, lfs)
         print('firstfile=', firstfile)
@@ -101,8 +101,8 @@ def pagemergerx(filelist, page, cache):
 
         f.close()
 
-    docref = f'tmp/{scac}/data/vreport/report'+str(cache)+'.pdf'
-    killfile = addpath(f'tmp/{scac}/data/vreport/report'+str(cache-1)+'.pdf')
+    docref = f'static/{scac}/data/vreport/report'+str(cache)+'.pdf'
+    killfile = addpath(f'static/{scac}/data/vreport/report'+str(cache-1)+'.pdf')
     try:
         os.remove(killfile)
     except:
@@ -124,7 +124,7 @@ def pagemergermp(filelist, cache, pages, multioutput):
         if j == 0:
             firstfile = filelist[0]
         else:
-            firstfile = addpath(f'tmp/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
+            firstfile = addpath(f'static/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
 
         reader = PdfFileReader(open(firstfile, 'rb'))
         first_page = reader.getPage(0)
@@ -141,9 +141,9 @@ def pagemergermp(filelist, cache, pages, multioutput):
         writer.addPage(sup_page)
 
         if j == lfs-1:
-            outfile = addpath(f'tmp/{scac}/data/vreport/report'+str(cache)+'.pdf')
+            outfile = addpath(f'static/{scac}/data/vreport/report'+str(cache)+'.pdf')
         else:
-            outfile = addpath(f'tmp/{scac}/data/vreport/temp'+str(j)+'.pdf')
+            outfile = addpath(f'static/{scac}/data/vreport/temp'+str(j)+'.pdf')
 
         print('lfs and j are:', j, lfs)
         print('firstfile=', firstfile)
@@ -179,14 +179,14 @@ def pagemergermp(filelist, cache, pages, multioutput):
     pdfcommand = ['pdfunite']
     for page in newpages:
         pdfcommand.append(page)
-    newmultioutput = addpath(f'tmp/{scac}/data/vreport/newmultioutput'+str(cache)+'.pdf')
+    newmultioutput = addpath(f'static/{scac}/data/vreport/newmultioutput'+str(cache)+'.pdf')
     pdfcommand.append(newmultioutput)
     tes = subprocess.check_output(pdfcommand)
 
-    docref = f'tmp/{scac}/data/vreport/report'+str(cache)+'.pdf'
+    docref = f'static/{scac}/data/vreport/report'+str(cache)+'.pdf'
     shutil.move(newmultioutput, addpath(docref))
 
-    killfile = addpath(f'tmp/{scac}/data/vreport/report'+str(cache-1)+'.pdf')
+    killfile = addpath(f'static/{scac}/data/vreport/report'+str(cache-1)+'.pdf')
     try:
         os.remove(killfile)
     except:

@@ -11,20 +11,155 @@ from webapp.CCC_system_setup import addpath, bankdata, scac
 from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
 from webapp.utils import *
+import subprocess
+import os
+import datetime
+from PyPDF2 import PdfFileReader
+from webapp.page_merger import pagemergerx
+from PIL import Image
 
 def call_stamp(odat, task_iter):
-    stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
+    stampdata = [3, 35, 35, 1,5, 120, 100, 1, 5, 477, 350, 12]
     if task_iter > 1:
-        for i in range(9):
+        for i in range(12):
             stampdata[i] = request.values.get(f'stampdata{i}')
     else:
         stampstring = odat.Status
         if isinstance(stampstring, str):
             print('stampstring is:', stampstring)
             stampdata = json.loads(stampstring)
-            if isinstance(stampdata, list): print('json loads stampdata is', stampdata)
-            else: stampdata = [3, 35, 35, 5, 120, 100, 5, 477, 350]
+            if isinstance(stampdata, list):
+                print('json loads stampdata is', stampdata)
+                if None in stampdata: stampdata = [0]*12
+            else: stampdata = [3, 35, 35, 1,5, 120, 100, 1, 5, 477, 350, 12]
     return stampdata
+
+def repackage(npages,file6,docref):
+    newpages = []
+    for f in range(1, npages+1):
+        newpages.append(addpath(f'static/{scac}/data/vreport/'+str(f)+'.pdf'))
+    pdfcommand = ['pdfunite']
+    for page in newpages:
+        pdfcommand.append(page)
+    pdfcommand.append(file6)
+    tes = subprocess.check_output(pdfcommand)
+    os.rename(file6, addpath(docref))
+
+def stamp_document(odat, stampdata, err, docin):
+    # if stampnow is called the document will already be recreated as a blank for here
+    # and the information includes odat, pdat, idata
+    err.append('Review Signed Package')
+    cache2 = int(odat.Pkcache)
+    docref = f'/static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
+    docreturn = f'static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
+    odat.Package = f'P_c{cache2}_{odat.Jo}.pdf'
+    db.session.commit()
+
+    today = datetime.datetime.today()
+    year = str(today.year)
+    day = str(today.day)
+    month = str(today.month)
+    # print(month,day,year)
+    datestr = month + '/' + day + '/' + year
+    file1 = addpath(docin)
+    reader = PdfFileReader(open(file1, 'rb'))
+    npages = reader.getNumPages()
+    ck = subprocess.check_output(['pdfseparate', file1, addpath(f'static/{scac}/data/vreport/%d.pdf')])
+    file6 = addpath(f'static/{scac}/data/vreport/report6.pdf')
+
+    sigpage = int(stampdata[4])
+    sigx = int(stampdata[6])
+    sigy = int(stampdata[5])
+    sigscale = float(stampdata[7])
+    xpage = int(stampdata[0])
+    xmarkx = int(stampdata[2])
+    xmarky = int(stampdata[1])
+    xscale = float(stampdata[3])
+    datepage = int(stampdata[8])
+    datex = int(stampdata[10])
+    datey = int(stampdata[9])
+    datefont = int(stampdata[11])
+
+    if sigpage > 0:
+        # Want to create a signature/date doc page
+        file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
+        c = canvas.Canvas(file2, pagesize=letter)
+        c.setLineWidth(1)
+        sigpage = sigpage - 1
+        sig = addpath(f'static/{scac}/pics/marksign2.jpg')
+        image = Image.open(sig)
+        imsize_list = list(image.size)
+        scalesize = imsize_list
+        scalesize[0] = int(sigscale*scalesize[0])
+        scalesize[1] = int(sigscale*scalesize[1])
+        newsize = tuple(scalesize)
+        print(newsize)
+        new_image = image.resize(newsize)
+        signew = addpath(f'static/{scac}/pics/marksign2_{scalesize[0]}{scalesize[1]}.png')
+        new_image.save(signew)
+        c.drawImage(signew, sigx, sigy, mask='auto')
+        c.showPage()
+        c.save()
+        cache = 1
+        sigpagefile = addpath(f'static/{scac}/data/vreport/' + str(sigpage + 1) + '.pdf')
+        cache, docrefx = pagemergerx([file1, file2], sigpage, cache)
+        file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
+        os.remove(sigpagefile)
+        os.rename(file3, sigpagefile)
+        repackage(npages, file6, docin)
+
+    if datepage > 0:
+        # Want to create a signature/date doc page
+        datepage = datepage - 1
+        file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
+        c = canvas.Canvas(file2, pagesize=letter)
+        c.setLineWidth(1)
+        c.setFont('Helvetica', datefont, leading=None)
+        c.drawString(datex, datey, datestr)
+        c.showPage()
+        c.save()
+        cache = 1
+        datepagefile = addpath(f'static/{scac}/data/vreport/' + str(datepage + 1) + '.pdf')
+        cache, docrefx = pagemergerx([file1, file2], datepage, cache)
+        file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
+        os.remove(datepagefile)
+        os.rename(file3, datepagefile)
+        repackage(npages, file6, docin)
+
+    if xpage > 0:
+        xpage = xpage - 1
+        xpagefile = addpath(f'static/{scac}/data/vreport/' + str(xpage + 1) + '.pdf')
+        file2 = addpath(f'static/{scac}/data/processing/t2.pdf')
+        c = canvas.Canvas(file2, pagesize=letter)
+        c.setLineWidth(1)
+        xbox = addpath(f'static/{scac}/pics/x100.png')
+        image = Image.open(xbox)
+        imsize_list = list(image.size)
+        scalesize = imsize_list
+        scalesize[0] = int(xscale*scalesize[0])
+        scalesize[1] = int(xscale*scalesize[1])
+        newsize = tuple(scalesize)
+        print(newsize)
+        new_image = image.resize(newsize)
+        xboxnew = addpath(f'static/{scac}/pics/x100_{scalesize[0]}{scalesize[1]}.png')
+        new_image.save(xboxnew)
+        #c.drawImage(xbox, xmarkx, xmarky, width=30, preserveAspectRatio=True, mask='auto')
+        c.drawImage(xboxnew, xmarkx, xmarky, mask='auto')
+        c.showPage()
+        c.save()
+        cache = 5
+        cache, docrefx = pagemergerx([file1, file2], xpage, cache)
+        file5 = addpath(f'static/{scac}/data/vreport/report5.pdf')
+        os.remove(xpagefile)
+        os.rename(file5, xpagefile)
+        repackage(npages, file6, docin)
+    # Create final document after all the overwrites:
+    os.rename(addpath(docin), addpath(docref))
+    odat.Pkcache = cache2 + 1
+    db.session.commit()
+
+    return docreturn
+
 
 def get_doclist(odat, dockind):
     fexist = [0] * 4
@@ -95,6 +230,7 @@ def makepackage(odat, task_iter, document_types, eprof, err):
     stampdata = call_stamp(odat, task_iter)
     fexist, packitems = get_doclist(odat, dockind)
 
+
     # Get the email data also in case changes occur there
     emaildata = [0] * 7
     for i in range(7):
@@ -111,5 +247,11 @@ def makepackage(odat, task_iter, document_types, eprof, err):
         tes = subprocess.check_output(pdflist)
     else:
         err.append('No documents available for this selection')
+
+    stampnow = request.values.get('stampnow')
+    if stampnow is not None:
+        print(f'stamping document going in: {docref}')
+        docref = stamp_document(odat, stampdata, err, docref)
+        print(f'stamped document coming out: {docref}')
 
     return stampdata, dockind, docref, err, fexist

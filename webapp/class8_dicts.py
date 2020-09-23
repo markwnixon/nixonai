@@ -39,6 +39,15 @@ Trucking_genre = {'table': 'Orders',
                                         'Completed Std' : ['Invoice', 'Proofs', 'Source','0'],
                                         'Completed All' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
                                       },
+                  'image_stamps': {
+                      'X': ['x.png', 'stamps', .2],
+                      'Check': ['check.png', 'stamps', .5],
+                      'Paid': ['paid.png', 'stamps', 1]
+                  },
+                  'signature_stamps': {
+                      'Mark': ['mark.png', 'signatures', .2],
+                      'Norma': ['norma.png', 'signatures', .2]
+                  },
                   'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
                                    'Source':'CT', 'Proof':'CT', 'View':'CT'},
                   'task_box_map': {

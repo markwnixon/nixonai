@@ -1053,6 +1053,8 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     completed = False
     viewport = ['0'] * 6
     document_profiles = eval(f"{genre}_genre['document_profiles']")
+    document_stamps = eval(f"{genre}_genre['image_stamps']")
+    document_signatures = eval(f"{genre}_genre['signature_stamps']")
     doc_profile_names = []
     for key in document_profiles:
         doc_profile_names.append(key)
