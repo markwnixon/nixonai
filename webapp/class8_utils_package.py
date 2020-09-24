@@ -45,7 +45,7 @@ def repackage(npages,file6,docref):
     tes = subprocess.check_output(pdfcommand)
     os.rename(file6, addpath(docref))
 
-def stamp_document(odat, stampdata, err, docin):
+def stamp_document(odat, stampdata, document_stamps, document_signatures, err, docin):
     # if stampnow is called the document will already be recreated as a blank for here
     # and the information includes odat, pdat, idata
     err.append('Review Signed Package')
@@ -67,10 +67,7 @@ def stamp_document(odat, stampdata, err, docin):
     ck = subprocess.check_output(['pdfseparate', file1, addpath(f'static/{scac}/data/vreport/%d.pdf')])
     file6 = addpath(f'static/{scac}/data/vreport/report6.pdf')
 
-    sigpage = int(stampdata[4])
-    sigx = int(stampdata[6])
-    sigy = int(stampdata[5])
-    sigscale = float(stampdata[7])
+
     xpage = int(stampdata[0])
     xmarkx = int(stampdata[2])
     xmarky = int(stampdata[1])
@@ -80,33 +77,40 @@ def stamp_document(odat, stampdata, err, docin):
     datey = int(stampdata[9])
     datefont = int(stampdata[11])
 
-    if sigpage > 0:
-        # Want to create a signature/date doc page
-        file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
-        c = canvas.Canvas(file2, pagesize=letter)
-        c.setLineWidth(1)
-        sigpage = sigpage - 1
-        sig = addpath(f'static/{scac}/pics/marksign2.jpg')
-        image = Image.open(sig)
-        imsize_list = list(image.size)
-        scalesize = imsize_list
-        scalesize[0] = int(sigscale*scalesize[0])
-        scalesize[1] = int(sigscale*scalesize[1])
-        newsize = tuple(scalesize)
-        print(newsize)
-        new_image = image.resize(newsize)
-        signew = addpath(f'static/{scac}/pics/marksign2_{scalesize[0]}{scalesize[1]}.png')
-        new_image.save(signew)
-        c.drawImage(signew, sigx, sigy, mask='auto')
-        c.showPage()
-        c.save()
-        cache = 1
-        sigpagefile = addpath(f'static/{scac}/data/vreport/' + str(sigpage + 1) + '.pdf')
-        cache, docrefx = pagemergerx([file1, file2], sigpage, cache)
-        file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
-        os.remove(sigpagefile)
-        os.rename(file3, sigpagefile)
-        repackage(npages, file6, docin)
+    signature = request.values.get('sigstamp')
+    if signature != None:
+            sigcheck = request.values.get('sigcheck')
+            if sigcheck:
+                sigpage = int(request.values.get('sigpage'))
+                sigx = int(request.values.get('sigx'))
+                sigy = int(request.values.get('sigy'))
+                sigscale = float(request.values.get('sigscale'))
+                # Want to create a signature/date doc page
+                file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
+                c = canvas.Canvas(file2, pagesize=letter)
+                c.setLineWidth(1)
+                sigpage = sigpage - 1
+                sig = addpath(f'static/{scac}/pics/marksign2.jpg')
+                image = Image.open(sig)
+                imsize_list = list(image.size)
+                scalesize = imsize_list
+                scalesize[0] = int(sigscale*scalesize[0])
+                scalesize[1] = int(sigscale*scalesize[1])
+                newsize = tuple(scalesize)
+                print(newsize)
+                new_image = image.resize(newsize)
+                signew = addpath(f'static/{scac}/pics/marksign2_{scalesize[0]}{scalesize[1]}.png')
+                new_image.save(signew)
+                c.drawImage(signew, sigx, sigy, mask='auto')
+                c.showPage()
+                c.save()
+                cache = 1
+                sigpagefile = addpath(f'static/{scac}/data/vreport/' + str(sigpage + 1) + '.pdf')
+                cache, docrefx = pagemergerx([file1, file2], sigpage, cache)
+                file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
+                os.remove(sigpagefile)
+                os.rename(file3, sigpagefile)
+                repackage(npages, file6, docin)
 
     if datepage > 0:
         # Want to create a signature/date doc page
@@ -203,7 +207,7 @@ def get_doclist(odat, dockind):
 
 
 
-def makepackage(odat, task_iter, document_types, eprof, err):
+def makepackage(odat, task_iter, document_types, document_stamps, document_signatures, eprof, err):
     err = []
     dockind = ['']*4
     if task_iter > 1 and eprof == 'Custom':
@@ -251,7 +255,7 @@ def makepackage(odat, task_iter, document_types, eprof, err):
     stampnow = request.values.get('stampnow')
     if stampnow is not None:
         print(f'stamping document going in: {docref}')
-        docref = stamp_document(odat, stampdata, err, docref)
+        docref = stamp_document(odat, stampdata, document_stamps, document_signatures, err, docref)
         print(f'stamped document coming out: {docref}')
 
     return stampdata, dockind, docref, err, fexist

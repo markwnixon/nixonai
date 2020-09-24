@@ -1055,9 +1055,13 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     document_profiles = eval(f"{genre}_genre['document_profiles']")
     document_stamps = eval(f"{genre}_genre['image_stamps']")
     document_signatures = eval(f"{genre}_genre['signature_stamps']")
-    doc_profile_names = []
+    doc_profile_names, doc_stamps, doc_signatures = [], [], []
     for key in document_profiles:
         doc_profile_names.append(key)
+    for key in document_stamps:
+        doc_stamps.append(key)
+    for key in document_signatures:
+        doc_signatures.append(key)
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -1065,6 +1069,44 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     numitems = len(entrydata)
     holdvec = [''] * numitems
     holdvec[7] = doc_profile_names
+    holdvec[10] = doc_stamps
+    holdvec[11] = doc_signatures
+    stamplist = []
+    stampdata = []
+    for doc in doc_stamps:
+        thisdoc = request.values.get(doc)
+        if thisdoc is not None:
+            thischeck = thisdoc+'_c'
+            checked = request.values.get(thischeck)
+            if checked == 'on':
+                stamplist.append(thisdoc)
+                page = request.values.get(thisdoc+'_p')
+                up = request.values.get(thisdoc + '_h')
+                right = request.values.get(thisdoc + '_r')
+                scale = request.values.get(thisdoc + '_s')
+                stampdata.append([int(page), int(up), int(right), float(scale)])
+    for doc in doc_signatures:
+        thisdoc = request.values.get(doc)
+        if thisdoc is not None:
+            thischeck = thisdoc+'_c'
+            checked = request.values.get(thischeck)
+            if checked == 'on':
+                stamplist.append(thisdoc)
+                page = request.values.get(thisdoc+'_p')
+                up = request.values.get(thisdoc + '_h')
+                right = request.values.get(thisdoc + '_r')
+                scale = request.values.get(thisdoc + '_s')
+                stampdata.append([int(page), int(up), int(right), float(scale)])
+
+    adding_stamp = request.values.get('stampname')
+    if adding_stamp != None:
+        stamplist.append(adding_stamp)
+    adding_sig = request.values.get('signame')
+    if adding_sig != None:
+        stamplist.append(adding_sig)
+    print('thestamplist is:',stamplist)
+    holdvec[15] = stamplist
+    print('thestampdatais:', stampdata)
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -1085,10 +1127,11 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 holdvec[4] = get_company(odat, eprof)
             else: holdvec[4] = emaildata_update()
 
-        holdvec[5], dockind, docref, err, fexist = makepackage(odat, task_iter, document_profiles, eprof, err)
+        holdvec[5], dockind, docref, err, fexist = makepackage(odat, task_iter, document_profiles, document_stamps, document_signatures, eprof, err)
         holdvec[6] = eprof
         holdvec[8] = dockind
         holdvec[9] = fexist
+
 
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'

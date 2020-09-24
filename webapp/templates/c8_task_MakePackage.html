@@ -53,77 +53,72 @@ First, select order of items and then hit REORDER button
 </table>
 </div>
 </div>
-
 <div class="card">
-<div class="card-header">
-Select location to mark with an X (Page, Height, Right, Image Scale)
-</div>
-<div class="card-body">
-<table>
-<tr>
-<td><div class="input-group-text">P:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[0]}} name="stampdata0"
-data-toggle="tooltip" title="Match this value to the page you want the mark, use zero to skip using"></td>
-
-<td><div class="input-group-text">H:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[1]}} name="stampdata1"></td>
-
-<td><div class="input-group-text">R:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[2]}} name="stampdata2"></td>
-
-<td><div class="input-group-text">Scale:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[3]}} name="stampdata3"></td>
-</tr>
-</table>
-</div>
-</div>
-<div class="card">
-<div class="card-header">
-Select location to mark with a Signature (Page, Height, Right)
-</div>
-<div class="card-body">
-<table>
-
-<tr><td><div class="input-group-text">P:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[4]}} name="stampdata4"
-data-toggle="tooltip" title="Match this value to the page you want the signature, use zero to skip using"></td>
-
-<td><div class="input-group-text">H:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[5]}} name="stampdata5"></td>
-
-<td><div class="input-group-text">R:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[6]}} name="stampdata6"></td>
-
-<td><div class="input-group-text">Scale:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[7]}} name="stampdata7"></td></tr>
-
-</table>
-</div>
+    <div class="card-header">
+        Select Items to Stamp on to Existing Documents
+    </div>
+    {% set stamps = holdvec[10] %}
+    {% set sigs = holdvec[11] %}
+    <div class="card-body">
+        <table>
+            <tr>
+                <td> <div class="input-group-text">Stamps:</div></td>
+                <td>
+                <select class="form-control" type="text" name="stampname" onchange="this.form.submit()">
+                    <option value="" disabled selected>None</option>
+                    {% for stamp in stamps %}
+                        <option value='{{ stamp }}'>{{ stamp }}</option>
+                    {% endfor %}
+                </select>
+                </td>
+            </tr>
+            <tr>
+                <td> <div class="input-group-text">Signatures:</div></td>
+                <td>
+                   <select class="form-control" type="text" name="signame" onchange="this.form.submit()">
+                        <option value="" disabled selected>None</option>
+                        {% for sig in sigs %}
+                            <option value='{{ sig }}'>{{ sig }}</option>
+                        {% endfor %}
+                   </select>
+                </td>
+            </tr>
+        </table>
+    </div>
 </div>
 
-<div class="card">
-<div class="card-header">
-Select location to place the date (Page, Height, Right)
-</div>
-<div class="card-body">
-<table>
-<tr><td><div class="input-group-text">P:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[8]}} name="stampdata8"
-data-toggle="tooltip" title="Match this value to the page you want the date, use zero to skip using"></td>
+{% set addedstamps = holdvec[15] %}
+{% for addedstamp in addedstamps %}
+    <input type = "hidden" name ="{{ addedstamp }}" value= "{{addedstamp}}">
+    {% set page = 5*(loop.index-1) %}
+    {% set height = 5*(loop.index-1)+1 %}
+    {% set right = 5*(loop.index-1)+2 %}
+    {% set scale = 5*(loop.index-1)+3 %}
+    {% set checks = 5*(loop.index-1)+4 %}
+    <div class="card">
 
-<td><div class="input-group-text">H:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[9]}} name="stampdata9"></td>
+        <div class="card-header">
+            <input class="inline-form-control" type="checkbox" checked  name="{{ addedstamp }}_c" onchange="this.form.submit()"> Select location for {{ addedstamp }} (Page, Height, Right, Image Scale)
+        </div>
 
-<td><div class="input-group-text">R:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[10]}} name="stampdata10"></td>
+        <div class="card-body">
+            <table>
+                <tr>
+                <td><div class="input-group-text">P: </div></td>
+                <td colspan="3"><input class="form-control" type="text" value={{stampdata[page]}} name="{{ addedstamp }}_p"
+                data-toggle="tooltip" title="Match this value to the page you want the mark, use zero to skip using"></td>
 
-<td><div class="input-group-text">Font:</div></td>
-<td colspan="3"><input class="form-control" type="text" value={{stampdata[11]}} name="stampdata11"></td></tr>
+                <td><div class="input-group-text">H:</div></td>
+                <td colspan="3"><input class="form-control" type="text" value={{stampdata[height]}} name="{{ addedstamp }}_h"></td>
 
+                <td><div class="input-group-text">R:</div></td>
+                <td colspan="3"><input class="form-control" type="text" value={{stampdata[right]}} name="{{ addedstamp }}_r"></td>
 
-</table>
-</div>
-</div>
-<input type = "hidden" name ="stamp" value= {{stamp}}>
-<input type = "hidden" name ="invooder" value= "{{invooder}}">
-<input type = "hidden" name="oder" value="{{oder}}">
+                <td><div class="input-group-text">Scale:</div></td>
+                <td colspan="3"><input class="form-control" type="text" value={{stampdata[scale]}} name="{{ addedstamp }}_s"></td>
+                </tr>
+            </table>
+
+        </div>
+    </div>
+{% endfor %}
