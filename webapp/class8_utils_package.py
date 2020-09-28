@@ -10,6 +10,8 @@ from webapp.viewfuncs import parseline, parselinenoupper
 from webapp.CCC_system_setup import addpath, bankdata, scac
 from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
+from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
+
 from webapp.utils import *
 import subprocess
 import os
@@ -19,7 +21,7 @@ from webapp.page_merger import pagemergerx
 from PIL import Image
 
 def call_stamp(odat, task_iter):
-    stampdata = [3, 35, 35, 1,5, 120, 100, 1, 5, 477, 350, 12]
+    stampdata = []
     if task_iter > 1:
         for i in range(12):
             stampdata[i] = request.values.get(f'stampdata{i}')
@@ -45,7 +47,7 @@ def repackage(npages,file6,docref):
     tes = subprocess.check_output(pdfcommand)
     os.rename(file6, addpath(docref))
 
-def stamp_document(odat, stampdata, document_stamps, document_signatures, err, docin):
+def stamp_document(genre, odat, stamplist, stampdata, err, docin):
     # if stampnow is called the document will already be recreated as a blank for here
     # and the information includes odat, pdat, idata
     err.append('Review Signed Package')
@@ -67,97 +69,55 @@ def stamp_document(odat, stampdata, document_stamps, document_signatures, err, d
     ck = subprocess.check_output(['pdfseparate', file1, addpath(f'static/{scac}/data/vreport/%d.pdf')])
     file6 = addpath(f'static/{scac}/data/vreport/report6.pdf')
 
+    document_stamps = eval(f"{genre}_genre['image_stamps']")
+    document_signatures = eval(f"{genre}_genre['signature_stamps']")
+    doc_stamps, doc_signatures = [], []
+    for key in document_stamps:
+        doc_stamps.append(key)
+    for key in document_signatures:
+        doc_signatures.append(key)
 
-    xpage = int(stampdata[0])
-    xmarkx = int(stampdata[2])
-    xmarky = int(stampdata[1])
-    xscale = float(stampdata[3])
-    datepage = int(stampdata[8])
-    datex = int(stampdata[10])
-    datey = int(stampdata[9])
-    datefont = int(stampdata[11])
+    for jx, stamp in enumerate(stamplist):
+        if stamp in doc_stamps:
+            listdata = document_stamps[stamp]
+        if stamp in doc_signatures:
+            listdata = document_signatures[stamp]
+        stampfile = listdata[0]
+        stampfolder = listdata[1]
+        filepath = addpath(f'static/{scac}/data/{stampfolder}/{stampfile}')
+        stamp_page = stampdata[5*jx]
+        stamp_up = stampdata[5*jx + 1]
+        stamp_right = stampdata[5*jx + 2]
+        stamp_scale = stampdata[5*jx + 3]
 
-    signature = request.values.get('sigstamp')
-    if signature != None:
-            sigcheck = request.values.get('sigcheck')
-            if sigcheck:
-                sigpage = int(request.values.get('sigpage'))
-                sigx = int(request.values.get('sigx'))
-                sigy = int(request.values.get('sigy'))
-                sigscale = float(request.values.get('sigscale'))
-                # Want to create a signature/date doc page
-                file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
-                c = canvas.Canvas(file2, pagesize=letter)
-                c.setLineWidth(1)
-                sigpage = sigpage - 1
-                sig = addpath(f'static/{scac}/pics/marksign2.jpg')
-                image = Image.open(sig)
-                imsize_list = list(image.size)
-                scalesize = imsize_list
-                scalesize[0] = int(sigscale*scalesize[0])
-                scalesize[1] = int(sigscale*scalesize[1])
-                newsize = tuple(scalesize)
-                print(newsize)
-                new_image = image.resize(newsize)
-                signew = addpath(f'static/{scac}/pics/marksign2_{scalesize[0]}{scalesize[1]}.png')
-                new_image.save(signew)
-                c.drawImage(signew, sigx, sigy, mask='auto')
-                c.showPage()
-                c.save()
-                cache = 1
-                sigpagefile = addpath(f'static/{scac}/data/vreport/' + str(sigpage + 1) + '.pdf')
-                cache, docrefx = pagemergerx([file1, file2], sigpage, cache)
-                file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
-                os.remove(sigpagefile)
-                os.rename(file3, sigpagefile)
-                repackage(npages, file6, docin)
-
-    if datepage > 0:
         # Want to create a signature/date doc page
-        datepage = datepage - 1
         file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
         c = canvas.Canvas(file2, pagesize=letter)
         c.setLineWidth(1)
-        c.setFont('Helvetica', datefont, leading=None)
-        c.drawString(datex, datey, datestr)
-        c.showPage()
-        c.save()
-        cache = 1
-        datepagefile = addpath(f'static/{scac}/data/vreport/' + str(datepage + 1) + '.pdf')
-        cache, docrefx = pagemergerx([file1, file2], datepage, cache)
-        file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
-        os.remove(datepagefile)
-        os.rename(file3, datepagefile)
-        repackage(npages, file6, docin)
-
-    if xpage > 0:
-        xpage = xpage - 1
-        xpagefile = addpath(f'static/{scac}/data/vreport/' + str(xpage + 1) + '.pdf')
-        file2 = addpath(f'static/{scac}/data/processing/t2.pdf')
-        c = canvas.Canvas(file2, pagesize=letter)
-        c.setLineWidth(1)
-        xbox = addpath(f'static/{scac}/pics/x100.png')
-        image = Image.open(xbox)
+        stamp_page = stamp_page - 1
+        image = Image.open(filepath)
         imsize_list = list(image.size)
-        scalesize = imsize_list
-        scalesize[0] = int(xscale*scalesize[0])
-        scalesize[1] = int(xscale*scalesize[1])
+        scalesize = [0,0]
+        scalesize[0] = int(stamp_scale * imsize_list[0])
+        scalesize[1] = int(stamp_scale * imsize_list[1])
         newsize = tuple(scalesize)
         print(newsize)
         new_image = image.resize(newsize)
-        xboxnew = addpath(f'static/{scac}/pics/x100_{scalesize[0]}{scalesize[1]}.png')
-        new_image.save(xboxnew)
-        #c.drawImage(xbox, xmarkx, xmarky, width=30, preserveAspectRatio=True, mask='auto')
-        c.drawImage(xboxnew, xmarkx, xmarky, mask='auto')
+        new_filepath = addpath(f'static/{scac}/{stampfolder}/{stampfile}_{scalesize[0]}{scalesize[1]}.png')
+        print(new_filepath)
+        new_image.save(new_filepath)
+        c.drawImage(new_filepath, stamp_right, stamp_up, mask='auto')
         c.showPage()
         c.save()
-        cache = 5
-        cache, docrefx = pagemergerx([file1, file2], xpage, cache)
-        file5 = addpath(f'static/{scac}/data/vreport/report5.pdf')
-        os.remove(xpagefile)
-        os.rename(file5, xpagefile)
+        cache = 1
+        sigpagefile = addpath(f'static/{scac}/data/vreport/' + str(stamp_page + 1) + '.pdf')
+        cache, docrefx = pagemergerx([file1, file2], stamp_page, cache)
+        file3 = addpath(f'static/{scac}/data/vreport/report1.pdf')
+        os.remove(sigpagefile)
+        os.rename(file3, sigpagefile)
         repackage(npages, file6, docin)
-    # Create final document after all the overwrites:
+
+    # Create final document after all the stamp applied:
     os.rename(addpath(docin), addpath(docref))
     odat.Pkcache = cache2 + 1
     db.session.commit()
@@ -207,7 +167,7 @@ def get_doclist(odat, dockind):
 
 
 
-def makepackage(odat, task_iter, document_types, document_stamps, document_signatures, eprof, err):
+def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, eprof, err):
     err = []
     dockind = ['']*4
     if task_iter > 1 and eprof == 'Custom':
@@ -231,7 +191,7 @@ def makepackage(odat, task_iter, document_types, document_stamps, document_signa
     #packitems are the items chosen to be included in the package
     #doclist are the items available to be added to the package
     #dockind is the kind of documents we want for this package
-    stampdata = call_stamp(odat, task_iter)
+    #stampdata = call_stamp(odat, task_iter)
     fexist, packitems = get_doclist(odat, dockind)
 
 
@@ -242,9 +202,9 @@ def makepackage(odat, task_iter, document_types, document_stamps, document_signa
 
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
-    stampstring = json.dumps(stampdata)
-    odat.Status = stampstring
-    db.session.commit()
+    #stampstring = json.dumps(stampdata)
+    #odat.Status = stampstring
+    #db.session.commit()
 
     if len(packitems) >= 1:
         pdflist = ['pdfunite'] + packitems + [addpath(docref)]
@@ -255,7 +215,7 @@ def makepackage(odat, task_iter, document_types, document_stamps, document_signa
     stampnow = request.values.get('stampnow')
     if stampnow is not None:
         print(f'stamping document going in: {docref}')
-        docref = stamp_document(odat, stampdata, document_stamps, document_signatures, err, docref)
+        docref = stamp_document(genre, odat, stamplist, stampdata, err, docref)
         print(f'stamped document coming out: {docref}')
 
     return stampdata, dockind, docref, err, fexist

@@ -1080,11 +1080,11 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             checked = request.values.get(thischeck)
             if checked == 'on':
                 stamplist.append(thisdoc)
-                page = request.values.get(thisdoc+'_p')
+                page = request.values.get(thisdoc + '_p')
                 up = request.values.get(thisdoc + '_h')
                 right = request.values.get(thisdoc + '_r')
                 scale = request.values.get(thisdoc + '_s')
-                stampdata.append([int(page), int(up), int(right), float(scale)])
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale)]
     for doc in doc_signatures:
         thisdoc = request.values.get(doc)
         if thisdoc is not None:
@@ -1096,7 +1096,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 up = request.values.get(thisdoc + '_h')
                 right = request.values.get(thisdoc + '_r')
                 scale = request.values.get(thisdoc + '_s')
-                stampdata.append([int(page), int(up), int(right), float(scale)])
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale)]
 
     adding_stamp = request.values.get('stampname')
     if adding_stamp != None:
@@ -1127,7 +1127,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 holdvec[4] = get_company(odat, eprof)
             else: holdvec[4] = emaildata_update()
 
-        holdvec[5], dockind, docref, err, fexist = makepackage(odat, task_iter, document_profiles, document_stamps, document_signatures, eprof, err)
+        holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err)
         holdvec[6] = eprof
         holdvec[8] = dockind
         holdvec[9] = fexist
