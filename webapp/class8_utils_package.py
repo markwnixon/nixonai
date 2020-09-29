@@ -85,10 +85,10 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
         stampfile = listdata[0]
         stampfolder = listdata[1]
         filepath = addpath(f'static/{scac}/data/{stampfolder}/{stampfile}')
-        stamp_page = stampdata[5*jx]
-        stamp_up = stampdata[5*jx + 1]
-        stamp_right = stampdata[5*jx + 2]
-        stamp_scale = stampdata[5*jx + 3]
+        stamp_page = stampdata[6*jx]
+        stamp_up = stampdata[6*jx + 1]
+        stamp_right = stampdata[6*jx + 2]
+        stamp_scale = stampdata[6*jx + 3]
 
         # Want to create a signature/date doc page
         file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
@@ -103,7 +103,7 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
         newsize = tuple(scalesize)
         print(newsize)
         new_image = image.resize(newsize)
-        new_filepath = addpath(f'static/{scac}/{stampfolder}/{stampfile}_{scalesize[0]}{scalesize[1]}.png')
+        new_filepath = addpath(f'static/{scac}/data/{stampfolder}/{stampfile}_{scalesize[0]}_{scalesize[1]}.png')
         print(new_filepath)
         new_image.save(new_filepath)
         c.drawImage(new_filepath, stamp_right, stamp_up, mask='auto')
@@ -202,9 +202,6 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
 
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
-    #stampstring = json.dumps(stampdata)
-    #odat.Status = stampstring
-    #db.session.commit()
 
     if len(packitems) >= 1:
         pdflist = ['pdfunite'] + packitems + [addpath(docref)]

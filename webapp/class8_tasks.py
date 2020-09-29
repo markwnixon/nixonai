@@ -1084,7 +1084,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 up = request.values.get(thisdoc + '_h')
                 right = request.values.get(thisdoc + '_r')
                 scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale)]
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thischeck]
     for doc in doc_signatures:
         thisdoc = request.values.get(doc)
         if thisdoc is not None:
@@ -1096,17 +1096,19 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 up = request.values.get(thisdoc + '_h')
                 right = request.values.get(thisdoc + '_r')
                 scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale)]
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thischeck]
 
     adding_stamp = request.values.get('stampname')
     if adding_stamp != None:
         stamplist.append(adding_stamp)
+        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
     adding_sig = request.values.get('signame')
     if adding_sig != None:
         stamplist.append(adding_sig)
-    print('thestamplist is:',stamplist)
+        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
+    print('thestamplist is:',task_iter,stamplist)
     holdvec[15] = stamplist
-    print('thestampdatais:', stampdata)
+    print('thestampdatais:', task_iter, stampdata)
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -1120,7 +1122,18 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         if task_iter == 0:
             holdvec[4] = get_company(odat, 'packages')
             eprof = 'Custom'
+            stampstring = odat.Status
+            if isinstance(stampstring, str):
+                print('stampstring is:', stampstring)
+                stampdata = json.loads(stampstring)
+                test = len(stampdata)/6
+                for ix in range(test):
+                    print('This is a stamp:', stampdata[6*ix+6])
         else:
+            # Save the current stamps to database for future launch
+            stampstring = json.dumps(stampdata)
+            odat.Status = stampstring
+            db.session.commit()
             eprof = request.values.get('emlprofile')
             lock = request.values.get('prolock')
             if lock:
