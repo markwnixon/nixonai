@@ -1074,7 +1074,9 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     stamplist = []
     stampdata = []
     for doc in doc_stamps:
+        print('doc is:', doc)
         thisdoc = request.values.get(doc)
+        print('thisdoc stamps is', thisdoc)
         if thisdoc is not None:
             thischeck = thisdoc+'_c'
             checked = request.values.get(thischeck)
@@ -1084,7 +1086,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 up = request.values.get(thisdoc + '_h')
                 right = request.values.get(thisdoc + '_r')
                 scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thischeck]
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
     for doc in doc_signatures:
         thisdoc = request.values.get(doc)
         if thisdoc is not None:
@@ -1096,7 +1098,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 up = request.values.get(thisdoc + '_h')
                 right = request.values.get(thisdoc + '_r')
                 scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thischeck]
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
 
     adding_stamp = request.values.get('stampname')
     if adding_stamp != None:
@@ -1107,7 +1109,6 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         stamplist.append(adding_sig)
         stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
     print('thestamplist is:',task_iter,stamplist)
-    holdvec[15] = stamplist
     print('thestampdatais:', task_iter, stampdata)
 
     filter = tablesetup['filter']
@@ -1126,12 +1127,16 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             if isinstance(stampstring, str):
                 print('stampstring is:', stampstring)
                 stampdata = json.loads(stampstring)
-                test = len(stampdata)/6
-                for ix in range(test):
-                    print('This is a stamp:', stampdata[6*ix+6])
+                vlen = int(len(stampdata)/6)
+                for ix in range(vlen):
+                    print('This is a stamp:', ix, stampdata[6*ix+5])
+                    if isinstance(stampdata[6*ix+5], str): stamplist.append(stampdata[6*ix+5])
+            print('taskiter0',stamplist,stampdata)
         else:
             # Save the current stamps to database for future launch
+
             stampstring = json.dumps(stampdata)
+            print('stampstring dump to json is:', stampstring)
             odat.Status = stampstring
             db.session.commit()
             eprof = request.values.get('emlprofile')
@@ -1139,7 +1144,9 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             if lock:
                 holdvec[4] = get_company(odat, eprof)
             else: holdvec[4] = emaildata_update()
+            print('taskiter1+', stamplist, stampdata)
 
+        holdvec[15] = stamplist
         holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err)
         holdvec[6] = eprof
         holdvec[8] = dockind
@@ -1152,7 +1159,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         viewport[3] = '/' + docref
         print('viewport=', viewport)
 
-        err.append(f'Viewing {docref}')
+        err.append(f'Viewing {docref} on iteration {task_iter}')
         err.append('Hit Finished to End Viewing and Return to Table View')
         finished = request.values.get('Finished')
         if finished is not None: completed = True
