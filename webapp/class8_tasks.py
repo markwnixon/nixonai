@@ -1047,6 +1047,57 @@ def get_company(odat, eprof):
         #emaildata = get_company_email(pdat)
     return emaildata
 
+def get_stamps_from_form(doc_stamps, doc_signatures):
+    stamplist = []
+    stampdata = []
+    for doc in doc_stamps:
+        print('doc is:', doc)
+        thisdoc = request.values.get(doc)
+        print('thisdoc stamps is', thisdoc)
+        if thisdoc is not None:
+            thischeck = thisdoc + '_c'
+            checked = request.values.get(thischeck)
+            if checked == 'on':
+                stamplist.append(thisdoc)
+                page = request.values.get(thisdoc + '_p')
+                up = request.values.get(thisdoc + '_h')
+                right = request.values.get(thisdoc + '_r')
+                scale = request.values.get(thisdoc + '_s')
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
+    for doc in doc_signatures:
+        thisdoc = request.values.get(doc)
+        if thisdoc is not None:
+            thischeck = thisdoc + '_c'
+            checked = request.values.get(thischeck)
+            if checked == 'on':
+                stamplist.append(thisdoc)
+                page = request.values.get(thisdoc + '_p')
+                up = request.values.get(thisdoc + '_h')
+                right = request.values.get(thisdoc + '_r')
+                scale = request.values.get(thisdoc + '_s')
+                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
+
+    adding_stamp = request.values.get('stampname')
+    if adding_stamp != None:
+        stamplist.append(adding_stamp)
+        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
+    adding_sig = request.values.get('signame')
+    if adding_sig != None:
+        stamplist.append(adding_sig)
+        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
+    return stamplist, stampdata
+
+def get_last_used_stamps(odat):
+    stamplist = []
+    stampdata = []
+    stampstring = odat.Status
+    if isinstance(stampstring, str):
+        stampdata = json.loads(stampstring)
+        vlen = int(len(stampdata) / 6)
+        for ix in range(vlen):
+            if isinstance(stampdata[6 * ix + 5], str): stamplist.append(stampdata[6 * ix + 5])
+    return stamplist, stampdata
+
 def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
     err = [f"Running Package task with task_iter {task_iter} using {tablesetup['table']}"]
@@ -1071,45 +1122,6 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     holdvec[7] = doc_profile_names
     holdvec[10] = doc_stamps
     holdvec[11] = doc_signatures
-    stamplist = []
-    stampdata = []
-    for doc in doc_stamps:
-        print('doc is:', doc)
-        thisdoc = request.values.get(doc)
-        print('thisdoc stamps is', thisdoc)
-        if thisdoc is not None:
-            thischeck = thisdoc+'_c'
-            checked = request.values.get(thischeck)
-            if checked == 'on':
-                stamplist.append(thisdoc)
-                page = request.values.get(thisdoc + '_p')
-                up = request.values.get(thisdoc + '_h')
-                right = request.values.get(thisdoc + '_r')
-                scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
-    for doc in doc_signatures:
-        thisdoc = request.values.get(doc)
-        if thisdoc is not None:
-            thischeck = thisdoc+'_c'
-            checked = request.values.get(thischeck)
-            if checked == 'on':
-                stamplist.append(thisdoc)
-                page = request.values.get(thisdoc+'_p')
-                up = request.values.get(thisdoc + '_h')
-                right = request.values.get(thisdoc + '_r')
-                scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
-
-    adding_stamp = request.values.get('stampname')
-    if adding_stamp != None:
-        stamplist.append(adding_stamp)
-        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
-    adding_sig = request.values.get('signame')
-    if adding_sig != None:
-        stamplist.append(adding_sig)
-        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
-    print('thestamplist is:',task_iter,stamplist)
-    print('thestampdatais:', task_iter, stampdata)
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -1123,18 +1135,11 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         if task_iter == 0:
             holdvec[4] = get_company(odat, 'packages')
             eprof = 'Custom'
-            stampstring = odat.Status
-            if isinstance(stampstring, str):
-                print('stampstring is:', stampstring)
-                stampdata = json.loads(stampstring)
-                vlen = int(len(stampdata)/6)
-                for ix in range(vlen):
-                    print('This is a stamp:', ix, stampdata[6*ix+5])
-                    if isinstance(stampdata[6*ix+5], str): stamplist.append(stampdata[6*ix+5])
-            print('taskiter0',stamplist,stampdata)
+            stamplist, stampdata = get_last_used_stamps(odat)
+
         else:
             # Save the current stamps to database for future launch
-
+            stamplist, stampdata = get_stamps_from_form(doc_stamps, doc_signatures)
             stampstring = json.dumps(stampdata)
             print('stampstring dump to json is:', stampstring)
             odat.Status = stampstring
