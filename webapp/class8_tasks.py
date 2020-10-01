@@ -3,7 +3,7 @@ from webapp.models import DriverAssign, Gledger, Vehicles, Invoices, JO, Income,
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
-from webapp.class8_utils_email import etemplate_truck
+from webapp.class8_utils_email import etemplate_truck, info_mimemail
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
 from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_tasks_money import MakeInvoice_task
@@ -1047,7 +1047,7 @@ def get_company(odat, eprof):
         #emaildata = get_company_email(pdat)
     return emaildata
 
-def get_stamps_from_form(doc_stamps, doc_signatures):
+def get_stamps_from_form(doc_stamps, doc_signatures, odat):
     stamplist = []
     stampdata = []
     for doc in doc_stamps:
@@ -1085,6 +1085,10 @@ def get_stamps_from_form(doc_stamps, doc_signatures):
     if adding_sig != None:
         stamplist.append(adding_sig)
         stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
+
+    stampstring = json.dumps(stampdata)
+    odat.Status = stampstring
+    db.session.commit()
     return stamplist, stampdata
 
 def get_last_used_stamps(odat):
@@ -1097,6 +1101,10 @@ def get_last_used_stamps(odat):
         for ix in range(vlen):
             if isinstance(stampdata[6 * ix + 5], str): stamplist.append(stampdata[6 * ix + 5])
     return stamplist, stampdata
+
+def make_bool(input):
+    if input is not None: return True
+    else: return False
 
 def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
@@ -1132,26 +1140,26 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     returnhit = request.values.get('Finished')
     if returnhit is not None: completed = True
     else:
+
         if task_iter == 0:
-            holdvec[4] = get_company(odat, 'packages')
+            emaildata = get_company(odat, 'packages')
             eprof = 'Custom'
             stamplist, stampdata = get_last_used_stamps(odat)
 
         else:
             # Save the current stamps to database for future launch
-            stamplist, stampdata = get_stamps_from_form(doc_stamps, doc_signatures)
-            stampstring = json.dumps(stampdata)
-            print('stampstring dump to json is:', stampstring)
-            odat.Status = stampstring
-            db.session.commit()
+            stamplist, stampdata = get_stamps_from_form(doc_stamps, doc_signatures, odat)
             eprof = request.values.get('emlprofile')
-            lock = request.values.get('prolock')
-            if lock:
-                holdvec[4] = get_company(odat, eprof)
-            else: holdvec[4] = emaildata_update()
-            print('taskiter1+', stamplist, stampdata)
+            #lock = request.values.get('prolock')
+            reorder_requested = make_bool(request.values.get('reorder'))
+            stamp_requested = make_bool(request.values.get('stampnow'))
+            email_requested = make_bool(request.values.get('emailnow'))
+            if reorder_requested or stamp_requested or email_requested: emaildata = emaildata_update()
+            else: emaildata = get_company(odat, eprof)
+            if email_requested: info_mimemail(emaildata)
 
         holdvec[15] = stamplist
+        holdvec[4] = emaildata
         holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err)
         holdvec[6] = eprof
         holdvec[8] = dockind

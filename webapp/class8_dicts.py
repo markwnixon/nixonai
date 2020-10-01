@@ -31,13 +31,14 @@ Trucking_genre = {'table': 'Orders',
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'document_profiles'  : {
                                         'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
+                                        'Signed Load Con' : ['Source','0','0','0'],
                                         'Update w/Source'   : ['Source','0','0','0'],
                                         'Update w/Proof'    : ['Proofs','0','0','0'],
                                         'Update w/Invoice'    : ['Invoice','0','0','0'],
                                         'Update w/Gate' : ['Gate Tickets','0','0','0'],
-                                        'Completed Min' : ['Invoice', 'Proofs','0','0'],
-                                        'Completed Std' : ['Invoice', 'Proofs', 'Source','0'],
-                                        'Completed All' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
+                                        'Completed IP' : ['Invoice', 'Proofs','0','0'],
+                                        'Completed IPS' : ['Invoice', 'Proofs', 'Source','0'],
+                                        'Completed IPSG' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
                                       },
                   'image_stamps': {
                       'X': ['x.png', 'stamps', .2],

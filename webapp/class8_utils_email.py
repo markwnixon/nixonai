@@ -41,6 +41,7 @@ def add_person(info):
     db.session.commit()
 
 def emaildata_update():
+    print('running email update')
     etitle = request.values.get('edat0')
     ebody = request.values.get('edat1')
     aname = request.values.get('edat6')
@@ -221,6 +222,17 @@ def etemplate_truck(eprof,odat):
         emailin2 = eaccts
         emailcc1 = em['info']
         emailcc2 = em['expo']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+        return emaildata
+
+    elif eprof == 'Update w/Source':
+        etitle = f'Update on Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nDelivery of this load is scheduled for {odat.Date2} to:\n\t\t{dblk[0]}\n\t\t{dblk[1]}\n\t\t{dblk[2]}\nWe will send a POD as soon as delivery is complete.'
+        aname = odat.Source
+        emailin1 = estatus
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
