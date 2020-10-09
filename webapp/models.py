@@ -417,7 +417,7 @@ class Focusareas(db.Model):
 class Orders(db.Model):
     __tablename__ = 'orders'
     id = db.Column('id', db.Integer, primary_key=True)
-    Status = db.Column('Status', db.String(200), default=None)
+    Status = db.Column('Status', db.String(1000), default=None)
     Jo = db.Column('Jo', db.String(25), nullable=False)
     HaulType = db.Column('HaulType', db.String(50), default=None)
     Order = db.Column('Order', db.String(50), default=Jo)

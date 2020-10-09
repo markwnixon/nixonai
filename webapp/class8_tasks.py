@@ -1050,41 +1050,54 @@ def get_company(odat, eprof):
 def get_stamps_from_form(doc_stamps, doc_signatures, odat):
     stamplist = []
     stampdata = []
+    # Have to create numeric sequence to allow using stamps more than once
     for doc in doc_stamps:
-        print('doc is:', doc)
-        thisdoc = request.values.get(doc)
-        print('thisdoc stamps is', thisdoc)
-        if thisdoc is not None:
-            thischeck = thisdoc + '_c'
-            checked = request.values.get(thischeck)
-            if checked == 'on':
-                stamplist.append(thisdoc)
-                page = request.values.get(thisdoc + '_p')
-                up = request.values.get(thisdoc + '_h')
-                right = request.values.get(thisdoc + '_r')
-                scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
+        for ix in range(1,29):
+            docnamed = doc + str(ix)
+            thisdoc = request.values.get(docnamed)
+            if thisdoc is not None:
+                thischeck = thisdoc + '_c'
+                checked = request.values.get(thischeck)
+                if checked == 'on':
+                    stamplist.append(thisdoc)
+                    page = request.values.get(thisdoc + '_p')
+                    up = request.values.get(thisdoc + '_h')
+                    right = request.values.get(thisdoc + '_r')
+                    scale = request.values.get(thisdoc + '_s')
+                    stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, doc, thisdoc]
+                else: break
     for doc in doc_signatures:
-        thisdoc = request.values.get(doc)
-        if thisdoc is not None:
-            thischeck = thisdoc + '_c'
-            checked = request.values.get(thischeck)
-            if checked == 'on':
-                stamplist.append(thisdoc)
-                page = request.values.get(thisdoc + '_p')
-                up = request.values.get(thisdoc + '_h')
-                right = request.values.get(thisdoc + '_r')
-                scale = request.values.get(thisdoc + '_s')
-                stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, thisdoc]
+        for ix in range(1,29):
+            docnamed = doc + str(ix)
+            thisdoc = request.values.get(docnamed)
+            if thisdoc is not None:
+                thischeck = thisdoc + '_c'
+                checked = request.values.get(thischeck)
+                if checked == 'on':
+                    stamplist.append(thisdoc)
+                    page = request.values.get(thisdoc + '_p')
+                    up = request.values.get(thisdoc + '_h')
+                    right = request.values.get(thisdoc + '_r')
+                    scale = request.values.get(thisdoc + '_s')
+                    stampdata = stampdata + [int(page), int(up), int(right), float(scale), checked, doc, thisdoc]
+                else: break
 
     adding_stamp = request.values.get('stampname')
     if adding_stamp != None:
-        stamplist.append(adding_stamp)
-        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
+        for jx in range(1,29):
+            test = adding_stamp + str(jx)
+            if test not in stamplist:
+                stamplist.append(test)
+                stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp, test]
+                break
     adding_sig = request.values.get('signame')
     if adding_sig != None:
-        stamplist.append(adding_sig)
-        stampdata = stampdata + [1, 300, 200, .5, 'on', adding_stamp]
+        for jx in range(1,29):
+            test = adding_sig + str(jx)
+            if test not in stamplist:
+                stamplist.append(test)
+                stampdata = stampdata + [1, 300, 200, .5, 'on', adding_sig, test]
+                break
 
     stampstring = json.dumps(stampdata)
     odat.Status = stampstring
@@ -1097,9 +1110,9 @@ def get_last_used_stamps(odat):
     stampstring = odat.Status
     if isinstance(stampstring, str):
         stampdata = json.loads(stampstring)
-        vlen = int(len(stampdata) / 6)
+        vlen = int(len(stampdata) / 7)
         for ix in range(vlen):
-            if isinstance(stampdata[6 * ix + 5], str): stamplist.append(stampdata[6 * ix + 5])
+            if isinstance(stampdata[7 * ix + 6], str): stamplist.append(stampdata[7 * ix + 6])
     return stamplist, stampdata
 
 def make_bool(input):

@@ -76,19 +76,23 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
         doc_stamps.append(key)
     for key in document_signatures:
         doc_signatures.append(key)
+    print('the stamplist is:', stamplist)
+    print('the stampdata is:', stampdata)
 
     for jx, stamp in enumerate(stamplist):
-        if stamp in doc_stamps:
-            listdata = document_stamps[stamp]
-        if stamp in doc_signatures:
-            listdata = document_signatures[stamp]
+        stampname = stampdata[7*jx + 5]
+        print('stampname is:',stampname)
+        if stampname in doc_stamps:
+            listdata = document_stamps[stampname]
+        if stampname in doc_signatures:
+            listdata = document_signatures[stampname]
         stampfile = listdata[0]
         stampfolder = listdata[1]
         filepath = addpath(f'static/{scac}/data/{stampfolder}/{stampfile}')
-        stamp_page = stampdata[6*jx]
-        stamp_up = stampdata[6*jx + 1]
-        stamp_right = stampdata[6*jx + 2]
-        stamp_scale = stampdata[6*jx + 3]
+        stamp_page = stampdata[7*jx]
+        stamp_up = stampdata[7*jx + 1]
+        stamp_right = stampdata[7*jx + 2]
+        stamp_scale = stampdata[7*jx + 3]
 
         # Want to create a signature/date doc page
         file2 = addpath(f'static/{scac}/data/processing/t1.pdf')
@@ -141,7 +145,8 @@ def get_doclist(odat, dockind):
                     packitems.append(fa)
                     fexist[jx] = 1
             if thisdoc == 'Proofs':
-                fa = addpath(f'static/{scac}/data/vproofs/{odat.Proof}')
+                fa = addpath(f'static/{scac}/data/vorders/{odat.Proof}')
+                print('Looking for proof file:', fa)
                 if os.path.isfile(fa):
                     packitems.append(fa)
                     fexist[jx] = 1

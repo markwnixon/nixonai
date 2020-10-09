@@ -91,11 +91,11 @@ First, select order of items and then hit REORDER button
 {% for addedstamp in addedstamps %}
 
     <input type = "hidden" name ="{{ addedstamp }}" value= "{{addedstamp}}">
-    {% set page = 6*(loop.index-1) %}
-    {% set height = 6*(loop.index-1)+1 %}
-    {% set right = 6*(loop.index-1)+2 %}
-    {% set scale = 6*(loop.index-1)+3 %}
-    {% set checks = 6*(loop.index-1)+4 %}
+    {% set page = 7*(loop.index-1) %}
+    {% set height = 7*(loop.index-1)+1 %}
+    {% set right = 7*(loop.index-1)+2 %}
+    {% set scale = 7*(loop.index-1)+3 %}
+    {% set checks = 7*(loop.index-1)+4 %}
     Working on {{ addedstamp }} with {{ stampdata[0] }}{{ page }}{{ height }}{{ stampdata[1] }}
     <div class="card">
 
