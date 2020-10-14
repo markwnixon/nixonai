@@ -172,7 +172,7 @@ def get_doclist(odat, dockind):
 
 
 
-def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, eprof, err):
+def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, eprof, err, emaildata):
     err = []
     dockind = ['']*4
     if task_iter > 1 and eprof == 'Custom':
@@ -199,12 +199,6 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
     #stampdata = call_stamp(odat, task_iter)
     fexist, packitems = get_doclist(odat, dockind)
 
-
-    # Get the email data also in case changes occur there
-    emaildata = [0] * 7
-    for i in range(7):
-        emaildata[i] = request.values.get('edat' + str(i))
-
     print('packitems final:', packitems)
     print('stampdata final:', stampdata)
 
@@ -219,5 +213,6 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
         print(f'stamping document going in: {docref}')
         docref = stamp_document(genre, odat, stamplist, stampdata, err, docref)
         print(f'stamped document coming out: {docref}')
+        emaildata[6] = odat.Package
 
-    return stampdata, dockind, docref, err, fexist
+    return emaildata, stampdata, dockind, docref, err, fexist

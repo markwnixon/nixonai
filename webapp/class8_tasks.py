@@ -1038,7 +1038,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
     return holdvec, entrydata, err, viewport, completed
 
 def get_company(odat, eprof):
-    emaildata = ['']*7
+    emaildata = ['']*9
     pdat = People.query.get(odat.Bid)
     if pdat is None:
         pdat = People.query.filter(People.Company == odat.Shipper).first()
@@ -1167,13 +1167,16 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             reorder_requested = make_bool(request.values.get('reorder'))
             stamp_requested = make_bool(request.values.get('stampnow'))
             email_requested = make_bool(request.values.get('emailnow'))
-            if reorder_requested or stamp_requested or email_requested: emaildata = emaildata_update()
-            else: emaildata = get_company(odat, eprof)
+            if reorder_requested or stamp_requested or email_requested:
+                emaildata = emaildata_update()
+            else:
+                emaildata = get_company(odat, eprof)
             if email_requested: info_mimemail(emaildata)
 
         holdvec[15] = stamplist
-        holdvec[4] = emaildata
-        holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err)
+        #holdvec[4] = emaildata
+        # Send in the emaildata in case it get modified by the stamps
+        holdvec[4], holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err, emaildata)
         holdvec[6] = eprof
         holdvec[8] = dockind
         holdvec[9] = fexist

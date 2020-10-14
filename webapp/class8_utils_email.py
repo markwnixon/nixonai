@@ -15,7 +15,7 @@ from webapp.CCC_system_setup import websites, passwords, companydata, scac, addp
 from webapp.CCC_system_setup import usernames as em
 from webapp import db
 from webapp.models import People, Orders
-from webapp.viewfuncs import stripper
+from webapp.viewfuncs import stripper, hasinput
 
 import datetime
 today = datetime.datetime.today()
@@ -44,12 +44,14 @@ def emaildata_update():
     print('running email update')
     etitle = request.values.get('edat0')
     ebody = request.values.get('edat1')
-    aname = request.values.get('edat6')
+    outfile = request.values.get('edat7')
+    sourcefile = request.values.get('edat6')
+    folder = request.values.get('edat8')
     emailin1 = request.values.get('edat2')
     emailin2 = request.values.get('edat3')
     emailcc1 = request.values.get('edat4')
     emailcc2 = request.values.get('edat5')
-    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcefile, outfile, folder]
     return emaildata
 
 def email_template(type, info):
@@ -233,7 +235,22 @@ def etemplate_truck(eprof,odat):
         emailin2 = ''
         emailcc1 = em['info']
         emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname]
+        return emaildata
+
+    elif eprof == 'Signed Load Con':
+        if hasinput(con):
+            etitle = f'Signed Load Confirmation: {od} | {keyval} | {con}'
+        else: etitle = f'Signed Load Confirmation: {od} | {keyval}'
+        ebody = f'Dear {odat.Shipper},\n\nThis load confirmation has been received with signed copy attached.'
+        sourcename = odat.Package
+        folder = 'vpackages'
+        outname = f'Signed_Load_Confirmation_{od}.pdf'
+        emailin1 = estatus
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, outname, folder]
         return emaildata
 
     elif eprof == 'quote':
@@ -493,7 +510,7 @@ def info_mimemail(emaildata):
                 + f'<img src = "{cdata[11]}" width="120" height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
 
     ourserver = websites['mailserver']
-    etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname = emaildata
+    etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, sendname, folder = emaildata
 
     #emailto = "export@firsteaglelogistics.com"
     emailfrom = em['invo']
@@ -510,6 +527,23 @@ def info_mimemail(emaildata):
     msg["Subject"] = etitle
 
     ebody = ebody.replace('\n', '<br>') + signature
+
+    # See if there is an attachment
+
+    if sourcename != 'No Attachment':
+        cfrom = addpath(f'static/{scac}/data/{folder}/{sourcename}')
+        newfile = addpath(f'static/{scac}/data/temp/{sendname}')
+        print(cfrom,newfile)
+        shutil.copy(cfrom,newfile)
+
+        attachment = open(newfile, "rb")
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload((attachment).read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', "attachment; filename= %s" % sendname)
+        msg.attach(part)
+        attachment.close()
+        #os.remove(newfile)
 
     msg.attach(MIMEText(ebody, 'html'))
     #msg.attach(MIMEText(signature, 'html'))
