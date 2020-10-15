@@ -235,7 +235,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = ''
         emailcc1 = em['info']
         emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname]
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vorders']
         return emaildata
 
     elif eprof == 'Signed Load Con':
