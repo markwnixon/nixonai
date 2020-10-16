@@ -1037,7 +1037,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
     return holdvec, entrydata, err, viewport, completed
 
-def get_company(odat, eprof):
+def get_company(eprof, odat):
     emaildata = ['']*9
     pdat = People.query.get(odat.Bid)
     if pdat is None:
@@ -1155,8 +1155,8 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     else:
 
         if task_iter == 0:
-            emaildata = get_company(odat, 'packages')
             eprof = 'Custom'
+            emaildata = get_company(eprof, odat)
             stamplist, stampdata = get_last_used_stamps(odat)
 
         else:
@@ -1170,7 +1170,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             if reorder_requested or stamp_requested or email_requested:
                 emaildata = emaildata_update()
             else:
-                emaildata = get_company(odat, eprof)
+                emaildata = get_company(eprof, odat)
             if email_requested: info_mimemail(emaildata)
 
         holdvec[15] = stamplist

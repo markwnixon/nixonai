@@ -175,7 +175,7 @@ def get_doclist(odat, dockind):
 def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, eprof, err, emaildata):
     err = []
     dockind = ['']*4
-    if task_iter > 1 and eprof == 'Custom':
+    if task_iter > 0 and eprof == 'Custom':
         sections = ['1st Section', '2nd Section', '3rd Section', '4th Section']
         for jx, section in enumerate(sections): dockind[jx] = request.values.get(section)
     else:
@@ -213,6 +213,7 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
         print(f'stamping document going in: {docref}')
         docref = stamp_document(genre, odat, stamplist, stampdata, err, docref)
         print(f'stamped document coming out: {docref}')
-        emaildata[6] = odat.Package
+
+    emaildata[6] = odat.Package
 
     return emaildata, stampdata, dockind, docref, err, fexist

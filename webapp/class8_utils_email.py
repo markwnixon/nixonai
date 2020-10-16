@@ -227,6 +227,18 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
+    elif eprof == 'Custom':
+        etitle = f'{scac} Invoice Package for Completed Orders: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nAn invoice package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+        aname = odat.Package
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        outname = f'Invoice_Package_{odat.Jo}.pdf'
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        return emaildata
+
     elif eprof == 'Update w/Source':
         etitle = f'Update on Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nDelivery of this load is scheduled for {odat.Date2} to:\n\t\t{dblk[0]}\n\t\t{dblk[1]}\n\t\t{dblk[2]}\nWe will send a POD as soon as delivery is complete.'
