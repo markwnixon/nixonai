@@ -228,26 +228,15 @@ def etemplate_truck(eprof,odat):
         return emaildata
 
     elif eprof == 'Custom':
-        etitle = f'{scac} Invoice Package for Completed Orders: {od} | {keyval} | {con}'
-        ebody = f'Dear {odat.Shipper},\n\nAn invoice package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+        etitle = f'{scac} Document Package For: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThis document package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
         emailcc1 = em['info']
         emailcc2 = em['expo']
-        outname = f'Invoice_Package_{odat.Jo}.pdf'
+        outname = f'Package_{odat.Jo}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
-        return emaildata
-
-    elif eprof == 'Update w/Source':
-        etitle = f'Update on Order: {od} | {keyval} | {con}'
-        ebody = f'Dear {odat.Shipper},\n\nDelivery of this load is scheduled for {odat.Date2} to:\n\t\t{dblk[0]}\n\t\t{dblk[1]}\n\t\t{dblk[2]}\nWe will send a POD as soon as delivery is complete.'
-        aname = odat.Source
-        emailin1 = estatus
-        emailin2 = ''
-        emailcc1 = em['info']
-        emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vorders']
         return emaildata
 
     elif eprof == 'Signed Load Con':
@@ -264,6 +253,52 @@ def etemplate_truck(eprof,odat):
         emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, outname, folder]
         return emaildata
+
+    elif eprof == 'Update w/Source':
+        etitle = f'Update on Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nDelivery of this load is scheduled for {odat.Date2} to:\n\t\t{dblk[0]}\n\t\t{dblk[1]}\n\t\t{dblk[2]}\nWe will send a POD as soon as delivery is complete.'
+        aname = odat.Source
+        emailin1 = estatus
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        return emaildata
+
+    elif eprof == 'Update w/Proof':
+        etitle = f'Proof for Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your proof of delivery is attached.\n\nPlease do not hesitate to respond if you have any questions.'
+        aname = odat.Proof
+        emailin1 = estatus
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        return emaildata
+
+    elif eprof == 'Update w/Invoice':
+        etitle = f'Invoice for Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice for services is attached.\n\nWe greatly appreciate your business.'
+        aname = odat.Invoice
+        aname = aname.replace('INV','Invoice_')
+        emailin1 = estatus
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        return emaildata
+
+    elif eprof == 'Update w/Gate':
+        etitle = f'Gate Tickets: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThe gate tickets for the subject order are attached.'
+        aname = odat.Gate
+        emailin1 = estatus
+        emailin2 = ''
+        emailcc1 = em['info']
+        emailcc2 = ''
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        return emaildata
+
 
     elif eprof == 'quote':
         etitle = cdata[2] + ' Quote: ' + jo
