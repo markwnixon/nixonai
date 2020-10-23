@@ -299,6 +299,41 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
         return emaildata
 
+    elif eprof == 'Completed IP':
+        etitle = f'Invoice and Proof for Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
+        aname = odat.Package
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        outname = f'Invoice-Proof_{odat.Jo}.pdf'
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        return emaildata
+
+    elif eprof == 'Completed IPS':
+        etitle = f'Invoice/Proof/Load-Confirmation for Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
+        aname = odat.Package
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        outname = f'Invoice-Package_{odat.Jo}.pdf'
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        return emaildata
+
+    elif eprof == 'Completed IPSG':
+        etitle = f'Invoice/Proof/Load-Con/Gate-Tickets for Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
+        aname = odat.Package
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        outname = f'Invoice-Package_{odat.Jo}.pdf'
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        return emaildata
 
     elif eprof == 'quote':
         etitle = cdata[2] + ' Quote: ' + jo
