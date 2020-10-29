@@ -288,6 +288,18 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
         return emaildata
 
+    elif eprof == 'Paid Invoice':
+        etitle = f'Payment Received on Invoice {odat.Jo} for Completed Order: {od} | {keyval} | {con}'
+        ebody = f'Dear {odat.Shipper},\n\nYour payment has been received, and your stamped invoice is attached.\n\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+        aname = odat.Invoice
+        aname = aname.replace('INV', 'Paid_Invoice_')
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        return emaildata
+
     elif eprof == 'Update w/Gate':
         etitle = f'Gate Tickets: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nThe gate tickets for the subject order are attached.'

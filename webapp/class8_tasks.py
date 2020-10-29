@@ -9,6 +9,7 @@ from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_tasks_money import MakeInvoice_task
 from webapp.class8_utils_package import makepackage
 from webapp.class8_utils_email import emaildata_update
+from webapp.class8_utils_invoice import make_invo_doc
 
 from sqlalchemy import inspect
 import datetime
@@ -1239,6 +1240,249 @@ def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_d
     db.session.commit()
 
     completed = True
+    return holdvec, entrydata, err, viewport, completed
+
+def check_income(odat, ldat, err):
+
+    invojo = odat.Jo
+    co = invojo[0]
+    invodate = ldat.Date
+    invoamt = ldat.Total
+    if ldat.Original is not None:
+        docref = ldat.Original
+    else:
+        docref = ''
+
+    lastpr = request.values.get('lastpr')
+    if hasvalue(lastpr):
+        ltext = lastpr.splitlines()
+        custref = ltext[0]
+        acctdb = ltext[1]
+    else:
+        custref = 'ChkNo'
+        acctdb = request.values.get('acctto')
+
+    incdat = Income.query.filter(Income.Jo == invojo).first()
+    if incdat is None:
+        print('incdat is none')
+        err.append('Creating New Payment on Jo')
+        paydesc = 'Receive payment on Invoice ' + invojo
+        recamount = ldat.Total
+
+        recdate = datetime.date.today()
+        acctdb = 'Undeposited Funds'
+
+        print('acctdb=', acctdb)
+        input = Income(Jo=invojo, Account=acctdb, Pid=odat.Bid, Description=paydesc,
+                       Amount=d2s(recamount), Ref=custref, Date=recdate, Original=os.path.basename(docref),
+                       From=odat.Shipper, Bank=None, Date2=None, Depositnum=None)
+        db.session.add(input)
+        db.session.commit()
+
+    else:
+        print('incdat is not none')
+        recamount = request.values.get('recamount')
+        custref = request.values.get('custref')
+        desc = request.values.get('desc')
+        recdate = request.values.get('recdate')
+        acctdb = request.values.get('acctto')
+        if acctdb is None:
+            acctdb = 'Cash'
+        if custref is None:
+            custref = 'ChkNo'
+        print('acctdb2=', acctdb)
+        if isinstance(invodate, str):
+            recdate = datetime.datetime.strptime(recdate, '%Y-%m-%d')
+        incdat.Amount = recamount
+        incdat.Ref = custref
+        incdat.Description = desc
+        incdat.Date = recdate
+        incdat.Original = docref
+        incdat.Account = acctdb
+        adat = Accounts.query.filter((Accounts.Name == acctdb) & (Accounts.Co == co)).first()
+        if adat is not None:
+            if adat.Type == 'Bank':
+                incdat.Bank = acctdb
+                incdat.Date2 = recdate
+                incdat.Depositnum = custref
+            else:
+                incdat.Bank = None
+                incdat.Date2 = None
+                incdat.Depositnum = None
+        else:
+            incdat.Bank, incdat.Date2, incdat.Depositnum = None, None, None
+        db.session.commit()
+
+    return err
+
+def check_invoice(odat, err):
+    invojo = odat.Jo
+    ldat = Invoices.query.filter(Invoices.Jo == invojo).first()
+
+    if ldat is not None:
+        co = invojo[0]
+        acdata = Accounts.query.filter((Accounts.Type == 'Bank') & (Accounts.Co == co)).order_by(Accounts.Name).all()
+        bklist = ['Undeposited Funds']
+        for adat in acdata:
+            bklist.append(adat.Name)
+
+        lastpr = request.values.get('lastpr')
+        if hasvalue(lastpr):
+            ltext = lastpr.splitlines()
+            custref = ltext[0]
+            acctdb = ltext[1]
+        else:
+            custref = 'ChkNo'
+            acctdb = request.values.get('acctto')
+
+        err = check_income(odat, ldat, err)
+
+        incdat = Income.query.filter(Income.Jo == invojo).first()
+        payment = [incdat.Amount, incdat.Ref, incdat.Date, incdat.Bank]
+        err.append('Amend Payment for Invoice ' + invojo)
+
+    return ldat, payment, err
+
+
+
+def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+
+    err = [f"Running Receive Pay task with task_iter {task_iter} using {tablesetup['table']}"]
+    completed = False
+    viewport = ['0'] * 6
+    document_profiles = eval(f"{genre}_genre['document_profiles']")
+    document_stamps = eval(f"{genre}_genre['image_stamps']")
+    document_signatures = eval(f"{genre}_genre['signature_stamps']")
+    doc_profile_names, doc_stamps, doc_signatures = [], [], []
+    for key in document_profiles:
+        doc_profile_names.append(key)
+    for key in document_stamps:
+        doc_stamps.append(key)
+    for key in document_signatures:
+        doc_signatures.append(key)
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    hiddendata = tablesetup['hidden data']
+    numitems = len(entrydata)
+    holdvec = [''] * numitems
+    holdvec[7] = doc_profile_names
+    holdvec[10] = doc_stamps
+    holdvec[11] = doc_signatures
+
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    creators = tablesetup['creators']  # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    odat = eval(nextquery)
+
+    returnhit = request.values.get('Finished')
+    if returnhit is not None:
+        completed = True
+    else:
+        if task_iter == 0:
+            eprof = 'Paid Invoice'
+            emaildata = get_company(eprof, odat)
+            stamplist = ['Paid1']
+            stampdata = [1, 300, 200, 0.5, 'on', 'Paid', 'Paid1']
+            #stamplist, stampdata = get_last_used_stamps(odat)
+            print('stampdata iter 0',stampdata)
+
+        else:
+            # Save the current stamps to database for future launch
+            stamplist, stampdata = get_stamps_from_form(doc_stamps, doc_signatures, odat)
+            eprof = request.values.get('emlprofile')
+            #lock = request.values.get('prolock')
+            reorder_requested = make_bool(request.values.get('stampnow'))
+            stamp_requested = make_bool(request.values.get('stampnow'))
+            email_requested = make_bool(request.values.get('emailnow'))
+            if reorder_requested or stamp_requested or email_requested:
+                emaildata = emaildata_update()
+            else:
+                emaildata = get_company(eprof, odat)
+            if email_requested: info_mimemail(emaildata)
+
+        holdvec[15] = stamplist
+        #holdvec[4] = emaildata
+        # Send in the emaildata in case it get modified by the stamps
+        holdvec[4], holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err, emaildata)
+        holdvec[6] = eprof
+        holdvec[8] = dockind
+        holdvec[9] = fexist
+        #if task_iter == 0:  docref = f'tmp/{scac}/data/vinvoice/{odat.Invoice}'
+
+        if 1 == 2:
+
+            ldat, payment, err = check_invoice(odat, err)
+            if ldat is not None:
+                pdat = People.query.filter(People.id == odat.Bid).first()
+                if pdat is None:
+                    pdat = People.query.filter(People.Company == odat.Shipper).first()
+                    odat.Bid = pdat.id
+                    db.session.commit()
+                ldata = Invoices.query.filter(Invoices.Jo == invojo).order_by(Invoices.Ea.desc()).all()
+                cache = odat.Icache + 1
+                odat.Icache = cache
+                invostyle = request.values.get('invoicestyle')
+                if invostyle is None:
+                    invostyle = 'Drayage Import'
+                make_invo_doc(odat, ldata, pdat, cache, invodate, payment, tablesetup, invostyle)
+                if cache > 1:
+                    docref = f'tmp/{scac}/data/vinvoice/INV' + invojo + 'c' + str(cache) + '.pdf'
+                    # Store for future use
+                else:
+                    docref = f'tmp/{scac}/data/vinvoice/INV' + invojo + '.pdf'
+
+            recupdate = request.values.get('recupdate')
+            if recupdate is not None:
+                hstat = odat.Hstat
+                if hstat == 2 or hstat == 3:
+                    odat.Hstat = 4
+                odat.Istat = 4
+                db.session.commit()
+                err.append('Viewing ' + docref)
+                emaildata = etemplate_truck('paidinvoice', 0, odat)
+                viewtype = 'paidinvoice'
+                completed = True
+
+                try:
+                    rec = float(recamount)
+                except:
+                    rec = 0.00
+                try:
+                    owe = float(ldat.Total)
+                except:
+                    owe = 0.00
+                if rec < owe:
+                    # Need to determine what has been paid for and what has not
+                    howapp = 1
+                else:
+                    for data in ldata:
+                        data.Status = 'P'
+
+                # gledger_write('income',invojo,acctdb,0)
+
+        #odat.Invoice = os.path.basename(docref)
+        #db.session.commit()
+        #print('docref=', docref)
+        viewport[0] = 'split panel left'
+        viewport[1] = 'email setup'
+        viewport[2] = 'show_doc_left'
+        viewport[3] = '/' + docref
+        #viewport[3] = '/' + tpath('invoice', odat.Invoice)
+        print('viewport=', viewport)
+
+        err.append(f'Viewing {docref}')
+        err.append('Hit Finished to End Viewing and Return to Table View')
+        holdvec[2] = Services.query.all()
+
+        loginvo = request.values.get('logInvo')
+        if loginvo is not None:
+            odat = eval(nextquery)
+            err = loginvo_m(odat, 2)
+            if 'Error' not in err:
+                completed = True
+
     return holdvec, entrydata, err, viewport, completed
 
 

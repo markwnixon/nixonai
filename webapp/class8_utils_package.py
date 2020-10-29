@@ -209,7 +209,7 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
         err.append('No documents available for this selection')
 
     stampnow = request.values.get('stampnow')
-    if stampnow is not None:
+    if stampnow is not None or eprof == 'Paid Invoice':
         print(f'stamping document going in: {docref}')
         docref = stamp_document(genre, odat, stamplist, stampdata, err, docref)
         print(f'stamped document coming out: {docref}')
