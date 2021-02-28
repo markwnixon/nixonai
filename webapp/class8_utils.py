@@ -40,6 +40,7 @@ def form_check(text,type):
     message = 'Type is not defined'
     print(text,type)
 
+
     if type == 'text':
         if not hasinput(text):
             text = ''
@@ -106,6 +107,10 @@ def form_check(text,type):
 
     elif type == 'dropblock1':
         from webapp.class8_tasks import get_drop
+        if hasinput(text):
+            testtext = text.strip()
+            if len(testtext) < 6:
+                text = get_drop(testtext)
         if not hasinput(text):
             loadname = request.values.get('dropblock1')
             if loadname is not None:
@@ -114,6 +119,10 @@ def form_check(text,type):
 
     elif type == 'dropblock2':
         from webapp.class8_tasks import get_drop
+        if hasinput(text):
+            testtext = text.strip()
+            if len(testtext) < 6:
+                text = get_drop(testtext)
         if not hasinput(text):
             loadname = request.values.get('dropblock2')
             if loadname is not None:

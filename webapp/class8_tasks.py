@@ -26,6 +26,7 @@ from webapp.viewfuncs import newjo
 import uuid
 
 def get_drop(loadname):
+    print(f'The LOADNAME is:{loadname}')
     dropdat = Drops.query.filter(Drops.Entity == loadname).first()
     if dropdat is not None:
         print('dropdat',dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
@@ -33,6 +34,15 @@ def get_drop(loadname):
         dline = dline.replace('None','')
         return dline
     else:
+        print(f'the lenght of loadname is...{len(loadname)}')
+        if len(loadname) == 3:
+            dropdat = Drops.query.filter(Drops.Entity.contains(loadname)).first()
+            if dropdat is not None:
+                print('dropdat', dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
+                dline = f'{dropdat.Entity}\n{dropdat.Addr1}\n{dropdat.Addr2}\n{dropdat.Phone}\n{dropdat.Email}'
+                dline = dline.replace('None', '')
+                return dline
+
         return ''
 
 def get_checked(thistable, data1id):
@@ -73,18 +83,21 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
 
         # For tables that are on get side data required for tasks:
         side_data = eval(f"{tableget}_setup['side data']")
-        print('class8_tasks.py 179 Tablemaker() For tables on get this side data:',side_data)
+        print('class8_tasks.py 86 Tablemaker() For tables on get this side data:',side_data)
         keydata = {}
         for side in side_data:
             for key, values in side.items():
+                print('')
+                print('****************************')
+                print(f'key:{key}, values:{values}')
                 select_value = values[2]
                 if isinstance(select_value, str):
                     if 'get_' in select_value:
                         find = select_value.replace('get_','')
                         select_value = request.values.get(find)
-                        print('class8_tasks.py 187 Tablemaker() select_value:',select_value)
+                        print('class8_tasks.py 98 Tablemaker() select_value:',select_value)
                 if select_value is not None:
-                    print(key, values, tableget)
+                    print(f'Key:{key} Values{values} tableget{tableget}')
                     if isinstance(select_value, str):
                         dbstats = eval(
                         f"{values[0]}.query.filter({values[0]}.{values[1]}=='{select_value}').order_by({values[0]}.{values[3]}).all()")
@@ -95,11 +108,12 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                         dblist = []
                         for dbstat in dbstats:
                             nextvalue = eval(f'dbstat.{values[3]}')
+                            print(f'nextvalue:{nextvalue}')
                             if nextvalue is not None:  nextvalue = nextvalue.strip()
                             if nextvalue not in dblist:
                                 dblist.append(nextvalue)
                         keydata.update({key: dblist})
-                        print(keydata)
+                        print(f'keydata is {keydata[key]}')
     return tabletitle, table_data, checked_data, jscripts, keydata
 
 def reset_state(task_boxes, genre_tables):
@@ -122,7 +136,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
     viewport = ['tables'] + ['0'] * 5
     # This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
     # If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-    print('Ready to run the task:', taskon, 'with task focus', task_focus)
+    print(f'Taskon:{taskon}, task_focus:{task_focus}, tasktype:{tasktype}, task_iter:{task_iter}')
 
     if tasktype == 'Table_Selected':
         tablesetup = eval(f'{task_focus}_setup')
@@ -312,8 +326,9 @@ def Table_maker(genre):
     #print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
     #print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
     #print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
-    #print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
-    #print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
+    print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
+    print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
+    print('class8_tasks.py 138 Tablemaker() haul types', genre_data['haul_types'])
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
@@ -460,6 +475,8 @@ def get_new_Jo(input):
 def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
+    masks = tablesetup['haulmask']
+    entrydata = mask_apply(entrydata, masks)
     try:
         hiddendata = tablesetup['hidden data']
     except:
@@ -516,6 +533,7 @@ def make_new_entry(tablesetup,holdvec):
     if dat is not None:
         id = dat.id
         for jx,entry in enumerate(entrydata):
+            print(f'Data going in is:{entry[0]} {holdvec[jx]}')
             setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
@@ -561,6 +579,43 @@ def make_new_entry(tablesetup,holdvec):
     return err
 
 #def New_task(task_iter, tablesetup, task_focus, checked_data):
+def mask_apply(entrydata, masks):
+    mask_to_apply = request.values.get('HaulType')
+    list = Trucking_genre['haul_types']
+    print(mask_to_apply)
+    if mask_to_apply in list:
+        print(f'the list is {list}')
+        this_index = list.index(mask_to_apply)
+        print(f'the index is {this_index}')
+        for jx, entry in enumerate(entrydata):
+            if 'Release' in entry[1]:
+                mask = masks['release']
+                entrydata[jx][2] = mask[this_index]
+            if 'Container' in entry[1]:
+                mask = masks['container']
+                entrydata[jx][2] = mask[this_index]
+            if 'Load At' in entry[1]:
+                mask = masks['load1']
+                entrydata[jx][2] = mask[this_index]
+            if 'Deliver To' in entry[1]:
+                mask = masks['load2']
+                entrydata[jx][2] = mask[this_index]
+            if 'Load Date' in entry[1]:
+                mask = masks['load1date']
+                entrydata[jx][2] = mask[this_index]
+                print(f'Mask {entry[2]}')
+            if 'Del Date' in entry[1]:
+                mask = masks['load2date']
+                entrydata[jx][2] = mask[this_index]
+            if 'Third Location' in entry[1]:
+                mask = masks['load3']
+                entrydata[jx][2] = mask[this_index]
+            if 'Third Date' in entry[1]:
+                mask = masks['load3date']
+                entrydata[jx][2] = mask[this_index]
+
+        entrydata = [v for v in entrydata if v[2] != 'no']
+    return entrydata
 
 def New_task(tablesetup, task_iter):
     completed = False
@@ -568,6 +623,8 @@ def New_task(tablesetup, task_iter):
 
     if task_iter > 0:
         entrydata = tablesetup['entry data']
+        masks = tablesetup['haulmask']
+        entrydata = mask_apply(entrydata, masks)
         numitems = len(entrydata)
         holdvec = [''] * numitems
         failed = 0

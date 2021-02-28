@@ -33,6 +33,7 @@
                         {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
                         {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
                         {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                        {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
                         {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}{% endif %}
 
                         {% set htest = holdvec[loop.index-1] %}
@@ -67,7 +68,6 @@
             </tr>
 
     {% elif entry[3] == 'text' or entry[3] == 'date' or entry[3] == 'time' %}
-
             <tr>
                 <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
                 <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>

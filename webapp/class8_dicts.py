@@ -1,14 +1,16 @@
 # These are dictionary setups that control the look, feel, and functionality of the class8 view screens
 from webapp.CCC_system_setup import companydata
+from flask import request
 co = companydata()
 
 genre = 'Trucking'
 jobcode = co[10] + genre[0]
+
 Trucking_genre = {'table': 'Orders',
                   'genre_tables': ['Orders', 'Interchange', 'Customers', 'Services'],
                   'genre_tables_on': ['on', 'off', 'off', 'off'],
                   'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice', 'Rec Pay'],
-                  'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 180 Days', 'Show All']},
+                  'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 180 Days', 'Last Year', 'This Year', 'Show All']},
                                     {'Pay Filter': ['Uninvoiced', 'Unrecorded', 'Unpaid', 'Show All']},
                                     {'Haul Filter': ['Not Started', 'In-Progress', 'Incomplete', 'Completed',
                                                      'Show All']},
@@ -27,7 +29,7 @@ Trucking_genre = {'table': 'Orders',
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
-                  'haul_types': ['Import Standard', 'Export Standard', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'document_profiles'  : {
                                         'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
@@ -137,6 +139,7 @@ Trucking_genre = {'table': 'Orders',
 #           5 - initial value of success for error check.  =0 presumes fail unless suceeds.  Program changes to 1 if successful.
 #           6 - error check message to provide if successful, for multiline text involving dropblocks this provides the data for
 #               providing a drop history
+#'haul_types': ['Dray Import', 'Dray Export', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
 Orders_setup = {'name' : 'Trucking Job',
                 'table': 'Orders',
                 'filter': None,
@@ -146,16 +149,18 @@ Orders_setup = {'name' : 'Trucking Job',
                 'entry data': [['Jo', 'JO', 'JO', jobcode, 'text', 0, 'ok'],
                                ['Order', 'Order', 'Customer Ref No.', 'text', 'text', 0, 'ok'],
                                ['Shipper', 'Shipper', 'Select Customer', 'select', 'customerdata', 0, 'ok'],
-                               ['HaulType', 'HaulType', 'Haul Type', 'select', 'haul_types', 0, 'ok'],
+                               ['HaulType', 'HaulType', 'Select Haul Type', 'select', 'haul_types', 0, 'ok'],
                                ['Booking', 'Release', 'Release', 'text', 'text', 0, 'ok'],
                                ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok'],
-                               ['Type', 'ConType', 'Container Type', 'select', 'container_types', 0, 'ok'],
+                               ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok'],
                                ['Chassis', 'Chassis', '', '', 'text', 0, 'ok'],
                                ['Amount', 'Amount', 'Base Charge', 'text', 'float', 0, 'ok'],
                                ['Dropblock1', 'Load At', 'Load At', 'multitext', 'dropblock1', 0, 'Shipper'],
-                               ['Date', 'Load Date', 'Load Date', 'date', 'date', 0, 'ok'],
+                               ['Date', 'Load Date', 'Pick Up Date', 'date', 'date', 0, 'ok'],
                                ['Dropblock2', 'Deliver To', 'Deliver To', 'multitext', 'dropblock2', 0, 'Shipper'],
-                               ['Date2', 'Del Date', 'Del Date', 'date', 'date', 0, 'ok'],
+                               ['Date2', 'Del Date', 'Delivery Date', 'date', 'date', 0, 'ok'],
+                               ['Dropblock3', 'Third Location', 'Third Location', 'multitext', 'dropblock3', 0, 'Shipper'],
+                               ['Date3', 'Third Date', 'Third Date', 'date', 'date', 0, 'ok'],
                                ['Driver', 'Driver', 'Select Driver',  'select', 'driverdata', 0, 'ok'],
                                ['Truck', 'Truck', 'Select Truck', 'select', 'truckdata', 0, 'ok'],
                                ['Commodity', 'Commodity', 'Commodity', 'text', 'text', 0, 'ok'],
@@ -166,7 +171,8 @@ Orders_setup = {'name' : 'Trucking Job',
                                ],
                 'hidden data' : [
                                 ['Company', 'hidden', 'Dropblock1'],
-                                ['Company2','hidden', 'Dropblock2']
+                                ['Company2','hidden', 'Dropblock2'],
+                                ['Location3', 'hidden', 'Dropblock3']
                                 ],
                 'colorfilter': ['Hstat'],
                 'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
@@ -178,21 +184,31 @@ Orders_setup = {'name' : 'Trucking Job',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
                 'source': ['Source', 'Jo'],
                 'copyswaps' : {},
-                'matchfrom' : {
-                                'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
-                                'Interchange': [['Booking', 'Release'], ['Container','Container'],['Type', 'ConType'], ['Chassis', 'Chassis']],
-                                'Customers': [['Shipper', 'Shipper']],
-                                'Services': []
+                'haulmask' : {
+                                'release': ['Release: BOL', 'Release: Booking', 'Release: BOL', 'Release: Booking', 'OTR Release BOL', 'OTR Release BOL', 'Transload Release', 'Release: BOL', 'Release: BOL', 'Release: BOL'],
+                                'container': ['Container', 'Container', 'Container', 'Container', 'Trailer No.', 'Trailer No.', 'Trailer No.', 'Container', 'Trailer No.', 'Container'],
+                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up From'],
+                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date'],
+                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To'],
+                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date'],
+                                'load3': ['no', 'no', 'Stop2', 'Stop2', 'no'],
+                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no']
                               },
+                'matchfrom':    {
+                                 'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
+                                 'Interchange': [['Booking', 'Release'], ['Container', 'Container'], ['Type', 'ConType'], ['Chassis', 'Chassis']],
+                                 'Customers': [['Shipper', 'Shipper']],
+                                 'Services': []
+                                },
                 'invoicetypes' : {
-                                    'Drayage Import' : {
+                                    'Dray Import' : {
                                                         'Top Blocks' : ['Bill To', 'Pickup and Return', 'Deliver To'],
                                                         'Middle Blocks' : ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
                                                         'Middle Items' : ['Order', 'BOL', 'Container', 'Date', 'Date2'],
                                                         'Lower Blocks' : ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
                                                         } ,
 
-                                    'Drayage Export': {
+                                    'Dray Export': {
                                         'Top Blocks': ['Bill To', 'Pickup and Return', 'Load At'],
                                         'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Job Start', 'Job Finished'],
                                         'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],

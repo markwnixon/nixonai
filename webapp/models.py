@@ -437,6 +437,7 @@ class Orders(db.Model):
     Date = db.Column('Date', db.DateTime)
     Time = db.Column('Time', db.String(20))
     Date2 = db.Column('Date2', db.DateTime)
+    Date3 = db.Column('Date3', db.DateTime)
     Time2 = db.Column('Time2', db.String(20))
     Time3 = db.Column('Time3', db.String(20))
     PaidInvoice = db.Column('PaidInvoice', db.String(100))
@@ -447,12 +448,14 @@ class Orders(db.Model):
     Storage = db.Column('Storage', db.Integer)
     Release = db.Column('Release', db.Boolean)
     Company2 = db.Column('Company2', db.String(50))
+    Location3 = db.Column('Location3', db.String(50))
     Seal = db.Column('Seal', db.String(50))
     Shipper = db.Column('Shipper', db.String(50))
     Type = db.Column('Type', db.String(50))
     Label = db.Column('Label', db.String(99))
     Dropblock1 = db.Column('Dropblock1', db.String(500))
     Dropblock2 = db.Column('Dropblock2', db.String(500))
+    Dropblock3 = db.Column('Dropblock3', db.String(500))
     Commodity = db.Column('Commodity', db.String(50))
     Packing = db.Column('Packing', db.String(50))
     Links = db.Column('Links', db.String(100))
@@ -475,7 +478,7 @@ class Orders(db.Model):
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
-                 Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck):
+                 Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -529,6 +532,9 @@ class Orders(db.Model):
         self.Pkcache = Pkcache
         self.QBi = QBi
         self.Truck = Truck
+        self.Dropblock3 = Dropblock3
+        self.Location3 = Location3
+        self.Date3 = Date3
 
 
 class Drops(db.Model):
