@@ -6,7 +6,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from reportlab.lib.utils import simpleSplit
-from page_merger import pagemerger, pagemergerx
+from webapp.page_merger import pagemerger
 from PIL import Image
 
 from webapp.viewfuncs import nonone, nononef, nononestr, dollar, avg, comporname, fullname, address
