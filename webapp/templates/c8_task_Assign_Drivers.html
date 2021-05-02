@@ -1,0 +1,80 @@
+{% set alltdata = holdvec[0] %}
+{% set allvdata = holdvec[1] %}
+
+<br>
+<div class="card">
+    <div class="card-header">
+        Assign Driver(s) to Trucks by Date
+        <button type="submit" class="btn btn-sm btn-green" name="LboxUpdate">Update</button>
+        <button type="submit" class="btn btn-sm btn-elegant" name="Return">Cancel</button>
+    </div>
+<div class="card-body">
+    <div class="d-sm-flex justify-content-center">
+        <div class="p-0">
+        Driver:
+            <select class="mdb-select md-form" name="thisdriver" onchange="this.form.submit()">
+                <option value="" disabled selected>Select Driver</option>
+                {% for drv in alltdata %}
+                <option {% if drv.Name == holdvec[10] %} selected {% endif %} value='{{ drv.Name }}'>{{ drv.Name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+&nbsp&nbsp
+        <div class="p-0">
+        Default:
+            <select class="mdb-select md-form" name="truckdefault" onchange="this.form.submit()">
+                <option value="" disabled selected>Assign New Default</option>
+                {% for trk in allvdata %}
+                <option {% if trk.Unit == holdvec[11] %} selected {% endif %} value='{{ trk.Unit }}'>{{ trk.Unit }} {{ trk.Plate }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="d-sm-flex justify-content-center">
+        <div class="p-0">
+            <div class="input-group-text">From Date</div><input class="form-control" type="date" name="dstart" value="{{holdvec[12]}}" onchange="this.form.submit()">
+        </div>
+        <div class="p-0">
+           <div class="input-group-text">To Date</div><input class="form-control" type="date" name="dfinish" value="{{holdvec[13]}}" onchange="this.form.submit()">
+        </div>
+    </div>
+<br>
+
+    <div class="d-flex flex-row align-items-center justify-content-between">
+        <div class="p-0"><b>Date</b></div>
+        <div class="p-0"><b>Day</b></div>
+        <div class="p-0"><b>Started With</b></div>
+        <div class="p-0"><b>Stopped With</b></div>
+    </div>
+    {% set dtvec = holdvec[14] %}
+    {% set ddvec = holdvec[15] %}
+    {% set tsvec = holdvec[16] %}
+    {% set tevec = holdvec[17] %}
+    {% for dt in dtvec %}
+        {% set jx = loop.index-1 %}
+            <div class="d-flex flex-row align-items-center justify-content-between">
+                <div class="p-0">{{ dt }}</div>
+                <div class="p-0">{{ ddvec[jx] }}</div>
+
+                <div class="p-0">
+                    <select class="mdb-select md-form" name="trks{{ jx }}">
+                        <option {% if tsvec[jx] == '0' %} selected {% endif %} value="0" >No Driving</option>
+                        {% for trk in allvdata %}
+                            <option {% if trk.Unit == tsvec[jx] %} selected {% endif %} value='{{ trk.Unit }}'>{{ trk.Unit }} {{ trk.Plate }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="p-0">
+                    <select class="mdb-select md-form" name="trke{{ jx }}">
+                        <option {% if tsvec[jx] == '0' %} selected {% endif %} value="0" >No Driving</option>
+                        {% for trk in allvdata %}
+                            <option {% if trk.Unit == tevec[jx] %} selected {% endif %} value='{{ trk.Unit }}'>{{ trk.Unit }} {{ trk.Plate }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+    {% endfor %}
+
+</div>

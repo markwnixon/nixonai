@@ -1,0 +1,78 @@
+<div class="row">
+<div class="col-sm-12" align="center">
+{% include 'Table_Row.html' %}
+</div>
+</div>
+{% set fdata = holdvec[2] %}
+{% if fdata %}
+
+    <h5><b>Truck Log from GPS</b></h5>
+  <div class="row">
+    <div class="col-sm-12">
+        <table id="dtHorizontalVerticalExample7" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+            <thead>
+            <tr class="amber lighten-4 text-center" >
+                <th style="font-weight:bold">Box</th>
+                <th style="font-weight:bold">Date</th>
+                <th style="font-weight:bold">Unit</th>
+                <th style="font-weight:bold">DriverStart</th>
+                <th style="font-weight:bold">DriverStop</th>
+                <th style="font-weight:bold">TimeStart</th>
+                <th style="font-weight:bold">TimeStop</th>
+                <th style="font-weight:bold">Hours</th>
+                <th style="font-weight:bold">LocStart</th>
+                <th style="font-weight:bold">LocStop</th>
+                <th style="font-weight:bold">Distance</th>
+                <th style="font-weight:bold">RadialDist</th>
+                <th style="font-weight:bold">RadialLoc</th>
+                <th style="font-weight:bold">OdomStart</th>
+                <th style="font-weight:bold">OdomStop</th>
+
+            </tr>
+            </thead>
+            <tbody>
+            {% for data in fdata %}
+                {% set a = data.Status  %}
+                {% set b = data.Rdist|int %}
+                {% if a==4 %}
+                    {% set atc1="green text-white font-weight-bold" %}
+                {% elif a==3 %}
+                    {% set atc1="amber font-weight-bold" %}
+                {% elif a==2 %}
+                    {% set atc1="purple text-white font-weight-bold" %}
+                {% elif a==1 %}
+                    {% set atc1="blue text-white font-weight-bold" %}
+                {% elif a == -1 %}
+                    {% set atc1="yellow font-weight-bold" %}
+                {% else %}
+                    {% set atc1="white font-weight-bold" %}
+                {% endif %}
+                {% if b > 100 %}
+                    {% set atc1="red font-white font-weight-bold" %}
+                {% endif %}
+
+            <tr >
+                <td align="center" ><input class="align-middle" type="checkbox" name="oder{{data.id}}" value="{{data.id}}"></td>
+                <td align="center" class="{{atc1}}">{{ data.Date }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Unit }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.DriverStart}}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.DriverEnd }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">&nbsp;&nbsp;{{ data.GPSin}}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">&nbsp;&nbsp;{{ data.GPSout }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Shift}}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Locationstart}}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Locationstop }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Distance}}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Rdist }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Rloc }}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Odomstart}}&nbsp;&nbsp;</td>
+                <td align="center" class="{{atc1}}">{{ data.Odomstop }}&nbsp;&nbsp;</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+No Trucklog Data Reported
+{% endif %}

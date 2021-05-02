@@ -25,36 +25,53 @@
   <table class="table table-striped table-bordered table-sm w-auto">
     <thead>
     <tr>
-      <td align="center" class="white red-text font-weight-bold">Status of Hauling</td>
+      <td align="center" class="white red-text font-weight-bold">Status of Hauling</td><td>&nbsp</td>
       <td align="center" >&nbsp;</td>
-      <td align="center" class="white red-text font-weight-bold">Status of Payments</td>
+      <td>&nbsp</td><td align="center" class="white red-text font-weight-bold">Status of Payments</td>
     </tr>
     </thead>
     <tbody>
     <tr>
-      <td align="left" class="white font-weight-bold">Work Not Started</td>
+      <td align="left" class="white font-weight-bold">Work Not Started</td><td align="center" class="white font-weight-bold">0</td>
       <td align="center" ><input class="align-middle" type="checkbox"></td>
-      <td align="right" class="white font-weight-bold">No Invoice & No Payments</td>
+      <td align="center" class="white font-weight-bold">0</td><td align="right" class="white font-weight-bold">No Invoice & No Payments</td>
     </tr>
     <tr>
-      <td align="left" class="blue text-white font-weight-bold">Container Pulled</td>
+      <td align="left" class="blue text-white font-weight-bold">Container Pulled</td><td align="center" class="blue text-white font-weight-bold">1</td>
       <td align="center" ><input class="align-middle" type="checkbox"></td>
-      <td align="right" class="blue text-white font-weight-bold">Invoice Created, not Recorded</td>
+      <td align="center" class="blue text-white font-weight-bold">1</td><td align="right" class="blue text-white font-weight-bold">Invoice Created, not Recorded</td>
     </tr>
     <tr>
-      <td align="left" class="purple text-white font-weight-bold">Container Returned</td>
+      <td align="left" class="purple text-white font-weight-bold">Container Returned</td><td align="center" class="purple text-white font-weight-bold">2</td>
       <td align="center" ><input class="align-middle" type="checkbox"></td>
-      <td align="right" class="purple text-white font-weight-bold">Invoice Recorded Not Emailed</td>
+      <td align="center" class="purple text-white font-weight-bold">2</td><td align="right" class="purple text-white font-weight-bold">Invoice Recorded Not Emailed</td>
+    </tr>
+
+    <tr>
+      <td align="left" class="amber font-weight-bold">Work Set to Complete</td><td align="center" class="amber font-weight-bold">3</td>
+      <td align="center" ><input class="align-middle" type="checkbox"></td>
+      <td align="center" class="amber font-weight-bold">3</td><td align="right" class="amber font-weight-bold">Invoice Recorded and Emailed</td>
+    </tr>
+
+    <tr>
+      <td align="left" class="green text-white font-weight-bold">Work Complete w/Pay</td><td align="center" class="green text-white font-weight-bold">4</td>
+      <td align="center" ><input class="align-middle" type="checkbox"></td>
+      <td align="center" class="green text-white font-weight-bold">4</td><td align="right" class="green text-white font-weight-bold">Payment Received</td>
     </tr>
     <tr>
-      <td align="left" class="amber font-weight-bold">Work Set to Complete</td>
+      <td align="left" class="grey text-white font-weight-bold"> Container Dropped</td><td align="center" class="grey text-white font-weight-bold">5</td>
       <td align="center" ><input class="align-middle" type="checkbox"></td>
-      <td align="right" class="amber font-weight-bold">Invoice Recorded and Emailed</td>
+      <td align="center" class="grey text-white font-weight-bold">5</td><td align="right" class="grey text-white font-weight-bold">Invoice Added to Summary Package</td>
     </tr>
     <tr>
-      <td align="left" class="green text-white font-weight-bold">Work Complete w/Pay</td>
+      <td align="left" class="orange font-weight-bold">Empty Returned for Drop</td><td align="center" class="orange font-weight-bold">6</td>
       <td align="center" ><input class="align-middle" type="checkbox"></td>
-      <td align="right" class="green text-white font-weight-bold">Payment Received</td>
+      <td align="center" class="orange font-weight-bold">6</td><td align="right" class="orange font-weight-bold">Invoice In Summary Package Emailed</td>
+    </tr>
+    <tr>
+      <td align="left" class="light-green text-white font-weight-bold">Work Complete w/Pay</td><td align="center" class="light-green text-white font-weight-bold">7</td>
+      <td align="center" ><input class="align-middle" type="checkbox"></td>
+      <td align="center" class="light-green text-white font-weight-bold">7</td><td align="right" class="light-green text-white font-weight-bold">Summary Pay Received</td>
     </tr>
     </tbody>
   </table>

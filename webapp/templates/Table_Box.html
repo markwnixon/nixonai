@@ -1,0 +1,16 @@
+{% set boxes = db_data[5] %}
+{% set boxchecks = db_data[6] %}
+{% set zbin = db_data[7] %}
+<div class="d-flex justify-content-around align-left">
+    <div class="p-2">
+        {% for box in boxes %}
+            <div class="custom-control custom-checkbox custom-control-inline">
+                <input type="checkbox" class="custom-control-input" id="inline{{box}}" {% if boxchecks[loop.index-1] == 'on' %} checked {% endif %} name="{{ box }}box" onchange="this.form.submit()">
+                <label class="custom-control-label" for="inline{{box}}">{{ box }}</label>
+            </div>
+         {% endfor %}
+    </div>
+</div>
+{% set sbin = zbin|join %}
+{% set sbin = 'Job' %}
+{{ sbin }} {{ zbin }}

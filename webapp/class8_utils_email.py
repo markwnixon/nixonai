@@ -19,6 +19,7 @@ from webapp.viewfuncs import stripper, hasinput
 
 import datetime
 today = datetime.datetime.today()
+today_str = today.strftime('%d %b %Y')
 
 def check_person(info):
     name = info[4]
@@ -81,7 +82,40 @@ def email_template(type, info):
 
     return emaildata
 
+def etemplate_suminv(eprof, sdat):
+    if eprof == 'suminv':
+        pdat = People.query.get(sdat.Pid)
+        if pdat is not None:
+            estatus, epod, eaccts = pdat.Email, pdat.Associate1, pdat.Associate2
+            estatus, epod, eaccts = stripper(estatus), stripper(epod), stripper(eaccts)
+        shipper = pdat.Company
+        etitle = f'Summary Invoice {sdat.Si} {today_str}'
+        ebody = f'Dear {shipper},\n\nAn invoice summary has been created for completed jobs.\n\nWe greatly appreciate your business.'
+        aname = sdat.Source
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        outname = f'Invoice_Summary_{sdat.Si}.pdf'
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vinvoice']
+        return emaildata
 
+    else:
+        etitle = 'Unknown'
+        ebody = 'Could not determine the type of package being emailed here.'
+
+    try:
+        pdat = People.query.get(sdat.Pid)
+        emailin1 = str(pdat.Email)
+    except:
+        emailin1 = 'Not Found'
+
+    emailin2 = ''
+    emailcc1 = em['info']
+    emailcc2 = em['serv']
+    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, '']
+
+    return emaildata
 
 def etemplate_truck(eprof,odat):
     cdata = companydata()
@@ -347,6 +381,18 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
         return emaildata
 
+    elif eprof == 'suminv':
+        etitle = f'Summary Invoice {odat.Si} {today_str}'
+        ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
+        aname = odat.Source
+        emailin1 = estatus
+        emailin2 = eaccts
+        emailcc1 = em['info']
+        emailcc2 = em['expo']
+        outname = f'Invoice_Summary_{odat.Si}_{today_str}.pdf'
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vinvoice']
+        return emaildata
+
     elif eprof == 'quote':
         etitle = cdata[2] + ' Quote: ' + jo
         ebody = 'Dear Customer:\n\nYour quote is attached. Please sign and return at your earliest convenience.\n\nWe look forward to doing business with you.\n\nSincerely,\n\n' + \
@@ -519,7 +565,7 @@ def email_app(pdat):
     
     #os.remove(newfile)
 
-def invoice_mimemail(docref, err):
+def invoice_mimemail(docref, err, lastpath):
     cdata = companydata()
     signature_block = cdata[2] + '<br>' + cdata[5] + '<br>' + cdata[6] + '<br>' + cdata[7]
     signature = f'<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><br><br><table><tr><td><div>'\
@@ -535,8 +581,7 @@ def invoice_mimemail(docref, err):
     ebody=request.values.get('edat1')
     newfile = request.values.get('edat6')
 
-    lastpath = 'vpackages'
-    if 'INV' in docref:
+    if 'INV' in docref or 'Inv' in docref:
         lastpath = 'vinvoice'
     elif 'Proof' in docref:
         lastpath = 'vproofs'

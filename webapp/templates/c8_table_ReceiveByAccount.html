@@ -1,0 +1,164 @@
+
+
+{% set co = holdvec[0] %}
+{% set mydata = holdvec[1] %}
+{% set accts = holdvec[2] %}
+{% set checks = holdvec[3] %}
+{% set amts = holdvec[6] %}
+{% set thisdate = holdvec[7] %}
+{% set thisref = holdvec[8] %}
+{% set depolist = holdvec[9] %}
+{% set thisdepo = holdvec[10] %}
+{% set autodis = holdvec[11] %}
+{% set invts = holdvec[12] %}
+{% set readygo = holdvec[13] %}
+{% set paymeth = holdvec[14] %}
+{% set paymeths = ['Cash', 'Check', 'Credit Card', 'Direct Deposit'] %}
+Receive Payments for Account: {{ co }}
+
+{% if readygo == 1 %}
+    {% set atc = 'btn btn-group-small btn-green my-small-btn' %}
+    {% set tooltip1 = "Record the Payments Against Selected Invoices" %}
+{% else %}
+    {% set atc = 'btn btn-group-small btn-green my-small-btn disabled' %}
+    {% set tooltip1 = "Disabled Until Invoices Previewed and Payment Method/Account Selected" %}
+{% endif %}
+
+<div class="row">
+    <div class="col-sm-1"></div>
+<div class="col-sm-10" align="center">
+<div class="d-sm-flex justify-content-between align-items-center small">
+    <div class="p-0">
+        <select class="mdb-select md-form" name="getaccount" onchange="this.form.submit()">
+            <option value="" disabled selected>Choose Account</option>
+            {% for acct in accts %}
+                <option {% if acct == co %} selected {% endif %} value='{{acct}}'>{{acct}}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="p-0">
+        <button type="submit" class="btn btn-group-small btn-grey my-small-btn" name="checkall"
+        data-toggle="tooltip" title="Check all the shown invoices">CheckAll</button>
+    </div>
+    <div class="p-0">
+        <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="previewpay"
+        data-toggle="tooltip" title="Preview Invoice and Payment Totals">Preview</button>
+    </div>
+    <div class="p-0">
+        <button type="submit" class="{{atc}}" name="recordpayment"
+        data-toggle="tooltip" title={{ tooltip1 }}>Record</button>
+    </div>
+    <div class="p-0">
+        <button type="submit" class="btn btn-group-small btn-unique my-small-btn" name="Return"
+        data-toggle="tooltip" title="Return to Truck Tables without Action">Cancel</button>
+    </div>
+    <div class="p-0">
+        <select class="mdb-select md-form" name="paymethod" onchange="this.form.submit()">
+            <option value="" disabled selected>Choose Pay Method</option>
+            {% for meth in paymeths %}
+                <option {% if paymeth == meth %} selected {% endif %} value='{{meth}}'>{{meth}}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="p-0">
+        <select class="mdb-select md-form" name="acctfordeposit">
+            <option value="" disabled selected>Choose Deposit Account</option>
+            {% for depo in depolist %}
+                <option {% if depo == thisdepo %} selected {% endif %} value='{{depo}}'>{{depo}}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="p-0">
+        <input class="align-middle" {% if autodis == 1 %} checked {% endif %} type="checkbox" name="autodisbox" value="1">
+        Discount Balances to Zero
+    </div>
+
+</div>
+</div>
+</div>
+
+<div class="row">
+    <div class="col-sm-1"></div>
+<div class="col-sm-10" align="center">
+<div class="d-sm-flex justify-content-between align-items-center small">
+    <div class="p-0">
+        Date Recieved:
+        <input class="form-control-inline form-control-sm" type="date" value="{{ thisdate }}" name="thisdate">
+    </div>
+    <div class="p-0">
+        Reference Number:
+        <input class="form-control-inline form-control-sm" type="text" value="{{ thisref }}" name="thisref">
+    </div>
+    <div class="p-0">
+        Selected Invoices Total: <b>${{ holdvec[4] }}</b>
+    </div>
+    <div class="p-0">
+        Payments Total: <b>${{ holdvec[5] }}</b>
+    </div>
+
+</div>
+</div>
+</div>
+
+<br>
+  <div class="row">
+    <div class="col-sm-12">
+        <table id="dtH6" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+            <thead>
+            <tr class="amber lighten-4 text-center" >
+                <th style="font-weight:bold">Job Order</th>
+                <th style="font-weight:bold">Bill To Company</th>
+                <th style="font-weight:bold">Order Number</th>
+                <th style="font-weight:bold">Delivery Date</th>
+                <th style="font-weight:bold">Booking No.</th>
+                <th style="font-weight:bold">Container No.</th>
+                <th style="font-weight:bold">Container Type</th>
+                <th style="font-weight:bold">Chk</th>
+                <th style="font-weight:bold">Invoice Amount</th>
+                <th style="font-weight:bold">SumInv</th>
+                <th style="font-weight:bold">Amount Received</th>
+
+            </tr>
+            </thead>
+            <tbody>
+            {% set atc1 = "align-middle font-weight-bold" %}
+            {% for data in mydata %}
+                {% set jx = loop.index - 1 %}
+
+
+
+                <tr >
+                    {% if data %}
+                        {% if data.Shipper|length > 20 %}
+                            {% set shp = data.Shipper[0:20] %}
+                        {% else %}
+                            {% set shp = data.Shipper %}
+                        {% endif %}
+                    {% endif %}
+                    {% if amts[jx] == '0.00' %}
+                        {% set amthere = data.Amount %}
+                    {% else %}
+                        {% set amthere = amts[jx] %}
+                    {% endif %}
+                    <td align="center" class="{{atc1}}">{{ data.Jo }}</td>
+                    <td align="center" class="{{atc1}}">{{ shp }}</td>
+                    <td align="center" class="{{atc1}}">{{ data.Order }}</td>
+                    <td align="center" class="{{atc1}}">{{ data.Date }}</td>
+                    <td align="center" class="{{atc1}}">{{ data.Booking }}</td>
+                    <td align="center" class="{{atc1}}">{{ data.Container }}</td>
+                    <td align="center" class="{{atc1}}">{{ data.Type }}</td>
+                    <td align="center" ><input class="align-bottom" {% if checks[jx]==1 %} checked {% endif %} type="checkbox" name="oder{{data.id}}" value="{{data.id}}"></td>
+                    <td align="center"  class="{{atc1}}">{{ invts[jx] }}</td>
+                    <td align="center"  class="{{atc1}}">{{ data.Label }}</td>
+
+                    <td align="center" class="{{atc1}}"><input class="form-control form-control-sm" type="text" value="{{ amthere }}" name="amount{{ data.id }}"></td>
+                </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+

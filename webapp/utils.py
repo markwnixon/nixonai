@@ -185,7 +185,7 @@ def nononef(input):
     return output
 
 def erud(err):
-    print('err is for function:', err)
+    #print('err is for function:', err)
     errup = ''
     for e in err:
         if len(e) > 0:
@@ -261,7 +261,7 @@ def monvals(iback):
             mid_month = 12
             mid_yer = mid_yer - 1
         monnam.append(f'{monlist[mid_month]} {str(mid_yer)}')
-        print(date(yer, mon, 1))
+        #print(date(yer, mon, 1))
         dfr.append(date(yer, mon, 1))
         mon = mon - 1
 

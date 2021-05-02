@@ -16,6 +16,7 @@
             <div class="col-sm-4">
                 {% if (viewport[2] == 'show_doc_left') or (viewport[2] == 'upload_doc_left') %}
                     {% include 'the_tables_hidden.html' %}
+
                 {% else %}
                     {% include 'the_tables.html' %}
                 {% endif %}
@@ -25,9 +26,15 @@
                 {% elif viewport[2] == 'show_doc_left' %}
                     <div class="row"><div class="col-sm-12" align="right">
                             Looking for: {{viewport[3]}}<br>
-                            <embed src="{{viewport[3]}}" width="575px" height="750px"/>
+                            <embed src="{{viewport[3]}}" width="750px" height="900px"/>
                     </div></div>
                 {% endif %}
+            </div>
+
+        {% elif viewport[0] == 'replace panel left' %}
+            <div class="col-sm-{{leftsize}}">
+                {% set viewer = 'c8_table_' + taskon + '.html' %}
+                {% include viewer %}
             </div>
 
         {% else %}
@@ -42,7 +49,7 @@
                 {% if viewport[0] == 'upload_doc_left' %}
                     {% include 'uploaddocs.html' %}
                 {% elif viewport[0] == 'show_doc_left' %}
-                    <div class="row"><div class="col-sm-12" align="right">
+                    <div class="row"><div class="col-sm-12" align="center">
                             Looking for: {{viewport[2]}}<br>
                             <embed src="{{viewport[2]}}" width="700px" height="850px"/>
                     </div></div>

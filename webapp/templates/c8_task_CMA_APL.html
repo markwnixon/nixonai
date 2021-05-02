@@ -1,0 +1,30 @@
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-around align-items-center">
+                <div class="p-0">Viewing {{viewport[2]}}</div>
+                <div class="p-0">
+                    <button type="submit" class="btn btn-md btn-primary" name="Return">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12" align="center">
+                {% set c1 = holdvec[1] %}
+                    {% for c in c1 %}
+                        <div class="row">
+                             {{ c }}<br>
+                        </div>
+                    {% endfor %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+<input type = "hidden" name="uploadtype" id="uploadtype" value="source">
+<input type = "hidden" name="username" id="username" value="{{ username }}">
+<input type = "hidden" name="username" id="username" value="{{ username }}">

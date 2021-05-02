@@ -1,0 +1,92 @@
+
+{% set update = 'invoUpdate'%}
+{% set logonly = 'logInvo'%}
+{% set etype = 'Invoice' %}
+{% set jo = holdvec[0] %}
+{% set invodate = holdvec[1] %}
+{% set sdata = holdvec[2] %}
+{% set invdata = holdvec[3] %}
+{% set odata = holdvec[5] %}
+
+<br>
+<div class="card">
+
+    <div class="card-header">
+        Edit Invoice Summary {{ sdata[0].Si }}<br>
+        <button type="submit" class="btn btn-elegant btn-sm" name="sireform">Reform<br>All</button>
+        <button type="submit" class="btn btn-danger btn-sm" name="siremove">Remove<br>Selected</button>
+        <button type="submit" class="btn btn-elegant btn-sm" name="siupdate">Update<br>Notes</button>
+        <button type="submit" class="btn btn-elegant btn-sm" name="siadd">Add<br>Selected</button>
+        <button class="btn  btn-blue btn-sm" type ="submit" name="Return">Return<br>to Tables</button>
+        <button type="submit" class="btn btn-green btn-sm" name="siemail">Email<br>Summary</button>
+    </div>
+
+<div class="card-body">
+{% set atc1="white font-weight-bold text-center" %}
+{% set atc2="white" %}
+<table>
+        <thead>
+        <tr>
+            <th class="{{atc1}}">Select</th>
+            <th class="{{atc1}}">JO</th>
+            <th class="{{atc1}}">Release</th>
+            <th class="{{atc1}}">Container</th>
+            <th class="{{atc1}}">Type</th>
+            <th class="{{atc1}}">Amt</th>
+            <th class="{{atc1}}">Description</th>
+        </tr>
+        </thead>
+        <tbody>
+
+{% for data in sdata %}
+    {% set taid = 'ta' + data.id|string %}
+            <tr>
+                <td align="center" ><input class="align-middle" type="checkbox" name="box{{data.id}}" "></td>
+                <td class="{{atc1}}">{{ data.Jo }}</td>
+                <td class="{{atc1}}">{{ data.Release }}</td>
+                <td class="{{atc1}}">{{ data.Container }}</td>
+                <td class="{{atc1}}">{{ data.Type }}</td>
+                <td class="{{atc1}}">{{ data.Amount }}</td>
+                <td><textarea class="{{atc2}}" type="text" name={{ taid }} rows="2" cols="40">{{ data.Description }}</textarea></td>
+            </tr>
+{% endfor %}
+<tr><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+<tr><td colspan="7" align="center" class="{{atc2}}">OTHER INVOICES FROM THIS SHIPPER THAT HAVE BEEN RECORDED AND MAY BE ADDED TO THIS SUMMARY</td></tr>
+<tr><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+{% for data in odata %}
+            <tr >
+                <td align="center" ><input class="align-middle" type="checkbox" name="obox{{data.id}}" "></td>
+                <td class="{{atc1}}">{{ data.Jo }}</td>
+                <td class="{{atc1}}">{{ data.Booking}}</td>
+                <td class="{{atc1}}">{{ data.Container }}</td>
+                <td class="{{atc1}}">{{ data.Type }}</td>
+                <td class="{{atc1}}">{{ data.InvoTotal }}</td>
+                <td class="{{atc1}}">{{ data.Description }}</td>
+            </tr>
+{% endfor %}
+
+
+
+
+
+    </table>
+<br>
+
+        <button type="submit" class="btn btn-elegant btn-sm" name="reform">Reform<br>All</button>
+        <button class="btn  btn-blue btn-sm" type ="submit" name="Return">Return<br>to Tables</button>
+        <button type="submit" class="btn btn-green btn-sm" name="emailInvo">Email<br>Summary</button>
+
+<input type = "hidden" name="inco" value="{{inco}}">
+<input type = "hidden" name="invo" value="{{invo}}">
+<input type = "hidden" name="invooder" value="{{invooder}}">
+
+</div>
+</div>
+
+
+<input type = "hidden" name ="invooder" value= {{invooder}}>
+<input type = "hidden" name ="invo" value= {{invo}}>
+<input type = "hidden" name ="odor" value= {{odor}}>
+<input type = "hidden" name ="cache" value= {{cache}}>
+sinow is {{ sdata[0].Si }}
+<input type = "hidden" name ="sinow" value= {{ sdata[0].Si }}>

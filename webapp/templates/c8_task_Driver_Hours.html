@@ -1,0 +1,38 @@
+{% set alltdata = holdvec[0] %}
+{% set allvdata = holdvec[1] %}
+{% set fdata = holdvec[2] %}
+
+<br>
+<div class="card">
+    <div class="card-header">
+        Assign Driver(s) to Trucks by Date
+        <button type="submit" class="btn btn-sm btn-green" name="LboxUpdate">Update</button>
+        <button type="submit" class="btn btn-sm btn-elegant" name="Return">Cancel</button>
+    </div>
+    <div class="card-body">
+
+            <div class="d-sm-flex justify-content-center">
+                <div class="p-0">
+                    <div class="input-group-text">From Date</div><input class="form-control" type="date" name="dstart" value="{{holdvec[12]}}" onchange="this.form.submit()">
+                </div>
+                <div class="p-0">
+                   <div class="input-group-text">To Date</div><input class="form-control" type="date" name="dfinish" value="{{holdvec[13]}}" onchange="this.form.submit()">
+                </div>
+            </div>
+<br>
+{% set dalldata = holdvec[3] %}
+            <div class="d-sm-flex justify-content-center">
+                        <div class="p-0">
+                        {% for drv in alltdata %}
+                            {% set ddata = dalldata[loop.index-1] %}
+                            {% set  thisdriver = ddata[0] %}
+                            {% set  hours = ddata[1] %}
+                            {%  set cdata = ddata[2] %}
+                                <b>{{ thisdriver }}</b> &nbsp; &nbsp; <b>{{ hours }} hours</b>
+                                <large>{{ cdata | safe }}</large>
+                                <br>
+                        {% endfor %}
+                        </div>
+            </div>
+    </div>
+</div>

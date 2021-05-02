@@ -48,7 +48,7 @@
 table tr td{
    font-size: 12px;
    height: 12px;
-   padding:1px !important;
+   padding:3px !important;
 }
 
 .table th, .table td {
@@ -255,9 +255,20 @@ $('.dataTables_length').addClass('bs-select');
 
 $(document).ready(function () {
 $('#dtTrucking').DataTable({
-"order": [[9, "desc" ]],
+"order": [[12, "desc" ]],
 "scrollX": true,
-"scrollY": 400,
+"scrollY": 500,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtSummaries').DataTable({
+"order": [[1, "desc" ]],
+"scrollX": true,
+"scrollY": 500,
 "stateSave": true,
 "paging": false // false to disable pagination (or any other option)
 });

@@ -1,0 +1,92 @@
+{% set bol = holdvec[1] %}
+{% set c1 = holdvec[2] %}
+{% set c2 = holdvec[3] %}
+{% set c3 = holdvec[4] %}
+{% set c4 = holdvec[5] %}
+{% set c5 = holdvec[6] %}
+
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-around align-items-center">
+                <div class="p-0">Viewing Unpulled Imports and Exports </div>
+                <div class="p-0">
+                    {% if bol is not none %}
+                        <button type="submit" class="btn btn-md btn-primary" name="noBOL">Remove BOL</button>
+                    {% else %}
+                        <button type="submit" class="btn btn-md btn-primary" name="BOL">Show BOL</button>
+                    {% endif %}
+                    <button type="submit" class="btn btn-md btn-primary" name="Return">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12" align="center">
+                    <b>Imports</b>
+                </div>
+            </div>
+
+            {% if bol is none %}
+                <div class="row">
+                    <div class="col-sm-6" align="left">
+                        {% for c in c1 %}
+                            {{ c }}<br>
+                        {% endfor %}
+                    </div>
+                    <div class="col-sm-6" align="left">
+                        {% for cx in c2 %}
+                            {{ cx }}<br>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            {% else %}
+
+                <div class="row">
+                    <div class="col-sm-6" align="left">
+                        {% for c in c1 %}
+                            {{ c }}<br>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-sm-6" align="left">
+                        {% for cx in c3 %}
+                            {{ cx }} &nbsp; &nbsp; {{ c2[loop.index-1] }}<br>
+                        {% endfor %}
+                    </div>
+
+                </div>
+
+            {% endif %}
+
+
+
+            <div class="row">
+                <div class="col-sm-12" align="center">
+                    <b>Exports</b>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-6" align="left">
+                    {% for c in c4 %}
+                        {{ c }}<br>
+                    {% endfor %}
+                </div>
+                <div class="col-sm-6" align="left">
+                    {% for c in c5 %}
+                        {{ c }}<br>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+<input type = "hidden" name="uploadtype" id="uploadtype" value="source">
+<input type = "hidden" name="username" id="username" value="{{ username }}">
+<input type = "hidden" name="username" id="username" value="{{ username }}">

@@ -10,7 +10,7 @@ from webapp.viewfuncs import parseline, parselinenoupper
 from webapp.CCC_system_setup import addpath, bankdata, scac
 from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.class8_utils_email import emaildata_update
-from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
+from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup
 
 from webapp.utils import *
 import subprocess
@@ -147,6 +147,12 @@ def get_doclist(odat, dockind):
             if thisdoc == 'Proofs':
                 fa = addpath(f'static/{scac}/data/vorders/{odat.Proof}')
                 print('Looking for proof file:', fa)
+                if os.path.isfile(fa):
+                    packitems.append(fa)
+                    fexist[jx] = 1
+            if thisdoc == 'PaidInvoice':
+                fa = addpath(f'static/{scac}/data/vinvoice/{odat.PaidInvoice}')
+                print('Looking for paid invoice file:', fa)
                 if os.path.isfile(fa):
                     packitems.append(fa)
                     fexist[jx] = 1

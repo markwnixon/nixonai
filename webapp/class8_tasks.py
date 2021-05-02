@@ -1,18 +1,23 @@
 from webapp import db
-from webapp.models import DriverAssign, Gledger, Vehicles, Invoices, JO, Income, Orders, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns
+from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
-from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup
+from webapp.class8_dicts import Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup
 from webapp.class8_utils_manifest import makemanifest
-from webapp.class8_tasks_money import MakeInvoice_task
+from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task
 from webapp.class8_utils_package import makepackage
 from webapp.class8_utils_email import emaildata_update
-from webapp.class8_utils_invoice import make_invo_doc
+from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment
+from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
+from webapp.class8_tasks_money import get_all_sids
+from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, Truck_Logs_task, CMA_APL_task
+import os
 
 from sqlalchemy import inspect
 import datetime
+from datetime import timedelta
 import os
 import subprocess
 #from func_cal import calmodalupdate
@@ -26,19 +31,19 @@ from webapp.viewfuncs import newjo
 import uuid
 
 def get_drop(loadname):
-    print(f'The LOADNAME is:{loadname}')
+    #print(f'The LOADNAME is:{loadname}')
     dropdat = Drops.query.filter(Drops.Entity == loadname).first()
     if dropdat is not None:
-        print('dropdat',dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
+        #print('dropdat',dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
         dline = f'{dropdat.Entity}\n{dropdat.Addr1}\n{dropdat.Addr2}\n{dropdat.Phone}\n{dropdat.Email}'
         dline = dline.replace('None','')
         return dline
     else:
-        print(f'the lenght of loadname is...{len(loadname)}')
+        #print(f'the lenght of loadname is...{len(loadname)}')
         if len(loadname) == 3:
             dropdat = Drops.query.filter(Drops.Entity.contains(loadname)).first()
             if dropdat is not None:
-                print('dropdat', dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
+                #print('dropdat', dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
                 dline = f'{dropdat.Entity}\n{dropdat.Addr1}\n{dropdat.Addr2}\n{dropdat.Phone}\n{dropdat.Email}'
                 dline = dline.replace('None', '')
                 return dline
@@ -51,53 +56,54 @@ def get_checked(thistable, data1id):
     for id in data1id:
         name = thistable+str(id)
         ischeck = request.values.get(name)
-        print(name,ischeck)
+        #print(name,ischeck)
         if ischeck == 'on':
             numchecked = numchecked + 1
             avec.append(int(id))
 
-    print(numchecked, avec)
+    #print(numchecked, avec)
     return numchecked, avec
 
 def populate(tables_on,tabletitle,tfilters,jscripts):
     # print(int(filter(check.isdigit, check)))
     checked_data = []
     table_data = []
+    labpassvec = []
     keydata = {}
 
-    # color_selectors = ['Istat', 'Status']
     for jx, tableget in enumerate(tables_on):
         tabletitle.append(tableget)
         table_setup = eval(f'{tableget}_setup')
-        print(table_setup)
-        db_data = get_dbdata(table_setup, tfilters)
+        #print(table_setup)
+        db_data, labpass = get_dbdata(table_setup, tfilters)
         table_data.append(db_data)
+        labpassvec.append(labpass)
 
         #Section to determine what items have been checked
         numchecked, avec = get_checked(tableget, db_data[1])
-        print('returning checks numc, avec=',numchecked, avec)
+        #print('returning checks numc, avec=',numchecked, avec)
         checked_data.append([tableget,numchecked,avec])
-        print('after',checked_data)
+        #print('after',checked_data)
 
         jscripts.append(eval(f"{tableget}_setup['jscript']"))
 
         # For tables that are on get side data required for tasks:
         side_data = eval(f"{tableget}_setup['side data']")
-        print('class8_tasks.py 86 Tablemaker() For tables on get this side data:',side_data)
+        #print('class8_tasks.py 86 Tablemaker() For tables on get this side data:',side_data)
         keydata = {}
         for side in side_data:
             for key, values in side.items():
-                print('')
-                print('****************************')
-                print(f'key:{key}, values:{values}')
+                #print('')
+                #print('****************************')
+                #print(f'key:{key}, values:{values}')
                 select_value = values[2]
                 if isinstance(select_value, str):
                     if 'get_' in select_value:
                         find = select_value.replace('get_','')
                         select_value = request.values.get(find)
-                        print('class8_tasks.py 98 Tablemaker() select_value:',select_value)
+                        #print('class8_tasks.py 98 Tablemaker() select_value:',select_value)
                 if select_value is not None:
-                    print(f'Key:{key} Values{values} tableget{tableget}')
+                    #print(f'Key:{key} Values{values} tableget{tableget}')
                     if isinstance(select_value, str):
                         dbstats = eval(
                         f"{values[0]}.query.filter({values[0]}.{values[1]}=='{select_value}').order_by({values[0]}.{values[3]}).all()")
@@ -108,15 +114,27 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                         dblist = []
                         for dbstat in dbstats:
                             nextvalue = eval(f'dbstat.{values[3]}')
-                            print(f'nextvalue:{nextvalue}')
+                            #print(f'nextvalue:{nextvalue}')
                             if nextvalue is not None:  nextvalue = nextvalue.strip()
                             if nextvalue not in dblist:
                                 dblist.append(nextvalue)
                         keydata.update({key: dblist})
-                        print(f'keydata is {keydata[key]}')
-    return tabletitle, table_data, checked_data, jscripts, keydata
+                        #print(f'keydata is {keydata[key]}')
+    return tabletitle, table_data, checked_data, jscripts, keydata, labpassvec
 
-def reset_state(task_boxes, genre_tables):
+def reset_state_soft(task_boxes):
+    tboxes={}
+    # Default time filter on entry into table is last 60 days:
+    #tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+    jscripts = ['dtTrucking']
+    taskon, task_iter, task_focus = None, None, None
+    viewport = ['tables'] + ['0'] * 5
+    for box in task_boxes:
+        for key, value in box.items():
+            tboxes[key] = key
+    return jscripts, taskon, task_iter, task_focus, tboxes, viewport
+
+def reset_state_hard(task_boxes, genre_tables):
     tboxes={}
     genre_tables_on = ['off'] * len(genre_tables)
     genre_tables_on[0] = 'on'
@@ -143,23 +161,46 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         rstring = f"{taskon}_task({task_focus}_setup, task_iter)"
         holdvec, entrydata, err, completed = eval(rstring)
 
+    elif tasktype == 'No_Display':
+        holdvec, entrydata, tablesetup = [], [], []
+        rstring = f"{taskon}_task(err)"
+        completed, err = eval(rstring)
+
+    elif tasktype == 'No_Selection_Plus_Display':
+        holdvec, entrydata, tablesetup = [0,0], [], []
+        rstring = f"{taskon}_task(err, holdvec, task_iter)"
+        completed, err, holdvec = eval(rstring)
+        viewport[3] = 'Show Text'
+        print(holdvec[0])
+        print(holdvec[1])
+
+    elif tasktype == 'No_Selection_Plus_Display_Plus_Left_Panel_Change':
+        holdvec, entrydata, tablesetup = ['']*30, [], []
+        rstring = f"{taskon}_task(err, holdvec, task_iter)"
+        completed, err, holdvec = eval(rstring)
+        viewport[0] = 'replace panel left'
+        viewport[2] = taskon
+        viewport[3] = 'Show Text'
+        print(f'taskon is {taskon}')
+
+
     elif tasktype == 'Single_Item_Selection':
         holdvec, entrydata = [], []
         # See if only one box is checked and if so what table it is from
         nc = sum(cks[1] for cks in checked_data)
         tids = [cks[2] for cks in checked_data if cks[2] != []]
         tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-        print('nc=', nc)
-        print(tids)
-        print(tabs)
+        #print('nc=', nc)
+        #print(tids)
+        #print(tabs)
         if nc == 1:
             thistable = tabs[0]
             sid = tids[0][0]
-            print('made it here with thistable sid taskiter', thistable, sid, task_iter)
+            #print('made it here with thistable sid taskiter', thistable, sid, task_iter)
             tablesetup = eval(f'{thistable}_setup')
             rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
             holdvec, entrydata, err, viewport, completed = eval(rstring)
-            print('returned with:', viewport, completed)
+            #print('returned with:', viewport, completed)
         elif nc > 1:
             err.append('Too many selections made for this task')
             completed = True
@@ -169,8 +210,8 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             completed = True
             tablesetup = None
 
-    elif tasktype == 'Two_Item_Selection':
-        holdvec, entrydata = [], []
+    elif tasktype == 'One_Table_Multi_Item_Selection':
+        holdvec, entrydata, err = [], [], []
         # See if only one box is checked and if so what table it is from
         nc = sum(cks[1] for cks in checked_data)
         tids = [cks[2] for cks in checked_data if cks[2] != []]
@@ -178,6 +219,26 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         print('nc=', nc)
         print(tids)
         print(tabs)
+        if nc > 0:
+            thistable = tabs[0]
+            sids = tids[0]
+            rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sids)"
+            holdvec, entrydata, err, viewport, completed = eval(rstring)
+            tablesetup = None
+        else:
+            err.append('Need to select item(s) for task')
+            completed = True
+            tablesetup = None
+
+    elif tasktype == 'Two_Item_Selection':
+        holdvec, entrydata = [], []
+        # See if only one box is checked and if so what table it is from
+        nc = sum(cks[1] for cks in checked_data)
+        tids = [cks[2] for cks in checked_data if cks[2] != []]
+        tabs = [cks[0] for cks in checked_data if cks[1] != 0]
+        #print('nc=', nc)
+        #print(tids)
+        #print(tabs)
         if nc == 2:
             thistable1 = tabs[0]
             try:
@@ -205,7 +266,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             tablesetup2 = eval(f'{thistable2}_setup')
             rstring = f"{taskon}_task(genre, task_iter, tablesetup, tablesetup2, task_focus, checked_data, sid1, sid2)"
             holdvec, entrydata, err, viewport, completed = eval(rstring)
-            print('returned with:', viewport, completed)
+            #print('returned with:', viewport, completed)
 
     elif tasktype == 'All_Item_Selection':
         holdvec, entrydata, err = [], [], []
@@ -213,9 +274,9 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         nc = sum(cks[1] for cks in checked_data)
         tids = [cks[2] for cks in checked_data if cks[2] != []]
         tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-        print('nc=', nc)
-        print(tids)
-        print(tabs)
+        #print('nc=', nc)
+        #print(tids)
+        #print(tabs)
         if nc > 0:
             rstring = f"{taskon}_task(genre, task_focus, task_iter, nc, tids, tabs)"
             holdvec, entrydata, err, viewport, completed = eval(rstring)
@@ -225,14 +286,14 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             err.append('Need to select item(s) to undo')
             completed = True
             tablesetup = None
-
+    print(f'Returning with viewport = {viewport}')
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
 
 def Table_maker(genre):
     username = session['username'].capitalize()
-
     # Gather information about the tables inside the genre
+    print(f'The genre is {genre}')
     genre_tables = eval(f"{genre}_genre['genre_tables']")
     quick_buttons = eval(f"{genre}_genre['quick_buttons']")
     table_filters = eval(f"{genre}_genre['table_filters']")
@@ -248,7 +309,7 @@ def Table_maker(genre):
     returnhit = None
 
     if request.method == 'POST':
-
+        print('Method is POST')
         # See if a task is active and ongoing
         tasktype = nononestr(request.values.get('tasktype'))
         taskon = nononestr(request.values.get('taskon'))
@@ -261,7 +322,12 @@ def Table_maker(genre):
         returnhit = request.values.get('Return')
         if returnhit is not None:
             # Asked to reset, so reset values as if not a Post (except the table filters which will be kept)
-            genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
+            jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
+
+            ###############Testing this###########
+            genre_tables_on = checked_tables(genre_tables)
+            tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
+
             for filter in table_filters:
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
         else:
@@ -270,6 +336,14 @@ def Table_maker(genre):
             # Get data only for tables that have been checked on
             genre_tables_on = checked_tables(genre_tables)
             tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
+            print(f'The tables on: {tables_on}')
+            session['table_defaults'] = tables_on
+            #Check to see if a table has been turned off.  If so place it back to default status
+            for tab in session['table_removed']:
+                if tab not in session['table_defaults']: session['table_removed'].remove(tab)
+            #Get the table viewing parameters that need to be set for the talbles that are on
+
+
 
             # Only check the launch boxes, filters, and task selections if no task is running
             if not hasinput(taskon):
@@ -290,17 +364,26 @@ def Table_maker(genre):
                             tasktype = tasklist[0]
                             taskon, task_focus = tasklist[1:]
 
-                print('The task is:', taskon)
-                print('The task focus is:', task_focus)
-                print('The task_iter is:', task_iter)
+                #print('The task is:', taskon)
+                #print('The task focus is:', task_focus)
+                #print('The task_iter is:', task_iter)
 
             # See if a table filter has been selected, this can take place even during a task
             for filter in table_filters:
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
-            print('class8_tasks.py 110 Tablemaker() The filter settings are:',tfilters)
 
-            # Reset colors for color filter in primary table:
-            # eval(f"{genre}_genre['table_filters']['Color filters")
+            #Reset Pay and Haul Filters if Show All selected (no filter applied)
+            if tfilters['Pay Filter'] == 'Show All': tfilters['Pay Filter'] = None
+            if tfilters['Haul Filter'] == 'Show All': tfilters['Haul Filter'] = None
+
+            if tfilters['Color Filter'] == 'Haul' or tfilters['Color Filter'] == 'Invoice':
+                #Provide filter consistency: if an invoice filter is selected make sure invoice colors are shown:
+                if tfilters['Pay Filter'] is not None and tfilters['Color Filter'] == 'Haul': tfilters['Color Filter'] = 'Both'
+                #Provide filter consistency: if an haul filter is selected make sure haul colors are shown:
+                if tfilters['Haul Filter'] is not None and tfilters['Color Filter'] == 'Invoice': tfilters['Color Filter'] = 'Both'
+                # Reset colors for color filter in primary table:
+                # eval(f"{genre}_genre['table_filters']['Color filters")
+
             if tfilters['Color Filter'] == 'Haul':
                 Orders_setup['colorfilter'] = ['Hstat']
             elif tfilters['Color Filter'] == 'Invoice':
@@ -308,11 +391,17 @@ def Table_maker(genre):
             elif tfilters['Color Filter'] == 'Both':
                 Orders_setup['colorfilter'] = ['Hstat', 'Istat']
 
+
+
     #First time thru (not a Post)
     else:
+        print('Method is NOT POST')
         genre_tables_on = ['off'] * len(genre_tables)
         genre_tables_on[0] = 'on'
-        tables_on = ['Orders']
+        tables_on = [eval(f"{genre}_genre['table']")]
+        #These two session variables control the table defaults. Each time table turned on it sets default
+        session['table_defaults'] = tables_on
+        session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
         tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
         jscripts = ['dtTrucking']
@@ -326,19 +415,19 @@ def Table_maker(genre):
     #print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
     #print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
     #print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
-    print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
-    print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
-    print('class8_tasks.py 138 Tablemaker() haul types', genre_data['haul_types'])
+    #print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
+    #print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
+    #print('class8_tasks.py 138 Tablemaker() haul types', genre_data['haul_types'])
 
     # Populate the tables that are on with data
-    tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on,tabletitle,tfilters,jscripts)
+    tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
     if hasvalue(taskon):
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
-            genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(task_boxes, genre_tables)
-            tabletitle, table_data, checked_data, jscripts, keydata = populate(tables_on, tabletitle, tfilters, jscripts)
+            jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
+            tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
 
         #for e in err:
@@ -346,8 +435,7 @@ def Table_maker(genre):
                 #taskon = None
                 #task_iter = 0
         if request.values.get('Cancel') is not None:
-            genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state(
-                task_boxes, genre_tables)
+            jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
             err = ['Entry canceled']
             taskon = None
             task_iter = 0
@@ -359,63 +447,130 @@ def Table_maker(genre):
         task_iter = 0
         tasktype = ''
         holdvec = [''] * 30
+        print(f'labpassvec is {labpassvec}')
         entrydata = []
         err = ['All is well']
         tablesetup = None
 
-    print(jscripts, holdvec)
+    #print(jscripts, holdvec)
     err = erud(err)
     if returnhit is not None:
         checked_data = [0,'0',['0']]
 
+    if len(holdvec)<50: holdvec = holdvec + ['']*(50-len(holdvec))
+    checkcol = [eval(f"{ix}_setup['checklocation']") for ix in tables_on]
+    holdvec[28] = checkcol
+    holdvec[29] = labpassvec
+    holdvec[27] = f'/static/{scac}/data/v{genre.lower()}s/'
+    print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
+    print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
+
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
 
-
-
+def tswap(tname, tflip, highfilter_value):
+    tflip1 = tflip[0]
+    tflip2 = tflip[1]
+    labpass = tflip1[0]
+    reverse = request.values.get(f'{tname}{tflip1[0]}')
+    if reverse is not None:
+        highfilter_value = tflip1[1]
+        labpass = tflip2[0]
+    nextreverse = request.values.get(f'{tname}{tflip2[0]}')
+    if nextreverse is not None:
+        highfilter_value = tflip2[1]
+        labpass = tflip1[0]
+    return labpass, highfilter_value
 
 def get_dbdata(table_setup, tfilters):
     today = datetime.date.today()
+    thisyear = today.year
+    lastyear = thisyear - 1
+    #print(thisyear,lastyear)
     query_adds = []
     table = table_setup['table']
-    print(table)
+    tname = table_setup['name']
+    #print(table)
     highfilter = table_setup['filter']
-    print(highfilter)
+    #print(highfilter)
     highfilter_value = table_setup['filterval']
     entrydata = table_setup['entry data']
-    print(entrydata)
+    filteron = table_setup['filteron']
+    #print(entrydata)
     color_selector = table_setup['colorfilter']
-    print(color_selector)
+    #print(f' For table {table} the color selector is {color_selector}')
+    labpass = None
+
+
+    boxchecks = []
+    try:
+        simpler = table_setup['simplify']
+        boxlist = []
+    except:
+        simpler = []
+
+    print(f"Critical Point {table} {session['table_removed']}")
+    if table not in session['table_removed']:
+        #Do this if needing to use default values
+        if simpler != []:
+            boxchecks = ['off'] * len(simpler)
+            boxchecks[0] = 'on'
+            session['table_removed'].append(table)
+            boxlist.append(simpler[0])
+        else: boxchecks, boxlist = [], []
+    else:
+        for box in simpler:
+            thischeck = request.values.get(f'{box}box')
+            boxchecks.append(thischeck)
+            if thischeck == 'on': boxlist.append(box)
 
     # Apply built-in table filter:
     if highfilter is not None:
-        query_adds.append(f"{table}.{highfilter} == '{highfilter_value}'")
+        logic = table_setup['filter logic']
+        tflip = table_setup['button flip']
+        if tflip is not None: labpass, highfilter_value = tswap(tname, tflip, highfilter_value)
+        query_adds.append(f"{table}.{highfilter} {logic} '{highfilter_value}'")
 
     # If this table has no color capability then it cannot be filtered by date or type
     if color_selector is not None:
 
         # Determine if time filter applies to query:
-        daysback = [int(word) for word in tfilters['Date Filter'].split() if word.isdigit()]
-        daysback = daysback[0] if daysback != [] else None
-        if daysback is not None:
-            stopdate = today - datetime.timedelta(days=daysback)
-            print('stopdate =', stopdate)
-            query_adds.append(f'{table}.Date > stopdate')
+        dtest = tfilters['Date Filter']
+        if dtest is not None and dtest != 'Show All' and 'Date' in filteron:
+            daysback = None
+            fromdate = None
+            todate = None
+            if '30' in dtest: daysback = 30
+            elif '60' in dtest: daysback = 60
+            elif '90' in dtest: daysback = 90
+            elif '120' in dtest: daysback = 120
+            elif '180' in dtest: daysback = 180
+            elif dtest == 'Last Year':
+                fromdate = datetime.date(lastyear,1,1)
+                todate = datetime.date(lastyear,12,31)
+            elif dtest == 'This Year':
+                fromdate = datetime.date(thisyear,1,1)
+            if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
+            if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
+            if todate is not None: query_adds.append(f'{table}.Date <= todate')
+            #print(f'This time filter applied from fromdate = {fromdate} to todate = {todate}')
 
         # Determine if pay filter applies to query:
         itest = tfilters['Pay Filter']
-        if itest is not None and itest != 'Show All':
+        if itest is not None and itest != 'Show All' and 'Invoice' in filteron:
             if itest == 'Uninvoiced':
-                pfilter = f'{table}.Istat == 0'
+                pfilter = f'{table}.Istat == None'
             elif itest == 'Unrecorded':
                 pfilter = f'{table}.Istat == 1'
             elif itest == 'Unpaid':
-                pfilter = f'{table}.Istat < 4'
+                pfilter = f'{table}.Istat != 4'
+            elif itest == 'InvoSummaries':
+                pfilter = f'{table}.Istat > 4'
             query_adds.append(pfilter)
 
         # Determine if haul filter applies to query:
         htest = tfilters['Haul Filter']
-        if htest is not None and htest != 'Show All':
+        if htest is not None and htest != 'Show All' and 'Haul' in filteron:
             if htest == 'Not Started':
                 hfilter = f'{table}.Hstat == 0'
             elif htest == 'In-Progress':
@@ -433,10 +588,12 @@ def get_dbdata(table_setup, tfilters):
         table_query = f'{table}.query.filter({query_adds[0]}).all()'
     elif len(query_adds) == 2:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]})).all()'
-    else:
+    elif len(query_adds) == 3:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})).all()'
+    else:
+        table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]})).all()'
 
-    print(table_query)
+    #print(table_query)
     odata = eval(table_query)
 
     # Determine color pallette to apply to table
@@ -450,22 +607,27 @@ def get_dbdata(table_setup, tfilters):
         if color_selector is not None:
             for kx, selector in enumerate(color_selector):
                 color_selector_value = getattr(odat, selector)
-                if kx == 0: rowcolors1.append(colorcode(color_selector_value))
-                if kx == 1: rowcolors2.append(colorcode(color_selector_value))
+                #print(f'for {odat.Jo} color selector value is {color_selector_value} on selector {selector}')
+                if kx == 0: rowcolors1.append(colorcode(table, color_selector_value))
+                if kx == 1: rowcolors2.append(colorcode(table, color_selector_value))
         else:
             color_selector_value = 0
-            rowcolors1.append(colorcode(color_selector_value))
-            rowcolors2.append(colorcode(color_selector_value))
+            rowcolors1.append(colorcode(table, color_selector_value))
+            rowcolors2.append(colorcode(table, color_selector_value))
 
         for jx, colist in enumerate(entrydata):
             co = colist[0]
             datarow[jx] = getattr(odat, co)
+            if colist[8] is not None:
+                eltest = f'{datarow[jx]}'
+                print(f'eltest {eltest} and colist is {colist[8]}')
+                if len(eltest) > colist[8]: datarow[jx] = eltest[0:colist[8]]
         data1.append(datarow)
 
     if color_selector is not None:
         if len(color_selector) == 1: rowcolors2 = rowcolors1
 
-    return [data1, data1id, rowcolors1, rowcolors2, entrydata]
+    return [data1, data1id, rowcolors1, rowcolors2, entrydata, simpler, boxchecks, boxlist], labpass
 
 def get_new_Jo(input):
     sdate = today.strftime('%Y-%m-%d')
@@ -476,7 +638,7 @@ def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
     masks = tablesetup['haulmask']
-    entrydata = mask_apply(entrydata, masks)
+    if masks != []: entrydata = mask_apply(entrydata, masks)
     try:
         hiddendata = tablesetup['hidden data']
     except:
@@ -488,13 +650,11 @@ def make_new_entry(tablesetup,holdvec):
     documents = tablesetup['documents']
     if 'Source' in documents:
         sourcekeys = tablesetup['source']
-        newfile = sourcekeys[0]
-        sourcekey = sourcekeys[1:]
+        dirloc = sourcekeys[0]
+        newfile = sourcekeys[1]
+        sourcekey = sourcekeys[2:]
     else:
         sourcekeys = None
-
-    print(documents)
-    print(sourcekeys)
 
     err = []
     #err = ['No Jo Created']
@@ -508,9 +668,9 @@ def make_new_entry(tablesetup,holdvec):
             holdvec[jx] = eval(f"get_new_{creation}('{entry[3]}')")
             #err = [f'New {creation} {holdvec[jx]} created']
 
-    print('The attr_names are:',attr_names)
-    for c_attr in inst.mapper.column_attrs:
-        print('Attrloop:',c_attr)
+    #print('The attr_names are:',attr_names)
+    #for c_attr in inst.mapper.column_attrs:
+        #print('Attrloop:',c_attr)
 
     dbnew = f'{table}('
     for col in attr_names:
@@ -522,18 +682,18 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
 
     newquery = f"{table}.query.filter({table}.{ukey} == '{uidtemp}').first()"
-    print('Getting the new temp entry:',newquery)
+    #print('Getting the new temp entry:',newquery)
     dat = eval(newquery)
     if dat is not None:
         id = dat.id
         for jx,entry in enumerate(entrydata):
-            print(f'Data going in is:{entry[0]} {holdvec[jx]}')
+            #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
             setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
@@ -550,22 +710,41 @@ def make_new_entry(tablesetup,holdvec):
         if sourcekeys is not None:
             nextquery = f"{table}.query.get({id})"
             dat = eval(nextquery)
-            print('Check to see if we need to save a source document:')
+            #print('Check to see if we need to save a source document:')
             docsave = request.values.get('viewport2')
             #newile already set at top of routine to the base name for document
-            for eachsource in sourcekey:
-                keyval = getattr(dat,eachsource)
-                newfile = newfile + f'_Jo_{keyval}'
+            #print(f'dirloc is {dirloc}')
+            if dirloc == 'vorders':
+                for eachsource in sourcekey:
+                    keyval = getattr(dat,eachsource)
+                    newfile = newfile + f'_Jo_{keyval}'
+                newfile = newfile + '_c0.pdf'
+            if dirloc == 'vinterchange':
+                #print(f'sourcekey is {sourcekey}')
+                for eachsource in sourcekey:
+                    keyval = getattr(dat,eachsource)
+                    newfile = newfile + f'{keyval}_'
+                newfile = newfile.upper() + '.pdf'
+                newfile = newfile.replace(' ','_')
+                newfile = newfile.replace('_.','.')
+            if dirloc == 'vpersons':
+                #print(f'sourcekey is {sourcekey}')
+                for eachsource in sourcekey:
+                    keyval = getattr(dat,eachsource)
+                    newfile = newfile + f'{keyval}_'
+                newfile = newfile.upper() + '.pdf'
+                newfile = newfile.replace(' ','_')
+                newfile = newfile.replace('_.','.')
+            if dirloc == 'vservices':
+                oldpath,newfile = os.path.split(docsave)
 
-            newfile = newfile + '_c0.pdf'
-            newfile = newfile.replace('None_','')
-            print('Jo, viewport2, newfile', keyval, docsave, newfile)
             if hasinput(docsave):
                 newpath = addpath(tpath(table, newfile))
                 oldpath = addpath(docsave).replace('//','/')
-                print('Need to move file from', oldpath, ' to', newpath)
+                #print('Need to move file from', oldpath, ' to', newpath)
                 try:
                     shutil.move(oldpath, newpath)
+                    #print(f'Moved file {oldpath} to {newpath}')
                 except:
                     print('File already moved')
                 setattr(dat, 'Source', newfile)
@@ -582,11 +761,11 @@ def make_new_entry(tablesetup,holdvec):
 def mask_apply(entrydata, masks):
     mask_to_apply = request.values.get('HaulType')
     list = Trucking_genre['haul_types']
-    print(mask_to_apply)
+    #print(mask_to_apply)
     if mask_to_apply in list:
-        print(f'the list is {list}')
+        #print(f'the list is {list}')
         this_index = list.index(mask_to_apply)
-        print(f'the index is {this_index}')
+        #print(f'the index is {this_index}')
         for jx, entry in enumerate(entrydata):
             if 'Release' in entry[1]:
                 mask = masks['release']
@@ -603,7 +782,7 @@ def mask_apply(entrydata, masks):
             if 'Load Date' in entry[1]:
                 mask = masks['load1date']
                 entrydata[jx][2] = mask[this_index]
-                print(f'Mask {entry[2]}')
+                #print(f'Mask {entry[2]}')
             if 'Del Date' in entry[1]:
                 mask = masks['load2date']
                 entrydata[jx][2] = mask[this_index]
@@ -624,7 +803,7 @@ def New_task(tablesetup, task_iter):
     if task_iter > 0:
         entrydata = tablesetup['entry data']
         masks = tablesetup['haulmask']
-        entrydata = mask_apply(entrydata, masks)
+        if masks != []: entrydata = mask_apply(entrydata, masks)
         numitems = len(entrydata)
         holdvec = [''] * numitems
         failed = 0
@@ -662,15 +841,20 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
+    masks = tablesetup['haulmask']
+    if masks != []: entrydata = mask_apply(entrydata, masks)
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
+    colorcol = tablesetup['colorfilter']
     creators = tablesetup['creators']  # Gather the data for the selected row
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
+
+    print(f'Running edit with task_iter {task_iter}')
 
     if task_iter > 0:
         failed = 0
@@ -685,11 +869,15 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
         update_item = request.values.get('Update Item')
         if update_item is not None:
+            try:
+                thisvalue = getattr(olddat, colorcol[0])
+                if thisvalue == -1: setattr(olddat, colorcol[0], 0)
+            except:
+                print('No color selector found')
+
             if failed == 0:
                 for jx, entry in enumerate(entrydata):
-                    if entry[0] not in creators:
-                        print('Updating Entry with', entry[0], holdvec[jx])
-                        setattr(olddat, f'{entry[0]}', holdvec[jx])
+                    if entry[0] not in creators: setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
                 for jx, entry in enumerate(hiddendata):
                     thisvalue = getattr(olddat,entry[2])
@@ -698,7 +886,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         thissubvalue = thisvalue[0]
                     except:
                         thissubvalue = ''
-                    print('Updating Entry with', entry[0], thissubvalue)
+                    #print('Updating Entry with', entry[0], thissubvalue)
                     setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
                 #err.append(f"Updated entry in {tablesetup['table']}")
@@ -719,21 +907,15 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         viewport[0] = 'show_doc_left'
         viewport[2] = '/' + tpath(f'{table}', docref)
 
-
     return holdvec, entrydata, err, viewport, completed
 
-def Inv_task(iter):
-    print(f'Running Inv task with iter {iter}')
-
-def Rec_task(iter):
-    print(f'Running Rec task with iter {iter}')
 
 def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
-    print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
+    #print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
-        print('table', table)
+        #print('table', table)
         for sid in tids[jx]:
             rstring = f'{table}.query.get({sid})'
             odat = eval(rstring)
@@ -760,17 +942,17 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
     return holdvec, entrydata, err, viewport, completed
 
 def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
-    print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
+    print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, tids= {tids} tabs= {tabs}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
         print('table', table)
         for sid in tids[jx]:
             if task_focus == 'Delete':
-                print('made it here with jx, thistable sid', jx, thistable, sid)
+                #print('made it here with jx, thistable sid', jx, thistable, sid)
                 rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
                 eval(rstring)
-            elif task_focus == 'Undo Invoice':
+            elif task_focus == 'Invoice':
                 # Need to add the undo of the journal entries
                 rstring = f'{table}.query.get({sid})'
                 odat = eval(rstring)
@@ -783,23 +965,57 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 Gledger.query.filter(Gledger.Tcode == odat.Jo).delete()
                 db.session.commit()
 
-            elif task_focus == 'Undo Payment':
-                rstring = f'{table}.query.filter({table}.id == {sid})'
+            elif task_focus == 'Payment':
+                rstring = f'{table}.query.get({sid})'
                 odat = eval(rstring)
-                odat.Istat = 3
-                if odat.Hstat == 4:
-                    odat.Hstat = 3
-                db.session.commit()
-                jo = odat.Jo
-                idata = Invoices.query.filter(Invoices.Jo == jo).all()
-                for data in idata:
-                    data.Status = 'New'
-                db.session.commit()
-                Income.query.filter(Income.Jo == jo).delete()
-                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
-                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
-                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
-                db.session.commit()
+                sinow = odat.Label
+                slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
+                odata = Orders.query.filter(Orders.Label == sinow).all()
+                print(f'Undoing sinow {sinow} slead id {slead.id} number of odata {len(odata)}')
+
+                if slead is None:
+                    odat.Istat = 2
+                    if odat.Hstat == 4:
+                        odat.Hstat = 3
+                    odat.PaidInvoice = None
+                    odat.PayRef = None
+                    odat.PayMeth = None
+                    odat.PayAcct = None
+                    odat.PaidDate = None
+                    odat.PaidAmt = None
+                    db.session.commit()
+                    jo = odat.Jo
+                    idata = Invoices.query.filter(Invoices.Jo == jo).all()
+                    for data in idata:
+                        data.Status = 'New'
+                    db.session.commit()
+                    Income.query.filter(Income.Jo == jo).delete()
+                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
+                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
+                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
+                    db.session.commit()
+                else:
+
+                    for each in odata:
+                        each.PaidInvoice = None
+                        each.PayRef = None
+                        each.PayMeth = None
+                        each.PayAcct = None
+                        each.PaidDate = None
+                        each.PaidAmt = None
+                        each.Istat = 5
+                        if each.Hstat == 4:
+                            each.Hstat = 3
+
+                        jo = each.Jo
+                        idata = Invoices.query.filter(Invoices.Jo == jo).all()
+                        for data in idata:
+                            data.Status = 'New'
+                        Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
+                        Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
+                        Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
+                    slead.Status = 2
+                    db.session.commit()
 
 
 
@@ -814,7 +1030,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
 
 
 def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
-    print(f'Running View Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, sid={sid}')
+    #print(f'Running View Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, sid={sid}')
     cancel = request.values.get('cancel')
     viewport = ['0'] * 6
     holdvec = []
@@ -830,12 +1046,15 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         nextquery = f"{table}.query.get({sid})"
         dat = eval(nextquery)
 
-        print('The task focus is:', task_focus)
+        #print('The task focus is:', task_focus)
         try:
             docref = getattr(dat, f'{task_focus}')
+            tpointer = f'{table}-{task_focus}'
+            print(f'Viewing for table: {table} and focus {task_focus}')
             try:
                 viewport[0] = 'show_doc_left'
-                viewport[2] = '/' + tpath(f'{table}', docref)
+                viewport[2] = '/' + tpath(f'{tpointer}', docref)
+                print(f'path director:{tpointer} and path found:{viewport[2]}')
                 err.append(f'Viewing {viewport[2]}')
                 err.append('Hit Return to End Viewing and Return to Table View')
             except:
@@ -864,7 +1083,7 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
         err = ['Upload has been cancelled']
     else:
         completed = False
-        err = [f'Running Upload task with iter {task_iter}']
+        err = [f'Running Upload task with iter {task_iter} table {thistable} and focus {task_focus}']
 
 
         if task_iter == 0:
@@ -887,10 +1106,10 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
             viewport[3] = str(sid)
             viewport[4] = f'{genre} {thistable} Item'
             ukey = eval(f"{thistable}_setup['ukey']")
-            print('the ukey=', ukey)
+            #print('the ukey=', ukey)
             viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
             fileout = ukey + '_' + eval(f"dat.{ukey}")
-            print(viewport)
+            #print(viewport)
 
             uploadnow = request.values.get('uploadnow')
 
@@ -899,14 +1118,14 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 file = request.files['docupload']
                 if file.filename == '':
                     err.append('No file selected for uploading')
-                else:
-                    print('file is', file.filename)
 
                 name, ext = os.path.splitext(file.filename)
                 if task_focus == 'Source':
                     sname = 'Scache'
                 elif task_focus == 'Proof':
                     sname = 'Pcache'
+                elif task_focus == 'TitleDoc':
+                    sname = 'Tcache'
 
                 sn = getattr(dat, sname)
                 try:
@@ -917,15 +1136,15 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                     bn = 0
 
                 filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
-                output1 = addpath(tpath(f'{thistable}', filename1))
-                print('output1=',output1)
+                output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
+                print(f'output1 for thistable {thistable}-{task_focus} = {output1}')
 
                 file.save(output1)
-                viewport[2] = '/'+tpath(f'{thistable}', filename1)
+                viewport[2] = '/'+tpath(f'{thistable}-{task_focus}', filename1)
 
                 if bn > 0:
                     oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
-                    oldoutput = addpath(tpath(f'{thistable}', oldfile))
+                    oldoutput = addpath(tpath(f'{thistable}-{task_focus}', oldfile))
                     try:
                         os.remove(oldoutput)
                         err.append('Cleaning up old files successful')
@@ -957,6 +1176,7 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     entrydata = tablesetup['entry data']
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
+    colorcol = tablesetup['colorfilter']
     creators = tablesetup['creators']    # Gather the data for the selected row
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
@@ -996,7 +1216,9 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
             if col in creators:
                 dbnew = dbnew + f", {col}='{thisitem}'"
             else:
+
                 thisvalue = getattr(olddat, f'{col}')
+                if col == colorcol[0]: thisvalue = -1
                 # Check if thisvalue requires a compliment value
                 if thisvalue in ckswaps:
                     thisvalue = swaps[thisvalue]
@@ -1056,7 +1278,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 if failed == 0:
                     for jx, entry in enumerate(entrydata):
                         if entry[0] not in creators:
-                            print('Updating Entry with', entry[0], holdvec[jx])
+                            #print('Updating Entry with', entry[0], holdvec[jx])
                             setattr(modata, f'{entry[0]}', holdvec[jx])
                     db.session.commit()
                     for jx, entry in enumerate(hiddendata):
@@ -1066,7 +1288,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                             thissubvalue = thisvalue[0]
                         except:
                             thissubvalue = ''
-                        print('Updating Entry with', entry[0], thissubvalue)
+                        #print('Updating Entry with', entry[0], thissubvalue)
                         setattr(modata, f'{entry[0]}', thissubvalue)
                     db.session.commit()
                 else:
@@ -1086,7 +1308,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
         db.session.commit()
         viewport[0] = 'show_doc_left'
         viewport[2] = '/' + tpath(f'manifest', docref)
-        print('viewport=', viewport)
+        #print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
@@ -1244,7 +1466,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         viewport[1] = 'email setup'
         viewport[2] = 'show_doc_left'
         viewport[3] = '/' + docref
-        print('viewport=', viewport)
+        #print('viewport=', viewport)
 
         err.append(f'Viewing {docref} on iteration {task_iter}')
         err.append('Hit Finished to End Viewing and Return to Table View')
@@ -1252,10 +1474,6 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         if finished is not None: completed = True
 
     return holdvec, entrydata, err, viewport, completed
-
-
-
-
 
 
 def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_data, sid1, sid2):
@@ -1279,20 +1497,20 @@ def Match_task(genre, task_iter, tablesetup1, tablesetup2, task_focus, checked_d
     c21, c22 = [colm[0] for colm in colmatch2], [colm[1] for colm in colmatch2]
 
     viewport = None
-    print('c11, c12', c11, c12)
-    print('c21, c22', c21, c22)
+    #print('c11, c12', c11, c12)
+    #print('c21, c22', c21, c22)
 
     for jx, col in enumerate(c11):
         thisvalue1 = getattr(olddat1, f'{col}')
         thisvalue2 = getattr(olddat2, f'{c12[jx]}')
-        print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
+        #print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
         setattr(olddat1, f'{col}', thisvalue2)
     db.session.commit()
 
     for jx, col in enumerate(c21):
         thisvalue1 = getattr(olddat1, f'{c22[jx]}')
         thisvalue2 = getattr(olddat2, f'{col}')
-        print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
+        #print(f'For {col} comparing the values of {thisvalue1} in {table1} to {thisvalue2} in {table2}')
         setattr(olddat2, f'{col}', thisvalue1)
     db.session.commit()
 
@@ -1321,7 +1539,7 @@ def check_income(odat, ldat, err):
 
     incdat = Income.query.filter(Income.Jo == invojo).first()
     if incdat is None:
-        print('incdat is none')
+        #print('incdat is none')
         err.append('Creating New Payment on Jo')
         paydesc = 'Receive payment on Invoice ' + invojo
         recamount = ldat.Total
@@ -1329,7 +1547,7 @@ def check_income(odat, ldat, err):
         recdate = datetime.date.today()
         acctdb = 'Undeposited Funds'
 
-        print('acctdb=', acctdb)
+        #print('acctdb=', acctdb)
         input = Income(Jo=invojo, Account=acctdb, Pid=odat.Bid, Description=paydesc,
                        Amount=d2s(recamount), Ref=custref, Date=recdate, Original=os.path.basename(docref),
                        From=odat.Shipper, Bank=None, Date2=None, Depositnum=None)
@@ -1337,7 +1555,7 @@ def check_income(odat, ldat, err):
         db.session.commit()
 
     else:
-        print('incdat is not none')
+        #print('incdat is not none')
         recamount = request.values.get('recamount')
         custref = request.values.get('custref')
         desc = request.values.get('desc')
@@ -1347,7 +1565,7 @@ def check_income(odat, ldat, err):
             acctdb = 'Cash'
         if custref is None:
             custref = 'ChkNo'
-        print('acctdb2=', acctdb)
+        #print('acctdb2=', acctdb)
         if isinstance(invodate, str):
             recdate = datetime.datetime.strptime(recdate, '%Y-%m-%d')
         incdat.Amount = recamount
@@ -1401,11 +1619,11 @@ def check_invoice(odat, err):
     return ldat, payment, err
 
 
-
 def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
     err = [f"Running Receive Pay task with task_iter {task_iter} using {tablesetup['table']}"]
     completed = False
+    slead = None
     viewport = ['0'] * 6
     document_profiles = eval(f"{genre}_genre['document_profiles']")
     document_stamps = eval(f"{genre}_genre['image_stamps']")
@@ -1432,6 +1650,15 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     creators = tablesetup['creators']  # Gather the data for the selected row
     nextquery = f"{table}.query.get({sid})"
     odat = eval(nextquery)
+    istat = odat.Istat
+    if istat == 5 or istat == 6:
+        # This is a summary invoice and must receive against all elements
+        sinow = odat.Label
+        slead = SumInv.query.filter( (SumInv.Si == sinow) & (SumInv.Status > 0) ).first()
+        odata = Orders.query.filter(Orders.Label == sinow).all()
+        sdata = SumInv.query.filter(SumInv.Si == sinow).all()
+        print(f'Using the summary invoice sinow={sinow} slead is {slead.id}')
+
 
     returnhit = request.values.get('Finished')
     if returnhit is not None:
@@ -1440,107 +1667,349 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
         if task_iter == 0:
             eprof = 'Paid Invoice'
             emaildata = get_company(eprof, odat)
-            stamplist = ['Paid1']
-            stampdata = [1, 300, 200, 0.5, 'on', 'Paid', 'Paid1']
-            #stamplist, stampdata = get_last_used_stamps(odat)
-            print('stampdata iter 0',stampdata)
+            paidon = today
+            if slead is None:
+                amtpaid = d2s(odat.InvoTotal)
+            else:
+                amtpaid = d2s(slead.Total)
+            payref = odat.PayRef
+            paymethod = odat.PayMeth
+            thisdepot = odat.PayAcct
+            if payref is None: payref = 'Check No.'
+            if paymethod is None:
+                paymethod = 'Check'
+                thisdepo = 'Undeposited Funds'
+            record_requested, email_requested = None, None
 
         else:
             # Save the current stamps to database for future launch
-            stamplist, stampdata = get_stamps_from_form(doc_stamps, doc_signatures, odat)
             eprof = request.values.get('emlprofile')
-            #lock = request.values.get('prolock')
-            reorder_requested = make_bool(request.values.get('stampnow'))
-            stamp_requested = make_bool(request.values.get('stampnow'))
+            update_requested = make_bool(request.values.get('update'))
+            record_requested = make_bool(request.values.get('recordnow'))
             email_requested = make_bool(request.values.get('emailnow'))
-            if reorder_requested or stamp_requested or email_requested:
+            if update_requested or email_requested:
                 emaildata = emaildata_update()
             else:
                 emaildata = get_company(eprof, odat)
-            if email_requested: info_mimemail(emaildata)
+            amtpaid = request.values.get('paidamt')
+            paidon = request.values.get('paidon')
+            paidon = datetime.datetime.strptime(paidon, '%Y-%m-%d')
+            paymethod = request.values.get('paymethod')
+            payref = request.values.get('payref')
+            thisdepo = request.values.get('acctfordeposit')
+            if paymethod == 'Cash' or paymethod == 'Check': thisdepo = 'Undeposited Funds'
 
-        holdvec[15] = stamplist
-        #holdvec[4] = emaildata
-        # Send in the emaildata in case it get modified by the stamps
-        holdvec[4], holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err, emaildata)
+
+        holdvec[0] = [d2s(amtpaid), paidon, payref, paymethod]
+        adata = Accounts.query.filter(Accounts.Type == 'Bank')
+        acctlist = ['Undeposited Funds']
+        for adat in adata: acctlist.append(adat.Name)
+        holdvec[1] = acctlist
+        holdvec[2] = thisdepo
+        #Create payment invoice off the unpaid invoice
+        if slead is None:
+            invofile = addpath(tpath('Orders-Invoice', odat.Invoice))
+            cache = odat.Icache
+            basefile = addpayment(invofile, cache, odat.InvoTotal, amtpaid, paidon,  payref, paymethod)
+            print(f'The updated paid invoice file is {basefile}')
+            odat.PaidInvoice = basefile
+            odat.Icache = cache+1
+            odat.PayRef = payref
+            odat.PayMeth = paymethod
+            odat.PayAcct = thisdepo
+            db.session.commit()
+            print(f'The updated paid invoice file is {basefile}')
+            docref = f'static/{scac}/data/vinvoice/{basefile}'
+        else:
+            invofile = addpath(tpath('Orders-Invoice', slead.Source))
+            cache = odat.Icache
+            basefile = addpayment(invofile, cache, slead.Total, amtpaid, paidon,  payref, paymethod)
+            print(f'The updated paid summary invoice file is {basefile}')
+            for each in odata:
+                each.PaidInvoice = basefile
+                each.Icache = cache+1
+                each.PayRef = payref
+                each.PayMeth = paymethod
+                each.PayAcct = thisdepo
+            slead.Status = 4
+            db.session.commit()
+            print(f'The updated paid summery invoice file is {basefile}')
+            docref = f'static/{scac}/data/vinvoice/{basefile}'
+
+
+        holdvec[4] = emaildata
         holdvec[6] = eprof
-        holdvec[8] = dockind
-        holdvec[9] = fexist
-        #if task_iter == 0:  docref = f'tmp/{scac}/data/vinvoice/{odat.Invoice}'
+        print(f'holdvec at this point 1616 is {holdvec}')
+        # Save the default payment parameters in holdvec[0]
 
-        if 1 == 2:
 
-            ldat, payment, err = check_invoice(odat, err)
-            if ldat is not None:
-                pdat = People.query.filter(People.id == odat.Bid).first()
-                if pdat is None:
-                    pdat = People.query.filter(People.Company == odat.Shipper).first()
-                    odat.Bid = pdat.id
-                    db.session.commit()
-                ldata = Invoices.query.filter(Invoices.Jo == invojo).order_by(Invoices.Ea.desc()).all()
-                cache = odat.Icache + 1
-                odat.Icache = cache
-                invostyle = request.values.get('invoicestyle')
-                if invostyle is None:
-                    invostyle = 'Drayage Import'
-                make_invo_doc(odat, ldata, pdat, cache, invodate, payment, tablesetup, invostyle)
-                if cache > 1:
-                    docref = f'tmp/{scac}/data/vinvoice/INV' + invojo + 'c' + str(cache) + '.pdf'
-                    # Store for future use
-                else:
-                    docref = f'tmp/{scac}/data/vinvoice/INV' + invojo + '.pdf'
-
-            recupdate = request.values.get('recupdate')
-            if recupdate is not None:
+        if record_requested or email_requested:
+            if slead is None:
                 hstat = odat.Hstat
                 if hstat == 2 or hstat == 3:
                     odat.Hstat = 4
                 odat.Istat = 4
+                odat.PaidDate = paidon
+                odat.PaidAmt = d2s(amtpaid)
                 db.session.commit()
-                err.append('Viewing ' + docref)
-                emaildata = etemplate_truck('paidinvoice', 0, odat)
-                viewtype = 'paidinvoice'
+                gledger_write('income', odat.Jo, thisdepo, 0)
+                if email_requested: info_mimemail(emaildata)
                 completed = True
+            else:
+                err_check = 0
+                for each in odata:
+                    odat_amount = d2s(each.InvoTotal)
+                    scheck = SumInv.query.filter(SumInv.Jo == each.Jo).first()
+                    if odat_amount != scheck.Amount:
+                        err_check = err_check+1
+                        err.append(f'Amounts do no match for JO {each.Jo} {odat_amount} vs. {scheck.Amount}')
+                if err_check == 0:
+                    for each in odata:
+                        hstat = each.Hstat
+                        if hstat == 2 or hstat == 3:
+                            each.Hstat = 4
+                        each.Istat = 7
+                        each.PaidDate = paidon
+                        each.PaidAmt = d2s(each.InvoTotal)
+                        db.session.commit()
+                        gledger_write('income', each.Jo, thisdepo, 0)
+                    if email_requested: info_mimemail(emaildata)
+                    completed = True
+                else: err.append('Could not process paid invoice')
 
-                try:
-                    rec = float(recamount)
-                except:
-                    rec = 0.00
-                try:
-                    owe = float(ldat.Total)
-                except:
-                    owe = 0.00
-                if rec < owe:
-                    # Need to determine what has been paid for and what has not
-                    howapp = 1
-                else:
-                    for data in ldata:
-                        data.Status = 'P'
 
-                # gledger_write('income',invojo,acctdb,0)
-
-        #odat.Invoice = os.path.basename(docref)
-        #db.session.commit()
-        #print('docref=', docref)
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'
         viewport[2] = 'show_doc_left'
         viewport[3] = '/' + docref
-        #viewport[3] = '/' + tpath('invoice', odat.Invoice)
-        print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
-        holdvec[2] = Services.query.all()
-
-        loginvo = request.values.get('logInvo')
-        if loginvo is not None:
-            odat = eval(nextquery)
-            err = loginvo_m(odat, 2)
-            if 'Error' not in err:
-                completed = True
 
     return holdvec, entrydata, err, viewport, completed
+
+
+def ReceiveByAccount_task(err, holdvec, task_iter):
+
+    err = [f"Running Receive By Account task with task_iter {task_iter}"]
+    completed = False
+
+    viewport = ['0'] * 6
+    #table = tablesetup['table']
+    #entrydata = tablesetup['entry data']
+    #hiddendata = tablesetup['hidden data']
+    #numitems = len(entrydata)
+    #holdvec = [''] * 30
+
+    today = datetime.date.today()
+    today_str = today.strftime('%Y-%m-%d')
+    stopdate = today-datetime.timedelta(days=300)
+    err=[]
+
+    #Determine unique shippers:
+    comps = []
+    tjobs = Orders.query.filter( ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 5) | (Orders.Istat == 6)) & (Orders.Date > stopdate) ).all()
+    for job in tjobs:
+        com = job.Shipper
+        if com not in comps:
+            comps.append(com)
+    co = request.values.get('getaccount')
+    holdvec[0] = co
+
+    # If first time up there is not selection so set to todays date
+    if co is None:
+        holdvec[7] = today_str
+    else:
+        holdvec[7] = request.values.get('thisdate')
+
+    #This is the relevant data for selection
+    odata = Orders.query.filter((Orders.Shipper == co) & ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 5) | (Orders.Istat == 6)) & (Orders.Date > stopdate)).all()
+    lenod = len(odata)
+    if lenod < 1:
+        if co is None:
+            err.append('Choose Account to Receive Payments On')
+        else:
+            err.append(f'{holdvec[0]} has only uninvoiced orders')
+    else:
+        err.append(f'Showing invoices for {holdvec[0]}')
+    holdvec[1] = odata
+    holdvec[2] = comps
+
+    thechecks = [0]*len(odata)
+    amts = ['0.00']*len(odata)
+    invts = ['0.00']*len(odata)
+    checkall = request.values.get('checkall')
+    runck = request.values.get('previewpay')
+    recordnow = request.values.get('recordpayment')
+    invotot = 0.0
+    paytot = 0.0
+    if runck is not None or recordnow is not None:
+        if runck is not None:
+            err.append(f'Totaling Open Invoices for {holdvec[0]}')
+        else:
+            err.append(f'Recording Invoices for {holdvec[0]}')
+
+        for jx,odat in enumerate(odata):
+
+            #Make sure we have an invoice and get the invoice total if we do
+            idat = Invoices.query.filter(Invoices.Jo == odat.Jo).first()
+            if idat is not None:
+                invototal = idat.Total
+                invts[jx] = invototal
+                amts[jx] = invototal
+
+            ckon = request.values.get('oder'+str(odat.id))
+            if ckon is not None:
+                thechecks[jx]=1
+                invotot = invotot + float(invts[jx])
+                recthis = request.values.get('amount'+str(odat.id))
+                try:
+                    paytot = paytot+float(recthis)
+                    amts[jx] = d2s(recthis)
+                except:
+                    err.append(f'Bad Amt Received JO {odat.Jo}')
+                    amts[jx] = '0.00'
+    else:
+        #Need to get the invoice totals even on the first pass:
+        for jx, odat in enumerate(odata):
+            idat = Invoices.query.filter(Invoices.Jo == odat.Jo).first()
+            if idat is not None:
+                invototal = idat.Total
+                invts[jx] = invototal
+                amts[jx] = invototal
+    if checkall is not None: thechecks = [1]*len(odata)
+    holdvec[3] = thechecks
+    holdvec[4] = d2s(invotot)
+    holdvec[5] = d2s(paytot)
+    holdvec[6] = amts
+    holdvec[8] = request.values.get('thisref')
+    holdvec[12] = invts
+    print('amts=',amts)
+    print(holdvec[7],holdvec[8])
+    depmethod = request.values.get('paymethod')
+    depref=None
+    if depmethod is None:
+        deps = ['Choose Pay Method First']
+        acctdb = 'None'
+        bank = None
+    elif depmethod == 'Cash' or depmethod == 'Check':
+        deps = ['Undeposited Funds']
+        acctdb = 'Undeposited Funds'
+        bank = None
+    elif depmethod == 'Credit Card':
+        acctdb = request.values.get('acctfordeposit')
+        bank = acctdb
+        deps = []
+        acdata = Accounts.query.filter((Accounts.Type == 'Bank') & (Accounts.Description.contains('Merchant'))).all()
+        for acd in acdata:
+            deps.append(acd.Name)
+    elif depmethod == 'Direct Deposit':
+        acctdb = request.values.get('acctfordeposit')
+        bank = acctdb
+        depref = holdvec[8]
+        #Get the account for deposit listing and the account for deposit selection:
+        deps = []
+        acdata = Accounts.query.filter( (Accounts.Type == 'Bank') | (Accounts.Type == 'Exch') ).all()
+        for acd in acdata:
+            deps.append(acd.Name)
+
+    holdvec[9] = deps
+    holdvec[14] = depmethod
+    holdvec[10] = acctdb
+    autodis = request.values.get('autodisbox')
+    autodis = nonone(autodis)
+    holdvec[11] = autodis
+
+    # Enable Record button if all selections required are made
+    try:
+        paytotf = float(paytot)
+        if paytotf > 0.0 and hasvalue(acctdb):
+            print(f'The acctdb is {acctdb}')
+            holdvec[13] = 1
+            err.append('Record capability enabled')
+        else:
+            holdvec[13] = 0
+            if co is not None:
+                if paytotf == 0.00:
+                    err.append('Choose Invoices to Receive Against')
+                if not hasvalue(acctdb):
+                    err.append('Choose Account to Deposit Funds')
+    except:
+        holdvec[13] = 0
+
+    if recordnow is not None:
+        err = []
+        jolist = []
+        print(f'Length of odata is {len(odata)}')
+        #Apply the payments
+        for jx, odat in enumerate(odata):
+            print(f'For jx {jx}')
+            if thechecks[jx]==1:
+                invojo = odat.Jo
+                print(f'Invojo is {invojo}')
+
+                if amts[jx] != '0.00':
+
+                    # Begin Income Creation:
+                    recamount = amts[jx]
+                    recdate = datetime.datetime.strptime(holdvec[7], '%Y-%m-%d')
+
+                    try:
+                        rec = float(recamount)
+                    except:
+                        rec = 0.00
+                    try:
+                        owe = float(invts[jx])
+                    except:
+                        owe = 0.00
+
+                    print('autodis=',autodis,rec,owe)
+                    if autodis == 1 and rec < owe:
+                        disamt = rec - owe
+                        #Need to add a discounting invoice to zero out the balance
+                        input = Invoices(Jo=invojo, SubJo=None, Pid=odat.Bid, Service='Discount', Description='Auto Discount',
+                                         Ea=d2s(disamt), Qty=1, Amount=d2s(disamt), Total=d2s(rec), Date=today,
+                                         Original=None, Status='P')
+                        db.session.add(input)
+                        db.session.commit()
+                        #Adjust Invoice Totals for all Line Items on this Order:
+                        ldata = Invoices.query.filter(Invoices.Jo == invojo).all()
+                        for data in ldata:
+                            data.Total = d2s(rec)
+                            db.session.commit()
+                        err.append(f'Info: Discount created for JO {odat.Jo} to balance invoice')
+                        owe = 0.00
+
+                    if rec < owe:
+                        err.append(f'Warning: Payment for JO {odat.Jo} less than invoiced')
+                    else:
+                        ldata = Invoices.query.filter(Invoices.Jo == invojo).all()
+                        for data in ldata:
+                            data.Status = 'P'
+                            db.session.commit()
+
+                    hstat = odat.Hstat
+                    if hstat == 2 or hstat == 3:
+                        odat.Hstat = 4
+                    odat.Istat = 4
+
+                    #odat.PaidInvoice = basefile
+                    #odat.Icache = cache + 1
+                    odat.PaidAmt = recamount
+                    odat.PayRef = holdvec[8]
+                    odat.PayMeth = holdvec[14]
+                    odat.PayAcct = holdvec[10]
+                    odat.PaidDate = recdate
+                    db.session.commit()
+                    gledger_write('income', invojo, 'Undeposited Funds', 0)
+
+                else:
+                    err.append(f'Have no Invoice to Receive Against for JO={invojo}')
+                    print(f'Have no Invoice to Receive Against for JO={invojo}')
+            else: print(f'The check did not pass {thechecks[jx]}')
+        if acct == 'Direct Deposit':  gledger_write('income', invojo, 'Undeposited Funds', 0)
+
+    return completed, err, holdvec
 
 
 

@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Gledger, Invoices, JO, Income, Bills, Accounts, People, Focusareas, Deposits, Adjusting
+from webapp.models import Gledger, Invoices, JO, Income, Bills, Accounts, People, Focusareas, Deposits, Adjusting, Orders
 import datetime
 from webapp.viewfuncs import stripper
 import json
@@ -52,16 +52,16 @@ def gledger_multi_job(bus,jolist,acctdb,acctcr):
             dtype = 'DD'
             # Else we will write directly to the bank account
         acctcr = 'Accounts Receivable'
-        idat = Income.query.filter(Income.Jo == jo).first()
-        pid = idat.Pid
-        date = idat.Date
+        odat = Orders.query.filter(Orders.Jo == jo).first()
+        pid = odat.Bid
+        date = odat.PaidDate
         co = get_company(pid)
-        ref = idat.Ref
+        ref = odat.PayRef
 
         amt = 0
         for joget in jolist:
-            idat = Income.query.filter(Income.Jo == joget).first()
-            amt = amt + int(float(idat.Amount) * 100)
+            odat = Orders.query.filter(Orders.Jo == joget).first()
+            amt = amt + int(float(odat.Amount) * 100)
 
 
         acr = Accounts.query.filter((Accounts.Name == acctcr) & (Accounts.Co == cc)).first()
@@ -184,16 +184,13 @@ def gledger_write(bus,jo,acctdb,acctcr):
         if bus=='income':
 
             if 'Cash' in acctdb or 'Check' in acctdb or 'Mcheck' in acctdb or 'Undeposited' in acctdb:
-                acctdb='Cash'
+                acctdb='Undeposited Funds'
                 dtype = 'ID'
-            else:
-                dtype = 'DD'
-                # Else we will write directly to the bank account
             acctcr='Accounts Receivable'
-            idat=Income.query.filter(Income.Jo==jo).first()
-            amt=int(float(idat.Amount)*100)
-            pid=idat.Pid
-            date = idat.Date
+            odat=Orders.query.filter(Orders.Jo==jo).first()
+            amt=int(float(odat.PaidAmt)*100)
+            pid=odat.Bid
+            date = odat.PaidDate
             co = get_company(pid)
 
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first()
@@ -207,7 +204,7 @@ def gledger_write(bus,jo,acctdb,acctcr):
                 gdat.Aid=acr.id
                 gdat.Date = date
             else:
-                input1 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='IC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=idat.Ref)
+                input1 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='IC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=odat.PayRef)
                 db.session.add(input1)
             db.session.commit()
             gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type==dtype)).first()
@@ -218,15 +215,22 @@ def gledger_write(bus,jo,acctdb,acctcr):
                 gdat.Aid=adb.id
                 gdat.Date = date
             else:
-                input2 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type=dtype,Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=idat.Ref)
+                input2 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type=dtype,Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=odat.PayRef)
                 db.session.add(input2)
             db.session.commit()
 
         if bus=='deposit':
-            idat=JO.query.filter(JO.jo==jo).first()
-            amt=int(float(idat.dinc)*100)
-            print('the jo is',jo)
+
+            odat=Orders.query.filter(Orders.Jo==jo).first()
+            amt=int(float(odat.PaidAmt)*100)
+            pid=odat.Bid
+            date = odat.PaidDate
+            co = get_company(pid)
+
             incdat = Deposits.query.filter(Deposits.Depositnum == jo).first()
+            if incdat is None:
+                #This must be a direct deposit and need to create the deposit ticket
+                input = Deposits()
             depdate = incdat.Date2
             #For deposits the company reference is carried in as the accr input
             cdat=People.query.filter(People.Company==acctcr).first()

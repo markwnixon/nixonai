@@ -38,7 +38,7 @@ def container_check(num):
 def form_check(text,type):
     status = 0
     message = 'Type is not defined'
-    print(text,type)
+    #print(text,type)
 
 
     if type == 'text':
@@ -80,6 +80,16 @@ def form_check(text,type):
             status = 2
             message = 'Error: must set a numerical value for this charge'
 
+    elif type == 'integer':
+        try:
+            dt = int(text)
+            text = str(dt)
+            status = 0
+            message = 'ok'
+        except:
+            status = 2
+            message = 'Error: must set a numerical value for this value'
+
     elif type == 'concheck':
         if text is not None:
             lenck = len(text)
@@ -94,13 +104,13 @@ def form_check(text,type):
                     message = f'No container information entered yet'
 
     elif type == 'container_types':
-        print('select',text)
+        #print('select',text)
         if text == 'Choose Later':
             status = 1
             message = 'Warning: Make selection if possible'
 
     elif type == 'customerdata':
-        print('select',text)
+        #print('select',text)
         if text == 'Choose Later':
             status = 2
             message = 'Error: must choose a customer'
@@ -115,7 +125,7 @@ def form_check(text,type):
             loadname = request.values.get('dropblock1')
             if loadname is not None:
                 text = get_drop(loadname)
-        print('got dropblock1',text)
+        #print('got dropblock1',text)
 
     elif type == 'dropblock2':
         from webapp.class8_tasks import get_drop
@@ -127,32 +137,46 @@ def form_check(text,type):
             loadname = request.values.get('dropblock2')
             if loadname is not None:
                 text = get_drop(loadname)
-        print('got dropblock2',text)
+        #print('got dropblock2',text)
 
     return text,status,message
 
-def colorcode(incol):
-    if isinstance(incol, int):
+def colorcode(table, incol):
+    #print(f'This table for color is {table}')
+    if table == 'Orders':
         if incol == 4: return 'green text-white font-weight-bold'
         elif incol == 3: return'amber font-weight-bold'
         elif incol == 2: return'purple text-white font-weight-bold'
         elif incol == 1: return 'blue text-white font-weight-bold'
         elif incol == -1: return 'yellow font-weight-bold'
+        elif incol == 5: return 'grey white-text font-weight-bold'
+        elif incol == 6: return 'orange font-weight-bold'
+        elif incol == 7: return 'light-green font-weight-bold'
         else: return 'white font-weight-bold'
-    else:
+    elif table == 'Interchange':
         if incol == 'IO': return 'blue-text font-weight-bold'
         elif incol == 'BBBBBB': return'amber font-weight-bold'
         else: return 'white font-weight-bold'
+    elif table == 'SumInv':
+        incol = int(incol)
+        #print(f'Incol is {incol}')
+        if incol == 1: return 'grey white-text font-weight-bold'
+        elif incol == 2: return 'orange font-weight-bold'
+        elif incol == 3: return 'black white-text font-weight-bold'
+        elif incol == 4: return 'light-green text-white font-weight-bold'
+        else: return 'white font-weight-bold'
+    else:
+        return 'white font-weight-bold'
 
 def checked_tables(tables):
     cks = []
     for table in tables:
         cks.append(request.values.get(f'{table}box'))
-    print('class8_utils.py 142 checked_tables() These are the checked tables:',cks)
+    #print('class8_utils.py 142 checked_tables() These are the checked tables:',cks)
     return cks
 
 def checkfor_fileupload(err, task_iter, viewport):
-    print('utils.py 146 Setting form upload with task_iter:', task_iter)
+    #print('utils.py 146 Setting form upload with task_iter:', task_iter)
     if task_iter == 1:
         viewport[0] = 'upload_doc_left'
     else:
@@ -165,14 +189,12 @@ def checkfor_fileupload(err, task_iter, viewport):
         file = request.files['docupload']
         if file.filename == '':
             err.append('No source file selected for uploading')
-        else:
-            print('file is', file.filename)
 
         name, ext = os.path.splitext(file.filename)
         filename1 = f'Source_{name}{ext}'
         output1 = addpath(tpath('temp', filename1))
         file.save(output1)
         viewport[2] = f'/static/{scac}/data/temp/{filename1}'
-        print('the source doc is....', viewport[2])
+        #print('the source doc is....', viewport[2])
 
     return err, viewport

@@ -1,125 +1,60 @@
 {% set emaildata = holdvec[4] %}
-{% set stampdata = holdvec[5] %}
 {% set emailin1=emaildata[0] %}
 {% set emailin2=emaildata[1] %}
 {% set emailcc1=emaildata[2] %}
 {% set emailcc2=emaildata[3] %}
-{% set sections = ['1st Section'] %}
-{% set docall = ['Invoice'] %}
-{% set docs = holdvec[8] %}
-{% set fexist = holdvec[9] %}
-<div class="card">
-<div class="card-header">
-Stamp Payment on Invoice
-</div>
-<div class="card-body">
-<table>
-<tr>
-<td colspan="4">
-<button type="submit" class="btn btn-mdb-color btn-sm" name="stampnow"
-data-toggle="tooltip" title="Use to change documentation order among tenders, proofs, invoice, etc">Update</button>
-<button type="submit" class="btn btn-dark-green btn-sm" name="emailnow"
-data-toggle="tooltip" title="Email the Packaged material using email setup shown on left">Email</button>
-<button type="submit" class="btn btn-blue btn-sm" name="Return"
-data-toggle="tooltip" title="Return to Tables without further execution of options">Return</button>
-</td>
-</tr>
-</table>
-</div>
-</div>
-<div class="card">
-<div class="card-header">
-Confirm/alter payment/pay-date and then hit UPDATE button
-</div>
-<div class="card-body">
-<table>
-{% for section in sections %}
-{% set outerloop = loop %}
-    <tr>
-        <td> <div class="input-group-text">{{ section }}:</div></td>
-        <td>
-        <select class="form-control" type="text" name="{{ section }}">
-        {% for thisdoc in docall %}
-            <option {% if docs[outerloop.index-1] == thisdoc %} selected {% endif %} value='{{ thisdoc }}'> {{ thisdoc }} </option>
-        {% endfor %}
-        <option {% if docs[outerloop.index-1] == '0' %} selected {% endif %} value='0'> Nothing </option>
-        </select>
-        </td>
-        <td><font color="red"> {% if docs[outerloop.index-1] != '0' %}{% if fexist[outerloop.index-1] == 0 %}This file type does not exist{% endif %}{% endif %}</font></td>
-    </tr>
-{% endfor %}
-</table>
-</div>
-</div>
+{% set paydata = holdvec[0] %}
+{% set depolist = holdvec[1] %}
+{% set thisdepo = holdvec[2] %}
+{% set paymeths = ['Cash', 'Check', 'Credit Card', 'Direct Deposit'] %}
+
 <div class="card">
     <div class="card-header">
-        Select Items to Stamp on to Existing Documents
+    Stamp Payment on Invoice
     </div>
-    {% set stamps = holdvec[10] %}
-    {% set sigs = holdvec[11] %}
     <div class="card-body">
         <table>
             <tr>
-                <td> <div class="input-group-text">Stamps:</div></td>
-                <td>
-                <select class="form-control" type="text" name="stampname" onchange="this.form.submit()">
-                    <option value="" disabled selected>None</option>
-                    {% for stamp in stamps %}
-                        <option value='{{ stamp }}'>{{ stamp }}</option>
-                    {% endfor %}
-                </select>
+                <td colspan="4">
+                <button type="submit" class="btn btn-mdb-color btn-sm" name="update"
+                data-toggle="tooltip" title="Use to change documentation order among tenders, proofs, invoice, etc">Update</button>
+                <button type="submit" class="btn btn-dark-green btn-sm" name="recordnow"
+                data-toggle="tooltip" title="Record the payment and finalize the invoice">Record Only</button>
+                <button type="submit" class="btn btn-dark-green btn-sm" name="emailnow"
+                data-toggle="tooltip" title="Email the Packaged material using email setup shown on left">Record & Email</button>
+                <button type="submit" class="btn btn-blue btn-sm" name="Return"
+                data-toggle="tooltip" title="Return to Tables without further execution of options">Return</button>
                 </td>
             </tr>
             <tr>
-                <td> <div class="input-group-text">Signatures:</div></td>
+                <td><div class="input-group-text">Amt Applied: </div></td><td><input class="form-control" type="text" value={{ paydata[0] }} name="paidamt"></td>
+                <td><div class="input-group-text">Date Applied: </div></td><td><input class="form-control" type="date" value={{ paydata[1] }} name="paidon"></td>
+            </tr>
+            <tr>
+
+                <td><div class="input-group-text">Pay Method: </div></td>
                 <td>
-                   <select class="form-control" type="text" name="signame" onchange="this.form.submit()">
-                        <option value="" disabled selected>None</option>
-                        {% for sig in sigs %}
-                            <option value='{{ sig }}'>{{ sig }}</option>
-                        {% endfor %}
-                   </select>
+                    <select class="form-control" type="text" name="paymethod" onchange="this.form.submit()">
+                    <option value="xxx" disabled selected>Choose Pay Method</option>
+                    {% for meth in paymeths %}
+                        <option {% if meth == paydata[3] %} selected {% endif %} value='{{meth}}'>{{meth}}</option>
+                    {% endfor %}
+                    </select>
                 </td>
+            <td><div class="input-group-text">Pay Reference: </div></td><td><input class="form-control" type="text" value="{{ paydata[2] }}" name="payref"></td>
+
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <select class="form-control" type="text" name="acctfordeposit">
+                    <option value="" disabled selected>Choose Deposit Account</option>
+                    {% for depo in depolist %}
+                        <option {% if depo == thisdepo %} selected {% endif %} value='{{depo}}'>{{depo}}</option>
+                    {% endfor %}
+        </select>
+                </td>
+
             </tr>
         </table>
     </div>
 </div>
-
-{% set addedstamps = holdvec[15] %}
-{% for addedstamp in addedstamps %}
-
-    <input type = "hidden" name ="{{ addedstamp }}" value= "{{addedstamp}}">
-    {% set page = 7*(loop.index-1) %}
-    {% set height = 7*(loop.index-1)+1 %}
-    {% set right = 7*(loop.index-1)+2 %}
-    {% set scale = 7*(loop.index-1)+3 %}
-    {% set checks = 7*(loop.index-1)+4 %}
-    Working on {{ addedstamp }} with {{ stampdata[0] }}{{ page }}{{ height }}{{ stampdata[1] }}
-    <div class="card">
-
-        <div class="card-header">
-            <input class="inline-form-control" type="checkbox" checked  name="{{ addedstamp }}_c" onchange="this.form.submit()"> Select location for {{ addedstamp }} (Page, Height, Right, Image Scale)
-        </div>
-
-        <div class="card-body">
-            <table>
-                <tr>
-                <td><div class="input-group-text">P: </div></td>
-                <td colspan="3"><input class="form-control" type="text" value="{{stampdata[page]}}" name="{{ addedstamp }}_p"></td>
-
-                <td><div class="input-group-text">H:</div></td>
-                <td colspan="3"><input class="form-control" type="text" value="{{stampdata[height]}}" name="{{ addedstamp }}_h"></td>
-
-                <td><div class="input-group-text">R:</div></td>
-                <td colspan="3"><input class="form-control" type="text" value="{{stampdata[right]}}" name="{{ addedstamp }}_r"></td>
-
-                <td><div class="input-group-text">Scale:</div></td>
-                <td colspan="3"><input class="form-control" type="text" value="{{stampdata[scale]}}" name="{{ addedstamp }}_s"></td>
-                </tr>
-            </table>
-
-        </div>
-    </div>
-{% endfor %}
-
-

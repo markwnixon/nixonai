@@ -473,12 +473,19 @@ class Orders(db.Model):
     Pkcache = db.Column('Pkcache', db.Integer)
     QBi = db.Column('QBi', db.Integer)
     Truck = db.Column('Truck', db.String(45))
+    PaidDate = db.Column('PaidDate', db.DateTime)
+    InvoDate = db.Column('InvoDate', db.DateTime)
+    PaidAmt = db.Column('PaidAmt', db.String(45))
+    PayRef = db.Column('PayRef', db.String(45))
+    PayMeth = db.Column('PayMeth', db.String(45))
+    PayAcct = db.Column('PayAcct', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
-                 Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3):
+                 Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
+                 InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -535,6 +542,12 @@ class Orders(db.Model):
         self.Dropblock3 = Dropblock3
         self.Location3 = Location3
         self.Date3 = Date3
+        self.InvoDate = InvoDate
+        self.PaidDate = PaidDate
+        self.PaidAmt = PaidAmt
+        self.PayRef = PayRef
+        self.PayMeth = PayMeth
+        self.PayAcct = PayAcct
 
 
 class Drops(db.Model):
@@ -897,23 +910,37 @@ class Autos(db.Model):
     Title = db.Column('Title', db.String(25))
     State = db.Column('State', db.String(25))
     EmpWeight = db.Column('EmpWeight', db.String(25))
-    Dispatched = db.Column('Dispatched', db.String(25))
     Value = db.Column('Value', db.String(50))
-    Original = db.Column('Original', db.String(50))
     TowCompany = db.Column('TowCompany', db.String(50))
     TowCost = db.Column('TowCost', db.String(25))
     TowCostEa = db.Column('TowCostEa', db.String(25))
     Status = db.Column('Status', db.String(25))
-    Date1 = db.Column('Date1', db.DateTime)
+    Date = db.Column('Date', db.DateTime)
     Date2 = db.Column('Date2', db.DateTime)
     Pufrom = db.Column('Pufrom', db.String(50))
     Delto = db.Column('Delto', db.String(50))
     Ncars = db.Column('Ncars', db.Integer)
     Orderid = db.Column('Orderid', db.String(25))
     Hjo = db.Column('Hjo', db.String(25))
+    Pid = db.Column('Pid', db.Integer)
+    Customer = db.Column('Customer', db.String(50))
+    Cost = db.Column('Cost', db.String(25))
+    Sale = db.Column('Sale', db.String(25))
+    Bfee = db.Column('Bfee', db.String(25))
+    Source = db.Column('Source', db.String(50))
+    Proof = db.Column('Proof', db.String(50))
+    TitleDoc = db.Column('TitleDoc', db.String(50))
+    Invoice= db.Column('Invoice', db.String(50))
+    Package= db.Column('Package', db.String(50))
+    Scache = db.Column('Scache', db.Integer)
+    Pcache = db.Column('Pcache', db.Integer)
+    Icache = db.Column('Icache', db.Integer)
+    Tcache = db.Column('Tcache', db.Integer)
+    Pkcache = db.Column('Pkcache', db.Integer)
 
-    def __init__(self, Jo, Year, Make, Model, Color, VIN, Title, State, EmpWeight, Dispatched, Value, Original, TowCompany,
-                 TowCost, TowCostEa, Status, Date1, Date2, Pufrom, Delto, Ncars, Orderid, Hjo):
+    def __init__(self, Jo, Year, Make, Model, Color, VIN, Title, State, EmpWeight, Value, TowCompany,
+                 TowCost, TowCostEa, Status, Date, Date2, Pufrom, Delto, Ncars, Orderid, Hjo, Pid, Customer,
+                 Cost, Sale, Bfee, Source, Proof, TitleDoc, Invoice, Package, Scache, Pcache, Icache, Tcache, Pkcache):
         self.Jo = Jo
         self.Year = Year
         self.Make = Make
@@ -923,20 +950,35 @@ class Autos(db.Model):
         self.Title = Title
         self.State = State
         self.EmpWeight = EmpWeight
-        self.Dispatched = Dispatched
         self.Value = Value
         self.TowCompany = TowCompany
         self.TowCost = TowCost
         self.TowCostEa = TowCostEa
-        self.Original = Original
         self.Status = Status
-        self.Date1 = Date1
+        self.Date = Date
         self.Date2 = Date2
         self.Pufrom = Pufrom
         self.Delto = Delto
         self.Ncars = Ncars
         self.Orderid = Orderid
         self.Hjo = Hjo
+        self.DelTicket = DelTicket
+        self.TitlePdf = TitlePdf
+        self.Pid = Pid
+        self.Customer = Customer
+        self.Cost = Cost
+        self.Sale = Sale
+        self.Bfee = Bfee
+        self.Source = Source
+        self.Proof = Proof
+        self.TitleDoc = TitleDoc
+        self.Invoice = Invoice
+        self.Package = Package
+        self.Scache = Scache
+        self.Pcache = Pcache
+        self.Tcache = Tcache
+        self.Icache = Icache
+        self.Pkcache = Pkcache
 
 
 
@@ -1102,6 +1144,44 @@ class Invoices(db.Model):
         self.Date = Date
         self.Original = Original
         self.Status = Status
+
+class SumInv(db.Model):
+    __tablename__ = 'suminv'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Si = db.Column('Si', db.String(25))
+    Jo = db.Column('Jo', db.String(25))
+    Begin = db.Column('Begin', db.DateTime)
+    End = db.Column('End', db.DateTime)
+    Release = db.Column('Release', db.String(45))
+    Container = db.Column('Container', db.String(45))
+    Type = db.Column('Type', db.String(45))
+    Description = db.Column('Description', db.String(300))
+    Amount = db.Column('Amount',  db.String(45))
+    Total = db.Column('Total',  db.String(45))
+    Source = db.Column('Source', db.String(50))
+    Status = db.Column('Status', db.String(25))
+    Cache = db.Column('Cache', db.Integer)
+    Pid = db.Column('Pid', db.Integer)
+    Billto = db.Column('Billto', db.String(50))
+    InvoDate = db.Column('InvoDate', db.DateTime)
+
+    def __init__(self, Si, Jo, Begin, End, Release, Container, Type, Description, Amount, Source, Status, Cache, Pid, Total, Billto, InvoDate):
+        self.Jo = Jo
+        self.Si = Si
+        self.Begin = Begin
+        self.End = End
+        self.Release = Release
+        self.Container = Container
+        self.Type = Type
+        self.Source = Source
+        self.Description = Description
+        self.Amount = Amount
+        self.Total = Total
+        self.Status = Status
+        self.Cache = Cache
+        self.Pid = Pid
+        self.Billto = Billto
+        self.InvoDate = InvoDate
 
 
 class Income(db.Model):
