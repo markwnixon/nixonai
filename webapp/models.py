@@ -303,7 +303,7 @@ class Interchange(db.Model):
     CargoWt = db.Column('CargoWt', db.String(25))
     Time = db.Column('Time', db.String(25))
     Status = db.Column('Status', db.String(25))
-    Source = db.Column('Original', db.String(50))
+    Source = db.Column('Source', db.String(50))
     Path = db.Column('Path', db.String(50))
     Type = db.Column('Type', db.String(25))
     Jo = db.Column('Jo', db.String(25))

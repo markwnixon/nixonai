@@ -1,4 +1,6 @@
 from webapp.utils import nodollar, dollar, avg, hasvalue
+from webapp.class8_utils import container_check
+
 import datetime
 import numbers
 
@@ -29,6 +31,23 @@ def test_hasvalue():
     goodvals = ['anystring', 2, 46, 57.654, 'abc123', '123', 0.00]
     for val in goodvals:
         assert hasvalue(val) == 1
+
+def test_container_check():
+    goodvals = ['EGHU9330618', 'EITU1205992', 'CAAU5457832', 'ZCSU8465051', 'SUDU6931479']
+    for val in goodvals:
+        a, b = container_check(val)
+        assert a == 0
+    badvals = []
+    for val in goodvals:
+        lastdigit = val[10]
+        for ix in range(10):
+            if ix != int(lastdigit):
+                badvals.append(f'{val[0:10]}{ix}')
+    for val in badvals:
+        assert len(val) == 11
+    for val in badvals:
+        a, b = container_check(val)
+        assert a == 2
 
 
 

@@ -93,6 +93,8 @@ def hasvalue(input):
     else:
         return 1
 
+# Function to determine if variable has a meaningful value
+# especially when returning database information
 def hasinput(input):
     if input is None:
         return 0
@@ -123,14 +125,6 @@ def txtfile(infile):
     base=os.path.splitext(infile)[0]
     tf=base+'.txt'
     return tf
-
-def commaguard(instring):
-    sandwich=re.compile(r',[A-Za-z]')
-    t1=sandwich.findall(instring)
-    for t in t1:
-        l=t[1]
-        instring=instring.replace(t,', '+l)
-    return instring
 
 def commaguard(instring):
     sandwich=re.compile(r',[A-Za-z]')
@@ -184,6 +178,8 @@ def nononef(input):
         output = 0.00
     return output
 
+#Function to diplay error messages collected on server side
+#and display on website
 def erud(err):
     #print('err is for function:', err)
     errup = ''
