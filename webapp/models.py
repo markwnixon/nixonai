@@ -728,7 +728,7 @@ class People(db.Model):
     Temp2 = db.Column('Temp2', db.String(200))
     Date1 = db.Column('Date1', db.DateTime)
     Date2 = db.Column('Date2', db.DateTime)
-    Source = db.Column('Original', db.String(200))
+    Source = db.Column('Source', db.String(200))
     Accountid = db.Column('Accountid', db.Integer)
 
     def __init__(self, Ptype, Company, First, Middle, Last, Addr1, Addr2, Addr3, Idtype, Idnumber, Telephone, Email, Associate1, Associate2, Temp1, Temp2, Date1, Date2, Source, Accountid):
