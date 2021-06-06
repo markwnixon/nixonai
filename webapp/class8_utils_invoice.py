@@ -91,6 +91,7 @@ def addpayment(file1, cache, amtowed, payment, paidon, payref, paymethod):
     except:
         print('Already a string')
     file2 = file1.replace('.pdf', f'_Paid{cache}.pdf')
+    file2 = file2.replace('/vInvoice','/vPaidInvoice')
     c = canvas.Canvas(file2, pagesize=letter)
     c.setLineWidth(1)
     c.setFillColor('white')
@@ -125,8 +126,8 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
 # All dates must begin in datetime format and will be converted to strings as required
 
     joborder = odata.Jo
-    file1 = addpath(f'static/{scac}/data/vinvoice/INV'+joborder+'.pdf')
-    file2 = addpath(f'static/{scac}/data/vinvoice/INV'+joborder+'c'+str(cache)+'.pdf')
+    file1 = addpath(f'static/{scac}/data/vInvoice/INV'+joborder+'.pdf')
+    file2 = addpath(f'static/{scac}/data/vInvoice/INV'+joborder+'c'+str(cache)+'.pdf')
     today = datetime.datetime.today().strftime('%m/%d/%Y')
     type = joborder[1]
     if invodate is None or invodate == 0:
@@ -389,8 +390,8 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     si = sdat.Si
     docref = sdat.Source
     newbase = f'{si}_c{cache}.pdf'
-    file1 = addpath(f'static/{scac}/data/vinvoice/{docref}')
-    file2 = addpath(f'static/{scac}/data/vinvoice/{si}_c{cache}.pdf')
+    file1 = addpath(f'static/{scac}/data/vInvoice/{docref}')
+    file2 = addpath(f'static/{scac}/data/vInvoice/{si}_c{cache}.pdf')
     today = datetime.datetime.today().strftime('%m/%d/%Y')
 
     if invodate is None or invodate == 0:

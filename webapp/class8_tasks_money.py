@@ -141,6 +141,8 @@ def update_invoice(myo, err, tablesetup, invostyle):
         myo.Invoice = os.path.basename(docref)
         myo.Icache = cache + 1
         myo.InvoTotal = d2s(total)
+        myo.BalDue = d2s(total)
+        myo.Payments = '0.00'
         db.session.commit()
 
         err.append('Viewing ' + docref)
@@ -239,6 +241,8 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             # Create invoice code for order
             odata1.Istat = 1
             odata1.InvoTotal = d2s(itotal)
+            odata1.BalDue = d2s(itotal)
+            odata1.Payments = '0.00'
 
             db.session.commit()
 
@@ -512,7 +516,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.Booking, Container=odat.Container, Type=odat.Type, Description=desc, Amount = odat.InvoTotal, Total = '0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
                     db.session.add(input)
                     odat.Label = si
-                    odat.Istat = 5
+                    odat.Istat = 6
                     db.session.commit()
             sdata = SumInv.query.filter(SumInv.Si == si).all()
             for sdat in sdata:
@@ -531,12 +535,12 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
             sendemail = request.values.get('siemail')
             if sendemail is not None:
-                err = invoice_mimemail(newbase, err, 'vinvoice')
+                err = invoice_mimemail(newbase, err, 'vInvoice')
                 if 'Error' not in err:
                     sdat.Status = 2
                     for sid in sids:
                         odat = Orders.query.get(sid)
-                        odat.Istat = 6
+                        odat.Istat = 7
                     db.session.commit()
                     completed = True
 

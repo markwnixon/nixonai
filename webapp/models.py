@@ -479,13 +479,15 @@ class Orders(db.Model):
     PayRef = db.Column('PayRef', db.String(45))
     PayMeth = db.Column('PayMeth', db.String(45))
     PayAcct = db.Column('PayAcct', db.String(45))
+    BalDue = db.Column('BalDue', db.String(45))
+    Payments = db.Column('Payments', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
-                 InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct):
+                 InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -548,6 +550,8 @@ class Orders(db.Model):
         self.PayRef = PayRef
         self.PayMeth = PayMeth
         self.PayAcct = PayAcct
+        self.BalDue = BalDue
+        self.Payments = Payments
 
 
 class Drops(db.Model):
@@ -1308,14 +1312,14 @@ class Bills(db.Model):
     Description = db.Column('Description', db.String(600))
     bAmount = db.Column('bAmount', db.String(20))
     Status = db.Column('Status', db.String(25))
-    Cache = db.Column('Cache', db.Integer)
-    Original = db.Column('Original', db.String(75))
+    Scache = db.Column('Scache', db.Integer)
+    Source = db.Column('Source', db.String(75))
     Ref = db.Column('Ref', db.String(50))
-    bDate = db.Column('bDate', db.DateTime)
+    Date = db.Column('Date', db.DateTime)
     pDate = db.Column('pDate', db.DateTime)
     pAmount = db.Column('pAmount', db.String(20))
     pMulti = db.Column('pMulti', db.String(20))
-    pAccount = db.Column('Account', db.String(50))
+    pAccount = db.Column('pAccount', db.String(50))
     bAccount = db.Column('bAccount', db.String(50))
     bType = db.Column('bType', db.String(25))
     bCat = db.Column('bCat', db.String(45))
@@ -1329,9 +1333,9 @@ class Bills(db.Model):
     dDate = db.Column('dDate', db.DateTime)
     pAmount2 = db.Column('pAmount2', db.String(20))
     pDate2 = db.Column('pDate2', db.DateTime)
-    Code1 = db.Column('Code1', db.String(45))
-    Code2 = db.Column('Code2', db.String(45))
-    CkCache = db.Column('CkCache', db.Integer)
+    Check = db.Column('Check', db.String(45))
+    Proof = db.Column('Proof', db.String(45))
+    Ccache = db.Column('Ccache', db.Integer)
     QBi = db.Column('QBi', db.Integer)
     iflag = db.Column('iflag', db.Integer)
     PmtList= db.Column('PmtList', db.String(200))
@@ -1341,8 +1345,10 @@ class Bills(db.Model):
     PdateList = db.Column('PdateList', db.String(200))
     CheckList = db.Column('CheckList', db.String(200))
     MethList = db.Column('MethList', db.String(200))
+    Pcache = db.Column('Pcache', db.Integer)
+    pMeth = db.Column('pMeth', db.String(45))
 
-    def __init__(self, Jo, Pid, Company, Memo, Description, bAmount, Status, Cache, Original, Ref, bDate, pDate, pAmount, pMulti, pAccount, bAccount, bType, bCat, bSubcat, Link, User, Co, Temp1, Temp2, Recurring, dDate, pAmount2, pDate2, Code1, Code2, CkCache, QBi, iflag, PmtList, PacctList, RefList, MemoList, PdateList, CheckList, MethList):
+    def __init__(self, Jo, Pid, Company, Memo, Description, bAmount, Status, Scache, Source, Ref, Date, pDate, pAmount, pMulti, pAccount, bAccount, bType, bCat, bSubcat, Link, User, Co, Temp1, Temp2, Recurring, dDate, pAmount2, pDate2, Proof, Check, Ccache, QBi, iflag, PmtList, PacctList, RefList, MemoList, PdateList, CheckList, MethList, Pcache, pMeth):
         self.Jo = Jo
         self.Pid = Pid
         self.Company = Company
@@ -1350,10 +1356,10 @@ class Bills(db.Model):
         self.Description = Description
         self.bAmount = bAmount
         self.Status = Status
-        self.Cache = Cache
-        self.Original = Original
+        self.Scache = Scache
+        self.Source = Source
         self.Ref = Ref
-        self.bDate = bDate
+        self.Date = Date
         self.pDate = pDate
         self.pAmount = pAmount
         self.pMulti = pMulti
@@ -1371,9 +1377,9 @@ class Bills(db.Model):
         self.dDate = dDate
         self.pAmount2 = pAmount2
         self.pDate2 = pDate2
-        self.Code1 = Code1
-        self.Code2 = Code2
-        self.CkCache = CkCache
+        self.Proof = Proof
+        self.Check = Check
+        self.Ccache = Ccache
         self.QBi = QBi
         self.iflag = iflag
         self.PmtList = PmtList
@@ -1383,6 +1389,8 @@ class Bills(db.Model):
         self.PdateList = PdateList
         self.CheckList = CheckList
         self.MethList = MethList
+        self.Pcache = Pcache
+        self.pMeth = pMeth
 
     def Bal(self):
         try:

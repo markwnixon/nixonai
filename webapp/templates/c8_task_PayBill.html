@@ -4,13 +4,13 @@
     <div class="d-flex justify-content-around align-items-center">
         <div class="p-0">Enter New {{ task_focus }} Information</div>
         <div class="p-0">
-            <button type="submit" class="btn btn-md btn-green" name="Create Item">Create {{ tablesetup['name'] }}</button>
+            <button type="submit" class="btn btn-md btn-green" name="Update Item">Pay Bill</button>
             <button type="submit" class="btn btn-md btn-elegant" name="Cancel">&nbsp; Cancel </button>
         </div>
     </div>
 </div>
 
-{% set form_check = tablesetup['form checks']['New'] %}
+{% set form_check = tablesetup['form checks']['PayBill'] %}
 
 <div class="card-body">
 <table class="table table-condensed table-hover">
@@ -33,19 +33,20 @@
                         <select class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
                         <option value='Choose Later'>Choose Later</option>
 
-                                {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
-                                {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
-                                {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
-                                {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
-                                {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
-                                {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
-                                {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
-                                {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
-                                {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
-                                {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
-                                {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
+                                    {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
+                                    {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
+                                    {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
+                                    {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                                    {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
+                                    {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
+                                    {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
+                                    {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
+                                    {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
+                                    {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
+                                    {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
 
-                                {% endif %}
+
+                            {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
                             {% for kdata in klist %}
@@ -78,14 +79,8 @@
                     <td colspan="2"><textarea class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
                 </tr>
 
-        {% elif entry[3] == 'disabled' %}
-
-                <tr>
-                    <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}" >{{  entry[2] }} disabled</div></td>
-                    <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}" disabled ></td>
-                </tr>
-
         {% elif entry[3] == 'text' or entry[3] == 'date' or entry[3] == 'time' %}
+
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
                     <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>

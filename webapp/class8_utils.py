@@ -35,10 +35,10 @@ def container_check(num):
 
 
 
-def form_check(text,type):
+def form_check(text,type,task):
     status = 0
     message = 'Type is not defined'
-    #print(text,type)
+    print(text,type,task)
 
 
     if type == 'text':
@@ -80,6 +80,26 @@ def form_check(text,type):
             status = 2
             message = 'Error: must set a numerical value for this charge'
 
+    elif type == 'amtpaid':
+        if task == 'PayBill':
+            try:
+                dt = float(text)
+                text = d2s(dt)
+                status = 0
+                message = 'ok'
+            except:
+                status = 2
+                message = 'Error: must set a numerical value for this payment'
+        else:
+            try:
+                dt = float(text)
+                text = d2s(dt)
+                status = 0
+                message = 'ok'
+            except:
+                status = 1
+                message = 'Warning: this must be set when paying, but not for edit'
+
     elif type == 'integer':
         try:
             dt = int(text)
@@ -115,6 +135,44 @@ def form_check(text,type):
             status = 2
             message = 'Error: must choose a customer'
 
+    elif type == 'vendordata':
+        #print('select',text)
+        if text == 'Choose Later':
+            status = 2
+            message = 'Error: must choose a vendor'
+
+    elif type == 'codata':
+        #print('select',text)
+        if text == 'Choose Later':
+            status = 2
+            message = 'Error: must associate bill with Co/Div'
+
+    elif type == 'expdata':
+        #print('select',text)
+        if text == 'Choose Later':
+            status = 2
+            message = 'Error: must associate bill with pay account'
+
+    elif type == 'acctdata':
+        #print('select',text)
+        if text == 'Choose Later':
+            if task == 'PayBill':
+                status = 2
+                message = 'Error: must a payment account'
+            else:
+                status = 1
+                message = 'Warning: this must be set when paying bill'
+
+    elif type == 'paymethods':
+        print('select',text,task)
+        if text == 'Choose Later':
+            if task == 'PayBill':
+                status = 2
+                message = 'Error: must include a payment method'
+            else:
+                status = 1
+                message = 'Warning: this must be set when paying bill'
+
     elif type == 'dropblock1':
         from webapp.class8_tasks import get_drop
         if hasinput(text):
@@ -144,14 +202,15 @@ def form_check(text,type):
 def colorcode(table, incol):
     #print(f'This table for color is {table}')
     if table == 'Orders':
-        if incol == 4: return 'green text-white font-weight-bold'
+        if incol == 5: return 'green text-white font-weight-bold'
         elif incol == 3: return'amber font-weight-bold'
         elif incol == 2: return'purple text-white font-weight-bold'
         elif incol == 1: return 'blue text-white font-weight-bold'
         elif incol == -1: return 'yellow font-weight-bold'
-        elif incol == 5: return 'grey white-text font-weight-bold'
-        elif incol == 6: return 'orange font-weight-bold'
-        elif incol == 7: return 'light-green font-weight-bold'
+        elif incol == 6: return 'grey white-text font-weight-bold'
+        elif incol == 7: return 'orange font-weight-bold'
+        elif incol == 8: return 'light-green font-weight-bold'
+        elif incol == 4: return 'black text-white font-weight-bold'
         else: return 'white font-weight-bold'
     elif table == 'Interchange':
         if incol == 'IO': return 'blue-text font-weight-bold'
@@ -164,6 +223,11 @@ def colorcode(table, incol):
         elif incol == 2: return 'orange font-weight-bold'
         elif incol == 3: return 'black white-text font-weight-bold'
         elif incol == 4: return 'light-green text-white font-weight-bold'
+        else: return 'white font-weight-bold'
+    elif table == 'Bills':
+        #print(f'Incol is {incol}')
+        if incol == 'Paid': return 'green text-white font-weight-bold'
+        elif incol == 'Part': return'amber font-weight-bold'
         else: return 'white font-weight-bold'
     else:
         return 'white font-weight-bold'

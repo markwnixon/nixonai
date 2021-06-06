@@ -157,26 +157,34 @@ Orders_setup = {'name' : 'Trucking Job',
                 'table': 'Orders',
                 'filter': None,
                 'filterval': None,
-                'checklocation': 9,
+                'checklocation': 4,
                 'creators': ['Jo'],
                 'ukey': 'Jo',
-                'simplify': ['Job','Job Detail','Money','Docs','Dispatch','Hidden'],
+                'simplify': ['Min','Docs','Job','Money','Job Detail','Dispatch','Hidden'],
                 'entry data': [['Jo', 'JO', 'JO', jobcode, 'text', 0, 'ok', 'cc', None, 'Always'],
                                ['Order', 'Order', 'Customer Ref No.', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
                                ['Shipper', 'Shipper', 'Select Customer', 'select', 'customerdata', 0, 'ok', 'cl', 15, 'Always'],
+                               ['Source', 'Src', 'Source', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                               ['Proof', 'Prf', 'Proof', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                               ['Gate', 'Gte', 'Gate', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                               ['Invoice', 'Inv', 'Invoice', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                                ['Package', 'Pkg', 'Package', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                                ['PaidInvoice', 'PInv', 'PaidInvoice', None, 'text', 0, 'ok', 'cL', None, 'Docs'],
                                ['HaulType', 'HaulType', 'Select Haul Type', 'select', 'haul_types', 0, 'ok', 'cl', None, 'Job'],
                                ['Booking', 'Release', 'Release', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
                                ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok', 'cc', None, 'Job'],
                                ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Job'],
                                ['Chassis', 'Chassis', '', '', 'text', 0, 'ok', 'cc', None, 'Job'],
-                               ['Amount', 'Base$', 'Base Charge', 'text', 'float', 0, 'ok', 'cr', None, 'Money'],
-                               ['InvoTotal', 'Invo$', 'Total Charge', 'text', 'float', 0, 'ok', 'cr', None, 'Money'],
+                                ['Date', 'Load Date', 'Pick Up Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date2', 'Del Date', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                               ['Amount', 'Base$', 'Base Charge', 'text', 'float', 0, 'ok', 'cr', None, 'Job'],
+                               ['InvoTotal', 'Invo$', 'Total Charge', 'disabled', 'disabled', 0, 'ok', 'cr', None, 'Money'],
+                                ['Payments', 'Paid$', 'Payments', 'disabled', 'disabled', 0, 'ok', 'cr', None, 'Money'],
+                                ['BalDue', 'Due$', 'BalDue', 'disabled', 'disabled', 0, 'ok', 'cr', None, 'Money'],
                                ['Dropblock1', 'Load At', 'Load At', 'multitext', 'dropblock1', 0, 'Shipper', 'll', None, 'Job Detail'],
-                               ['Date', 'Load Date', 'Pick Up Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
                                ['Dropblock2', 'Deliver To', 'Deliver To', 'multitext', 'dropblock2', 0, 'Shipper', 'll', None, 'Job Detail'],
-                               ['Date2', 'Del Date', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
-                               ['Dropblock3', 'Third Location', 'Third Location', 'multitext', 'dropblock3', 0, 'Shipper', 'll', None, 'Job Detail'],
-                               ['Date3', 'Third Date', 'Third Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job Detail'],
+                               ['Dropblock3', 'Third Location', 'Third Location', 'appears_if', 'HaulType', 0, 'Shipper', 'll', None, 'Job Detail'],
+                               ['Date3', 'Third Date', 'Third Date', 'appears_if', 'HaulType', 0, 'ok', 'cc', None, 'Job Detail'],
                                ['Driver', 'Driver', 'Select Driver',  'select', 'driverdata', 0, 'ok', 'cc', None, 'Dispatch'],
                                ['Truck', 'Truck', 'Select Truck', 'select', 'truckdata', 0, 'ok', 'cc', None, 'Dispatch'],
                                ['Commodity', 'Commodity', 'Commodity', 'text', 'text', 0, 'ok', 'cc', None, 'Dispatch'],
@@ -193,24 +201,39 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ],
                 'colorfilter': ['Hstat','Istat'],
                 'filteron':  ['Date', 'Invoice', 'Haul'],
-                'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                              {'driverdata': ['Drivers', 'Active', 1, 'Name']},
-                              {'truckdata': ['Vehicles', 'Active', 1, 'Unit']},
-                              {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
-                              {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
+                              {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
+                              {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                              {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
+                              {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
+                              {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
+                              ],
+
+                'default values': {'get_Shipper': 'Fill This Later'},
+                'form checks': {
+                    'New': ['Job', 'Job Detail'],
+                    'Edit': ['Job', 'Job Detail', 'Money', 'Dispatch'],
+                    'Dispatch': ['Dispatch']
+                },
+                'appears_if': {
+                    'HaulType': ['Extra Stop', 'Transload'],
+                    'Dropblock3': ['multitext', 'dropblock3'],
+                    'Date3': ['date', 'date']
+                },
+
                 'jscript': 'dtTrucking',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
-                'source': ['vorders', 'Source', 'Jo'],
+                'sourcenaming': ['Source_Jo', 'c0', 'Jo'],
                 'copyswaps' : {},
                 'haulmask' : {
                                 'release': ['Release: BOL', 'Release: Booking', 'Release: BOL', 'Release: Booking', 'OTR Release BOL', 'OTR Release BOL', 'Transload Release', 'Release: BOL', 'Release: BOL', 'Release: BOL'],
                                 'container': ['Container', 'Container', 'Container', 'Container', 'Trailer No.', 'Trailer No.', 'Trailer No.', 'Container', 'Trailer No.', 'Container'],
-                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up From'],
-                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date'],
-                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To'],
-                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date'],
-                                'load3': ['no', 'no', 'Stop2', 'Stop2', 'no'],
-                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no']
+                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up From', 'Pick Up From','Pick Up From','Pick Up From','Pick Up From'],
+                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date', 'Pick Up From','Pick Up From','Pick Up From'],
+                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To', 'Deliver To','Deliver To','Deliver To','Deliver To','Deliver To'],
+                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date', 'no', 'no'],
+                                'load3': ['no', 'no', 'Stop2', 'Stop2', 'no', 'Stop2', 'Load Out', 'no', 'Delivery To', 'Delivery To'],
+                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no','Stop2 Date','no', 'Stop2 Date','Stop2 Date','Stop2 Date']
                               },
                 'matchfrom':    {
                                  'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
@@ -285,12 +308,10 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                      'haulmask' : [],
                      'colorfilter': ['Status'],
                       'filteron':  ['Date'],
-                     'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                                   {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
-                                   {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                     'side data': [],
                      'jscript': 'dtHorizontalVerticalExample2',
                      'documents': ['Source'],
-                     'source': ['vinterchange', '', 'Container', 'Type'],
+                     'sourcenaming': [None, None, 'Container', 'Type'],
                      'copyswaps' : {
                                     'Load In' : 'Empty Out',
                                     'Empty Out' : 'Load In',
@@ -327,12 +348,10 @@ Customers_setup = {'name' : 'Customer',
                    'haulmask': [],
                    'colorfilter': None,
                     'filteron':  [],
-                   'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                                 {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
-                                 {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                   'side data': [],
                    'jscript': 'dtHorizontalVerticalExample3',
                    'documents': ['Source'],
-                   'source': ['vpersons','', 'Company'],
+                   'sourcenaming': [None, None,'Company'],
                    'copyswaps' : {}
                    }
 
@@ -350,12 +369,9 @@ Services_setup = {'name' : 'Service',
                   'haulmask': [],
                   'colorfilter': None,
                    'filteron':  [],
-                  'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                                {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
-                                {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                  'side data': [],
                   'jscript': 'dtHorizontalVerticalExample4',
-                  'documents': ['Source'],
-                  'source': ['vservices', ''],
+                  'documents': [],
                   'copyswaps' : {}
                   }
 
@@ -388,9 +404,7 @@ Summaries_setup = {'name' : 'Summaries',
                   'haulmask': [],
                   'colorfilter': ['Status'],
                    'filteron':  [],
-                  'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                                {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
-                                {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                  'side data': [],
                   'jscript': 'dtSummaries',
                   'documents': ['Source'],
                   'source': ['vservices', ''],
@@ -416,9 +430,7 @@ Invoices_setup = {'name' : 'Invoice',
                   'hidden data' : [],
                   'haulmask': [],
                   'colorfilter': None,
-                  'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                                {'dropblock1': ['Orders', 'Shipper', 'get_Shipper', 'Company']},
-                                {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+                  'side data': [],
                   'jscript': 'dtHorizontalVerticalExample4',
                   'documents': ['None'],
                   'source': ['None'],
@@ -640,6 +652,163 @@ Autos_setup = {'name' : 'Auto Job',
                                                            'Amount']
                                                     }
 
+                                },
+                'summarytypes': {
+                                    'Invoice': {
+                                            'Top Blocks': ['Bill To', 'Pickup and Return for Dray Import', 'Deliver To'],
+                                            'Middle Blocks': ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
+                                            'Middle Items': ['Order', 'Booking', 'Container', 'Date', 'Date2'],
+                                            'Lower Blocks': ['JO', 'Gate Out-In', 'Booking', 'Container', 'Description/Notes', 'Amt']
+                                        }
+
+                                    }
+                }
+
+billcode = co[10] + 'B'
+Billing_genre =   {'table': 'Bills',
+                  'genre_tables': ['Bills', 'Vendors'],
+                  'genre_tables_on': ['on', 'off'],
+                  'quick_buttons': ['New Bill', 'Edit Item', 'Pay Bill',  'Print Checks'],
+                  'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 180 Days', 'Last Year', 'This Year', 'Show All']},
+                                    {'Pay Filter': ['Unpaid', 'Show All']}],
+                  'task_boxes': [{'Adding': ['New Bill', 'New Vendor', 'Upload Bill', 'Upload Payment']},
+                                 {'Editing': ['Edit Item', 'Match']},
+                                 {'Money Flow': ['Pay Bill', 'Multi-Pay', 'Print Check']},
+                                 {'View Docs': ['Bill Source', 'Pay Record', 'Check']},
+                                 {'Undo': ['Delete Item', 'Undo Payment']},
+                                 {'Tasks': ['Detention Report', 'Chassis Report', 'Bill Calendar']}],
+                  'document_profiles'  : {
+                                        'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
+                                        'Signed Load Con' : ['Source','0','0','0'],
+                                        'Update w/Source'   : ['Source','0','0','0'],
+                                        'Update w/Proof'    : ['Proofs','0','0','0'],
+                                        'Update w/Invoice'    : ['Invoice','0','0','0'],
+                                        'Paid Invoice'    : ['Invoice','0','0','0'],
+                                        'Update w/Gate' : ['Gate Tickets','0','0','0'],
+                                        'Completed IP' : ['Invoice', 'Proofs','0','0'],
+                                        'Completed IPS' : ['Invoice', 'Proofs', 'Source','0'],
+                                        'Completed IPSG' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
+                                      },
+                  'paymethods': ['Cash', 'Check', 'Credit Card', 'Epay-App', 'Epay-Web', 'PayCargo', 'Wire'],
+                  'image_stamps': {
+                      'X': ['x.png', 'stamps', .2],
+                      'Check': ['check.png', 'stamps', .5],
+                      'Paid': ['paid.png', 'stamps', 1]
+                  },
+                  'signature_stamps': {
+                      'Mark': ['mark.png', 'signatures', .2],
+                      'Norma': ['norma.png', 'signatures', .2]
+                  },
+                  'task_mapping': {'Bill':'Bills', 'Vendor':'Vendors',
+                                   'Source':'CT', 'Proof':'CT', 'View':'CT'},
+                  'task_box_map': {
+                                    'Quick' :
+                                        {
+                                            'New Bill' : ['Table_Selected', 'New', 'Bills'],
+                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
+                                            'Pay Bill' : ['Single_Item_Selection', 'PayBill', 'Form'],
+                                            'Print Checks' : ['Single_Item_Selection', 'PrintChecks', 'Form']
+                                        },
+                                    'Adding':
+                                        {
+                                         'New Bill': ['Table_Selected', 'New', 'Bills'],
+                                         'New Vendor' : ['Table_Selected', 'New', 'Customers'],
+                                         'Upload Bill' : ['Single_Item_Selection', 'Upload', 'Source'],
+                                         'Upload Payment' : ['Single_Item_Selection', 'Upload', 'Proof']
+                                         },
+
+                                    'Editing':
+                                        {
+                                         'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
+                                         'Match': ['Two_Item_Selection', 'Match', ''],
+                                         'Accept': ['All_Item_Selection', 'Accept', '']
+                                        },
+
+                                    'Money Flow':
+                                        {
+                                         'Pay Bill' : ['Single_Item_Selection', 'PayBill', 'Invoice'],
+                                         'Multi-Pay' : ['One_Table_Multi_Item_Selection', 'MultiPay', 'Invoice'],
+                                         'Print Check' : ['Single_Item_Selection', 'PrintChecks', 'Package']
+                                        },
+
+                                    'View Docs':
+                                        {
+                                         'Bill Source' : ['Single_Item_Selection', 'View', 'Source'],
+                                         'Pay Record' : ['Single_Item_Selection', 'View', 'Proof'],
+                                         'Check' : ['Single_Item_Selection', 'View', 'Check']
+                                         },
+
+                                    'Undo':
+                                        {
+                                          'Delete Item': ['All_Item_Selection', 'Undo', 'Delete'],
+                                          'Undo Payment': ['All_Item_Selection', 'Undo', 'Payment']
+                                        },
+                                    'Tasks':
+                                        {
+                                          'Detention Report': ['No_Selection_Plus_Display', 'Street_Turn', 'None'],
+                                          'Chassis Report': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None'],
+                                          'Bill Calendar' : ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Assign_Drivers', 'None']
+                                        }
+
+                                    }
+                    }
+
+Bills_setup = {'name' : 'Billing',
+                'table': 'Bills',
+                'filter': None,
+                'filterval': None,
+                'checklocation': 6,
+                'creators': ['Jo'],
+                'ukey': 'Jo',
+                'simplify': ['Min','ExpType','PayInfo','Docs'],
+                'entry data': [['Jo', 'JO', 'JO', billcode, 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Date', 'Bill Date', 'Bill Date',  'date', 'date', 0, 'ok', 'cc', None, 'Always'],
+                                ['dDate', 'Due Date', 'Due Date',  'date', 'date', 0, 'ok', 'cc', None, 'Always'],
+                                ['Company', 'Vendor', 'Select Vendor', 'select', 'vendordata', 0, 'ok', 'cl', 15, 'Always'],
+                                ['bAmount', 'Bill$', 'Bill$', 'text', 'float', 0, 'ok', 'cr', None, 'Always'],
+                                ['Co', 'Co', 'Co/Div', 'select', 'codata', 0, 'ok', 'cc', None, 'Always'],
+
+                                ['bAccount','ExAcct', 'Pay Acct', 'select', 'expdata', 0, 'ok', 'cl', None, 'ExpType'],
+                                ['bType','Ptype', 'Ptype', 'disabled', 'disabled', 0, 'ok', 'cc', None, 'ExpType'],
+                                ['bCat', 'D/I', 'D/I', 'disabled', 'disabled', 0, 'ok', 'cl', None, 'ExpType'],
+                                ['bSubcat','Cat', 'Cat', 'disabled', 'disabled', 0, 'Category', 'cl', None, 'ExpType'],
+
+
+                                ['pMeth','Meth', 'Meth', 'select', 'paymethods', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['pAccount','Account', 'Account', 'select', 'acctdata', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['pAmount','Paid Amount', 'Amount Paid', 'text', 'amtpaid', 0, 'ok', 'cr', None, 'PayInfo'],
+                                ['pDate','Paid Date', 'Paid Date', 'date', 'date', 0, 'ok', 'cc', None, 'PayInfo'],
+                                ['Description','Desc', 'Desc', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['Memo','Memo', 'Memo', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['Ref','RefNo', 'RefNo', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
+
+                               ['Source', 'Bill', 'Source', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                               ['Proof', 'Pf', 'Proof', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                               ['Check', 'Ck', 'Check', 'text', None, 0, 'ok', 'cL', None, 'Docs']
+                               ],
+                'hidden data': [],
+                'colorfilter': ['Status'],
+                'filteron':  ['Date'],
+                'side data': [{'vendordata': ['People', [['Ptype', 'Vendor']], 'Company']},
+                              {'acctdata': ['Accounts', [['Type', 'Bank']],'Name']},
+                              {'expdata': ['Accounts', [['Co', 'get_Co'],['Type','Expense']], 'Name']},
+                              {'codata': ['Divisions', [['Name', 'All']], 'Co']}
+                              ],
+                'default values': {'get_Co': 'N'},
+                'form checks': {
+                                'New': ['ExpType'],
+                                'Edit':['ExpType','PayInfo'],
+                                'PayBill':['ExpType','PayInfo']
+                                },
+                'bring data': [['Bills','bAccount','Accounts','Name',['Name', 'Category', 'Subcategory', 'Type', 'Co'],['bAccount','bCat','bSubcat', 'bType', 'Co']],
+                               ['Bills','Company','People','Company',['id'],['Pid']]
+                               ],
+                'jscript': 'dtTrucking',
+                'documents': ['Source', 'Proof', 'Check'],
+                'sourcenaming': ['Source_Pay', 'c0', 'Jo'],
+                'copyswaps' : {},
+                'haulmask' : {},
+                'matchfrom':    {
                                 },
                 'summarytypes': {
                                     'Invoice': {

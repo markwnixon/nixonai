@@ -52,8 +52,8 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
     # and the information includes odat, pdat, idata
     err.append('Review Signed Package')
     cache2 = int(odat.Pkcache)
-    docref = f'/static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
-    docreturn = f'static/{scac}/data/vpackages/P_c{cache2}_{odat.Jo}.pdf'
+    docref = f'/static/{scac}/data/vPackage/P_c{cache2}_{odat.Jo}.pdf'
+    docreturn = f'static/{scac}/data/vPackage/P_c{cache2}_{odat.Jo}.pdf'
     odat.Package = f'P_c{cache2}_{odat.Jo}.pdf'
     db.session.commit()
 
@@ -135,23 +135,23 @@ def get_doclist(odat, dockind):
     for jx, thisdoc in enumerate(dockind):
         if thisdoc != '0':
             if thisdoc == 'Source':
-                fa = addpath(f'static/{scac}/data/vorders/{odat.Source}')
+                fa = addpath(f'static/{scac}/data/vSource/{odat.Source}')
                 if os.path.isfile(fa):
                     packitems.append(fa)
                     fexist[jx] = 1
             if thisdoc == 'Invoice':
-                fa = addpath(f'static/{scac}/data/vinvoice/{odat.Invoice}')
+                fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
                 if os.path.isfile(fa):
                     packitems.append(fa)
                     fexist[jx] = 1
             if thisdoc == 'Proofs':
-                fa = addpath(f'static/{scac}/data/vorders/{odat.Proof}')
+                fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
                 print('Looking for proof file:', fa)
                 if os.path.isfile(fa):
                     packitems.append(fa)
                     fexist[jx] = 1
             if thisdoc == 'PaidInvoice':
-                fa = addpath(f'static/{scac}/data/vinvoice/{odat.PaidInvoice}')
+                fa = addpath(f'static/{scac}/data/vPaidInvoice/{odat.PaidInvoice}')
                 print('Looking for paid invoice file:', fa)
                 if os.path.isfile(fa):
                     packitems.append(fa)
@@ -195,7 +195,7 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
     odat.Package = basefile
     odat.Pkcache = cache2
     db.session.commit()
-    docref = f'static/{scac}/data/vpackages/{basefile}'
+    docref = f'static/{scac}/data/vPackage/{basefile}'
 
     #stampdata defines marks we want to add to the document and their location
     #emaildata comes from the email profile but can be amended here

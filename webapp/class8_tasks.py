@@ -1,10 +1,11 @@
 from webapp import db
-from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos
+from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
-from webapp.class8_dicts import Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup
+from webapp.class8_dicts import *
+#Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup, Billing_genre, Bills_setup
 from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task
 from webapp.class8_utils_package import makepackage
@@ -89,37 +90,65 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
 
         # For tables that are on get side data required for tasks:
         side_data = eval(f"{tableget}_setup['side data']")
+        defaults = eval(f"{tableget}_setup['default values']")
         #print('class8_tasks.py 86 Tablemaker() For tables on get this side data:',side_data)
         keydata = {}
         for side in side_data:
+            print(f'side is: {side}')
             for key, values in side.items():
                 #print('')
                 #print('****************************')
-                #print(f'key:{key}, values:{values}')
-                select_value = values[2]
-                if isinstance(select_value, str):
-                    if 'get_' in select_value:
-                        find = select_value.replace('get_','')
-                        select_value = request.values.get(find)
-                        #print('class8_tasks.py 98 Tablemaker() select_value:',select_value)
-                if select_value is not None:
-                    #print(f'Key:{key} Values{values} tableget{tableget}')
-                    if isinstance(select_value, str):
-                        dbstats = eval(
-                        f"{values[0]}.query.filter({values[0]}.{values[1]}=='{select_value}').order_by({values[0]}.{values[3]}).all()")
-                    if isinstance(select_value, int):
-                        dbstats = eval(
-                        f"{values[0]}.query.filter({values[0]}.{values[1]}=={select_value}).order_by({values[0]}.{values[3]}).all()")
-                    if dbstats is not None:
-                        dblist = []
-                        for dbstat in dbstats:
-                            nextvalue = eval(f'dbstat.{values[3]}')
-                            #print(f'nextvalue:{nextvalue}')
-                            if nextvalue is not None:  nextvalue = nextvalue.strip()
-                            if nextvalue not in dblist:
-                                dblist.append(nextvalue)
-                        keydata.update({key: dblist})
-                        #print(f'keydata is {keydata[key]}')
+                print(f'key:{key}, values:{values}')
+                ktable = values[0]
+                pairs = values[1]
+                keyon = values[2]
+                for ix, pair in enumerate(pairs):
+                    col = pair[0]
+                    select_value = pair[1]
+                    print(f'col,select_value is: {col} {select_value}')
+                    if ix == 0:
+                        if isinstance(select_value, str):
+                            # Output of the get_ could be string or integer, but have to start with string to test get_
+                            if 'get_' in select_value:
+                                default_val = defaults[f'{select_value}']
+                                find = select_value.replace('get_', '')
+                                select_value = request.values.get(find)
+                                if select_value is None: select_value = default_val
+
+                        if isinstance(select_value, str):
+                            if select_value == 'All':
+                                filters = f"{ktable}.query.order_by({ktable}.{keyon}).all()"
+                            else:
+                                filters = f"{ktable}.query.filter(({ktable}.{col}=='{select_value}')"
+                        elif isinstance(select_value, int):
+                            filters = f"{ktable}.query.filter(({ktable}.{col}=={select_value})"
+                    else:
+                        if isinstance(select_value, str):
+                            # Output of the get_ could be string or integer, but have to start with string to test get_
+                            if 'get_' in select_value:
+                                find = select_value.replace('get_', '')
+                                select_value = request.values.get(find)
+                                if select_value is None: select_value = 'All'
+                        if isinstance(select_value, str):
+                            filters = filters + f" & ({ktable}.{col}=='{select_value}')"
+                        elif isinstance(select_value, int):
+                            filters = filters + f" & ({ktable}.{col}=={select_value})"
+                    print(f'for ix:{ix}, col: {col}, select_value:{select_value} the current filters is {filters}')
+
+            if 'all()' not in filters: filters = filters+f').order_by({ktable}.{keyon}).all()'
+            print(filters)
+            dbstats = eval(filters)
+
+            if dbstats is not None:
+                dblist = []
+                for dbstat in dbstats:
+                    nextvalue = eval(f'dbstat.{keyon}')
+                    #print(f'nextvalue:{nextvalue}')
+                    if nextvalue is not None:  nextvalue = nextvalue.strip()
+                    if nextvalue not in dblist:
+                        dblist.append(nextvalue)
+                keydata.update({key: dblist})
+                #print(f'keydata is {keydata[key]}')
     return tabletitle, table_data, checked_data, jscripts, keydata, labpassvec
 
 def reset_state_soft(task_boxes):
@@ -171,8 +200,8 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         rstring = f"{taskon}_task(err, holdvec, task_iter)"
         completed, err, holdvec = eval(rstring)
         viewport[3] = 'Show Text'
-        print(holdvec[0])
-        print(holdvec[1])
+        #print(holdvec[0])
+        #print(holdvec[1])
 
     elif tasktype == 'No_Selection_Plus_Display_Plus_Left_Panel_Change':
         holdvec, entrydata, tablesetup = ['']*30, [], []
@@ -181,7 +210,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         viewport[0] = 'replace panel left'
         viewport[2] = taskon
         viewport[3] = 'Show Text'
-        print(f'taskon is {taskon}')
+        #print(f'taskon is {taskon}')
 
 
     elif tasktype == 'Single_Item_Selection':
@@ -373,23 +402,26 @@ def Table_maker(genre):
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
 
             #Reset Pay and Haul Filters if Show All selected (no filter applied)
-            if tfilters['Pay Filter'] == 'Show All': tfilters['Pay Filter'] = None
-            if tfilters['Haul Filter'] == 'Show All': tfilters['Haul Filter'] = None
+            if 'Pay Filter' in tfilters:
+                if tfilters['Pay Filter'] == 'Show All': tfilters['Pay Filter'] = None
+            if 'Haul Filter' in tfilters:
+                if tfilters['Haul Filter'] == 'Show All': tfilters['Haul Filter'] = None
 
-            if tfilters['Color Filter'] == 'Haul' or tfilters['Color Filter'] == 'Invoice':
-                #Provide filter consistency: if an invoice filter is selected make sure invoice colors are shown:
-                if tfilters['Pay Filter'] is not None and tfilters['Color Filter'] == 'Haul': tfilters['Color Filter'] = 'Both'
-                #Provide filter consistency: if an haul filter is selected make sure haul colors are shown:
-                if tfilters['Haul Filter'] is not None and tfilters['Color Filter'] == 'Invoice': tfilters['Color Filter'] = 'Both'
-                # Reset colors for color filter in primary table:
-                # eval(f"{genre}_genre['table_filters']['Color filters")
+            if 'Color Filter' in tfilters:
+                if tfilters['Color Filter'] == 'Haul' or tfilters['Color Filter'] == 'Invoice':
+                    #Provide filter consistency: if an invoice filter is selected make sure invoice colors are shown:
+                    if tfilters['Pay Filter'] is not None and tfilters['Color Filter'] == 'Haul': tfilters['Color Filter'] = 'Both'
+                    #Provide filter consistency: if an haul filter is selected make sure haul colors are shown:
+                    if tfilters['Haul Filter'] is not None and tfilters['Color Filter'] == 'Invoice': tfilters['Color Filter'] = 'Both'
+                    # Reset colors for color filter in primary table:
+                    # eval(f"{genre}_genre['table_filters']['Color filters")
 
-            if tfilters['Color Filter'] == 'Haul':
-                Orders_setup['colorfilter'] = ['Hstat']
-            elif tfilters['Color Filter'] == 'Invoice':
-                Orders_setup['colorfilter'] = ['Istat']
-            elif tfilters['Color Filter'] == 'Both':
-                Orders_setup['colorfilter'] = ['Hstat', 'Istat']
+                if tfilters['Color Filter'] == 'Haul':
+                    Orders_setup['colorfilter'] = ['Hstat']
+                elif tfilters['Color Filter'] == 'Invoice':
+                    Orders_setup['colorfilter'] = ['Istat']
+                elif tfilters['Color Filter'] == 'Both':
+                    Orders_setup['colorfilter'] = ['Hstat', 'Istat']
 
 
 
@@ -439,14 +471,14 @@ def Table_maker(genre):
             err = ['Entry canceled']
             taskon = None
             task_iter = 0
-            holdvec = [''] * 30
+            holdvec = [''] * 50
             entrydata = []
             viewport = ['tables'] + ['0']*5
     else:
         taskon = None
         task_iter = 0
         tasktype = ''
-        holdvec = [''] * 30
+        holdvec = [''] * 50
         print(f'labpassvec is {labpassvec}')
         entrydata = []
         err = ['All is well']
@@ -459,9 +491,9 @@ def Table_maker(genre):
 
     if len(holdvec)<50: holdvec = holdvec + ['']*(50-len(holdvec))
     checkcol = [eval(f"{ix}_setup['checklocation']") for ix in tables_on]
-    holdvec[28] = checkcol
-    holdvec[29] = labpassvec
-    holdvec[27] = f'/static/{scac}/data/v{genre.lower()}s/'
+    holdvec[48] = checkcol
+    holdvec[49] = labpassvec
+    holdvec[47] = f'/static/{scac}/data/v'
     print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
     print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
@@ -509,20 +541,32 @@ def get_dbdata(table_setup, tfilters):
     except:
         simpler = []
 
-    print(f"Critical Point {table} {session['table_removed']}")
+    print(f"Critical Point {table} Removed:{session['table_removed']}")
     if table not in session['table_removed']:
         #Do this if needing to use default values
         if simpler != []:
             boxchecks = ['off'] * len(simpler)
-            boxchecks[0] = 'on'
+            boxchecks[0:3] = ['on','on','on']
             session['table_removed'].append(table)
-            boxlist.append(simpler[0])
+            boxlist = simpler[0:3]
         else: boxchecks, boxlist = [], []
     else:
         for box in simpler:
+            print(f'box is {box}')
             thischeck = request.values.get(f'{box}box')
             boxchecks.append(thischeck)
             if thischeck == 'on': boxlist.append(box)
+        print(f'boxlist is {boxlist}')
+        #This part will replace with session variable for when we leave the tables but come back to them
+        if boxlist == []:
+            print('replacing null with session')
+            boxlist = session['boxlist']
+            boxchecks = ['off'] * len(simpler)
+            for ix,box in enumerate(simpler):
+                if box in boxlist: boxchecks[ix] = 'on'
+        else:
+            session['boxlist'] = boxlist
+            print('changing session variable')
 
     # Apply built-in table filter:
     if highfilter is not None:
@@ -535,51 +579,54 @@ def get_dbdata(table_setup, tfilters):
     if color_selector is not None:
 
         # Determine if time filter applies to query:
-        dtest = tfilters['Date Filter']
-        if dtest is not None and dtest != 'Show All' and 'Date' in filteron:
-            daysback = None
-            fromdate = None
-            todate = None
-            if '30' in dtest: daysback = 30
-            elif '60' in dtest: daysback = 60
-            elif '90' in dtest: daysback = 90
-            elif '120' in dtest: daysback = 120
-            elif '180' in dtest: daysback = 180
-            elif dtest == 'Last Year':
-                fromdate = datetime.date(lastyear,1,1)
-                todate = datetime.date(lastyear,12,31)
-            elif dtest == 'This Year':
-                fromdate = datetime.date(thisyear,1,1)
-            if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
-            if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
-            if todate is not None: query_adds.append(f'{table}.Date <= todate')
-            #print(f'This time filter applied from fromdate = {fromdate} to todate = {todate}')
+        if 'Date Filter' in tfilters:
+            dtest = tfilters['Date Filter']
+            if dtest is not None and dtest != 'Show All' and 'Date' in filteron:
+                daysback = None
+                fromdate = None
+                todate = None
+                if '30' in dtest: daysback = 30
+                elif '60' in dtest: daysback = 60
+                elif '90' in dtest: daysback = 90
+                elif '120' in dtest: daysback = 120
+                elif '180' in dtest: daysback = 180
+                elif dtest == 'Last Year':
+                    fromdate = datetime.date(lastyear,1,1)
+                    todate = datetime.date(lastyear,12,31)
+                elif dtest == 'This Year':
+                    fromdate = datetime.date(thisyear,1,1)
+                if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
+                if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
+                if todate is not None: query_adds.append(f'{table}.Date <= todate')
+                #print(f'This time filter applied from fromdate = {fromdate} to todate = {todate}')
 
         # Determine if pay filter applies to query:
-        itest = tfilters['Pay Filter']
-        if itest is not None and itest != 'Show All' and 'Invoice' in filteron:
-            if itest == 'Uninvoiced':
-                pfilter = f'{table}.Istat == None'
-            elif itest == 'Unrecorded':
-                pfilter = f'{table}.Istat == 1'
-            elif itest == 'Unpaid':
-                pfilter = f'{table}.Istat != 4'
-            elif itest == 'InvoSummaries':
-                pfilter = f'{table}.Istat > 4'
-            query_adds.append(pfilter)
+        if 'Pay Filter' in tfilters:
+            itest = tfilters['Pay Filter']
+            if itest is not None and itest != 'Show All' and 'Invoice' in filteron:
+                if itest == 'Uninvoiced':
+                    pfilter = f'{table}.Istat == None'
+                elif itest == 'Unrecorded':
+                    pfilter = f'{table}.Istat == 1'
+                elif itest == 'Unpaid':
+                    pfilter = f'{table}.Istat != 5'
+                elif itest == 'InvoSummaries':
+                    pfilter = f'{table}.Istat > 5'
+                query_adds.append(pfilter)
 
         # Determine if haul filter applies to query:
-        htest = tfilters['Haul Filter']
-        if htest is not None and htest != 'Show All' and 'Haul' in filteron:
-            if htest == 'Not Started':
-                hfilter = f'{table}.Hstat == 0'
-            elif htest == 'In-Progress':
-                hfilter = f'{table}.Hstat == 1'
-            elif htest == 'Incomplete':
-                hfilter = f'{table}.Hstat < 2'
-            elif htest == 'Completed':
-                hfilter = f'{table}.Hstat >= 2'
-            query_adds.append(hfilter)
+        if 'Haul Filter' in tfilters:
+            htest = tfilters['Haul Filter']
+            if htest is not None and htest != 'Show All' and 'Haul' in filteron:
+                if htest == 'Not Started':
+                    hfilter = f'{table}.Hstat == 0'
+                elif htest == 'In-Progress':
+                    hfilter = f'{table}.Hstat == 1'
+                elif htest == 'Incomplete':
+                    hfilter = f'{table}.Hstat < 2'
+                elif htest == 'Completed':
+                    hfilter = f'{table}.Hstat >= 2'
+                query_adds.append(hfilter)
 
     # Put the filters together from the 3 possible pieces: time, type1, type2
     if query_adds == []:
@@ -620,7 +667,7 @@ def get_dbdata(table_setup, tfilters):
             datarow[jx] = getattr(odat, co)
             if colist[8] is not None:
                 eltest = f'{datarow[jx]}'
-                print(f'eltest {eltest} and colist is {colist[8]}')
+                #print(f'eltest {eltest} and colist is {colist[8]}')
                 if len(eltest) > colist[8]: datarow[jx] = eltest[0:colist[8]]
         data1.append(datarow)
 
@@ -649,10 +696,11 @@ def make_new_entry(tablesetup,holdvec):
     ukey = tablesetup['ukey']
     documents = tablesetup['documents']
     if 'Source' in documents:
-        sourcekeys = tablesetup['source']
-        dirloc = sourcekeys[0]
-        newfile = sourcekeys[1]
-        sourcekey = sourcekeys[2:]
+        sourcekeys = tablesetup['sourcenaming']
+        if sourcekeys[0] is not None: basename = sourcekeys[0]
+        else: basename = None
+        postfix = sourcekeys[1]
+        keyfinds = sourcekeys[2:]
     else:
         sourcekeys = None
 
@@ -682,7 +730,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
@@ -692,9 +740,11 @@ def make_new_entry(tablesetup,holdvec):
     dat = eval(newquery)
     if dat is not None:
         id = dat.id
+        form_show = tablesetup['form checks']['New']
         for jx,entry in enumerate(entrydata):
-            #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
-            setattr(dat, f'{entry[0]}', holdvec[jx])
+            if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
+                setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
                 thisvalue = getattr(dat, entry[2])
@@ -714,29 +764,17 @@ def make_new_entry(tablesetup,holdvec):
             docsave = request.values.get('viewport2')
             #newile already set at top of routine to the base name for document
             #print(f'dirloc is {dirloc}')
-            if dirloc == 'vorders':
-                for eachsource in sourcekey:
-                    keyval = getattr(dat,eachsource)
-                    newfile = newfile + f'_Jo_{keyval}'
-                newfile = newfile + '_c0.pdf'
-            if dirloc == 'vinterchange':
-                #print(f'sourcekey is {sourcekey}')
-                for eachsource in sourcekey:
-                    keyval = getattr(dat,eachsource)
-                    newfile = newfile + f'{keyval}_'
-                newfile = newfile.upper() + '.pdf'
-                newfile = newfile.replace(' ','_')
-                newfile = newfile.replace('_.','.')
-            if dirloc == 'vpersons':
-                #print(f'sourcekey is {sourcekey}')
-                for eachsource in sourcekey:
-                    keyval = getattr(dat,eachsource)
-                    newfile = newfile + f'{keyval}_'
-                newfile = newfile.upper() + '.pdf'
-                newfile = newfile.replace(' ','_')
-                newfile = newfile.replace('_.','.')
-            if dirloc == 'vservices':
-                oldpath,newfile = os.path.split(docsave)
+            keyval = getattr(dat, keyfinds[0])
+            if len(keyfinds)==2:
+                keyval2 =  getattr(dat, keyfinds[1])
+                keyval = f'{keyval}_{keyval2}'
+            keyval = keyval.upper()
+            keyval = keyval.replace(' ','_')
+            if basename is not None: keyval = f'{basename}_{keyval}'
+            if postfix is not None:
+                newfile = f'{keyval}_{postfix}.pdf'
+            else:
+                newfile = f'{keyval}.pdf'
 
             if hasinput(docsave):
                 newpath = addpath(tpath(table, newfile))
@@ -761,11 +799,11 @@ def make_new_entry(tablesetup,holdvec):
 def mask_apply(entrydata, masks):
     mask_to_apply = request.values.get('HaulType')
     list = Trucking_genre['haul_types']
-    #print(mask_to_apply)
+    print(mask_to_apply)
     if mask_to_apply in list:
-        #print(f'the list is {list}')
+        print(f'the list is {list}')
         this_index = list.index(mask_to_apply)
-        #print(f'the index is {this_index}')
+        print(f'the index is {this_index}')
         for jx, entry in enumerate(entrydata):
             if 'Release' in entry[1]:
                 mask = masks['release']
@@ -780,7 +818,9 @@ def mask_apply(entrydata, masks):
                 mask = masks['load2']
                 entrydata[jx][2] = mask[this_index]
             if 'Load Date' in entry[1]:
+
                 mask = masks['load1date']
+                print(f'Mask {entry[1]}, {this_index} {mask}')
                 entrydata[jx][2] = mask[this_index]
                 #print(f'Mask {entry[2]}')
             if 'Del Date' in entry[1]:
@@ -796,9 +836,24 @@ def mask_apply(entrydata, masks):
         entrydata = [v for v in entrydata if v[2] != 'no']
     return entrydata
 
+def check_appears(tablesetup, entry):
+    checks = tablesetup['appears_if']
+    testval = entry[4]
+    testmat = checks[testval]
+    colmat = checks[entry[0]]
+    havedat = request.values.get(testval)
+    if havedat is not None:
+        for test in testmat:
+            if test in havedat:
+                print(test,havedat)
+                return colmat
+        print('checkappears',testval,testmat,colmat,havedat)
+    return entry[3], entry[4]
+
 def New_task(tablesetup, task_iter):
     completed = False
     err = [f"Running New task with task_iter {task_iter} using {tablesetup['table']}"]
+    form_show = tablesetup['form checks']['New']
 
     if task_iter > 0:
         entrydata = tablesetup['entry data']
@@ -810,11 +865,28 @@ def New_task(tablesetup, task_iter):
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            if entry[1] != 'hidden':
-                holdvec[jx] = request.values.get(f'{entry[0]}')
-                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
-                if entry[5] > 1: failed = failed + 1
-                if entry[5] == 1: warned = warned + 1
+            if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                if entry[1] != 'hidden':
+                    holdvec[jx] = request.values.get(f'{entry[0]}')
+                    holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'New')
+                    if entry[5] > 1: failed = failed + 1
+                    if entry[5] == 1: warned = warned + 1
+
+        if 'bring data' in tablesetup:
+            for bring in tablesetup['bring data']:
+                tab1, sel, tab2, cat, colist1, colist2 = bring
+                print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                valmatch = request.values.get(sel)
+                print(valmatch)
+                escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                adat = eval(escript)
+                if adat is not None:
+                    for jx, col in enumerate(colist1):
+                        thisval = getattr(adat, col)
+                        for ix, entry in enumerate(entrydata):
+                            if entry[0] == colist2[jx]:
+                                holdvec[ix] = thisval
+
         err.append(f'There are {failed} input errors and {warned} input warnings')
 
         create_item = request.values.get('Create Item')
@@ -853,6 +925,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     creators = tablesetup['creators']  # Gather the data for the selected row
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
+    form_show = tablesetup['form checks']['Edit']
 
     print(f'Running edit with task_iter {task_iter}')
 
@@ -861,10 +934,33 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            holdvec[jx] = request.values.get(f'{entry[0]}')
-            holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
-            if entry[5] > 1: failed = failed + 1
-            if entry[5] == 1: warned = warned + 1
+            if entry[3] == 'appears_if':
+                entry[3], entry[4] = check_appears(tablesetup, entry)
+                entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
+                print(f'Return from check_appears is {entry[3]} and {entry[4]}')
+            if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
+                holdvec[jx] = request.values.get(f'{entry[0]}')
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'Edit')
+                if entry[5] > 1: failed = failed + 1
+                if entry[5] == 1: warned = warned + 1
+
+        if 'bring data' in tablesetup:
+            for bring in tablesetup['bring data']:
+                tab1, sel, tab2, cat, colist1, colist2 = bring
+                print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                valmatch = request.values.get(sel)
+                print(valmatch)
+                escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                adat = eval(escript)
+                if adat is not None:
+                    for jx, col in enumerate(colist1):
+                        thisval = getattr(adat, col)
+                        for ix, entry in enumerate(entrydata):
+                            if entry[0] == colist2[jx]:
+                                holdvec[ix] = thisval
+                                #print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+
         err.append(f'There are {failed} input errors and {warned} input warnings')
 
         update_item = request.values.get('Update Item')
@@ -877,7 +973,8 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
             if failed == 0:
                 for jx, entry in enumerate(entrydata):
-                    if entry[0] not in creators: setattr(olddat, f'{entry[0]}', holdvec[jx])
+                    if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                        if entry[0] not in creators: setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
                 for jx, entry in enumerate(hiddendata):
                     thisvalue = getattr(olddat,entry[2])
@@ -891,6 +988,25 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 db.session.commit()
                 #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
+
+                # Test of bring data-modify the database at this point
+                if 'bring data' in tablesetup:
+                    for bring in tablesetup['bring data']:
+                        tab1, sel, tab2, cat, colist1, colist2 = bring
+                        print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                        valmatch = request.values.get(sel)
+                        print(valmatch)
+                        escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                        print(escript)
+                        adat = eval(escript)
+                        if adat is not None:
+                            for jx, col in enumerate(colist1):
+                                thisval = getattr(adat, col)
+                                setattr(olddat, colist2[jx], thisval)
+                                print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+                            db.session.commit()
+                    #olddat = eval(nextquery)
+                    #for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
             else:
                 err.append(f'Cannot update entry until input errors shown in red below are resolved')
 
@@ -899,7 +1015,12 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         nextquery = f"{table}.query.get({sid})"
         olddat = eval(nextquery)
 
-        for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
+        for jx, entry in enumerate(entrydata):
+            if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry)
+            holdvec[jx] = getattr(olddat, f'{entry[0]}')
+
+
+
 
 
     docref = getattr(olddat, 'Source')
@@ -959,6 +1080,9 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 odat.Invoice = None
                 odat.Istat = 0
                 odat.Links = None
+                odat.BalDue = None
+                odat.InvoTotal = None
+                odat.Payments = '0.00'
                 db.session.commit()
                 Invoices.query.filter(Invoices.Jo == odat.Jo).delete()
                 Income.query.filter(Income.Jo == odat.Jo).delete()
@@ -971,11 +1095,11 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 sinow = odat.Label
                 slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
                 odata = Orders.query.filter(Orders.Label == sinow).all()
-                print(f'Undoing sinow {sinow} slead id {slead.id} number of odata {len(odata)}')
+                if slead is not None: print(f'Undoing sinow {sinow} slead id {slead.id} number of odata {len(odata)}')
 
                 if slead is None:
-                    odat.Istat = 2
-                    if odat.Hstat == 4:
+                    odat.Istat = 3
+                    if odat.Hstat == 5:
                         odat.Hstat = 3
                     odat.PaidInvoice = None
                     odat.PayRef = None
@@ -983,6 +1107,8 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                     odat.PayAcct = None
                     odat.PaidDate = None
                     odat.PaidAmt = None
+                    odat.Payments = '0.00'
+                    odat.BalDue = odat.InvoTotal
                     db.session.commit()
                     jo = odat.Jo
                     idata = Invoices.query.filter(Invoices.Jo == jo).all()
@@ -1003,8 +1129,8 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         each.PayAcct = None
                         each.PaidDate = None
                         each.PaidAmt = None
-                        each.Istat = 5
-                        if each.Hstat == 4:
+                        each.Istat = 6
+                        if each.Hstat == 5:
                             each.Hstat = 3
 
                         jo = each.Jo
@@ -1268,7 +1394,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
             for jx, entry in enumerate(entrydata):
                 holdvec[jx] = request.values.get(f'{entry[0]}')
-                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4])
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'Manifest')
                 if entry[5] > 1: failed = failed + 1
                 if entry[5] == 1: warned = warned + 1
             err.append(f'There are {failed} input errors and {warned} input warnings')
@@ -1438,6 +1564,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             eprof = 'Custom'
             emaildata = get_company(eprof, odat)
             stamplist, stampdata = get_last_used_stamps(odat)
+            email_requested = 0
 
         else:
             # Save the current stamps to database for future launch
@@ -1451,7 +1578,8 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 emaildata = emaildata_update()
             else:
                 emaildata = get_company(eprof, odat)
-            if email_requested: info_mimemail(emaildata)
+            if email_requested:
+                info_mimemail(emaildata)
 
         holdvec[15] = stamplist
         #holdvec[4] = emaildata
@@ -1472,6 +1600,14 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         err.append('Hit Finished to End Viewing and Return to Table View')
         finished = request.values.get('Finished')
         if finished is not None: completed = True
+
+        if email_requested:
+            print('Exiting after email requested completed')
+            if 'Invoice' in dockind:
+                print('This is an invoice based package')
+                odat.Istat = 3
+                db.session.commit()
+            completed = True
 
     return holdvec, entrydata, err, viewport, completed
 
@@ -1651,7 +1787,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     nextquery = f"{table}.query.get({sid})"
     odat = eval(nextquery)
     istat = odat.Istat
-    if istat == 5 or istat == 6:
+    if istat == 6 or istat == 7:
         # This is a summary invoice and must receive against all elements
         sinow = odat.Label
         slead = SumInv.query.filter( (SumInv.Si == sinow) & (SumInv.Status > 0) ).first()
@@ -1674,7 +1810,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                 amtpaid = d2s(slead.Total)
             payref = odat.PayRef
             paymethod = odat.PayMeth
-            thisdepot = odat.PayAcct
+            thisdepo = odat.PayAcct
             if payref is None: payref = 'Check No.'
             if paymethod is None:
                 paymethod = 'Check'
@@ -1719,7 +1855,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             odat.PayAcct = thisdepo
             db.session.commit()
             print(f'The updated paid invoice file is {basefile}')
-            docref = f'static/{scac}/data/vinvoice/{basefile}'
+            docref = f'static/{scac}/data/vPaidInvoice/{basefile}'
         else:
             invofile = addpath(tpath('Orders-Invoice', slead.Source))
             cache = odat.Icache
@@ -1734,7 +1870,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             slead.Status = 4
             db.session.commit()
             print(f'The updated paid summery invoice file is {basefile}')
-            docref = f'static/{scac}/data/vinvoice/{basefile}'
+            docref = f'static/{scac}/data/vPaidInvoice/{basefile}'
 
 
         holdvec[4] = emaildata
@@ -1747,10 +1883,21 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             if slead is None:
                 hstat = odat.Hstat
                 if hstat == 2 or hstat == 3:
-                    odat.Hstat = 4
-                odat.Istat = 4
+                    odat.Hstat = 5
+                odat.Istat = 5
                 odat.PaidDate = paidon
                 odat.PaidAmt = d2s(amtpaid)
+
+                paysofar = odat.Payments
+                if paysofar is not None:
+                    paysofar = float(paysofar)
+                else:
+                    paysofar = 0.00
+                totpaid = paysofar + float(amtpaid)
+                baldue = float(odat.InvoTotal) - totpaid
+                odat.BalDue = d2s(baldue)
+                odat.Payments = d2s(totpaid)
+
                 db.session.commit()
                 gledger_write('income', odat.Jo, thisdepo, 0)
                 if email_requested: info_mimemail(emaildata)
@@ -1767,8 +1914,8 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                     for each in odata:
                         hstat = each.Hstat
                         if hstat == 2 or hstat == 3:
-                            each.Hstat = 4
-                        each.Istat = 7
+                            each.Hstat = 5
+                        each.Istat = 8
                         each.PaidDate = paidon
                         each.PaidAmt = d2s(each.InvoTotal)
                         db.session.commit()
@@ -1808,7 +1955,7 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
     #Determine unique shippers:
     comps = []
-    tjobs = Orders.query.filter( ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 5) | (Orders.Istat == 6)) & (Orders.Date > stopdate) ).all()
+    tjobs = Orders.query.filter( ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date > stopdate) ).all()
     for job in tjobs:
         com = job.Shipper
         if com not in comps:
@@ -1823,7 +1970,7 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
         holdvec[7] = request.values.get('thisdate')
 
     #This is the relevant data for selection
-    odata = Orders.query.filter((Orders.Shipper == co) & ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 5) | (Orders.Istat == 6)) & (Orders.Date > stopdate)).all()
+    odata = Orders.query.filter((Orders.Shipper == co) & ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date > stopdate)).all()
     lenod = len(odata)
     if lenod < 1:
         if co is None:
@@ -1990,8 +2137,8 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
                     hstat = odat.Hstat
                     if hstat == 2 or hstat == 3:
-                        odat.Hstat = 4
-                    odat.Istat = 4
+                        odat.Hstat = 5
+                    odat.Istat = 5
 
                     #odat.PaidInvoice = basefile
                     #odat.Icache = cache + 1
@@ -2011,9 +2158,132 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
     return completed, err, holdvec
 
+def PayBill_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    err = [f"Running PayBill task with task_iter {task_iter} using {tablesetup['table']}"]
+    completed = False
+    viewport = ['0'] * 6
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    masks = tablesetup['haulmask']
+    if masks != []: entrydata = mask_apply(entrydata, masks)
+    hiddendata = tablesetup['hidden data']
+    numitems = len(entrydata)
+    holdvec = [''] * numitems
+
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    colorcol = tablesetup['colorfilter']
+    creators = tablesetup['creators']  # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    olddat = eval(nextquery)
+    form_show = tablesetup['form checks']['PayBill']
+
+    print(f'Running edit with task_iter {task_iter}')
+
+    if task_iter > 0:
+        failed = 0
+        warned = 0
+
+        for jx, entry in enumerate(entrydata):
+            if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
+                holdvec[jx] = request.values.get(f'{entry[0]}')
+                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'PayBill')
+                if entry[5] > 1: failed = failed + 1
+                if entry[5] == 1: warned = warned + 1
+
+        if 'bring data' in tablesetup:
+            for bring in tablesetup['bring data']:
+                tab1, sel, tab2, cat, colist1, colist2 = bring
+                print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                valmatch = request.values.get(sel)
+                print(valmatch)
+                escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                adat = eval(escript)
+                if adat is not None:
+                    for jx, col in enumerate(colist1):
+                        thisval = getattr(adat, col)
+                        for ix, entry in enumerate(entrydata):
+                            if entry[0] == colist2[jx]:
+                                holdvec[ix] = thisval
+                                # print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+
+        err.append(f'There are {failed} input errors and {warned} input warnings')
+
+        update_item = request.values.get('Update Item')
+        if update_item is not None:
+            try:
+                thisvalue = getattr(olddat, colorcol[0])
+                if thisvalue == -1: setattr(olddat, colorcol[0], 0)
+            except:
+                print('No color selector found')
+
+            if failed == 0:
+                for jx, entry in enumerate(entrydata):
+                    if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                        if entry[0] not in creators: setattr(olddat, f'{entry[0]}', holdvec[jx])
+                db.session.commit()
+                for jx, entry in enumerate(hiddendata):
+                    thisvalue = getattr(olddat, entry[2])
+                    try:
+                        thisvalue = thisvalue.splitlines()
+                        thissubvalue = thisvalue[0]
+                    except:
+                        thissubvalue = ''
+                    # print('Updating Entry with', entry[0], thissubvalue)
+                    setattr(olddat, f'{entry[0]}', thissubvalue)
+                db.session.commit()
+                # err.append(f"Updated entry in {tablesetup['table']}")
+                # Test if Bill is completely paid and set status attribute accordingly:
+                newdat = eval(nextquery)
+                billamt = float(newdat.bAmount)-.01
+                paidamt = float(newdat.pAmount)
+                if paidamt > billamt:
+                    newdat.Status = 'Paid'
+                elif paidamt > 0.0:
+                    newdat.Status = 'Part'
+                else:
+                    newdat.Status = 'Unpaid'
+                db.session.commit()
 
 
+                completed = True
 
+                # Test of bring data-modify the database at this point
+                if 'bring data' in tablesetup:
+                    for bring in tablesetup['bring data']:
+                        tab1, sel, tab2, cat, colist1, colist2 = bring
+                        print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                        valmatch = request.values.get(sel)
+                        print(valmatch)
+                        escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                        print(escript)
+                        adat = eval(escript)
+                        if adat is not None:
+                            for jx, col in enumerate(colist1):
+                                thisval = getattr(adat, col)
+                                setattr(olddat, colist2[jx], thisval)
+                                print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+                            db.session.commit()
+                    # olddat = eval(nextquery)
+                    # for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
+            else:
+                err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+    else:
+        # Gather the data for the selected row
+        nextquery = f"{table}.query.get({sid})"
+        olddat = eval(nextquery)
+
+        for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
+
+    docref = getattr(olddat, 'Source')
+    if docref is not None:
+        viewport[0] = 'show_doc_left'
+        viewport[2] = '/' + tpath(f'{table}', docref)
+
+    return holdvec, entrydata, err, viewport, completed
 
 
 

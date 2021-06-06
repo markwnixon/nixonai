@@ -1127,9 +1127,9 @@ def global_inv(odata,odervec):
         import make_T_invoice
         make_T_invoice.main(myo,ldata,pdata1,pdata2,pdata3,cache,today,0)
         if cache>1:
-            docref=f'tmp/{scac}/data/vinvoice/INV'+myo.Jo+'c'+str(cache)+'.pdf'
+            docref=f'tmp/{scac}/data/vInvoice/INV'+myo.Jo+'c'+str(cache)+'.pdf'
         else:
-            docref=f'tmp/{scac}/data/vinvoice/INV'+myo.Jo+'.pdf'
+            docref=f'tmp/{scac}/data/vInvoice/INV'+myo.Jo+'.pdf'
         myo.Path=docref
         myo.Storage=cache
         db.session.commit()
@@ -1154,10 +1154,10 @@ def global_inv(odata,odervec):
         grandtotal=grandtotal+float(idat.Total)
         # put together the file paperwork
 
-    file1=f'tmp/{scac}/data/vinvoice/P_' + 'test.pdf'
+    file1=f'tmp/{scac}/data/vInvoice/P_' + 'test.pdf'
     cache2 = int(odat.Detention)
     cache2=cache2+1
-    docref=f'tmp/{scac}/data/vinvoice/P_c'+str(cache2)+'_' + order + '.pdf'
+    docref=f'tmp/{scac}/data/vInvoice/P_c'+str(cache2)+'_' + order + '.pdf'
 
     for j, i in enumerate(odervec):
         odat=Orders.query.get(i)

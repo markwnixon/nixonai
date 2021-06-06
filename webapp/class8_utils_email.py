@@ -270,7 +270,7 @@ def etemplate_truck(eprof,odat):
         emailcc1 = em['info']
         emailcc2 = em['expo']
         outname = f'Package_{odat.Jo}.pdf'
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
 
     elif eprof == 'Signed Load Con':
@@ -279,7 +279,7 @@ def etemplate_truck(eprof,odat):
         else: etitle = f'Signed Load Confirmation: {od} | {keyval}'
         ebody = f'Dear {odat.Shipper},\n\nThis load confirmation has been received with signed copy attached.'
         sourcename = odat.Package
-        folder = 'vpackages'
+        folder = 'vPackage'
         outname = f'Signed_Load_Confirmation_{od}.pdf'
         emailin1 = estatus
         emailin2 = ''
@@ -296,7 +296,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = ''
         emailcc1 = em['info']
         emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
         return emaildata
 
     elif eprof == 'Update w/Proof':
@@ -307,7 +307,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = ''
         emailcc1 = em['info']
         emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
         return emaildata
 
     elif eprof == 'Update w/Invoice':
@@ -319,7 +319,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = ''
         emailcc1 = em['info']
         emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
         return emaildata
 
     elif eprof == 'Paid Invoice':
@@ -331,7 +331,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = eaccts
         emailcc1 = em['info']
         emailcc2 = em['expo']
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
         return emaildata
 
     elif eprof == 'Update w/Gate':
@@ -342,7 +342,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = ''
         emailcc1 = em['info']
         emailcc2 = ''
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
         return emaildata
 
     elif eprof == 'Completed IP':
@@ -354,7 +354,7 @@ def etemplate_truck(eprof,odat):
         emailcc1 = em['info']
         emailcc2 = em['expo']
         outname = f'Invoice-Proof_{odat.Jo}.pdf'
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
 
     elif eprof == 'Completed IPS':
@@ -366,7 +366,7 @@ def etemplate_truck(eprof,odat):
         emailcc1 = em['info']
         emailcc2 = em['expo']
         outname = f'Invoice-Package_{odat.Jo}.pdf'
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
 
     elif eprof == 'Completed IPSG':
@@ -378,7 +378,7 @@ def etemplate_truck(eprof,odat):
         emailcc1 = em['info']
         emailcc2 = em['expo']
         outname = f'Invoice-Package_{odat.Jo}.pdf'
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vpackages']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
 
     elif eprof == 'suminv':
@@ -582,11 +582,11 @@ def invoice_mimemail(docref, err, lastpath):
     newfile = request.values.get('edat6')
 
     if 'INV' in docref or 'Inv' in docref:
-        lastpath = 'vinvoice'
+        lastpath = 'vInvoice'
     elif 'Proof' in docref:
-        lastpath = 'vproofs'
+        lastpath = 'vProofs'
     elif 'Manifest' in docref:
-        lastpath = 'vmanifest'
+        lastpath = 'vManifest'
 
     if newfile != 'none':
         cfrom = addpath(f'static/{scac}/data/{lastpath}/{docref}')

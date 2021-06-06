@@ -31,17 +31,32 @@
         {% endfor %}
     {% endfor %}
 
-    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Job"
-      data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Job  </button>
-->
-          <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Item"
-        data-toggle="tooltip" title="MODIFY information associated with any selected item">Edit<br>Item</button>
-->
-              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Invoice"
-        data-toggle="tooltip" title="Create and Edit an Invoice">Invoice<br>Editor</button>
-->
-            <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Receive Payment"
-        data-toggle="tooltip" title="Receive money and apply toward a selected Job/Invoice">Receive<br>Payment</button>
+                {% if genre == 'Orders' %}
+                    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Job"
+                      data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Job  </button>
+                ->
+                          <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Item"
+                        data-toggle="tooltip" title="MODIFY information associated with any selected item">Edit<br>Item</button>
+                ->
+                              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Invoice"
+                        data-toggle="tooltip" title="Create and Edit an Invoice">Invoice<br>Editor</button>
+                ->
+                            <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Receive Payment"
+                        data-toggle="tooltip" title="Receive money and apply toward a selected Job/Invoice">Receive<br>Payment</button>
+                {% endif %}
+                {% if genre == 'Bills' %}
+                    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Bill"
+                      data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Bill  </button>
+                ->
+                          <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Item"
+                        data-toggle="tooltip" title="MODIFY information associated with any selected item">Edit<br>Item</button>
+                ->
+                              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Pay Bill"
+                        data-toggle="tooltip" title="Pay a Bill">Pay<br>Bill</button>
+                ->
+                            <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Print Checks"
+                        data-toggle="tooltip" title="Print a Check">Print<br>Checks</button>
+                {% endif %}
     </div>
 </div>
 
