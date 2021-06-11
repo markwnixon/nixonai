@@ -213,7 +213,7 @@ Orders_setup = {'name' : 'Trucking Job',
                 'form checks': {
                     'New': ['Job', 'Job Detail'],
                     'Edit': ['Job', 'Job Detail', 'Money', 'Dispatch'],
-                    'Dispatch': ['Dispatch']
+                    'Manifest': ['Dispatch']
                 },
                 'appears_if': {
                     'HaulType': ['Extra Stop', 'Transload'],

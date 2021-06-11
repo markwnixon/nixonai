@@ -12,10 +12,10 @@ from webapp.utils import *
 
 
 def manfile(joborder, cache):
-    wpath=addpath(f'static/{scac}/data/vmanifest/Manifest')
+    wpath=addpath(f'static/{scac}/data/vManifest/Manifest')
     file1=wpath+joborder+'.pdf'
     file2=wpath+joborder+'c'+str(cache)+'.pdf'
-    file3 = f'static/{scac}/data/vmanifest/Manifest'+joborder+'c'+str(cache)+'.pdf'
+    file3 = f'static/{scac}/data/vManifest/Manifest'+joborder+'c'+str(cache)+'.pdf'
     return file1, file2, file3
 
 def minbox_write(header, lineitems, fs1, fs2):
@@ -300,7 +300,7 @@ def makemanifest(odat):
 
         c.drawString(leftstart + bump * 3, m1 + 5 * dl + bump * 2, sector)
         print('lineitems', lineitems)
-        top = scroll_write(c, 'Helvetica', 10, level1 - dh, leftstart + bump * 3, 13, lineitems)
+        top = scroll_write(c, 'Helvetica', 10, level1 - dh, leftstart + bump * 3, 13, lineitems, 175)
         leftstart = leftstart + boxwidth + padding
 
     # Middle Boxes Top Level

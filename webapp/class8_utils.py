@@ -126,8 +126,8 @@ def form_check(text,type,task):
     elif type == 'container_types':
         #print('select',text)
         if text == 'Choose Later':
-            status = 1
-            message = 'Warning: Make selection if possible'
+            status = 2
+            message = 'Error: Must have container type selected'
 
     elif type == 'customerdata':
         #print('select',text)

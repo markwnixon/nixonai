@@ -865,6 +865,9 @@ def New_task(tablesetup, task_iter):
         warned = 0
 
         for jx, entry in enumerate(entrydata):
+            if entry[3] == 'appears_if':
+                entry[3], entry[4] = check_appears(tablesetup, entry)
+                entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 if entry[1] != 'hidden':
                     holdvec[jx] = request.values.get(f'{entry[0]}')
@@ -1089,7 +1092,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 Gledger.query.filter(Gledger.Tcode == odat.Jo).delete()
                 db.session.commit()
 
-            elif task_focus == 'Payment':
+            elif table == 'Orders' and task_focus == 'Payment':
                 rstring = f'{table}.query.get({sid})'
                 odat = eval(rstring)
                 sinow = odat.Label
@@ -1142,6 +1145,12 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
                     slead.Status = 2
                     db.session.commit()
+
+            elif table == 'Bills' and task_focus == 'Payment':
+                rstring = f'{table}.query.get({sid})'
+                odat = eval(rstring)
+                odat.Status = None
+                db.session.commit()
 
 
 
@@ -2286,6 +2295,8 @@ def PayBill_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     return holdvec, entrydata, err, viewport, completed
 
 
-
-
+def PrintChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    err = [f"Running PrintChecks_task with task_iter {task_iter} using {tablesetup['table']}"]
+    holdvec, entrydata, err, viewport, completed = PayBill_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid)
+    return holdvec, entrydata, err, viewport, completed
 
