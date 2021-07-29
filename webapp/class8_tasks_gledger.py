@@ -275,7 +275,7 @@ def gledger_write(bus,jo,acctdb,acctcr):
             bdat=Bills.query.filter(Bills.Jo==jo).first()
             amt=int(float(bdat.bAmount)*100)
             pid=bdat.Pid
-            bdate = bdat.bDate
+            bdate = bdat.Date
             co = get_company(pid)
 
             acctcr = 'Accounts Payable'
@@ -351,7 +351,7 @@ def gledger_write(bus,jo,acctdb,acctcr):
                 duetocr = adat2.Name
                 duetocrid = adat2.id
 
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Aid==duetoid) & (Gledger.Type=='PD')).first()
+                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Aid==duetodbid) & (Gledger.Type=='PD')).first()
                 if gdat is not None:
                     gdat.Debit=amt
                     gdat.Recorded=dt

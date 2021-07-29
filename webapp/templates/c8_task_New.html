@@ -10,27 +10,29 @@
     </div>
 </div>
 
-{% set form_check = tablesetup['form checks']['New'] %}
+{% set form_show = tablesetup['form show']['New'] %}
 
 <div class="card-body">
 <table class="table table-condensed table-hover">
 <tbody>
 {% for entry in entrydata %}
-    {% if entry[4] is not none and (entry[9] in form_check or entry[9] == 'Always') %}
+    {% if entry[4] is not none and (entry[9] in form_show or entry[9] == 'Always') %}
 
         {% if entry[5] == 0 %}
-                {%  set colortext = '' %}{% set message = 'ok' %}
+            {%  set colortext = '' %}{% set message = 'ok' %}
+            {%  set valdat = 'is-valid' %}
         {% elif entry[5] == 1 %}
                 {%  set colortext = 'yellow' %}
         {% else %}
                 {%  set colortext = 'red text-white' %}
+                {%  set valdat = 'is-invalid' %}
         {% endif %}
         {% if entry[3] == 'select' %}
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
 
                     <td>
-                        <select class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
+                        <select class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
                         <option value='Choose Later'>Choose Later</option>
 
                                 {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
@@ -75,20 +77,21 @@
             {% endif %}
                 <tr>
                     <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
-                    <td colspan="2"><textarea class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
+                    <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
                 </tr>
 
         {% elif entry[3] == 'disabled' %}
 
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}" >{{  entry[2] }} disabled</div></td>
-                    <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}" disabled ></td>
+                    <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}" disabled ></td>
                 </tr>
 
         {% elif entry[3] == 'text' or entry[3] == 'date' or entry[3] == 'time' %}
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
-                    <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
+                    <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
+
                 </tr>
 
         {% endif %}

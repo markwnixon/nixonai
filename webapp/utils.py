@@ -100,7 +100,7 @@ def hasinput(input):
         return 0
     elif isinstance(input,str):
         input = input.strip()
-        if input == '' or input == 'None' or input == 'none':
+        if input == '' or input == 'None' or input == 'none' or input == 'Choose Later':
             return 0
         else:
             return 1

@@ -1,9 +1,12 @@
+from webapp import db
+from webapp.models import Bills, People
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.pagesizes import landscape
 from reportlab.platypus import Image
 from reportlab.lib.units import inch
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.graphics.barcode import eanbc, qr, usps
 
 from reportlab.lib.utils import simpleSplit
 from webapp.page_merger import pagemerger
@@ -17,18 +20,17 @@ import shutil
 from webapp.CCC_system_setup import addpath, bankdata, scac
 import numbers
 from webapp.utils import *
+from webapp.class8_utils import *
 
 def truncate_item(item,lena, fs):
     item_width = stringWidth(item, 'Helvetica', fs)
-    print(f'item width {item_width} versus limit {lena}')
+    #print(f'item width {item_width} versus limit {lena}')
     if item_width > lena:
         while item_width > lena:
             item = item.rpartition(' ')[0]
             item_width = stringWidth(item, 'Helvetica', fs)
-            print(f'new item width {item_width}')
+            #print(f'new item width {item_width}')
     return item
-
-
 
 
 def scroll_write(c, fonttype, fontsize, top, left, dsp, itemlist, available_space):
@@ -75,14 +77,78 @@ def center_write(odata, headers, headeritems, fs1, fs2, ltm, rtm):
 def write_lines(c,fixed_width, thistext, thisfont, thisfontsize, xdist, ydist, lineheight):
 
     lines = simpleSplit(thistext, thisfont, thisfontsize, fixed_width)
-    print(lines)
-    print(f'lines are {lines}')
+    #print(lines)
+    #print(f'lines are {lines}')
     for thisline in lines:
         c.drawString(xdist, ydist, thisline)
         ydist = ydist - lineheight
     if lines != []: ydist = ydist + lineheight
 
     return xdist, ydist
+
+def opto_table(c, headers, rows, font, fontsize, ltm, rtm, mtop, mbot, max_block, headerbold, hlineson, vlineson):
+    fontbold = f'{font}-Bold'
+    hlen = len(headers)
+    spread = 15
+    min_w = []
+    for header in headers:
+        if headerbold: thisw = stringWidth(header, fontbold, fontsize)
+        else: thisw = stringWidth(header, font, fontsize)
+        #print(f'header {header} {thisw}')
+        thisw = thisw + spread
+        min_w.append(thisw)
+    for row in rows:
+        for kx, col in enumerate(row):
+            if not hasvalue(col): col = ''
+            #print(f'col is {col} and font is {font}')
+            thisw = stringWidth(col, font, fontsize) + spread
+            thatw = min_w[kx]
+            new_min = max(thisw, thatw)
+            min_w[kx] = new_min
+    min_w[max_block] = 0
+    total_spread = sum(min_w)
+    width_avail = rtm - ltm
+    mx_len = width_avail - total_spread
+    min_w[max_block] = mx_len
+    #print(f'Here are the widths: {min_w}')
+    ctrx = []
+    sdsx = []
+    thisctr = ltm
+    thisend = ltm
+    for ix, header in enumerate(headers):
+        if ix < hlen:
+            thisctr = thisend + min_w[ix] / 2
+            thisend = thisend + min_w[ix]
+        ctrx.append(thisctr)
+        sdsx.append(thisend)
+
+    nlines = len(rows) + 1
+    m_per_line = (mtop - mbot)/nlines
+    extra_ht = m_per_line - fontsize*.8
+    bump = extra_ht/2
+    m_here = mtop - m_per_line + bump
+    #print(f'Using mtop {mtop}, mbot {mbot}, m_per {m_per_line}, extra_ht {extra_ht}, bump {bump}')
+
+    if hlineson: c.line(ltm, mtop, rtm, mtop)
+    if headerbold: c.setFont(fontbold, fontsize, leading=None)
+    for jx, header in enumerate(headers):
+        if hlineson: c.line(ltm, m_here - bump, rtm, m_here - bump)
+        c.drawCentredString(ctrx[jx], m_here, header)
+
+    c.setFont(font, fontsize, leading=None)
+    for row in rows:
+        m_here = m_here - m_per_line
+        if hlineson: c.line(ltm, m_here-bump, rtm, m_here-bump)
+        for jx, col in enumerate(row):
+            if not hasvalue(col): col = ''
+            c.drawCentredString(ctrx[jx], m_here, col)
+
+    # Create the vertical lines
+    if vlineson:
+        c.line(ltm, mtop, ltm, mbot)
+        for l in sdsx:
+            c.line(l, mtop, l, mbot)
+
 
 def addpayment(file1, cache, amtowed, payment, paidon, payref, paymethod):
     baldue = float(amtowed) - float(payment)
@@ -513,7 +579,7 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     min_w = []
     for header in header3:
         thisw = stringWidth(header, 'Helvetica', 11)
-        print(f'header {header} {thisw}')
+        #print(f'header {header} {thisw}')
         thisw = thisw + spread
         min_w.append(thisw)
     for line in all_lines:
@@ -527,7 +593,7 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     width_avail = rtm-ltm
     mx_len = width_avail - total_spread
     min_w[max_block] = mx_len
-    print(f'Here are the widths: {min_w}')
+    #print(f'Here are the widths: {min_w}')
     ctrx = []
     sdsx = []
     thisctr = ltm
@@ -542,7 +608,7 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     for jx, header in enumerate(header3):
         c.drawCentredString(ctrx[jx], m2+tb, header)
 
-    #Crate the vertical lines
+    #Create the vertical lines
     for l in sdsx:
         c.line(l, m2, l, m5)
 
@@ -627,3 +693,307 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     shutil.copy(file1, file2)
 
     return file2, newbase
+
+def getzip(addr):
+    try:
+        items = addr.split()
+        zip = items[-1]
+        if len(zip)==5 or len(zip)==10:
+            return zip
+        else:
+            return 0
+    except:
+        return 0
+
+
+def writechecks(sids,pmeth):
+    #Functions for turning numbers into words imported from class8_utils.py
+
+    sid = sids[0]
+    rows = len(sids) + 1
+    bdat = Bills.query.get(sid)
+    pdat = People.query.get(bdat.Pid)
+    if len(sids) > 1: multi = True
+    else: multi = False
+
+
+    ckstyle = request.values.get('ckstyle')
+    if ckstyle is None: ckstyle = 1
+    else: ckstyle = int(ckstyle)
+
+    billno = bdat.Jo
+
+    try: cache = int(bdat.Ccache)
+    except: cache = 0
+
+    if pmeth == 'Check':
+        if multi: docref = f'Check_{billno}_Multi_c{cache}.pdf'
+        else: docref = f'Check_{billno}_c{cache}.pdf'
+    else:
+        if multi: docref = f'Payment_{billno}_Multi_c{cache}.pdf'
+        else: docref = f'Payment_{billno}_c{cache}.pdf'
+
+    file1 = addpath(f'static/{scac}/data/vCheck/{docref}')
+    bdat.Ccache = cache + 1
+    db.session.commit()
+    print(f'The check docref is {docref} and ckstyle is {ckstyle}')
+
+    try:
+        if multi: amt = bdat.pAmount2
+        else: amt = bdat.pAmount
+        amt = amt.replace(',', '')
+        amount = float(amt)
+    except:
+        amt = bdat.bAmount
+        amount = float(amt)
+
+    # Create the Check Date:
+    billdate = bdat.pDate
+    try: datestr = billdate.strftime('%m/%d/%Y')
+    except: datestr = datetime.datetime.today().strftime('%m/%d/%Y')
+
+    if bdat.Memo is None: memo = ' '
+    else: memo = bdat.Memo
+
+    if bdat.Description is None: desc = ' '
+    else: desc = bdat.Description
+    payref = bdat.Ref
+
+    # Check to see if we have the required data to make an invoice:
+    payee = pdat.Company
+    addr1 = pdat.Addr1
+    addr2 = pdat.Addr2
+
+    amount_num = d2s(amount)
+    bank = bdat.pAccount
+    amount_text = get_check_words(amount_num)
+    # print(amount_text)
+
+    # We need to add '*******' to back of this enough to fill up the rest of the block
+    atlen = len(amount_text)
+    addstar = '*' * (90-atlen)
+    amount_text = f'{amount_text}{addstar}'
+
+    c = canvas.Canvas(file1,  pagesize=letter)
+    c.setFont('Helvetica', 12, leading=None)
+
+# Main check writing (top 1/3)
+    if pmeth == 'Check':
+        c.drawString(515, 720, datestr)
+        c.drawString(70, 685, payee)
+        c.drawString(500, 686, amount_num)
+        c.drawString(30, 660, amount_text)
+        c.drawString(52, 592, memo)
+
+    ltm, ctrall, rtm = 15, 310, 590
+    dl, hls = 17.6, 530
+
+    m1 = 510
+    m2 = m1-dl
+    m3 = m2-dl
+    m4 = m3-10
+    m5 = m4-dl
+    m6 = m5-dl
+    m7 = 265
+    m8 = m7-dl
+    m9 = m8-dl
+    m10 = m9-10
+    m11 = m10-dl
+    m12 = m11-dl
+
+    n1 = ltm+90
+    n2 = n1+150
+    n3 = n2+80
+    n4 = n3+80
+    n5 = rtm-90
+
+    btype = bdat.bType
+    bcat = bdat.bCat
+    bsubcat = bdat.bSubcat
+    acct = bdat.bAccount
+    comp = bdat.Co
+    if acct is None: acct = ' '
+    if comp is None: comp = ' '
+    bacct = f'{acct} ({comp})'
+    if multi:
+        #We need to know if we can label the top with same info or if it varies and thus cannot
+        joset, pamtset, btypset, bcatset, bsubcatset, bacctset, paidset = [], [], [], [], [], [], []
+        for sid in sids:
+            cdat = Bills.query.get(sid)
+            joset.append(cdat.Jo)
+            pamtset.append(cdat.pAmount)
+            btypset.append(cdat.bType)
+            bcatset.append(cdat.bCat)
+            bsubcatset.append(cdat.bSubcat)
+            bacctset.append(cdat.bAccount)
+            paidset.append(cdat.Status)
+
+        if sameall(joset): billno = joset[0]
+        else: billno = 'Multiple'
+        if sameall(btypset): btype = btypset[0]
+        else: btype = 'Multiple'
+        if sameall(bcatset): bcat = bcatset[0]
+        else: bcat = 'Multiple'
+        if sameall(bsubcatset): bsubcat = bsubcatset[0]
+        else: bsubcat = 'Multiple'
+        if sameall(bacctset): bacct = bacctset[0]
+        else: bacct = 'Multiple'
+    else:
+        cdat = Bills.query.get(sid)
+        paidset = [cdat.Status]
+
+    item11 = ['Date', 'Ck No.', 'Type', 'Category', 'Subcategory', 'Account']
+    item12 = [datestr, payref, btype, bcat, bsubcat, bacct]
+    item21 = ['BillNo', 'Amount', 'Check Made Out To', 'From Acct']
+    item22 = [billno, amount_num, payee, bank]
+    if multi:
+        itemheads = ['BillRef', 'Amount', 'Type', 'Category', 'Subcategory', 'Account']
+        itemeachs = []
+        for ix, sid in enumerate(sids):
+            itemeachs.append([joset[ix], pamtset[ix], btypset[ix], bcatset[ix], bsubcatset[ix], bacctset[ix]])
+
+
+    if pmeth == 'Check':
+        #Only sign check if all items are paid and recorded
+        if sameall(paidset) and paidset[0] == 'Paid':
+            image = addpath(f'static/{scac}/pics/ck_sigfile.png')
+            c.drawImage(image, 374, 587, width=200, height=40)
+        else:
+            c.setFont('Helvetica-Bold', 14, leading=None)
+            c.drawString(374, 587, '***Void Until Recorded***')
+            c.setFont('Helvetica', 12, leading=None)
+
+# Middle 1/3 section ********** only print this section if making a payment record that is not a check
+
+        memoline2 = m6 - dl * 2
+        if ckstyle == 1:
+            font = 'Helvetica'
+            fontsize = 12
+            opto_table(c, item11, [item12], font, fontsize, ltm, rtm, m1, m3, 5, True, True, True)
+            opto_table(c, item21, [item22], font, fontsize, ltm, rtm, m4, m6, 2, True, True, True)
+
+            if multi:
+                mtop = m6 - dl
+                if rows > 6 :
+                    dr = dl*7/rows
+                    fontsize = 11
+                    if rows > 12: fontsize = 10
+                else:
+                    dr = dl
+                    fontsize = 12
+                opto_table(c, itemheads, itemeachs, font, fontsize, ltm, rtm, mtop, mtop - dr*rows, 5, True, False, False)
+
+            else:
+                mtop = m6 - dl * 2
+                c.drawString(ltm + 20, mtop, f'Memo on Check:  {memo}')
+                mtop = mtop - dl
+                c.drawString(ltm + 20, mtop, f'Full Description:  {desc}')
+                mtop = mtop - dl*2
+
+                c.drawString(ltm + 20, mtop, 'Paid To (Name and Address):')
+                mtop = mtop - dl
+                c.drawString(ltm + 20, mtop, payee)
+                mtop = mtop - dl
+                c.drawString(ltm + 20, mtop, addr1)
+                mtop = mtop - dl
+                c.drawString(ltm + 20, mtop, addr2)
+
+
+        else:
+            cdata = companydata()
+            c.setFont('Helvetica', 12, leading=None)
+            offup = 5
+            c.drawString(50, m2+offup, cdata[2])
+            c.drawString(50, m2+offup-14, cdata[5])
+            c.drawString(50, m2+offup-28, cdata[6])
+            memoline2 = memoline2 + 1
+            c.drawString(ltm+70, memoline2, payee)
+            c.drawString(ltm+70, memoline2-14, addr1)
+            c.drawString(ltm+70, memoline2-28, addr2)
+            zip = getzip(addr2)
+            #print('myzipcode is',zip)
+            if zip != 0:
+                barcode_usps = usps.POSTNET(zip)
+                barcode_usps.drawOn(c,ltm+70,memoline2-42)
+
+    #Bottom 1/3rd labels
+
+        font = 'Helvetica'
+        fontsize = 12
+        opto_table(c, item11, [item12], font, fontsize, ltm, rtm, m7, m9, 5, True, True, True)
+        opto_table(c, item21, [item22], font, fontsize, ltm, rtm, m10, m12, 2, True, True, True)
+
+        if multi:
+            mtop = m12 - dl
+            if rows > 6:
+                dr = dl * 7 / rows
+                fontsize = 11
+                if rows > 12: fontsize = 10
+            else:
+                dr = dl
+                fontsize = 12
+            opto_table(c, itemheads, itemeachs, font, fontsize, ltm, rtm, mtop, mtop - dr * rows, 5, True, False, False)
+
+        else:
+            mtop = m12 - dl * 2
+            c.drawString(ltm + 20, mtop, f'Memo on Check:  {memo}')
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, f'Full Description:  {desc}')
+            mtop = mtop - dl * 2
+
+            c.drawString(ltm + 20, mtop, 'Paid To (Name and Address):')
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, payee)
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, addr1)
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, addr2)
+
+    else:
+        # Payment record if not writing a check
+        c.drawCentredString(ltm+(rtm-ltm)/2,750,f'{pmeth} Payment Record')
+        if sameall(paidset) and paidset[0] == 'Paid':
+            c.drawCentredString(ltm + (rtm - ltm) / 2, 735, 'Payment has been Recorded in Register')
+        else:
+            c.drawCentredString(ltm + (rtm - ltm) / 2, 735, '***Void Until Recorded***')
+        m1 = 720
+        m2 = m1 - dl
+        m3 = m2 - dl
+        m4 = m3 - 10
+        m5 = m4 - dl
+        m6 = m5 - dl
+        font = 'Helvetica'
+        fontsize = 12
+        opto_table(c, item11, [item12], font, fontsize, ltm, rtm, m1, m3, 5, True, True, True)
+        opto_table(c, item21, [item22], font, fontsize, ltm, rtm, m4, m6, 2, True, True, True)
+
+        if multi:
+            mtop = m6 - dl
+            if rows > 6:
+                dr = dl * 7 / rows
+                fontsize = 11
+                if rows > 12: fontsize = 10
+            else:
+                dr = dl
+                fontsize = 12
+            opto_table(c, itemheads, itemeachs, font, fontsize, ltm, rtm, mtop, mtop - dr * rows, 5, True, False, False)
+
+        else:
+            mtop = m6 - dl * 2
+            c.drawString(ltm + 20, mtop, f'Memo:  {memo}')
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, f'Full Description:  {desc}')
+            mtop = mtop - dl * 2
+
+            c.drawString(ltm + 20, mtop, 'Paid To:')
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, payee)
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, addr1)
+            mtop = mtop - dl
+            c.drawString(ltm + 20, mtop, addr2)
+
+
+    c.showPage()
+    c.save()
+    return docref, file1, cache, ckstyle

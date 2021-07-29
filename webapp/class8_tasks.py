@@ -10,7 +10,7 @@ from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task
 from webapp.class8_utils_package import makepackage
 from webapp.class8_utils_email import emaildata_update
-from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment
+from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
 from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
 from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, Truck_Logs_task, CMA_APL_task
@@ -251,9 +251,9 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         if nc > 0:
             thistable = tabs[0]
             sids = tids[0]
+            tablesetup = eval(f'{thistable}_setup')
             rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sids)"
             holdvec, entrydata, err, viewport, completed = eval(rstring)
-            tablesetup = None
         else:
             err.append('Need to select item(s) for task')
             completed = True
@@ -779,12 +779,20 @@ def make_new_entry(tablesetup,holdvec):
             if hasinput(docsave):
                 newpath = addpath(tpath(table, newfile))
                 oldpath = addpath(docsave).replace('//','/')
-                #print('Need to move file from', oldpath, ' to', newpath)
+                print('Need to move file from', oldpath, ' to', newpath)
                 try:
                     shutil.move(oldpath, newpath)
-                    #print(f'Moved file {oldpath} to {newpath}')
+                    print(f'Moved file {oldpath} to {newpath}')
                 except:
                     print('File already moved')
+                # Test to see if file exists
+                if os.path.isfile(newpath):
+                    print('The file exists')
+                else:
+                    print('The file does not exist')
+                    newfile = None
+
+                print(f'Setting Source attribute for New Entry in Table {table} with ID {id} to {newfile}')
                 setattr(dat, 'Source', newfile)
                 setattr(dat, 'Scache', 0)
                 db.session.commit()
@@ -853,7 +861,8 @@ def check_appears(tablesetup, entry):
 def New_task(tablesetup, task_iter):
     completed = False
     err = [f"Running New task with task_iter {task_iter} using {tablesetup['table']}"]
-    form_show = tablesetup['form checks']['New']
+    form_show = tablesetup['form show']['New']
+    form_checks = tablesetup['form checks']['New']
 
     if task_iter > 0:
         entrydata = tablesetup['entry data']
@@ -871,7 +880,9 @@ def New_task(tablesetup, task_iter):
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 if entry[1] != 'hidden':
                     holdvec[jx] = request.values.get(f'{entry[0]}')
-                    holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'New')
+                    if entry[0] in form_checks: required = True
+                    else: required = False
+                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required)
                     if entry[5] > 1: failed = failed + 1
                     if entry[5] == 1: warned = warned + 1
 
@@ -898,12 +909,26 @@ def New_task(tablesetup, task_iter):
                 err = make_new_entry(tablesetup,holdvec)
                 err.append(f"Created new entry in {tablesetup['table']}")
                 completed = True
+                if tablesetup['table'] == 'Bills':
+                    bdat = Bills.query.filter(Bills.id>0).order_by(Bills.id.desc()).first()
+                    if bdat is not None:
+                        pdat = People.query.filter(People.Company == bdat.Company).first()
+                        if pdat is not None:
+                            bid = bdat.id
+                            bdat.Pid = pdat.id
+                            db.session.commit()
+                            bdat = Bills.query.get(bid)
+                        err = gledger_write('newbill', bdat.Jo, bdat.bAccount, bdat.pAccount)
             else:
                 err.append(f'Cannot create entry until input errors shown in red below are resolved')
 
     else:
         holdvec = [''] * 30
         entrydata = tablesetup['entry data']
+        for jx, entry in enumerate(entrydata):
+            if entry[0] in form_checks: required = True
+            else: required = False
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required)
 
 
     return holdvec, entrydata, err, completed
@@ -928,7 +953,8 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     creators = tablesetup['creators']  # Gather the data for the selected row
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
-    form_show = tablesetup['form checks']['Edit']
+    form_show = tablesetup['form show']['Edit']
+    form_checks = tablesetup['form checks']['Edit']
 
     print(f'Running edit with task_iter {task_iter}')
 
@@ -941,10 +967,13 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 entry[3], entry[4] = check_appears(tablesetup, entry)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
                 print(f'Return from check_appears is {entry[3]} and {entry[4]}')
+            print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
                 holdvec[jx] = request.values.get(f'{entry[0]}')
-                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'Edit')
+                if entry[0] in form_checks: required = True
+                else: required = False
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required)
                 if entry[5] > 1: failed = failed + 1
                 if entry[5] == 1: warned = warned + 1
 
@@ -989,6 +1018,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     #print('Updating Entry with', entry[0], thissubvalue)
                     setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
+                # The amount could change on a bill, so if a bill need to update
+                if table == 'Bills':
+                    bdat = eval(nextquery)
+                    err = gledger_write('newbill', bdat.Jo, bdat.bAccount, bdat.pAccount)
                 #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
 
@@ -1021,6 +1054,9 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         for jx, entry in enumerate(entrydata):
             if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry)
             holdvec[jx] = getattr(olddat, f'{entry[0]}')
+            if entry[0] in form_checks: required = True
+            else: required = False
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required)
 
 
 
@@ -1147,14 +1183,39 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                     db.session.commit()
 
             elif table == 'Bills' and task_focus == 'Payment':
+                print('In the unpay bill section')
                 rstring = f'{table}.query.get({sid})'
                 odat = eval(rstring)
-                odat.Status = None
+                if odat is not None:
+                    if odat.Status == 'Paid':
+                        check = odat.Check
+                        pacctlist = odat.PacctList
+                        if pacctlist is None: multi = False
+                        else: multi = True
+                        if multi:
+                            kill_list = eval(pacctlist)
+                            for k in kill_list:
+                                kdat = Bills.query.get(k)
+                                kdat.Status = None
+                                kdat.PmtList = None
+                                kdat.PacctList = None
+                                kdat.Pmulti = None
+                                kdat.PAmount2 = None
+                                jo = kdat.Jo
+                                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
+                                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
+                        else:
+                            odat.Status = None
+                            jo = odat.Jo
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
+
+
                 db.session.commit()
 
 
 
-    db.session.commit()
+    #db.session.commit()
 
     holdvec, entrydata, err = [], [], []
     viewport = ['0'] * 6
@@ -2167,136 +2228,310 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
     return completed, err, holdvec
 
-def PayBill_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
-    err = [f"Running PayBill task with task_iter {task_iter} using {tablesetup['table']}"]
-    completed = False
-    viewport = ['0'] * 6
+def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
+    form_show = tablesetup['form show'][thisform]
+    form_checks = tablesetup['form checks'][thisform]
+    if thisform != 'MultiChecks': form_show.append('Always')
+    failed = 0
+    warned = 0
+    for jx, entry in enumerate(entrydata):
+        if entry[4] is not None and entry[9] in form_show:
+            # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
+            holdvec[jx] = request.values.get(f'{entry[0]}')
+            if entry[0] in form_checks: required = True
+            else: required = False
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required)
+            if entry[5] > 1: failed = failed + 1
+            if entry[5] == 1: warned = warned + 1
 
+    if 'bring data' in tablesetup:
+        for bring in tablesetup['bring data']:
+            tab1, sel, tab2, cat, colist1, colist2 = bring
+            print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+            valmatch = request.values.get(sel)
+            print(valmatch)
+            escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+            adat = eval(escript)
+            if adat is not None:
+                for jx, col in enumerate(colist1):
+                    thisval = getattr(adat, col)
+                    for ix, entry in enumerate(entrydata):
+                        if entry[0] == colist2[jx]:
+                            holdvec[ix] = thisval
+                            # print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+
+    err.append(f'There are {failed} input errors and {warned} input warnings')
+    return holdvec, err, failed
+
+def altersids(bdata, locked):
+    allsids = []
+    for bdat in bdata:
+        pd = bdat.Status
+        print(f'For id {bdat.id} pd is {pd} and locked is {locked}')
+        if locked: allsids.append(bdat.id)
+        elif pd != 'Paid': allsids.append(bdat.id)
+    sidon = []
+    for sid in allsids:
+        ck1 = request.values.get(f'Billout{sid}')
+        ck2 = request.values.get(f'Billin{sid}')
+        ck3 = request.values.get(f'Billhid{sid}')
+        print(f'for sid {sid} ck1 is {ck1} and ck2 is {ck2} and ck3 is {ck3}')
+        if ck1 == 'on': sidon.append(sid)
+        if ck2 == 'on': sidon.append(sid)
+    return allsids, sidon
+
+
+
+def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sids):
+
+    err = [f"Running MultiChecks task with task_iter {task_iter} using {tablesetup['table']}"]
+    print(f"Running MultiChecks task with task_iter {task_iter} using {tablesetup['table']} and sids {sids}")
     table = tablesetup['table']
-    entrydata = tablesetup['entry data']
-    masks = tablesetup['haulmask']
-    if masks != []: entrydata = mask_apply(entrydata, masks)
-    hiddendata = tablesetup['hidden data']
-    numitems = len(entrydata)
-    holdvec = [''] * numitems
+    plist, bid_list, pamt_list, status_list = [], [], [], []
+    ptot = 0.00
+    gofwd = 1
+    postdata, postdata2, allsids = [], [], []
+    #posdata is summary of bill data on check currently
+    #postdata2 is summary of bill data with same company
+    record_item = request.values.get('Record Item')
+    locked = request.values.get('locked')
 
-    filter = tablesetup['filter']
-    filterval = tablesetup['filterval']
-    colorcol = tablesetup['colorfilter']
-    creators = tablesetup['creators']  # Gather the data for the selected row
-    nextquery = f"{table}.query.get({sid})"
-    olddat = eval(nextquery)
-    form_show = tablesetup['form checks']['PayBill']
-
-    print(f'Running edit with task_iter {task_iter}')
-
+    #Get preliminary setup data based on first sid (want all the bills that match company and baccount
+    nextquery = f"{table}.query.get({sids[0]})"
+    bdat = eval(nextquery)
+    pdat = People.query.get(bdat.Pid)
+    print(f'data trouble {bdat.id} {pdat.id} {bdat.bAccount}')
+    bdata = Bills.query.filter(Bills.Pid == pdat.id).all()
+    #This prelinary data provides all similar bills to the ones being referred
     if task_iter > 0:
-        failed = 0
-        warned = 0
+        # Now can alter the mutli-bill check to include other bills of similar nature and remove as well per selections
+        allsids, sids = altersids(bdata, locked)
+    else:
+        for dat in bdata:
+            if dat.Status != 'Paid': allsids.append(dat.id)
+    print(f"Updated MultiChecks task with task_iter {task_iter} using {tablesetup['table']} and sids {sids} and allsids {allsids}")
 
-        for jx, entry in enumerate(entrydata):
-            if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
-                holdvec[jx] = request.values.get(f'{entry[0]}')
-                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'PayBill')
-                if entry[5] > 1: failed = failed + 1
-                if entry[5] == 1: warned = warned + 1
+    if sids != []:
 
-        if 'bring data' in tablesetup:
-            for bring in tablesetup['bring data']:
-                tab1, sel, tab2, cat, colist1, colist2 = bring
-                print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
-                valmatch = request.values.get(sel)
-                print(valmatch)
-                escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
-                adat = eval(escript)
-                if adat is not None:
-                    for jx, col in enumerate(colist1):
-                        thisval = getattr(adat, col)
-                        for ix, entry in enumerate(entrydata):
-                            if entry[0] == colist2[jx]:
-                                holdvec[ix] = thisval
-                                # print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+        for sid in sids:
+            nextquery = f"{table}.query.get({sid})"
+            bdat = eval(nextquery)
+            pdat = People.query.get(bdat.Pid)
+            plist.append(pdat.id)
+            bid_list.append(bdat.id)
+            pamt_list.append(d2s(bdat.bAmount))
+            bdat.pAmount = bdat.bAmount
+            status_list.append(bdat.Status)
+            ptot = ptot + float(bdat.bAmount)
+            postdata.append([str(sid), bdat.Jo, bdat.bAmount, bdat.bAccount])
 
-        err.append(f'There are {failed} input errors and {warned} input warnings')
-
-        update_item = request.values.get('Update Item')
-        if update_item is not None:
-            try:
-                thisvalue = getattr(olddat, colorcol[0])
-                if thisvalue == -1: setattr(olddat, colorcol[0], 0)
-            except:
-                print('No color selector found')
-
-            if failed == 0:
-                for jx, entry in enumerate(entrydata):
-                    if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                        if entry[0] not in creators: setattr(olddat, f'{entry[0]}', holdvec[jx])
-                db.session.commit()
-                for jx, entry in enumerate(hiddendata):
-                    thisvalue = getattr(olddat, entry[2])
-                    try:
-                        thisvalue = thisvalue.splitlines()
-                        thissubvalue = thisvalue[0]
-                    except:
-                        thissubvalue = ''
-                    # print('Updating Entry with', entry[0], thissubvalue)
-                    setattr(olddat, f'{entry[0]}', thissubvalue)
-                db.session.commit()
-                # err.append(f"Updated entry in {tablesetup['table']}")
-                # Test if Bill is completely paid and set status attribute accordingly:
-                newdat = eval(nextquery)
-                billamt = float(newdat.bAmount)-.01
-                paidamt = float(newdat.pAmount)
-                if paidamt > billamt:
-                    newdat.Status = 'Paid'
-                elif paidamt > 0.0:
-                    newdat.Status = 'Part'
-                else:
-                    newdat.Status = 'Unpaid'
-                db.session.commit()
-
-
+        if not sameall(plist):
+            err.append('Billing Company does not Match for all Bill Items')
+            gofwd = 0
+        if 'Paid' in status_list:
+            if task_iter == 0:
+                err.append('Some Billing Items have been Paid')
                 completed = True
+                holdvec = []
+                entrydata = []
+                viewport = []
+                print('Exiting in the paid out location')
+                return holdvec, entrydata, err, viewport, completed
+        err.append(f'Writing check for {bid_list}')
+        err.append(f'Checks amounts are: {pamt_list}')
+        err.append(f'Total amount is: {d2s(ptot)}')
+        if gofwd:
+            db.session.commit()
+            for sid in sids:
+                nextquery = f"{table}.query.get({sid})"
+                bdat = eval(nextquery)
+                bdat.pAmount2 = d2s(ptot)
+                bdat.PmtList = f'{pamt_list}'
+                bdat.PacctList = f'{bid_list}'
+            db.session.commit()
+            #Find other items for this biller
+            for thisid in allsids:
+                if thisid not in sids:
+                    adat = Bills.query.get(thisid)
+                    postdata2.append([str(thisid), adat.Jo, adat.bAmount, adat.bAccount])
 
-                # Test of bring data-modify the database at this point
-                if 'bring data' in tablesetup:
-                    for bring in tablesetup['bring data']:
-                        tab1, sel, tab2, cat, colist1, colist2 = bring
-                        print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
-                        valmatch = request.values.get(sel)
-                        print(valmatch)
-                        escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
-                        print(escript)
-                        adat = eval(escript)
-                        if adat is not None:
-                            for jx, col in enumerate(colist1):
-                                thisval = getattr(adat, col)
-                                setattr(olddat, colist2[jx], thisval)
-                                print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
-                            db.session.commit()
-                    # olddat = eval(nextquery)
-                    # for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
+            nextquery = f"{table}.query.get({sids[0]})"
+            bdat = eval(nextquery)
+
+            viewport = ['0'] * 6
+            holdvec = [''] * 50
+            completed = False
+            creators = tablesetup['creators']
+            entrydata = tablesetup['entry data']
+            form_show = tablesetup['form show']['MultiChecks']
+            form_checks = tablesetup['form checks']['MultiChecks']
+            hiddendata = tablesetup['hidden data']
+
+            if task_iter > 0:
+                if locked:
+                    for jx, entry in enumerate(entrydata):
+                        holdvec[jx] = getattr(bdat, f'{entry[0]}')
+                else:
+                    holdvec, err, failed = get_billform_data(entrydata, tablesetup, holdvec, err, 'MultiChecks')
+                    err.append(f'Failed is {failed}')
+
+                    update_item = request.values.get('Update Item')
+                    if update_item is not None or record_item is not None:
+                        try:
+                            thisvalue = getattr(bdat, colorcol[0])
+                            if thisvalue == -1: setattr(bdat, colorcol[0], 0)
+                        except:
+                            print('No color selector found')
+
+                        if failed == 0:
+                            for sid in sids:
+                                nextquery = f"{table}.query.get({sid})"
+                                each_bdat = eval(nextquery)
+                                for jx, entry in enumerate(entrydata):
+                                    if entry[4] is not None and entry[9] in form_show:
+                                        if entry[0] not in creators: setattr(each_bdat, f'{entry[0]}', holdvec[jx])
+                                db.session.commit()
+                                for jx, entry in enumerate(hiddendata):
+                                    thisvalue = getattr(bdat, entry[2])
+                                    try:
+                                        thisvalue = thisvalue.splitlines()
+                                        thissubvalue = thisvalue[0]
+                                    except:
+                                        thissubvalue = ''
+                                    # print('Updating Entry with', entry[0], thissubvalue)
+                                    setattr(each_bdat, f'{entry[0]}', thissubvalue)
+                                db.session.commit()
+                            # err.append(f"Updated entry in {tablesetup['table']}")
+                            # Test if Bill is completely paid and set status attribute accordingly:
+                            #If Recording need to mark each item Paid to get signature on the check!!
+                            if record_item is not None:
+                                for sid in sids:
+                                    nextquery = f"{table}.query.get({sid})"
+                                    each_bdat = eval(nextquery)
+                                    each_bdat.Status = 'Paid'
+                                db.session.commit()
+
+                            # Test of bring data-modify the database at this point
+                            if 'bring data' in tablesetup:
+                                for bring in tablesetup['bring data']:
+                                    tab1, sel, tab2, cat, colist1, colist2 = bring
+                                    print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                                    valmatch = request.values.get(sel)
+                                    print(valmatch)
+                                    escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                                    print(escript)
+                                    adat = eval(escript)
+                                    if adat is not None:
+                                        for jx, col in enumerate(colist1):
+                                            thisval = getattr(adat, col)
+                                            for sid in sids:
+                                                nextquery = f"{table}.query.get({sid})"
+                                                bdat = eval(nextquery)
+                                                setattr(bdat, colist2[jx], thisval)
+                                                print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+                                        db.session.commit()
+                            bdat = eval(nextquery)
+                            pdat = People.query.get(bdat.Pid)
+                            for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(bdat, f'{entry[0]}')
+                        else:
+                            err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
             else:
-                err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+                nextquery = f"{table}.query.get({sids[0]})"
+                bdat = eval(nextquery)
+                # Get Default Account Data
+                print('co is', co[10])
+                adat = Accounts.query.filter((Accounts.Type == 'Bank') & (Accounts.Co == co[10])).first()
+                for jx, entry in enumerate(entrydata):
+                    holdvec[jx] = getattr(bdat, f'{entry[0]}')
+                    aj = hasinput(holdvec[jx])
+                    if aj == 0:
+                        print(f'{entry[0]} {holdvec[jx]} {aj}')
+                        if entry[0] == 'pMeth':
+                            holdvec[jx], entry[5], entry[6] = 'Check', 1, 'Warning: Inserted Default Value'
+                        elif entry[0] == 'pAccount':
+                            holdvec[jx], entry[5], entry[6] = adat.Name, 1, 'Warning: Inserted Default Value'
+                        elif entry[0] == 'pAmount':
+                            holdvec[jx], entry[5], entry[6] = bdat.bAmount, 1, 'Warning: Inserted Default Value'
+                        elif entry[0] == 'pDate':
+                            holdvec[jx], entry[5], entry[6] = today, 1, 'Warning: Inserted Default Value'
+                        elif entry[0] == 'Memo':
+                            holdvec[jx], entry[5], entry[6] = f'{bdat.bSubcat} {bdat.bAccount}', 1, 'Warning: Inserted Default Value'
+                        elif entry[0] == 'Ref':
+                            blast = Bills.query.filter(
+                                (Bills.pAccount == adat.Name) & (Bills.pMeth == 'Check') & (Bills.Status == 'Paid')).order_by(
+                                Bills.id.desc()).first()
+                            try:
+                                next_check = int(blast.Ref) + 1
+                            except:
+                                next_check = ''
+                            if blast is not None:  holdvec[jx], entry[5], entry[6] = f'{next_check}', 1, 'Warning: Inserted Default Value'
+####################################################################
+            print(f'Writing checks with sids = {sids}')
+            pmeth = request.values.get('pMeth')
+            if pmeth is None: pmeth = 'Check'
+            docref, file1, cache, style = writechecks(sids,pmeth)
+            print(f'The check style is {style}')
+            #######################################################
+            holdvec[40] = str(style)
+            holdvec[39] = postdata
+            holdvec[38] = postdata2
+            holdvec[37] = locked
+            holdvec[36] = pmeth
+            if cache > 0:
+                lastcache = cache - 1
+                lastfile = file1.replace(f'_c{cache}', f'_c{lastcache}')
+                try: os.remove(lastfile)
+                except: print(f'{lastfile} does not exist')
+
+            if record_item is not None:
+                for sid in sids:
+                    nextquery = f"{table}.query.get({sid})"
+                    each_bdat = eval(nextquery)
+                    err = gledger_write('paybill', each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount)
+                    err.append(f'Ledger paid {each_bdat.Jo} to {each_bdat.bAccount} from {each_bdat.pAccount}')
+                    each_bdat.Check = docref
+                    each_bdat.Ccache = cache + 1
+                db.session.commit()
+                holdvec[37] = 1
+            else:
+                bdat.Ccache = cache + 1
+                db.session.commit()
+
+            returnnow = request.values.get('Return')
+            if returnnow is not None:
+                completed = True
+            elif record_item is None:
+                # In case we have locked the check but still going back/forth on address labels
+                for sid in sids:
+                    nextquery = f"{table}.query.get({sid})"
+                    each_bdat = eval(nextquery)
+                    each_bdat.Check = docref
+                    each_bdat.Ccache = cache + 1
+                db.session.commit()
+
+            if docref is not None:
+                viewport[0] = 'show_doc_left'
+                viewport[2] = '/' + tpath(f'{table}-Check', docref)
+
+
+            print(f'Exiting in the comleted section completed is {completed}')
+
+            return holdvec, entrydata, err, viewport, completed
+
+        else:
+            print('Exiting in the gofwd section')
+            completed = True
+            holdvec = []
+            entrydata = []
+            viewport = []
+            return holdvec, entrydata, err, viewport, completed
 
     else:
-        # Gather the data for the selected row
-        nextquery = f"{table}.query.get({sid})"
-        olddat = eval(nextquery)
-
-        for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
-
-    docref = getattr(olddat, 'Source')
-    if docref is not None:
-        viewport[0] = 'show_doc_left'
-        viewport[2] = '/' + tpath(f'{table}', docref)
-
-    return holdvec, entrydata, err, viewport, completed
-
-
-def PrintChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
-    err = [f"Running PrintChecks_task with task_iter {task_iter} using {tablesetup['table']}"]
-    holdvec, entrydata, err, viewport, completed = PayBill_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid)
-    return holdvec, entrydata, err, viewport, completed
-
+        completed = True
+        holdvec = []
+        entrydata = []
+        viewport = []
+        print('Exiting in the no sids location')
+        return holdvec, entrydata, err, viewport, completed

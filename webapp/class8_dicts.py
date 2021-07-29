@@ -668,13 +668,12 @@ billcode = co[10] + 'B'
 Billing_genre =   {'table': 'Bills',
                   'genre_tables': ['Bills', 'Vendors'],
                   'genre_tables_on': ['on', 'off'],
-                  'quick_buttons': ['New Bill', 'Edit Item', 'Pay Bill',  'Print Checks'],
+                  'quick_buttons': ['New Bill', 'Edit Item', 'Pay Bill'],
                   'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 180 Days', 'Last Year', 'This Year', 'Show All']},
                                     {'Pay Filter': ['Unpaid', 'Show All']}],
                   'task_boxes': [{'Adding': ['New Bill', 'New Vendor', 'Upload Bill', 'Upload Payment']},
                                  {'Editing': ['Edit Item', 'Match']},
-                                 {'Money Flow': ['Pay Bill', 'Multi-Pay', 'Print Check']},
-                                 {'View Docs': ['Bill Source', 'Pay Record', 'Check']},
+                                 {'View Docs': ['Bill Source', 'Receipt', 'Pay Record']},
                                  {'Undo': ['Delete Item', 'Undo Payment']},
                                  {'Tasks': ['Detention Report', 'Chassis Report', 'Bill Calendar']}],
                   'document_profiles'  : {
@@ -706,8 +705,7 @@ Billing_genre =   {'table': 'Bills',
                                         {
                                             'New Bill' : ['Table_Selected', 'New', 'Bills'],
                                             'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
-                                            'Pay Bill' : ['Single_Item_Selection', 'PayBill', 'Form'],
-                                            'Print Checks' : ['Single_Item_Selection', 'PrintChecks', 'Form']
+                                            'Pay Bill' : ['One_Table_Multi_Item_Selection', 'MultiChecks', 'Form']
                                         },
                                     'Adding':
                                         {
@@ -724,18 +722,11 @@ Billing_genre =   {'table': 'Bills',
                                          'Accept': ['All_Item_Selection', 'Accept', '']
                                         },
 
-                                    'Money Flow':
-                                        {
-                                         'Pay Bill' : ['Single_Item_Selection', 'PayBill', 'Invoice'],
-                                         'Multi-Pay' : ['One_Table_Multi_Item_Selection', 'MultiPay', 'Invoice'],
-                                         'Print Check' : ['Single_Item_Selection', 'PrintChecks', 'Package']
-                                        },
-
                                     'View Docs':
                                         {
                                          'Bill Source' : ['Single_Item_Selection', 'View', 'Source'],
-                                         'Pay Record' : ['Single_Item_Selection', 'View', 'Proof'],
-                                         'Check' : ['Single_Item_Selection', 'View', 'Check']
+                                         'Receipt' : ['Single_Item_Selection', 'View', 'Proof'],
+                                         'Pay Record' : ['Single_Item_Selection', 'View', 'Check']
                                          },
 
                                     'Undo':
@@ -760,7 +751,7 @@ Bills_setup = {'name' : 'Billing',
                 'checklocation': 6,
                 'creators': ['Jo'],
                 'ukey': 'Jo',
-                'simplify': ['Min','ExpType','PayInfo','Docs'],
+                'simplify': ['Min','ExpType','PayInfo','PayInfo2','Docs'],
                 'entry data': [['Jo', 'JO', 'JO', billcode, 'text', 0, 'ok', 'cc', None, 'Always'],
                                 ['Date', 'Bill Date', 'Bill Date',  'date', 'date', 0, 'ok', 'cc', None, 'Always'],
                                 ['dDate', 'Due Date', 'Due Date',  'date', 'date', 0, 'ok', 'cc', None, 'Always'],
@@ -773,18 +764,18 @@ Bills_setup = {'name' : 'Billing',
                                 ['bCat', 'D/I', 'D/I', 'disabled', 'disabled', 0, 'ok', 'cl', None, 'ExpType'],
                                 ['bSubcat','Cat', 'Cat', 'disabled', 'disabled', 0, 'Category', 'cl', None, 'ExpType'],
 
-
-                                ['pMeth','Meth', 'Meth', 'select', 'paymethods', 0, 'ok', 'cl', None, 'PayInfo'],
-                                ['pAccount','Account', 'Account', 'select', 'acctdata', 0, 'ok', 'cl', None, 'PayInfo'],
-                                ['pAmount','Paid Amount', 'Amount Paid', 'text', 'amtpaid', 0, 'ok', 'cr', None, 'PayInfo'],
+                                ['pMeth','Pay Meth', 'Pay Method', 'select', 'paymethods', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['pAccount','Pay Account', 'Paid From Account', 'select', 'acctdata', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['pAmount','Paid Amount', 'Paid Amount', 'text', 'amtpaid', 0, 'ok', 'cr', None, 'PayInfo2'],
                                 ['pDate','Paid Date', 'Paid Date', 'date', 'date', 0, 'ok', 'cc', None, 'PayInfo'],
                                 ['Description','Desc', 'Desc', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
-                                ['Memo','Memo', 'Memo', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
-                                ['Ref','RefNo', 'RefNo', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['Memo','Memo', 'Check Memo', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
+                                ['Ref','RefNo', 'RefNo or Check#', 'text', 'text', 0, 'ok', 'cl', None, 'PayInfo'],
 
                                ['Source', 'Bill', 'Source', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                ['Proof', 'Pf', 'Proof', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                ['Check', 'Ck', 'Check', 'text', None, 0, 'ok', 'cL', None, 'Docs']
+
                                ],
                 'hidden data': [],
                 'colorfilter': ['Status'],
@@ -796,9 +787,14 @@ Bills_setup = {'name' : 'Billing',
                               ],
                 'default values': {'get_Co': 'N'},
                 'form checks': {
+                       'New': ['Date', 'dDate', 'Company', 'bAmount', 'Co', 'bAccount'],
+                       'Edit': ['Date', 'dDate', 'Company', 'bAmount', 'Co', 'bAccount'],
+                       'MultiChecks': ['Date', 'dDate', 'Company', 'bAmount', 'Co', 'bAccount','pMeth','pAccount','pAmount','pDate','Ref']
+                                },
+                'form show': {
                                 'New': ['ExpType'],
-                                'Edit':['ExpType','PayInfo'],
-                                'PayBill':['ExpType','PayInfo']
+                                'Edit':['ExpType','PayInfo','PayInfo2'],
+                                'MultiChecks':['PayInfo']
                                 },
                 'bring data': [['Bills','bAccount','Accounts','Name',['Name', 'Category', 'Subcategory', 'Type', 'Co'],['bAccount','bCat','bSubcat', 'bType', 'Co']],
                                ['Bills','Company','People','Company',['id'],['Pid']]
@@ -820,3 +816,39 @@ Bills_setup = {'name' : 'Billing',
 
                                     }
                 }
+
+Vendors_setup = {'name' : 'Vendor',
+                   'table': 'People',
+                   'filter': 'Ptype',
+                   'filterval': 'Vendor',
+                   'filter logic': '==',
+                   'button flip': None,
+                   'checklocation': 1,
+                   'creators': [],
+                   'ukey' : 'Company',
+                   'simplify': [],
+                   'entry data': [['Company', 'Company/Name', 'Company/Name', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Addr1', 'Addr1', 'Address Line 1', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Addr2', 'Addr2', 'Address Line 2', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Telephone', 'Telephone', 'Telephone', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                  ['Email', 'Email Status', 'Email Status', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Associate1', 'Email POD', 'Email POD', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Associate2', 'Email AP', 'Email AP', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Date1', 'Added Date', 'Added Date', 'date', 'date', 0, 'ok', 'cc', None, 'Always']],
+                   'hidden data' : [],
+                   'haulmask': [],
+                   'colorfilter': None,
+                    'filteron':  [],
+                   'side data': [],
+                   'default values': {'get_Co': 'N'},
+                     'form checks': {
+                         'New': [],
+                         'Edit': [],
+                         'PayBill': [],
+                         'PrintChecks': []
+                     },
+                   'jscript': 'dtHorizontalVerticalExample3',
+                   'documents': ['Source'],
+                   'sourcenaming': [None, None,'Company'],
+                   'copyswaps' : {}
+                   }

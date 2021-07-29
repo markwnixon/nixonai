@@ -1,0 +1,206 @@
+{% set form_check = tablesetup['form show']['MultiChecks'] %}
+{% set ckstyle = holdvec[40] %}
+{% set indata = holdvec[39] %}
+{% set outdata = holdvec[38] %}
+{% set lock = holdvec[37] %}
+{% set pmeth = holdvec[36] %}
+
+
+<br>
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-around align-items-center">
+            <div class="p-0">Modify, Record, Print Bill Payments</div>
+            <div class="p-0">
+                <button type="submit" class="btn btn-md btn-primary" name="Update Item" {% if lock %} disabled {% endif %}>Update</button>
+                <button type="submit" class="btn btn-md btn-green" name="Record Item" {% if lock %} disabled {% endif %}>Record</button>
+                <button type="submit" class="btn btn-md btn-elegant" name="Cancel">Return</button>
+            </div>
+        </div>
+    </div>
+
+<div class="card-body">
+<table class="table table-condensed table-hover">
+<tbody>
+    {% if pmeth == 'Check' %}
+        <tr>
+        <td><div class="input-group-text">Check Style:</div></td>
+        <td>
+        <select class="form-control" type="text" name="ckstyle" onchange="this.form.submit()">
+        <option value="1" {% if ckstyle == '1' %} selected {% endif %} > Repeated Notation </option>
+        <option value="2" {% if ckstyle == '2' %} selected {% endif %} > Address for Mailing </option>
+        </select>
+        </td>
+        </tr>
+    {% else %}
+        <input type = "hidden"  value={{ ckstyle }} name="ckstyle">
+    {% endif %}
+
+
+
+{% for entry in entrydata %}
+    {% if entry[4] is not none and entry[9] in form_check %}
+
+        {% if entry[5] == 0 %}
+                {%  set colortext = '' %}{% set message = 'ok' %}
+                {%  set valdat = 'is-valid' %}
+        {% elif entry[5] == 1 %}
+                {%  set colortext = 'yellow' %}
+        {% else %}
+                {%  set colortext = 'red text-white' %}
+                {%  set valdat = 'is-invalid' %}
+        {% endif %}
+        {% if entry[3] == 'select' %}
+                <tr>
+                    <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }} {% if lock %}disabled{% endif %}</div></td>
+
+                    <td>
+                        <select class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()" {% if lock %}disabled{% endif %}>
+                        <option value='Choose Later'>Choose Later</option>
+
+                                    {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
+                                    {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
+                                    {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
+                                    {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                                    {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
+                                    {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
+                                    {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
+                                    {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
+                                    {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
+                                    {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
+                                    {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
+
+
+                            {% endif %}
+
+                            {% set htest = holdvec[loop.index-1] %}
+                            {% for kdata in klist %}
+                                <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+
+        {%  elif entry[3] == 'multitext' %}
+            {% if entry[4] != 'text' %}
+                {% if entry[4] == 'dropblock1' %}{% set klist = keydata.dropblock1 %}{% endif %}
+                {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% endif %}
+                    {% if klist %}
+                    <tr>
+                        <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
+                        <td>
+                            <select class="form-control" type="text" name="{{ entry[4] }}" onchange="this.form.submit()">
+                            <option value="">Optional Choose from Previous</option>
+                            {% for du in klist %}
+                                <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                            {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {%  endif  %}
+            {% endif %}
+                <tr>
+                    <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
+                    <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
+                </tr>
+
+        {% elif entry[3] == 'disabled' %}
+
+            <tr>
+                <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}" >{{  entry[2] }} disabled</div></td>
+                <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}" disabled ></td>
+            </tr>
+
+        {% elif entry[3] == 'text' or entry[3] == 'date' or entry[3] == 'time' %}
+                {% set newlabel = entry[2] %}
+                {% if pmeth == 'Check' %}
+                    {% if 'RefNo' in newlabel %}{% set newlabel = 'Check#' %}{% endif %}
+                    {% if 'Memo' in newlabel %}{% set newlabel = 'Check Memo' %}{% endif %}
+                {% elif pmeth == 'Cash' %}
+                    {% if 'RefNo' in newlabel %}{% set newlabel = 'Receipt#' %}{% endif %}
+                    {% if 'Memo' in newlabel %}{% set newlabel = 'Receipt Memo' %}{% endif %}
+                {% else%}
+                    {% if 'RefNo' in newlabel %}{% set newlabel = 'Reference#' %}{% endif %}
+                    {% if 'Memo' in newlabel %}{% set newlabel = 'Pay Memo' %}{% endif %}
+                {% endif %}
+
+                <tr>
+                    <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  newlabel }} {% if lock %} disabled {% endif %}</div></td>
+                    <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}" {% if lock %}disabled{% endif %}></td>
+                </tr>
+
+        {% endif %}
+    {% endif %}
+
+{% endfor %}
+
+</tbody></table>
+</div></div>
+
+
+{% if indata %}
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-around align-items-center">
+                <div class="p-0" align = "center">Items Included on Check {% if lock %} <br> **Items Recorded and Locked** {% endif %}</div>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="table table-condensed table-hover">
+               <thead>
+                    <tr align="center" style="font-weight:bold; background-color:linen">
+                        <th>Include</th><th>ID</th><th>BillRef</th><th>$Amt</th><th>Bill Account</th>
+                    </tr>
+               </thead>
+                <tbody>
+                  {% for data in indata %}
+                        <tr align="center" >
+                            {% set thisid = data[0] %}
+                            <td align="center" ><input class="align-middle" type="checkbox"  checked name="Billout{{thisid}}" {% if lock %} disabled {% endif %}></td>
+                            {% if lock %} <input type = "hidden"  value="on"  name="Billout{{thisid}}"> {% endif %}
+                            {% for dat in data %}
+                                <td>{{ dat }}</td>
+                            {% endfor %}
+                        </tr>
+                  {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{%  endif %}
+
+{% if not lock %}
+    {%  if outdata %}
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-around align-items-center">
+                    <div class="p-0">Similar Items That May be Added</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-condensed table-hover">
+                <thead>
+                    <tr align="center" style="font-weight:bold; background-color:lightblue" >
+                        <th>&nbsp;&nbsp;&nbsp;Add&nbsp;&nbsp;&nbsp;</th><th>ID</th><th>BillRef</th><th>$Amt</th><th>Bill Account</th>
+                    </tr>
+               </thead>
+                <tbody>
+                  {% for data in outdata %}
+                        <tr align="center" >
+                            {% set thisid = data[0] %}
+                            <td align="center" ><input class="align-middle" type="checkbox"  name="Billin{{thisid}}"></td>
+                            {% for dat in data %}
+                                <td>{{ dat }}</td>
+                            {% endfor %}
+                        </tr>
+                  {% endfor %}
+                </tbody></table>
+            </div>
+        </div>
+    {%  endif %}
+{% endif %}
+{% if lock %}
+    <input type = "hidden"  value="on"  name="locked">
+    <input type = "hidden"  value={{ pmeth }} name="pMeth">
+{% endif %}
+

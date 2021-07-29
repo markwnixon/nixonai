@@ -3,9 +3,14 @@
 from flask import request
 from webapp.utils import *
 import datetime
+import math
 today = datetime.datetime.today()
 
-
+def sameall(lst):
+    digfor = True
+    for item in lst:
+        if item != lst[0]: digfor = False
+    return digfor
 
 def container_check(num):
     check1 = 0
@@ -34,54 +39,58 @@ def container_check(num):
         return 2, message
 
 
-
-def form_check(text,type,task):
+def form_check(input,text,type,task,req):
+    print(' ')
+    print(f'Checking input for input:{input} text:{text} type:{type} task:{task} required:{req}')
     status = 0
-    message = 'Type is not defined'
-    print(text,type,task)
+    message = ''
+    if type == 'disabled':
+        print('returning disabled')
+        return text, status, message
 
+    if not req:
+        status = 0
+        message = 'Not a Required Input'
+        if not hasinput(text): text = ''
 
-    if type == 'text':
-        if not hasinput(text):
-            text = ''
-            status = 1
-            message = 'Warning: This text data has no value'
-        else:
-            status = 0
-            message = 'Ok'
+    else:
 
-    elif type == 'multitext':
+        if type == 'text':
+            if not hasinput(text):
+                text = ''
+                status = 2
+                message = 'Error: This text data has no value'
+            else:
+                status = 0
+                message = 'Ok'
 
-        if not hasinput(text):
-            text = ''
-            status = 1
-            message = 'Warning: This text data has no value'
-        else:
-            status = 0
-            message = 'Ok'
+        elif type == 'multitext':
 
-    elif type == 'date':
-        try:
-            dt = datetime.datetime.strptime(text,'%Y-%m-%d')
-            status = 0
-            message = 'ok'
-        except:
-            text = today.strftime('%Y-%m-%d')
-            status = 1
-            message = 'Warning: No date time entered so date set to today'
+            if not hasinput(text):
+                text = ''
+                status = 2
+                message = 'Error: This text data has no value'
+            else:
+                status = 0
+                message = 'Ok'
 
-    elif type == 'float':
-        try:
-            dt = float(text)
-            text = d2s(dt)
-            status = 0
-            message = 'ok'
-        except:
-            status = 2
-            message = 'Error: must set a numerical value for this charge'
+        elif type == 'date':
+            if isinstance(text, datetime.date):
+                print('date is in datetime format')
+                status = 0
+                message = 'ok'
+            else:
+                try:
+                    dt = datetime.datetime.strptime(text,'%Y-%m-%d')
+                    status = 0
+                    message = 'ok'
+                    print('date is text that can be converted')
+                except:
+                    text = today.strftime('%Y-%m-%d')
+                    status = 1
+                    message = 'Warning: No date time entered so date set to today'
 
-    elif type == 'amtpaid':
-        if task == 'PayBill':
+        elif type == 'float':
             try:
                 dt = float(text)
                 text = d2s(dt)
@@ -89,115 +98,140 @@ def form_check(text,type,task):
                 message = 'ok'
             except:
                 status = 2
-                message = 'Error: must set a numerical value for this payment'
-        else:
+                message = 'Error: must set a numerical value for this charge'
+
+        elif type == 'amtpaid':
+            if task == 'PayBill':
+                try:
+                    dt = float(text)
+                    text = d2s(dt)
+                    status = 0
+                    message = 'ok'
+                except:
+                    status = 2
+                    message = 'Error: must set a numerical value for this payment'
+            else:
+                try:
+                    dt = float(text)
+                    text = d2s(dt)
+                    status = 0
+                    message = 'ok'
+                except:
+                    status = 1
+                    message = 'Warning: this must be set when paying, but not for edit'
+
+        elif type == 'integer':
             try:
-                dt = float(text)
-                text = d2s(dt)
+                dt = int(text)
+                text = str(dt)
                 status = 0
                 message = 'ok'
             except:
-                status = 1
-                message = 'Warning: this must be set when paying, but not for edit'
+                status = 2
+                message = 'Error: must set a numerical value for this value'
 
-    elif type == 'integer':
-        try:
-            dt = int(text)
-            text = str(dt)
-            status = 0
-            message = 'ok'
-        except:
-            status = 2
-            message = 'Error: must set a numerical value for this value'
+        elif type == 'concheck':
+            if text is not None:
+                lenck = len(text)
+                if lenck == 11:
+                    status, message = container_check(text)
+                else:
+                    if lenck > 0:
+                        status = 2
+                        message = f'Container must have length of 11 characters not {lenck}'
+                    else:
+                        status = 1
+                        message = f'No container information entered yet'
 
-    elif type == 'concheck':
-        if text is not None:
-            lenck = len(text)
-            if lenck == 11:
-                status, message = container_check(text)
-            else:
-                if lenck > 0:
+        elif type == 'container_types':
+            #print('select',text)
+            if text == 'Choose Later':
+                status = 2
+                message = 'Error: Must have container type selected'
+
+        elif type == 'customerdata':
+            #print('select',text)
+            if text == 'Choose Later':
+                status = 2
+                message = 'Error: must choose a customer'
+
+        elif type == 'vendordata':
+            if text == 'Choose Later':
+                status = 2
+                message = 'Error: must choose a vendor'
+            elif not hasinput(text):
+                status = 2
+                message = 'Must choose the vendor'
+
+        elif type == 'codata':
+            #print('select',text)
+            if text == 'Choose Later':
+                status = 2
+                message = 'Error: must associate bill with Co/Div'
+            elif not hasinput(text):
+                status = 2
+                message = 'Must choose the responsible Co/Div for the Bill'
+
+        elif type == 'expdata':
+            #print('select',text)
+            if text == 'Choose Later':
+                status = 2
+                message = 'Error: must associate bill with pay account'
+            elif not hasinput(text):
+                status = 2
+                message = 'Must choose the responsible billing account for the Bill'
+
+        elif type == 'acctdata':
+            #print('select',text)
+            if text == 'Choose Later':
+                if task == 'PayBill':
                     status = 2
-                    message = f'Container must have length of 11 characters not {lenck}'
+                    message = 'Error: must a payment account'
                 else:
                     status = 1
-                    message = f'No container information entered yet'
+                    message = 'Warning: this must be set when paying bill'
 
-    elif type == 'container_types':
-        #print('select',text)
-        if text == 'Choose Later':
+        elif type == 'paymethods':
+            print('select',text,task)
+            if text == 'Choose Later':
+                if task == 'PayBill':
+                    status = 2
+                    message = 'Error: must include a payment method'
+                else:
+                    status = 1
+                    message = 'Warning: this must be set when paying bill'
+
+        elif type == 'dropblock1':
+            from webapp.class8_tasks import get_drop
+            if hasinput(text):
+                testtext = text.strip()
+                if len(testtext) < 6:
+                    text = get_drop(testtext)
+            if not hasinput(text):
+                loadname = request.values.get('dropblock1')
+                if loadname is not None:
+                    text = get_drop(loadname)
+            #print('got dropblock1',text)
+
+        elif type == 'dropblock2':
+            from webapp.class8_tasks import get_drop
+            if hasinput(text):
+                testtext = text.strip()
+                if len(testtext) < 6:
+                    text = get_drop(testtext)
+            if not hasinput(text):
+                loadname = request.values.get('dropblock2')
+                if loadname is not None:
+                    text = get_drop(loadname)
+
+        else:
             status = 2
-            message = 'Error: Must have container type selected'
+            message = 'Input Required but not Found'
+            text = ''
 
-    elif type == 'customerdata':
-        #print('select',text)
-        if text == 'Choose Later':
-            status = 2
-            message = 'Error: must choose a customer'
+    print(f'At conclusion of input for input:{input} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
 
-    elif type == 'vendordata':
-        #print('select',text)
-        if text == 'Choose Later':
-            status = 2
-            message = 'Error: must choose a vendor'
-
-    elif type == 'codata':
-        #print('select',text)
-        if text == 'Choose Later':
-            status = 2
-            message = 'Error: must associate bill with Co/Div'
-
-    elif type == 'expdata':
-        #print('select',text)
-        if text == 'Choose Later':
-            status = 2
-            message = 'Error: must associate bill with pay account'
-
-    elif type == 'acctdata':
-        #print('select',text)
-        if text == 'Choose Later':
-            if task == 'PayBill':
-                status = 2
-                message = 'Error: must a payment account'
-            else:
-                status = 1
-                message = 'Warning: this must be set when paying bill'
-
-    elif type == 'paymethods':
-        print('select',text,task)
-        if text == 'Choose Later':
-            if task == 'PayBill':
-                status = 2
-                message = 'Error: must include a payment method'
-            else:
-                status = 1
-                message = 'Warning: this must be set when paying bill'
-
-    elif type == 'dropblock1':
-        from webapp.class8_tasks import get_drop
-        if hasinput(text):
-            testtext = text.strip()
-            if len(testtext) < 6:
-                text = get_drop(testtext)
-        if not hasinput(text):
-            loadname = request.values.get('dropblock1')
-            if loadname is not None:
-                text = get_drop(loadname)
-        #print('got dropblock1',text)
-
-    elif type == 'dropblock2':
-        from webapp.class8_tasks import get_drop
-        if hasinput(text):
-            testtext = text.strip()
-            if len(testtext) < 6:
-                text = get_drop(testtext)
-        if not hasinput(text):
-            loadname = request.values.get('dropblock2')
-            if loadname is not None:
-                text = get_drop(loadname)
-        #print('got dropblock2',text)
-
-    return text,status,message
+    return text, status, message
 
 def colorcode(table, incol):
     #print(f'This table for color is {table}')
@@ -262,3 +296,116 @@ def checkfor_fileupload(err, task_iter, viewport):
         #print('the source doc is....', viewport[2])
 
     return err, viewport
+
+#Utility for printing out a barcode from an address
+
+
+#Utilities for turning numbers into words (like for check writing)
+
+def once(num):
+    one = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+    word = ''
+    word = one[int(num)]
+    word = word.strip()
+    return word
+
+def ten(num):
+    tenp = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+    tenp2 = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+    word = ''
+    if num[0] == '1':
+        word = tenp[int(num[1])]
+    else:
+        text = once(num[1])
+        word = tenp2[int(num[0])]
+        word = word + "-" + text
+    word = word.strip()
+    return word
+
+def hundred(num):
+    one = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+    word = ''
+    text = ten(num[1:])
+    word = one[int(num[0])]
+    if num[0] != '0':
+        word = word + "-Hundred "
+    word = word + text
+    word = word.strip()
+    return word
+
+def thousand(num):
+    one = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+    word = ''
+    pref = ''
+    text = ''
+    length = len(num)
+    if length == 6:
+        text = hundred(num[3:])
+        pref = hundred(num[:3])
+    if length == 5:
+        text = hundred(num[2:])
+        pref = ten(num[:2])
+    if length == 4:
+        text = hundred(num[1:])
+        word = one[int(num[0])]
+    if num[0] != '0' or num[1] != '0' or num[2] != '0':
+        word = word + "-Thousand "
+    word = word + text
+    if length == 6 or length == 5:
+        word = pref + word
+    word = word.strip()
+    return word
+
+def million(num):
+    word = ''
+    pref = ''
+    text = ''
+    length = len(num)
+    if length == 9:
+        text = thousand(num[3:])
+        pref = hundred(num[:3])
+    if length == 8:
+        text = thousand(num[2:])
+        pref = ten(num[:2])
+    if length == 7:
+        text = thousand(num[1:])
+        word = one[int(num[0])]
+    if num[0] != '0' or num[1] != '0' or num[2] != '0':
+        word = word + " Million "
+    word = word + text
+    if length == 9 or length == 8:
+        word = pref + word
+    word = word.strip()
+    return word
+
+def get_check_words(num):
+    val1 = float(num)
+    val2 = math.floor(val1)
+    #print(val2)
+    val3 = val1-val2
+    val3 = round(val3*100)
+    #print(val3)
+    a = str(val2)
+    leng = len(a)
+    if leng == 1:
+        if a == '0':
+            num = 'Zero'
+        else:
+            num = once(a)
+    if leng == 2:
+        num = ten(a)
+    if leng == 3:
+        num = hundred(a)
+    if leng > 3 and leng < 7:
+        num = thousand(a)
+    if leng > 6 and leng < 10:
+        num = million(a)
+
+    lnum = len(num)
+    # print(num[lnum-1])
+    if num[lnum-1] == '-':
+        num = num[0:lnum-1]
+
+    tval3 = "{0:0=2d}".format(val3)
+    amount_text = num + ' and ' + tval3 + '/100 '
+    return amount_text
