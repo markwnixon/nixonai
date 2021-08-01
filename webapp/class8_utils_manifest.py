@@ -5,6 +5,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import datetime
 import shutil
+import os
 from webapp.viewfuncs import parseline, parselinenoupper
 from webapp.CCC_system_setup import addpath, bankdata, scac
 from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
@@ -12,10 +13,16 @@ from webapp.utils import *
 
 
 def manfile(joborder, cache):
+    if not hasinput(cache): cache = 1
     wpath=addpath(f'static/{scac}/data/vManifest/Manifest')
     file1=wpath+joborder+'.pdf'
     file2=wpath+joborder+'c'+str(cache)+'.pdf'
     file3 = f'static/{scac}/data/vManifest/Manifest'+joborder+'c'+str(cache)+'.pdf'
+    file4 = wpath + joborder + 'c' + str(cache - 1) + '.pdf'
+    try:
+        os.remove(file4)
+    except:
+        print(f'No file {file4} found')
     return file1, file2, file3
 
 def minbox_write(header, lineitems, fs1, fs2):
@@ -102,23 +109,33 @@ def get_sectors(ht, odat):
     middle2 = ['Order', 'Pickup/ShipperID', 'PU Date/Time', 'DEL Date/Time']
     middle2data = [order, pickup, loaddatetime, deliverdatetime]
 
-    if ht == 'Import Standard':
-        sectors = ['Pickup Load at Port', 'Deliver To', 'Return to Port']
-        sectorlocs[1] = odat.Dropblock1.splitlines()
-        sectorlocs[2] = odat.Dropblock2.splitlines()
-        sectorlocs[3] = odat.Dropblock1.splitlines()
-        middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'BOL', 'Container' ,'Size/Type', 'Seal']
-        middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Seal]
+    if hasvalue(ht):
 
-    elif ht == 'Export Standard':
-        sectors = ['Pickup Empty at Port', 'Load At', 'Return to Port']
-        sectorlocs[1] = odat.Dropblock1.splitlines()
-        sectorlocs[2] = odat.Dropblock2.splitlines()
-        sectorlocs[3] = odat.Dropblock1.splitlines()
-        middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Booking', 'Container' ,'Size/Type', 'Seal']
-        middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Seal]
+        if 'Import' in ht:
+            sectors = ['Pickup Load at Port', 'Deliver To', 'Return to Port']
+            sectorlocs[1] = odat.Dropblock1.splitlines()
+            sectorlocs[2] = odat.Dropblock2.splitlines()
+            sectorlocs[3] = odat.Dropblock1.splitlines()
+            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'BOL', 'Container' ,'Size/Type', 'Seal']
+            middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Seal]
 
-    sectors = ['Shipping Agent'] + sectors
+        elif 'Export' in ht:
+            sectors = ['Pickup Empty at Port', 'Load At', 'Return to Port']
+            sectorlocs[1] = odat.Dropblock1.splitlines()
+            sectorlocs[2] = odat.Dropblock2.splitlines()
+            sectorlocs[3] = odat.Dropblock1.splitlines()
+            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Booking', 'Container' ,'Size/Type', 'Seal']
+            middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Seal]
+
+        elif 'OTR' in ht:
+            sectors = ['Pickup Location', 'Delivery Location']
+            sectorlocs[1] = odat.Dropblock1.splitlines()
+            sectorlocs[2] = odat.Dropblock2.splitlines()
+            sectorlocs[3] = odat.Dropblock1.splitlines()
+            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Trailer #','Size/Type', 'Seal']
+            middle1data = [scac,odat.Driver,truck,tag,odat.Container,odat.Type,odat.Seal]
+
+    sectors = ['Shipper/Agent'] + sectors
     return sectors, sectorlocs, dates, middle1, middle1data, middle2, middle2data
 
 def center_write_items(headers, headeritems, fs1, fs2, ltm, rtm):

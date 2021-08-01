@@ -10,40 +10,42 @@
     </div>
 </div>
 
-{% set form_check = tablesetup['form checks']['Manifest'] %}
+{% set form_show = tablesetup['form show']['Manifest'] %}
 
 <div class="card-body">
-<table class="table table-condensed table-hover">
-<tbody>
-{% for entry in entrydata %}
-    {% if entry[4] is not none and (entry[9] in form_check or entry[9] == 'Always') %}
-        {% if entry[5] == 0 %}
+    <table class="table table-condensed table-hover">
+    <tbody>
+    {% for entry in entrydata %}
+        {% if entry[4] is not none and (entry[9] in form_show or entry[9] == 'Always') %}
+            {% if entry[5] == 0 %}
                 {%  set colortext = '' %}{% set message = 'ok' %}
-        {% elif entry[5] == 1 %}
+                {%  set valdat = 'is-valid' %}
+            {% elif entry[5] == 1 %}
                 {%  set colortext = 'yellow' %}
-        {% else %}
+            {% else %}
                 {%  set colortext = 'red text-white' %}
-        {% endif %}
+                {%  set valdat = 'is-invalid' %}
+            {% endif %}
+
         {% if entry[3] == 'select' %}
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
 
                     <td>
-                        <select class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
+                        <select class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" onchange="this.form.submit()">
                         <option value='Choose Later'>Choose Later</option>
 
                                 {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
-                                {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
-                                {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
-                                {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
-                                {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
-                                {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
-                                {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
-                                {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
-                                {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
-                                {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
-                                {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
-
+                                    {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
+                                    {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
+                                    {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                                    {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
+                                    {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
+                                    {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
+                                    {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
+                                    {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
+                                    {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
+                                    {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                                 {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
@@ -58,6 +60,7 @@
             {% if entry[4] != 'text' %}
                 {% if entry[4] == 'dropblock1' %}{% set klist = keydata.dropblock1 %}{% endif %}
                 {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% endif %}
+                {% if entry[4] == 'dropblock3' %}{% set klist = keydata.dropblock3 %}{% endif %}
                 {% if klist %}
                 <tr>
                     <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
@@ -74,14 +77,23 @@
             {% endif %}
                 <tr>
                     <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
-                    <td colspan="2"><textarea class="form-control {{ colortext }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
+                    <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
                 </tr>
+
+        {% elif entry[3] == 'disabled' %}
+
+            <tr>
+                <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}" >{{  entry[2] }} disabled</div></td>
+                <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}" disabled ></td>
+            </tr>
+
+
 
         {% elif entry[3] == 'text' or entry[3] == 'date' or entry[3] == 'time' %}
 
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
-                    <td><input class="form-control {{ colortext }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
+                    <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
                 </tr>
 
         {% endif %}

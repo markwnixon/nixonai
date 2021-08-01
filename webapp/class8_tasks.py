@@ -15,11 +15,11 @@ from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
 from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, Truck_Logs_task, CMA_APL_task
 import os
+import ntpath
 
 from sqlalchemy import inspect
 import datetime
 from datetime import timedelta
-import os
 import subprocess
 #from func_cal import calmodalupdate
 import json
@@ -740,10 +740,10 @@ def make_new_entry(tablesetup,holdvec):
     dat = eval(newquery)
     if dat is not None:
         id = dat.id
-        form_show = tablesetup['form checks']['New']
+        form_show = tablesetup['form show']['New']
         for jx,entry in enumerate(entrydata):
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
+                print(f'Data going in is:{entry[0]} {holdvec[jx]}')
                 setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
@@ -856,6 +856,7 @@ def check_appears(tablesetup, entry):
                 print(test,havedat)
                 return colmat
         print('checkappears',testval,testmat,colmat,havedat)
+    print(f'checkvals returning {entry[3]} and {entry[4]}')
     return entry[3], entry[4]
 
 def New_task(tablesetup, task_iter):
@@ -923,11 +924,12 @@ def New_task(tablesetup, task_iter):
                 err.append(f'Cannot create entry until input errors shown in red below are resolved')
 
     else:
-        holdvec = [''] * 30
+        holdvec = [''] * 60
         entrydata = tablesetup['entry data']
         for jx, entry in enumerate(entrydata):
             if entry[0] in form_checks: required = True
             else: required = False
+            print(f'Doing Task Iter = 0 checks on entry {entry} numer {jx}')
             holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required)
 
 
@@ -1006,7 +1008,9 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
             if failed == 0:
                 for jx, entry in enumerate(entrydata):
                     if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                        if entry[0] not in creators: setattr(olddat, f'{entry[0]}', holdvec[jx])
+                        if entry[0] not in creators:
+                            print(f'Setting entry {entry[0]} to {holdvec[jx]}')
+                            setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
                 for jx, entry in enumerate(hiddendata):
                     thisvalue = getattr(olddat,entry[2])
@@ -1062,7 +1066,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
 
 
-    docref = getattr(olddat, 'Source')
+    try:
+        docref = getattr(olddat, 'Source')
+    except:
+        docref = None
     if docref is not None:
         viewport[0] = 'show_doc_left'
         viewport[2] = '/' + tpath(f'{table}', docref)
@@ -1447,6 +1454,11 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
+    masks = tablesetup['haulmask']
+    if masks != []: entrydata = mask_apply(entrydata, masks)
+
+    form_checks = tablesetup['form checks']['Manifest']
+    form_show = tablesetup['form show']['Manifest']
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -1461,21 +1473,53 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
         if task_iter > 0:
             failed = 0
             warned = 0
-
             for jx, entry in enumerate(entrydata):
-                holdvec[jx] = request.values.get(f'{entry[0]}')
-                holdvec[jx], entry[5], entry[6] = form_check(holdvec[jx], entry[4], 'Manifest')
-                if entry[5] > 1: failed = failed + 1
-                if entry[5] == 1: warned = warned + 1
+                if entry[3] == 'appears_if':
+                    entry[3], entry[4] = check_appears(tablesetup, entry)
+                    entrydata[jx][3], entrydata[jx][4] = entry[3], entry[4]
+                    print(f'Return from check_appears is {entry[3]} and {entry[4]}')
+                print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
+                if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                    # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
+                    holdvec[jx] = request.values.get(f'{entry[0]}')
+                    if entry[0] in form_checks: required = True
+                    else: required = False
+                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required)
+                    if entry[5] > 1: failed = failed + 1
+                    if entry[5] == 1: warned = warned + 1
+
+            if 'bring data' in tablesetup:
+                for bring in tablesetup['bring data']:
+                    tab1, sel, tab2, cat, colist1, colist2 = bring
+                    print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                    valmatch = request.values.get(sel)
+                    print(valmatch)
+                    escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                    adat = eval(escript)
+                    if adat is not None:
+                        for jx, col in enumerate(colist1):
+                            thisval = getattr(adat, col)
+                            for ix, entry in enumerate(entrydata):
+                                if entry[0] == colist2[jx]:
+                                    holdvec[ix] = thisval
+                                    # print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+
             err.append(f'There are {failed} input errors and {warned} input warnings')
 
             update_item = request.values.get('Update Manifest')
             if update_item is not None:
+                try:
+                    thisvalue = getattr(modata, colorcol[0])
+                    if thisvalue == -1: setattr(modata, colorcol[0], 0)
+                except:
+                    print('No color selector found')
+
                 if failed == 0:
                     for jx, entry in enumerate(entrydata):
-                        if entry[0] not in creators:
-                            #print('Updating Entry with', entry[0], holdvec[jx])
-                            setattr(modata, f'{entry[0]}', holdvec[jx])
+                        if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                            if entry[0] not in creators:
+                                print(f'Setting entry {entry[0]} to {holdvec[jx]}')
+                                setattr(modata, f'{entry[0]}', holdvec[jx])
                     db.session.commit()
                     for jx, entry in enumerate(hiddendata):
                         thisvalue = getattr(modata, entry[2])
@@ -1484,7 +1528,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                             thissubvalue = thisvalue[0]
                         except:
                             thissubvalue = ''
-                        #print('Updating Entry with', entry[0], thissubvalue)
+                        # print('Updating Entry with', entry[0], thissubvalue)
                         setattr(modata, f'{entry[0]}', thissubvalue)
                     db.session.commit()
                 else:
@@ -1494,13 +1538,21 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
             # Gather the data for the selected row
             nextquery = f"{table}.query.get({sid})"
             modata = eval(nextquery)
-            for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(modata, f'{entry[0]}')
+
+            for jx, entry in enumerate(entrydata):
+                if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry)
+                holdvec[jx] = getattr(modata, f'{entry[0]}')
+                if entry[0] in form_checks: required = True
+                else: required = False
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required)
 
         docref = makemanifest(modata)
         try:
             modata.Mcache = int(modata.Mcache) + 1
+            modata.Manifest = ntpath.basename(docref)
         except:
             modata.Mcache = 1
+            modata.Manifest = ntpath.basename(docref)
         db.session.commit()
         viewport[0] = 'show_doc_left'
         viewport[2] = '/' + tpath(f'manifest', docref)

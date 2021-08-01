@@ -166,14 +166,15 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Shipper', 'Shipper', 'Select Customer', 'select', 'customerdata', 0, 'ok', 'cl', 15, 'Always'],
                                ['Source', 'Src', 'Source', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                ['Proof', 'Prf', 'Proof', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                                ['Manifest', 'Man', 'Manifest', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                ['Gate', 'Gte', 'Gate', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                ['Invoice', 'Inv', 'Invoice', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                 ['Package', 'Pkg', 'Package', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                 ['PaidInvoice', 'PInv', 'PaidInvoice', None, 'text', 0, 'ok', 'cL', None, 'Docs'],
                                ['HaulType', 'HaulType', 'Select Haul Type', 'select', 'haul_types', 0, 'ok', 'cl', None, 'Job'],
-                               ['Booking', 'Release', 'Release', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                               ['Booking', 'Release', 'Release', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
+                                ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Job'],
                                ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok', 'cc', None, 'Job'],
-                               ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Job'],
                                ['Chassis', 'Chassis', '', '', 'text', 0, 'ok', 'cc', None, 'Job'],
                                 ['Date', 'Load Date', 'Pick Up Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
                                 ['Date2', 'Del Date', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
@@ -210,10 +211,15 @@ Orders_setup = {'name' : 'Trucking Job',
                               ],
 
                 'default values': {'get_Shipper': 'Fill This Later'},
-                'form checks': {
+                'form show': {
                     'New': ['Job', 'Job Detail'],
                     'Edit': ['Job', 'Job Detail', 'Money', 'Dispatch'],
-                    'Manifest': ['Dispatch']
+                    'Manifest': ['Job', 'Job Detail', 'Dispatch']
+                },
+                'form checks': {
+                    'New': ['Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3'],
+                    'Edit': ['Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3','Dropblock1', 'Dropblock2', 'Dropblock3'],
+                    'Manifest': ['Driver','Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3', 'Dropblock1', 'Dropblock2', 'Dropblock3']
                 },
                 'appears_if': {
                     'HaulType': ['Extra Stop', 'Transload'],
@@ -309,6 +315,15 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                      'colorfilter': ['Status'],
                       'filteron':  ['Date'],
                      'side data': [],
+                     'default values': {'get_Shipper': 'Fill This Later'},
+                     'form show': {
+                         'New': ['Ticket'],
+                         'Edit': ['Ticket','Extras']
+                     },
+                     'form checks': {
+                         'New': ['Container'],
+                         'Edit': ['Container']
+                     },
                      'jscript': 'dtHorizontalVerticalExample2',
                      'documents': ['Source'],
                      'sourcenaming': [None, None, 'Container', 'Type'],
@@ -349,6 +364,15 @@ Customers_setup = {'name' : 'Customer',
                    'colorfilter': None,
                     'filteron':  [],
                    'side data': [],
+                   'default values': {'get_Shipper': 'Fill This Later'},
+                   'form show': {
+                       'New': [ ],
+                       'Edit': [ ]
+                   },
+                   'form checks': {
+                       'New': ['Company'],
+                       'Edit': ['Company']
+                   },
                    'jscript': 'dtHorizontalVerticalExample3',
                    'documents': ['Source'],
                    'sourcenaming': [None, None,'Company'],
@@ -370,6 +394,15 @@ Services_setup = {'name' : 'Service',
                   'colorfilter': None,
                    'filteron':  [],
                   'side data': [],
+                  'default values': {'get_Shipper': 'Fill This Later'},
+                  'form show': {
+                      'New': [],
+                      'Edit': []
+                  },
+                  'form checks': {
+                      'New': ['Company'],
+                      'Edit': ['Company']
+                  },
                   'jscript': 'dtHorizontalVerticalExample4',
                   'documents': [],
                   'copyswaps' : {}
@@ -397,14 +430,22 @@ Summaries_setup = {'name' : 'Summaries',
                                ['Amount', 'Amount', 'Amount', 'text', 'float', 0, 'ok', 'cr', None, 'Always'],
                                ['Total', 'Total', 'Total', 'text', 'float', 0, 'ok', 'cr', None, 'Always'],
                                ['Description', 'Description', 'Description', 'multitext', 'text', 0, 'ok', 'cl', None, 'Always'],
-                               ['Status', 'Status', 'Status', 'text', 'integer', 0, 'ok', 'cc', None, 'Always'],
-                               ['Cache', 'Cache', 'Cache', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                               ['Status', 'Status', 'Status', 'text', 'integer', 0, 'ok', 'cc', None, 'Always']
                                ],
                   'hidden data' : [],
                   'haulmask': [],
                   'colorfilter': ['Status'],
                    'filteron':  [],
                   'side data': [],
+                   'default values': {'get_Shipper': 'Fill This Later'},
+                   'form show': {
+                       'New': [],
+                       'Edit': []
+                   },
+                   'form checks': {
+                       'New': [],
+                       'Edit': []
+                   },
                   'jscript': 'dtSummaries',
                   'documents': ['Source'],
                   'source': ['vservices', ''],
@@ -598,11 +639,22 @@ Autos_setup = {'name' : 'Auto Job',
                 'hidden data' : [],
                 'colorfilter': ['Status'],
                 'filteron':  ['Date', 'Invoice', 'Haul'],
-                'side data': [{'customerdata': ['People', 'Ptype', 'Trucking', 'Company']},
-                              {'driverdata': ['Drivers', 'Active', 1, 'Name']},
-                              {'truckdata': ['Vehicles', 'Active', 1, 'Unit']},
-                              {'dropblock1': ['Autos', 'PuFrom', 'get_TowCo', 'Company']},
-                              {'dropblock2': ['Orders', 'Shipper', 'get_Shipper', 'Company2']}],
+               'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
+                             {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
+                             {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                             {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
+                             {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
+                             {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
+                             ],
+               'default values': {'get_Shipper': 'Fill This Later'},
+               'form show': {
+                   'New': ['Job', 'Tow', 'Work'],
+                   'Edit': ['Job', 'Tow', 'Work']
+               },
+               'form checks': {
+                   'New': ['Customer', 'Date', 'Date2'],
+                   'Edit': ['Customer', 'Date', 'Date2']
+               },
                 'jscript': 'dtTrucking',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
                 'source': ['vorders', 'Source', 'Jo'],

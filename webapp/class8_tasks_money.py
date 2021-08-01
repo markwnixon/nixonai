@@ -68,7 +68,10 @@ def initialize_invoice(myo, err):
             myo.Icache = cache + 1
             qty = 1
             descript = 'Order ' + myo.Order + ' Line Haul ' + myo.Company + ' to ' + myo.Company2
-            amount = float(myo.Amount)
+            try:
+                amount = float(myo.Amount)
+            except:
+                amount = 0.00
             input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,
                              Ea=d2s(amount), Qty=qty, Amount=d2s(amount), Total=0.00, Date=today,
                              Original=None, Status='New')
