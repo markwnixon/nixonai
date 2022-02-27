@@ -569,7 +569,7 @@ def invoice_mimemail(docref, err, lastpath):
     cdata = companydata()
     signature_block = cdata[2] + '<br>' + cdata[5] + '<br>' + cdata[6] + '<br>' + cdata[7]
     signature = f'<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><br><br><table><tr><td><div>'\
-                + f'<img src = "{cdata[11]}" width="120" height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
+                + f'<img src = "{cdata[11]}" height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
 
     ourserver = websites['mailserver']
 

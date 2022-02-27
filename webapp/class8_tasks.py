@@ -1119,6 +1119,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 #print('made it here with jx, thistable sid', jx, thistable, sid)
                 rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
                 eval(rstring)
+                db.session.commit()
             elif task_focus == 'Invoice':
                 # Need to add the undo of the journal entries
                 rstring = f'{table}.query.get({sid})'

@@ -15,8 +15,8 @@ from webapp.class8_tasks_gledger import gledger_write
 
 def loginvo_m(odat,ix):
     alink = odat.Links
-    print(ix,alink)
-    if alink is not None:
+    print(f'ix is {ix} and alink is {alink}')
+    if hasinput(alink):
         if 1 == 1:
             alist = json.loads(alink)
             for aoder in alist:
