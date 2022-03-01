@@ -256,7 +256,7 @@ Orders_setup = {'name' : 'Trucking Job',
                                                         } ,
 
                                     'Dray Export': {
-                                        'Top Blocks': ['Bill To', 'Pickup and Return for Dray Export', 'Load At'],
+                                        'Top Blocks': ['Bill To', 'Load At', 'Pickup and Return for Dray Export', ],
                                         'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Job Start', 'Job Finished'],
                                         'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
                                         'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']

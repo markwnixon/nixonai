@@ -864,6 +864,7 @@ def New_task(tablesetup, task_iter):
     err = [f"Running New task with task_iter {task_iter} using {tablesetup['table']}"]
     form_show = tablesetup['form show']['New']
     form_checks = tablesetup['form checks']['New']
+    print(f'Entering New Task with task iter {task_iter}')
 
     if task_iter > 0:
         entrydata = tablesetup['entry data']
@@ -875,6 +876,7 @@ def New_task(tablesetup, task_iter):
         warned = 0
 
         for jx, entry in enumerate(entrydata):
+            print(f'Entry loop: jx"{jx}, entry:{entry}')
             if entry[3] == 'appears_if':
                 entry[3], entry[4] = check_appears(tablesetup, entry)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
@@ -929,7 +931,6 @@ def New_task(tablesetup, task_iter):
         for jx, entry in enumerate(entrydata):
             if entry[0] in form_checks: required = True
             else: required = False
-            print(f'Doing Task Iter = 0 checks on entry {entry} numer {jx}')
             holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required)
 
 

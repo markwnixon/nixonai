@@ -101,7 +101,9 @@ def add_service(myo):
                 elif mys.Service == 'Storage':
                     descript = 'Days of Storage'
                 elif mys.Service == 'Chassis Fees':
-                    descript = 'Days of Chassis'
+                    qty = myo.Date2 - myo.Date
+                    qty = qty.days + 1
+                    descript = f'Days of Chassis, {myo.Date} - {myo.Date2}'
                 amount = float(mys.Price)
                 input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service=mys.Service, Description=descript, Ea=d2s(
                     amount), Qty=qty, Amount=d2s(amount), Total=0.00, Date=today, Original=None, Status='New')
@@ -204,7 +206,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         invostyle = 'Dray Import'
     headers = tablesetup['invoicetypes'][invostyle]
     print('the headers are:', headers)
-    holdvec[4] = invostyle
+    holdvec[5] = invostyle
 
     returnhit = request.values.get('Finished')
 
@@ -215,7 +217,19 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         table = tablesetup['table']
         nextquery = f"{table}.query.get({sid})"
         odata1 = eval(nextquery)
-        jo = getattr(odata1, 'Jo')
+        haultype = getattr(odata1, 'HaulType')
+        invostyle = request.values.get('invoicestyle')
+        if invostyle is None:
+            if 'Export' in haultype:
+                invostyle = 'Dray Export'
+            elif 'Import' in haultype:
+                invostyle = 'Dray Import'
+            else:
+                invostyle = 'OTR"'
+
+
+
+
 
         #Need to jump over to invoice database
         jo = getattr(odata1, 'Jo')

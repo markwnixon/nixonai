@@ -19,7 +19,7 @@ SQLALCHEMY_DATABASE_URI = dbp[0] +"{username}:{password}@{hostname}/{databasenam
             databasename=dbp[4]
         )
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
-app.config["SQLALCHEMY_POOL_RECYCLE"] = 299
+app.config["SQLALCHEMY_POOL_RECYCLE"] = 280
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["DEBUG"] = True
 app.config["SECRET_KEY"] = dbp[5]

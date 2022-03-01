@@ -7,6 +7,7 @@
 {% set sdata = holdvec[2] %}
 {% set invdata = holdvec[3] %}
 
+
 <br>
 <div class="card">
 
@@ -30,7 +31,7 @@
         <select class="mdb-select md-form" name="invoicestyle" onchange="this.form.submit()">
             <option value="" disabled selected>Change Invoice Style</option>
             {% for ld in invdata %}
-                <option {% if holdvec[4] == ld %} selected {% endif %} value="{{ ld }}">{{ ld }}</option>
+                <option {% if holdvec[5] == ld %} selected {% endif %} value="{{ ld }}">{{ ld }}</option>
             {% endfor %}
         </select>
     </div>
