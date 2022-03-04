@@ -1640,10 +1640,13 @@ def get_last_used_stamps(odat):
     stampdata = []
     stampstring = odat.Status
     if isinstance(stampstring, str):
-        stampdata = json.loads(stampstring)
-        vlen = int(len(stampdata) / 7)
-        for ix in range(vlen):
-            if isinstance(stampdata[7 * ix + 6], str): stamplist.append(stampdata[7 * ix + 6])
+        try:
+            stampdata = json.loads(stampstring)
+            vlen = int(len(stampdata) / 7)
+            for ix in range(vlen):
+                if isinstance(stampdata[7 * ix + 6], str): stamplist.append(stampdata[7 * ix + 6])
+        except:
+            print(f'String for stamp in this location is {stampstring} and not in json format')
     return stamplist, stampdata
 
 def make_bool(input):

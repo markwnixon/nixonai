@@ -1,8 +1,11 @@
 from flask import request
 from webapp import db
-from webapp.models import People, Drops, Drivers, Vehicles
+from webapp.models import People, Drops, Drivers, Vehicles, Interchange
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+
+from PyPDF2 import PdfFileReader, PdfFileWriter, PdfFileMerger
+from PyPDF2.pdf import PageObject
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import datetime
 import shutil
@@ -128,6 +131,30 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
 
     return docreturn
 
+def blendticks(gfile1,gfile2,outfile):
+
+    reader1 = PdfFileReader(open(gfile1, 'rb'))
+    p1 = reader1.getPage(0)
+
+    reader2 = PdfFileReader(open(gfile2, 'rb'))
+    p2 = reader2.getPage(0)
+    #p2.cropBox.lowerLeft = (50,400)
+    #p2.cropBox.upperRight = (600,700)
+
+    #offset_x = p2.mediaBox[2]
+    offset_x = 0
+    offset_y = -280
+
+    # add second page to first one
+    p1.mergeTranslatedPage(p2, offset_x, offset_y, expand=False)
+    p1.cropBox.lowerLeft = (50,250)
+    p1.cropBox.upperRight = (550,800)
+
+    output = PdfFileWriter()
+    output.addPage(p1)
+
+    with open(outfile, "wb") as out_f:
+        output.write(out_f)
 
 def get_doclist(odat, dockind):
     fexist = [0] * 4
@@ -156,23 +183,23 @@ def get_doclist(odat, dockind):
                 if os.path.isfile(fa):
                     packitems.append(fa)
                     fexist[jx] = 1
-            if thisdoc == 'Ticks':
+            if thisdoc == 'Gate Tickets':
                 idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
                 if idata is not None:
                     if len(idata) > 1:
                         # Get a blended ticket
                         con = idata[0].Container
-                        newdoc = f'static/{scac}/data/vinterchange/{con}_Blended.pdf'
+                        newdoc = f'static/{scac}/data/vGate/{con}_Blended.pdf'
                         if os.path.isfile(addpath(newdoc)):
                             print(f'{newdoc} exists already')
                         else:
-                            g1 = f'static/{scac}/data/vinterchange/{idata[0].Original}'
-                            g2 = f'static/{scac}/data/vinterchange/{idata[1].Original}'
+                            g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
+                            g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
                             blendticks(addpath(g1), addpath(g2), addpath(newdoc))
                         packitems.append(addpath(newdoc))
                         fexist[jx] = 1
                     else:
-                        packitems.append(addpath(f'tmp/{scac}/data/vinterchange/{idata[0].Original}'))
+                        packitems.append(addpath(f'tmp/{scac}/data/vGate/{idata[0].Source}'))
                         fexist[jx] = 1
     return fexist, packitems
 
