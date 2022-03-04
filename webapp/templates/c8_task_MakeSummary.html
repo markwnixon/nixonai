@@ -39,6 +39,7 @@
         <tbody>
 
 {% for data in sdata %}
+    {% set aaid = 'aa' + data.id|string %}
     {% set taid = 'ta' + data.id|string %}
             <tr>
                 <td align="center" ><input class="align-middle" type="checkbox" name="box{{data.id}}" "></td>
@@ -46,7 +47,7 @@
                 <td class="{{atc1}}">{{ data.Release }}</td>
                 <td class="{{atc1}}">{{ data.Container }}</td>
                 <td class="{{atc1}}">{{ data.Type }}</td>
-                <td class="{{atc1}}">{{ data.Amount }}</td>
+                <td><textarea class="{{atc2}}" type="text" name={{ aaid }} rows="1" cols="10">{{ data.Amount }}</textarea></td>
                 <td><textarea class="{{atc2}}" type="text" name={{ taid }} rows="2" cols="40">{{ data.Description }}</textarea></td>
             </tr>
 {% endfor %}

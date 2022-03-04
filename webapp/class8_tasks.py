@@ -32,7 +32,7 @@ from webapp.viewfuncs import newjo
 import uuid
 
 def get_drop(loadname):
-    #print(f'The LOADNAME is:{loadname}')
+    print(f'In get_drop The LOADNAME is:{loadname}')
     dropdat = Drops.query.filter(Drops.Entity == loadname).first()
     if dropdat is not None:
         #print('dropdat',dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
@@ -435,7 +435,7 @@ def Table_maker(genre):
         session['table_defaults'] = tables_on
         session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
-        tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+        tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
         jscripts = ['dtTrucking']
         taskon, task_iter, task_focus = None, None, None
 
@@ -880,6 +880,7 @@ def New_task(tablesetup, task_iter):
             if entry[3] == 'appears_if':
                 entry[3], entry[4] = check_appears(tablesetup, entry)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
+            print(f'form show is:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 if entry[1] != 'hidden':
                     holdvec[jx] = request.values.get(f'{entry[0]}')

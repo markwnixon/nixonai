@@ -48,49 +48,54 @@ def form_check(input,text,type,task,req):
         print('returning disabled')
         return text, status, message
 
-    if not req:
-        status = 0
-        message = 'Not a Required Input'
-        if not hasinput(text): text = ''
 
-    else:
+    if type == 'text':
+        if not hasinput(text):
+            text = ''
+            status = 2
+            message = 'Error: This text data has no value'
+        else:
+            status = 0
+            message = 'Ok'
 
-        if type == 'text':
-            if not hasinput(text):
-                text = ''
-                status = 2
-                message = 'Error: This text data has no value'
-            else:
-                status = 0
-                message = 'Ok'
+    elif type == 'multitext':
 
-        elif type == 'multitext':
+        if not hasinput(text):
+            text = ''
+            status = 2
+            message = 'Error: This text data has no value'
+        else:
+            status = 0
+            message = 'Ok'
 
-            if not hasinput(text):
-                text = ''
-                status = 2
-                message = 'Error: This text data has no value'
-            else:
-                status = 0
-                message = 'Ok'
-
-        elif type == 'date':
-            if isinstance(text, datetime.date):
-                print('date is in datetime format')
+    elif type == 'date':
+        if isinstance(text, datetime.date):
+            print('date is in datetime format')
+            status = 0
+            message = 'ok'
+        else:
+            try:
+                dt = datetime.datetime.strptime(text,'%Y-%m-%d')
                 status = 0
                 message = 'ok'
-            else:
-                try:
-                    dt = datetime.datetime.strptime(text,'%Y-%m-%d')
-                    status = 0
-                    message = 'ok'
-                    print('date is text that can be converted')
-                except:
-                    text = today.strftime('%Y-%m-%d')
-                    status = 1
-                    message = 'Warning: No date time entered so date set to today'
+                print('date is text that can be converted')
+            except:
+                text = today.strftime('%Y-%m-%d')
+                status = 1
+                message = 'Warning: No date time entered so date set to today'
 
-        elif type == 'float':
+    elif type == 'float':
+        try:
+            dt = float(text)
+            text = d2s(dt)
+            status = 0
+            message = 'ok'
+        except:
+            status = 2
+            message = 'Error: must set a numerical value for this charge'
+
+    elif type == 'amtpaid':
+        if task == 'PayBill':
             try:
                 dt = float(text)
                 text = d2s(dt)
@@ -98,199 +103,194 @@ def form_check(input,text,type,task,req):
                 message = 'ok'
             except:
                 status = 2
-                message = 'Error: must set a numerical value for this charge'
-
-        elif type == 'amtpaid':
-            if task == 'PayBill':
-                try:
-                    dt = float(text)
-                    text = d2s(dt)
-                    status = 0
-                    message = 'ok'
-                except:
-                    status = 2
-                    message = 'Error: must set a numerical value for this payment'
-            else:
-                try:
-                    dt = float(text)
-                    text = d2s(dt)
-                    status = 0
-                    message = 'ok'
-                except:
-                    status = 1
-                    message = 'Warning: this must be set when paying, but not for edit'
-
-        elif type == 'integer':
+                message = 'Error: must set a numerical value for this payment'
+        else:
             try:
-                dt = int(text)
-                text = str(dt)
+                dt = float(text)
+                text = d2s(dt)
                 status = 0
                 message = 'ok'
             except:
-                status = 2
-                message = 'Error: must set a numerical value for this value'
+                status = 1
+                message = 'Warning: this must be set when paying, but not for edit'
 
-        elif type == 'concheck':
-            #Complex checker.  We want to assess ligitimate containers for proper number
-            #but allow for exceptions or use of dry vans and other container types...etc
-            haul = request.values.get('HaulType')
-            print(f'**********************the haul type is {haul}')
-            if haul is None:
-                if not hasinput(text):
-                    status = 0
-                    message = 'Not a required input yet'
+    elif type == 'integer':
+        try:
+            dt = int(text)
+            text = str(dt)
+            status = 0
+            message = 'ok'
+        except:
+            status = 2
+            message = 'Error: must set a numerical value for this value'
+
+    elif type == 'concheck':
+        #Complex checker.  We want to assess ligitimate containers for proper number
+        #but allow for exceptions or use of dry vans and other container types...etc
+        haul = request.values.get('HaulType')
+        print(f'**********************the haul type is {haul}')
+        if haul is None:
+            if not hasinput(text):
+                status = 0
+                message = 'Not a required input yet'
+            else:
+                lenck = len(text)
+                if lenck == 11:
+                    status, message = container_check(text)
                 else:
+                    if lenck > 3:
+                        status = 2
+                        message = f'Container must have length of 11 characters not {lenck}'
+                    else:
+                        status = 2
+                        message = f'Valid container number input required'
+
+        else:
+            if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
+                if hasinput(text):
                     lenck = len(text)
                     if lenck == 11:
                         status, message = container_check(text)
                     else:
-                        if lenck > 3:
+                        if lenck > 0:
                             status = 2
                             message = f'Container must have length of 11 characters not {lenck}'
                         else:
                             status = 2
                             message = f'Valid container number input required'
-
-            else:
-                if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
-                    if hasinput(text):
-                        lenck = len(text)
-                        if lenck == 11:
-                            status, message = container_check(text)
-                        else:
-                            if lenck > 0:
-                                status = 2
-                                message = f'Container must have length of 11 characters not {lenck}'
-                            else:
-                                status = 2
-                                message = f'Valid container number input required'
-                    else:
-                        if 'Import' in haul:
-                            status = 2
-                            message = 'Must enter a valid container number'
-                        else:
-                            status = 1
-                            message = 'Container number required after pull'
                 else:
-                    status = 0
-                    message = 'Not a required input for haul type'
-
-        elif type == 'release':
-            #Complex checker.  We want to assess ligitimate bookings for proper number
-            #but allow for exceptions or use of dry vans and other container types...etc
-            haul = request.values.get('HaulType')
-            print(f'**********************the haul type is {haul}')
-            if haul is None:
-                status = 0
-                message = 'Not a required input yet'
-            else:
-                if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
-                    if text is not None:
-                        lenck = len(text)
-
-                        if lenck < 4:
-                            status = 2
-                            message = f'Must have at least 4 characters not {lenck}'
-                        else:
-                            status = 0
-                            if 'Export' in haul: message = 'Booking number entered'
-                            if 'Import' in haul: message = 'BOL number entered'
-                    else:
+                    if 'Import' in haul:
                         status = 2
-                        if 'Export' in haul: message = 'Must enter a booking number'
-                        if 'Import' in haul: message = 'Must enter a BOL number'
-
-                else:
-                    status = 0
-                    message = 'Not a required input for this haul type'
-
-        elif type == 'container_types':
-            if text == 'Choose Later' or not hasinput(text):
-                status = 2
-                message = 'Must select a container type'
-
-        elif type == 'haul_types':
-            if text == 'Choose Later' or not hasinput(text):
-                status = 2
-                message = 'Must select a haul type'
-
-        elif type == 'customerdata':
-            if text == 'Choose Later' or not hasinput(text):
-                status = 2
-                message = 'Must select a customer'
-
-        elif type == 'vendordata':
-            if text == 'Choose Later':
-                status = 2
-                message = 'Error: must choose a vendor'
-            elif not hasinput(text):
-                status = 2
-                message = 'Must choose the vendor'
-
-        elif type == 'driverdata':
-            if text == 'Choose Later' or not hasinput(text):
-                status = 2
-                message = 'Must choose a driver'
+                        message = 'Must enter a valid container number'
+                    else:
+                        status = 1
+                        message = 'Container number required after pull'
             else:
                 status = 0
-                message = 'Driver selected'
+                message = 'Not a required input for haul type'
 
-        elif type == 'codata':
-            #print('select',text)
-            if text == 'Choose Later':
-                status = 2
-                message = 'Error: must associate bill with Co/Div'
-            elif not hasinput(text):
-                status = 2
-                message = 'Must choose the responsible Co/Div for the Bill'
-
-        elif type == 'expdata':
-            #print('select',text)
-            if text == 'Choose Later':
-                status = 2
-                message = 'Error: must associate bill with pay account'
-            elif not hasinput(text):
-                status = 2
-                message = 'Must choose the responsible billing account for the Bill'
-
-        elif type == 'acctdata':
-            #print('select',text)
-            if text == 'Choose Later':
-                if task == 'PayBill':
-                    status = 2
-                    message = 'Error: must a payment account'
-                else:
-                    status = 1
-                    message = 'Warning: this must be set when paying bill'
-
-        elif type == 'paymethods':
-            print('select',text,task)
-            if text == 'Choose Later':
-                if task == 'PayBill':
-                    status = 2
-                    message = 'Error: must include a payment method'
-                else:
-                    status = 1
-                    message = 'Warning: this must be set when paying bill'
-
-        elif type == 'dropblock1' or type == 'dropblock2' or type == 'dropblock3':
-            from webapp.class8_tasks import get_drop
-            if hasinput(text):
-                testtext = text.strip()
-                if len(testtext) < 6:
-                    text = get_drop(testtext)
-            if not hasinput(text):
-                loadname = request.values.get(type)
-                if loadname is not None:
-                    text = get_drop(loadname)
-            if not hasinput(text):
-                status = 2
-                message = 'Must include this location information'
-
+    elif type == 'release':
+        #Complex checker.  We want to assess ligitimate bookings for proper number
+        #but allow for exceptions or use of dry vans and other container types...etc
+        haul = request.values.get('HaulType')
+        print(f'**********************the haul type is {haul}')
+        if haul is None:
+            status = 0
+            message = 'Not a required input yet'
         else:
+            if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
+                if text is not None:
+                    lenck = len(text)
+
+                    if lenck < 4:
+                        status = 2
+                        message = f'Must have at least 4 characters not {lenck}'
+                    else:
+                        status = 0
+                        if 'Export' in haul: message = 'Booking number entered'
+                        if 'Import' in haul: message = 'BOL number entered'
+                else:
+                    status = 2
+                    if 'Export' in haul: message = 'Must enter a booking number'
+                    if 'Import' in haul: message = 'Must enter a BOL number'
+
+            else:
+                status = 0
+                message = 'Not a required input for this haul type'
+
+    elif type == 'container_types':
+        if text == 'Choose Later' or not hasinput(text):
             status = 2
-            message = 'Input Required but not Found'
-            if not hasinput(text): text = ''
+            message = 'Must select a container type'
+
+    elif type == 'haul_types':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must select a haul type'
+
+    elif type == 'customerdata':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must select a customer'
+
+    elif type == 'vendordata':
+        if text == 'Choose Later':
+            status = 2
+            message = 'Error: must choose a vendor'
+        elif not hasinput(text):
+            status = 2
+            message = 'Must choose the vendor'
+
+    elif type == 'driverdata':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must choose a driver'
+        else:
+            status = 0
+            message = 'Driver selected'
+
+    elif type == 'codata':
+        #print('select',text)
+        if text == 'Choose Later':
+            status = 2
+            message = 'Error: must associate bill with Co/Div'
+        elif not hasinput(text):
+            status = 2
+            message = 'Must choose the responsible Co/Div for the Bill'
+
+    elif type == 'expdata':
+        #print('select',text)
+        if text == 'Choose Later':
+            status = 2
+            message = 'Error: must associate bill with pay account'
+        elif not hasinput(text):
+            status = 2
+            message = 'Must choose the responsible billing account for the Bill'
+
+    elif type == 'acctdata':
+        #print('select',text)
+        if text == 'Choose Later':
+            if task == 'PayBill':
+                status = 2
+                message = 'Error: must a payment account'
+            else:
+                status = 1
+                message = 'Warning: this must be set when paying bill'
+
+    elif type == 'paymethods':
+        print('select',text,task)
+        if text == 'Choose Later':
+            if task == 'PayBill':
+                status = 2
+                message = 'Error: must include a payment method'
+            else:
+                status = 1
+                message = 'Warning: this must be set when paying bill'
+
+    elif type == 'dropblock1' or type == 'dropblock2' or type == 'dropblock3':
+        from webapp.class8_tasks import get_drop
+        if hasinput(text):
+            testtext = text.strip()
+            if len(testtext) < 6:
+                text = get_drop(testtext)
+        if not hasinput(text):
+            loadname = request.values.get(type)
+            if loadname is not None:
+                text = get_drop(loadname)
+        if not hasinput(text):
+            status = 2
+            message = 'Must include this location information'
+
+    else:
+        status = 2
+        message = 'Input Required but not Found'
+        if not hasinput(text): text = ''
+
+
+    if not req:
+        status = 0
+        message = 'Not a Required Input'
+        if not hasinput(text): text = ''
 
     print(f'At conclusion of input for input:{input} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
 

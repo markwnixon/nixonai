@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Orders, Invoices, People, Services, Drops, SumInv
+from webapp.models import Orders, Invoices, People, Services, Drops, SumInv, Interchange
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
@@ -331,11 +331,46 @@ def find_zip_line(address):
 
 
 def set_desc(odat):
+    jo = odat.Jo
     haultype = odat.HaulType
     delivery = find_zip_line(odat.Dropblock1)
     returnto = find_zip_line(odat.Dropblock2)
     print(f'found {delivery} {returnto}')
-    desc = f'{odat.HaulType} {delivery} to {returnto}'
+    desc = ''
+    #desc = f'{haultype} {delivery} to {returnto}'
+    idata = Invoices.query.filter(Invoices.Jo == jo).all()
+    for idat in idata:
+        desc = f'{desc}{idat.Service}={idat.Amount}, '
+    desc = desc[:-1]
+    desc = f'{desc}\n'
+
+    if odat.Shipper == 'Global Business Link':
+        bk1 = odat.Booking
+        bk2 = odat.BOL
+        if hasinput(bk2):
+            if bk1 != bk2:
+                desc = f'{desc} Pulled under booking {bk2}'
+            else:
+                desc = f'{desc} In-Out booking match.'
+        else:
+            # Have to double check the interchange tables
+            idata = Interchange.query.filter(Interchange.Jo == odat.Jo).all()
+            if len(idata) == 2:
+                idat1 = idata[0]
+                idat2 = idata[1]
+                if idat1.Release == idat2.Release:
+                    desc = f'{desc} In-Out booking match.'
+                else:
+                    if 'In' in idat1.Type:
+                        bkin = idat1.Release
+                        bkout = idat2.Release
+                    else:
+                        bkin = idat2.Release
+                        bkout = idat1.Release
+                    desc = f'{desc} Pulled under booking {bkout}'
+                    odat.BOL = bkout
+                    odat.Booking = bkin
+                    db.session.commit()
     return desc
 
 
@@ -355,7 +390,7 @@ def invoice_for_all(sids, table, err):
         nextquery = f"{table}.query.get({sid})"
         odat = eval(nextquery)
         inv = getattr(odat, 'Invoice')
-        if inv is None:
+        if not hasinput(inv):
             err.append(f'Order JO {odat.Jo} has no invoice')
             return False, err
     return True, err
@@ -481,12 +516,39 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         print(f'siupdate is {siupdate}')
         if siupdate is not None:
             sdata = SumInv.query.filter(SumInv.Si == sinow).all()
-            print(f'got sdata {sdata}')
+            thetotal = 0.00
             for sdat in sdata:
                 this_desc = request.values.get(f'ta{sdat.id}')
-                print(f'found this description for {sdat.id}:  {this_desc}')
                 sdat.Description = this_desc
+                this_amt = request.values.get(f'aa{sdat.id}')
+                old_amt = sdat.Amount
+                famt = float(this_amt)
+                thetotal += famt
+                this_amt = d2s(this_amt)
+                sdat.Amount = this_amt
+                if abs(famt - float(old_amt)) > .005:
+                    # If value changes we need to update the other databases...
+                    odat = Orders.query.filter(Orders.Jo == sdat.Jo).first()
+                    odat.Amount = this_amt
+                    odat.InvoTotal = this_amt
+                    idata = Invoices.query.filter(Invoices.Jo == sdat.Jo).all()
+                    if idata != []:
+                        idat = idata[0]
+                        newadd = famt - float(idat.Total)
+                        # the first line item increase by the amount of change in the total
+                        idat.Amount = nodollar(float(idat.Amount) + newadd)
+                        for idat in idata:
+                            idat.Total = this_amt
+                db.session.commit()
+                #Update the descriptions if price changes
+                if abs(famt - float(old_amt)) > .005:
+                    desc = set_desc(odat)
+                    sdat.Description = desc
+
+            for sdat in sdata:
+                sdat.Total = d2s(thetotal)
             db.session.commit()
+
 
         if siadd is not None:
             slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
@@ -530,7 +592,8 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     # Put each line into the summary invoice database
                     desc = set_desc(odat)
                     docref = f'{si}.pdf'
-                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.Booking, Container=odat.Container, Type=odat.Type, Description=desc, Amount = odat.InvoTotal, Total = '0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
+                    amt = d2s(odat.InvoTotal)
+                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.Booking, Container=odat.Container, Type=odat.Type, Description=desc, Amount = amt, Total = '0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
                     db.session.add(input)
                     odat.Label = si
                     odat.Istat = 6
