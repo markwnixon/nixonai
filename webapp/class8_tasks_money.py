@@ -7,6 +7,7 @@ from webapp.class8_utils_email import etemplate_truck, emaildata_update, invoice
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup
 from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc
+from webapp.viewfuncs import newjo
 
 #Python functions that require database access
 from webapp.class8_utils import *
@@ -385,11 +386,50 @@ def same_company_all(sids, table):
         if shipper != shippertest: return False
     return True
 
-def invoice_for_all(sids, table, err):
+def make_default_invoice(odat, tablesetup):
+    sid = odat.id
+    jo = odat.Jo
+    pid = odat.Bid
+    if '40' in odat.Type:
+        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Line Haul',Description='Drayage to Seagirt',Ea=350.00,Qty=1.00,Amount=350.00,Total=425.00,Date=today,Original=None,Status='New')
+        db.session.add(input)
+        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Chassis',Description='Predefined Agreement',Ea=75.00,Qty=1.00,Amount=75.00,Total=425.00,Date=today,Original=None,Status='New')
+        db.session.add(input)
+        odat.Amount = d2s('350.00')
+        odat.InvoTotal = d2s('425.00')
+        db.session.commit()
+
+        odat = Orders.query.get(sid)
+        ldata = Invoices.query.filter(Invoices.Jo == jo).order_by(Invoices.Ea.desc()).all()
+        pdata1 = People.query.filter(People.id == odat.Bid).first()
+        cache = odat.Icache
+
+        docref = make_invo_doc(odat, ldata, pdata1, cache, today, 0, tablesetup, 'Dray Export')
+        docref = os.path.basename(docref)
+        odat.Invoice= docref
+        odat.Istat = 1
+        odat.BalDue = d2s('$425.00')
+        odat.Payments = '0.00'
+
+        for ldat in ldata:
+            ldat.Original = docref
+        db.session.commit()
+        odat = Orders.query.get(sid)
+    return odat
+
+
+
+
+def invoice_for_all(sids, table, err, tablesetup):
     for sid in sids:
         nextquery = f"{table}.query.get({sid})"
         odat = eval(nextquery)
         inv = getattr(odat, 'Invoice')
+        if not hasinput(inv):
+            #Check to see if the shipper has a default invoice and make it
+            if odat.Shipper == "Global Business Link":
+                odat = make_default_invoice(odat, tablesetup)
+            inv = getattr(odat, 'Invoice')
         if not hasinput(inv):
             err.append(f'Order JO {odat.Jo} has no invoice')
             return False, err
@@ -435,6 +475,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     invostyle = 'Invoice'
     holdvec[4] = invostyle
     returnhit = request.values.get('Finished')
+    cancelhit = request.values.get('Cancel')
     table = tablesetup['table']
     if table == 'SumInv':
         sids = convert_sids(sids[0])
@@ -442,7 +483,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
     testchecks = same_company_all(sids, table)
     print(f'testchecks={testchecks}')
-    testinv, err = invoice_for_all(sids, table, err)
+    testinv, err = invoice_for_all(sids, table, err, tablesetup)
 
     if testchecks is False:
         completed = True
@@ -450,6 +491,11 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     elif testinv is False:
         completed = True
     elif returnhit is not None: completed = True
+    elif cancelhit is not None:
+        sinow = request.values.get('sinow')
+        SumInv.query.filter(SumInv.Si == sinow).delete()
+        db.session.commit()
+        completed = True
 
     else:
         completed = False
@@ -583,7 +629,10 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     stat = 1
                     if sdat is None:
                         if sinow is None:
-                            si = f'SI{jo[2:]}'
+                            sdate = today.strftime('%Y-%m-%d')
+                            jbcode = 'SI'
+                            si = newjo(jbcode, sdate)
+                            #si = f'SI{jo[2:]}'
                         else: si = sinow
                     else:
                         si = sdat.Si
@@ -593,7 +642,8 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     desc = set_desc(odat)
                     docref = f'{si}.pdf'
                     amt = d2s(odat.InvoTotal)
-                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.Booking, Container=odat.Container, Type=odat.Type, Description=desc, Amount = amt, Total = '0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
+                    print(f'amt input to suminv for jo {jo} is {amt} for {odat.InvoTotal}')
+                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.Booking, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
                     db.session.add(input)
                     odat.Label = si
                     odat.Istat = 6
