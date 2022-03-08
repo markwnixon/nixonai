@@ -12,6 +12,7 @@ from webapp.class8_utils_package import makepackage
 from webapp.class8_utils_email import emaildata_update
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
 from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
+from InterchangeFuncs import Order_Container_Update
 from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, Truck_Logs_task, CMA_APL_task
 import os
@@ -94,18 +95,18 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
         #print('class8_tasks.py 86 Tablemaker() For tables on get this side data:',side_data)
         keydata = {}
         for side in side_data:
-            print(f'side is: {side}')
+            #print(f'side is: {side}')
             for key, values in side.items():
                 #print('')
                 #print('****************************')
-                print(f'key:{key}, values:{values}')
+                #print(f'key:{key}, values:{values}')
                 ktable = values[0]
                 pairs = values[1]
                 keyon = values[2]
                 for ix, pair in enumerate(pairs):
                     col = pair[0]
                     select_value = pair[1]
-                    print(f'col,select_value is: {col} {select_value}')
+                    #print(f'col,select_value is: {col} {select_value}')
                     if ix == 0:
                         if isinstance(select_value, str):
                             # Output of the get_ could be string or integer, but have to start with string to test get_
@@ -133,7 +134,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                             filters = filters + f" & ({ktable}.{col}=='{select_value}')"
                         elif isinstance(select_value, int):
                             filters = filters + f" & ({ktable}.{col}=={select_value})"
-                    print(f'for ix:{ix}, col: {col}, select_value:{select_value} the current filters is {filters}')
+                    #print(f'for ix:{ix}, col: {col}, select_value:{select_value} the current filters is {filters}')
 
             if 'all()' not in filters: filters = filters+f').order_by({ktable}.{keyon}).all()'
             print(filters)
@@ -552,21 +553,21 @@ def get_dbdata(table_setup, tfilters):
         else: boxchecks, boxlist = [], []
     else:
         for box in simpler:
-            print(f'box is {box}')
+            #print(f'box is {box}')
             thischeck = request.values.get(f'{box}box')
             boxchecks.append(thischeck)
             if thischeck == 'on': boxlist.append(box)
-        print(f'boxlist is {boxlist}')
+        #print(f'boxlist is {boxlist}')
         #This part will replace with session variable for when we leave the tables but come back to them
         if boxlist == []:
-            print('replacing null with session')
+            #print('replacing null with session')
             boxlist = session['boxlist']
             boxchecks = ['off'] * len(simpler)
             for ix,box in enumerate(simpler):
                 if box in boxlist: boxchecks[ix] = 'on'
         else:
             session['boxlist'] = boxlist
-            print('changing session variable')
+            #print('changing session variable')
 
     # Apply built-in table filter:
     if highfilter is not None:
@@ -685,6 +686,7 @@ def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
     masks = tablesetup['haulmask']
+    id = None
     if masks != []: entrydata = mask_apply(entrydata, masks)
     try:
         hiddendata = tablesetup['hidden data']
@@ -801,7 +803,7 @@ def make_new_entry(tablesetup,holdvec):
     else:
         print('Data not found')
 
-    return err
+    return err, id
 
 #def New_task(task_iter, tablesetup, task_focus, checked_data):
 def mask_apply(entrydata, masks):
@@ -910,9 +912,12 @@ def New_task(tablesetup, task_iter):
         create_item = request.values.get('Create Item')
         if create_item is not None:
             if failed == 0:
-                err = make_new_entry(tablesetup,holdvec)
+                err,sid = make_new_entry(tablesetup,holdvec)
                 err.append(f"Created new entry in {tablesetup['table']}")
                 completed = True
+                if tablesetup['table'] == 'Orders':
+                    print(f'Updating Orders with {sid}')
+                    Order_Container_Update(sid)
                 if tablesetup['table'] == 'Bills':
                     bdat = Bills.query.filter(Bills.id>0).order_by(Bills.id.desc()).first()
                     if bdat is not None:
@@ -1011,7 +1016,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 for jx, entry in enumerate(entrydata):
                     if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                         if entry[0] not in creators:
-                            print(f'Setting entry {entry[0]} to {holdvec[jx]}')
+                            #print(f'Setting entry {entry[0]} to {holdvec[jx]}')
                             setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
                 for jx, entry in enumerate(hiddendata):
@@ -1028,6 +1033,9 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 if table == 'Bills':
                     bdat = eval(nextquery)
                     err = gledger_write('newbill', bdat.Jo, bdat.bAccount, bdat.pAccount)
+                if table == 'Orders':
+                    print(f'Updating Orders with {sid}')
+                    Order_Container_Update(sid)
                 #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
 
@@ -2218,13 +2226,10 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
         print(f'Length of odata is {len(odata)}')
         #Apply the payments
         for jx, odat in enumerate(odata):
-            print(f'For jx {jx}')
+
             if thechecks[jx]==1:
-                invojo = odat.Jo
-                print(f'Invojo is {invojo}')
-
                 if amts[jx] != '0.00':
-
+                    invojo = odat.Jo
                     # Begin Income Creation:
                     recamount = amts[jx]
                     recdate = datetime.datetime.strptime(holdvec[7], '%Y-%m-%d')
@@ -2276,13 +2281,18 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
                     odat.PayAcct = holdvec[10]
                     odat.PaidDate = recdate
                     db.session.commit()
-                    gledger_write('income', invojo, 'Undeposited Funds', 0)
+
+                    jolist.append(invojo)
+                    #gledger_write('income', invojo, 'Undeposited Funds', 0)
 
                 else:
                     err.append(f'Have no Invoice to Receive Against for JO={invojo}')
                     print(f'Have no Invoice to Receive Against for JO={invojo}')
             else: print(f'The check did not pass {thechecks[jx]}')
-        if acct == 'Direct Deposit':  gledger_write('income', invojo, 'Undeposited Funds', 0)
+        print('the jo list is', jolist)
+        #gledger_write('income', invojo, acctdb, 0)
+        gledger_multi_job('income', jolist, acctdb, 0)
+        completed=True
 
     return completed, err, holdvec
 

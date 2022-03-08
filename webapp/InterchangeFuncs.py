@@ -301,35 +301,63 @@ def seektaken(container,dstart):
 
 def Order_Container_Update(oder):
     odat = Orders.query.get(oder)
-
     bk = odat.Booking
     bol = odat.BOL
-    bk = real_use(bk,bol)
-    if not hasinput(bk): bk = 'Book TBD'
     container = odat.Container
+    ht = odat.HaulType
 
     start_date = odat.Date - timedelta(30)
     end_date = odat.Date + timedelta(30)
-    idata = Interchange.query.filter( (Interchange.Date > start_date) & (Interchange.Date < end_date) & ( (Interchange.Container == container) | (Interchange.Release==bk) ) ).all()
+    pulled = False
+    returned = False
+    jimport = False
+    jexport = False
 
-    for idat in idata:
-        type=idat.Type
-        idat.Company=odat.Shipper
-        idat.Jo=odat.Jo
-        if not hasinput(container) or container == 'TBD':
-            if not seektaken(idat.Container,start_date):
-                odat.Container = idat.Container
-                if odat.Istat == -1:
-                    odat.Istat = 0
-        hstat=odat.Hstat
-        if hstat is None:
-            hstat = 0
-        if 'Out' in type:
-            if hstat == 0: odat.Hstat = 1
-            odat.Date = idat.Date
-        if 'In' in type:
-            odat.Hstat = 2
-            odat.Date2 = idat.Date
+    if 'Import' in ht and hasinput(container):
+        jimport = True
+        idata = Interchange.query.filter( (Interchange.Date > start_date) & (Interchange.Date < end_date) & (Interchange.Container == container) ).all()
+        for jx,idat in enumerate(idata):
+            type =  idat.Type
+            if 'Out' in type:
+                ao = idat
+                pulled = True
+            if 'In' in type:
+                ai = idat
+                returned = True
+    elif 'Export' in ht and hasinput(bk):
+        jexport = True
+        idata = Interchange.query.filter((Interchange.Date > start_date) & (Interchange.Date < end_date) & (Interchange.Release == bk)).all()
+        for jx,idat in enumerate(idata):
+            type =  idat.Type
+            if 'Out' in type:
+                ao = idat
+                pulled = True
+                bkout = idat.Release
+                # Container may be returned under different booking
+                pulled_container = idat.Container
+                rdat = Interchange.query.filter( (Interchange.Date > start_date) & (Interchange.Date < end_date) & (Interchange.Container == pulled_container) & ( Interchange.Type.contains('In')) ).first()
+                if rdat is not None:
+                    returned = True
+                    ai = rdat
+
+    print(f'For sid {oder} we have container {container} and pulled is {pulled} and returned is {returned}')
+    if pulled and not returned:
+        odat.Hstat = 1
+        ao.Company = odat.Shipper
+        ao.Jo = odat.Jo
+        odat.Date = ao.Date
+        if odat.Istat == -1: odat.Istat = 0
+        if jexport:
+            odat.Container = ao.Container
+            odat.Chassis = ao.Chassis
+        db.session.commit()
+    if returned:
+        if not hasinput(container): odat.Container = ai.Container
+        if odat.Istat == -1: odat.Istat = 0
+        ai.Company = odat.Shipper
+        ai.Jo = odat.Jo
+        odat.Hstat = 2
+        odat.Date2 = ai.Date
         db.session.commit()
 
 
