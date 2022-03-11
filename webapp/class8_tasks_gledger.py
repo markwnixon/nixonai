@@ -186,6 +186,7 @@ def gledger_write(bus,jo,acctdb,acctcr):
             if 'Cash' in acctdb or 'Check' in acctdb or 'Mcheck' in acctdb or 'Undeposited' in acctdb:
                 acctdb='Undeposited Funds'
                 dtype = 'ID'
+            else: dtype = 'DD'
             acctcr='Accounts Receivable'
             odat=Orders.query.filter(Orders.Jo==jo).first()
             amt=int(float(odat.PaidAmt)*100)

@@ -349,7 +349,8 @@ def Order_Container_Update(oder):
         if odat.Istat == -1: odat.Istat = 0
         if jexport:
             odat.Container = ao.Container
-            odat.Chassis = ao.Chassis
+        odat.Chassis = ao.Chassis
+        odat.Type = ao.ConType
         db.session.commit()
     if returned:
         if not hasinput(container): odat.Container = ai.Container
@@ -358,6 +359,16 @@ def Order_Container_Update(oder):
         ai.Jo = odat.Jo
         odat.Hstat = 2
         odat.Date2 = ai.Date
+        if not hasinput(odat.Chassis): odat.Chassis = ai.Chassis
+        if not hasinput(odat.Type): odat.Type = ai.ConType
+        db.session.commit()
+
+    if jexport and pulled and returned:
+        if ao.Release != ai.Release:
+            odat.Booking = ai.Release
+            odat.BOL = ao.release
+        else:
+            odat.BOL = ai.Release
         db.session.commit()
 
 
