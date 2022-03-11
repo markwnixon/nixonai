@@ -61,7 +61,7 @@ def gledger_multi_job(bus,jolist,acctdb,acctcr):
         amt = 0
         for joget in jolist:
             odat = Orders.query.filter(Orders.Jo == joget).first()
-            amt = amt + int(float(odat.Amount) * 100)
+            amt = amt + int(float(odat.InvoTotal) * 100)
 
 
         acr = Accounts.query.filter((Accounts.Name == acctcr) & (Accounts.Co == cc)).first()
