@@ -23,7 +23,7 @@
                     {% include 'Table_Box.html' %}
 
 
-                    {% if thistable != tabletitle[0] %}
+
                             <div class="row">
                                   <div class="col-sm-12" align="center" style="font-weight:bold"> {{ thistable }} </div>
                             </div>
@@ -33,7 +33,7 @@
                                     {% set aname = thistable+thisbutton%}{{ aname }}
                                     <button type="submit" class="btn btn-green btn-sm" name="{{ aname }}">{{ thisbutton }}</button>
                                 {% endif %}
-                    {% endif %}
+
                         {% set data1 = db_data[0] %}
                         {% set data1id = db_data[1] %}
                         {% set rowcolors1 = db_data[2] %}

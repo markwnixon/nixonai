@@ -266,10 +266,43 @@ $('.dataTables_length').addClass('bs-select');
 });
 
 $(document).ready(function () {
+$('#dtTrucking1').DataTable({
+"aaSorting": [[1, "desc" ]],
+"scrollX": true,
+"scrollY": 800,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtTrucking9').DataTable({
+"aaSorting": [[9, "desc" ]],
+"scrollX": true,
+"scrollY": 800,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
 $('#dtInterchange').DataTable({
 "aaSorting": [[8, "desc" ]],
 "scrollX": true,
-"scrollY": 500,
+"scrollY": 800,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#dtInterchange2').DataTable({
+"aaSorting": [[1, "desc" ]],
+"scrollX": true,
+"scrollY": 800,
 "stateSave": true,
 "paging": false // false to disable pagination (or any other option)
 });
@@ -280,7 +313,7 @@ $(document).ready(function () {
 $('#dtSummaries').DataTable({
 "order": [[1, "desc" ]],
 "scrollX": true,
-"scrollY": 500,
+"scrollY": 800,
 "stateSave": true,
 "paging": false // false to disable pagination (or any other option)
 });
@@ -300,9 +333,9 @@ $('.dataTables_length').addClass('bs-select');
 
 $(document).ready(function () {
 $('#dtHorizontalVerticalExample3').DataTable({
-"order": [[ 4, "desc" ]],
+"aaSorting": [[1, "desc" ]],
 "scrollX": true,
-"scrollY": 300,
+"scrollY": 500,
 "stateSave": true,
 "paging": false
 });
@@ -311,7 +344,7 @@ $('.dataTables_length').addClass('bs-select');
 
 $(document).ready(function () {
 $('#dtHorizontalVerticalExample4').DataTable({
-"order": [[ 2, "asc" ]],
+"aaSorting": [[1, "desc" ]],
 "scrollX": true,
 "scrollY": 200,
 "stateSave": true,

@@ -7,7 +7,7 @@ from webapp.class8_utils_email import etemplate_truck, info_mimemail
 from webapp.class8_dicts import *
 #Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup, Billing_genre, Bills_setup
 from webapp.class8_utils_manifest import makemanifest
-from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task
+from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task, income_record
 from webapp.class8_utils_package import makepackage
 from webapp.class8_utils_email import emaildata_update
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
@@ -87,7 +87,24 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
         checked_data.append([tableget,numchecked,avec])
         #print('after',checked_data)
 
-        jscripts.append(eval(f"{tableget}_setup['jscript']"))
+        boxchecks = db_data[6]
+        boxlist = db_data[7]
+        print('boxing:',tableget,boxchecks,boxlist)
+        if tableget == 'Orders':
+            if 'Job' in boxlist:
+                if 'Docs' in boxlist:
+                    jscripts.append('dtTrucking')
+                else:
+                    jscripts.append('dtTrucking9')
+            else:
+                jscripts.append('dtTrucking1')
+        elif tableget == 'Interchange':
+            if 'Ticket' in boxlist:
+                jscripts.append('dtInterchange')
+            else: jscripts.append('dtInterchange2')
+        else:
+            jscripts.append(eval(f"{tableget}_setup['jscript']"))
+
 
         # For tables that are on get side data required for tasks:
         side_data = eval(f"{tableget}_setup['side data']")
@@ -174,10 +191,11 @@ def reset_state_hard(task_boxes, genre_tables):
     jscripts = ['dtTrucking']
     taskon, task_iter, task_focus = None, None, None
     viewport = ['tables'] + ['0'] * 5
+    tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
     for box in task_boxes:
         for key, value in box.items():
             tboxes[key] = key
-    return genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport
+    return genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport, tfilters
 
 def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err):
     completed = False
@@ -367,10 +385,11 @@ def Table_maker(genre):
             genre_tables_on = checked_tables(genre_tables)
             tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
             print(f'The tables on: {tables_on}')
-            session['table_defaults'] = tables_on
+
+            #session['table_defaults'] = tables_on
             #Check to see if a table has been turned off.  If so place it back to default status
-            for tab in session['table_removed']:
-                if tab not in session['table_defaults']: session['table_removed'].remove(tab)
+            #for tab in session['table_removed']:
+                #if tab not in session['table_defaults']: session['table_removed'].remove(tab)
             #Get the table viewing parameters that need to be set for the talbles that are on
 
 
@@ -432,9 +451,10 @@ def Table_maker(genre):
         genre_tables_on = ['off'] * len(genre_tables)
         genre_tables_on[0] = 'on'
         tables_on = [eval(f"{genre}_genre['table']")]
+
         #These two session variables control the table defaults. Each time table turned on it sets default
-        session['table_defaults'] = tables_on
-        session['table_removed'] = []
+        #session['table_defaults'] = tables_on
+        #session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
         tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
         jscripts = ['dtTrucking']
@@ -459,7 +479,13 @@ def Table_maker(genre):
     if hasvalue(taskon):
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
-            jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
+            print(f'the tables on are: {tables_on}')
+            if tables_on == []:
+                genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport, tfilters = reset_state_hard(task_boxes, genre_tables)
+                genre_data = eval(f"{genre}_genre")
+                genre_data['genre_tables_on'] = genre_tables_on
+            else:
+                jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
 
@@ -495,8 +521,8 @@ def Table_maker(genre):
     holdvec[48] = checkcol
     holdvec[49] = labpassvec
     holdvec[47] = f'/static/{scac}/data/v'
-    print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
-    print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
+    #print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
+    #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
@@ -542,32 +568,21 @@ def get_dbdata(table_setup, tfilters):
     except:
         simpler = []
 
-    print(f"Critical Point {table} Removed:{session['table_removed']}")
-    if table not in session['table_removed']:
-        #Do this if needing to use default values
-        if simpler != []:
-            boxchecks = ['off'] * len(simpler)
-            boxchecks[0:3] = ['on','on','on']
-            session['table_removed'].append(table)
-            boxlist = simpler[0:3]
-        else: boxchecks, boxlist = [], []
-    else:
+    #print(f"Critical Point {table} Removed:{session['table_removed']}")
+    #if table not in session['table_removed']:
+    if simpler != []:
         for box in simpler:
-            #print(f'box is {box}')
             thischeck = request.values.get(f'{box}box')
             boxchecks.append(thischeck)
             if thischeck == 'on': boxlist.append(box)
-        #print(f'boxlist is {boxlist}')
-        #This part will replace with session variable for when we leave the tables but come back to them
+        #Do this if needing to use default values
+        #If nothing on then turn 3 on
         if boxlist == []:
-            #print('replacing null with session')
-            boxlist = session['boxlist']
             boxchecks = ['off'] * len(simpler)
-            for ix,box in enumerate(simpler):
-                if box in boxlist: boxchecks[ix] = 'on'
-        else:
-            session['boxlist'] = boxlist
-            #print('changing session variable')
+            boxchecks[0:3] = ['on','on','on']
+            boxlist = simpler[0:3]
+    else: boxchecks, boxlist = [], []
+
 
     # Apply built-in table filter:
     if highfilter is not None:
@@ -927,7 +942,7 @@ def New_task(tablesetup, task_iter):
                             bdat.Pid = pdat.id
                             db.session.commit()
                             bdat = Bills.query.get(bid)
-                        err = gledger_write('newbill', bdat.Jo, bdat.bAccount, bdat.pAccount)
+                        err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
             else:
                 err.append(f'Cannot create entry until input errors shown in red below are resolved')
 
@@ -1032,7 +1047,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 # The amount could change on a bill, so if a bill need to update
                 if table == 'Bills':
                     bdat = eval(nextquery)
-                    err = gledger_write('newbill', bdat.Jo, bdat.bAccount, bdat.pAccount)
+                    err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
                 if table == 'Orders':
                     print(f'Updating Orders with {sid}')
                     Order_Container_Update(sid)
@@ -1892,7 +1907,7 @@ def check_invoice(odat, err):
 
 
 def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
-
+    # Receive Pay for a Single Invoice
     err = [f"Running Receive Pay task with task_iter {task_iter} using {tablesetup['table']}"]
     completed = False
     slead = None
@@ -1923,6 +1938,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     nextquery = f"{table}.query.get({sid})"
     odat = eval(nextquery)
     istat = odat.Istat
+
     if istat == 6 or istat == 7:
         # This is a summary invoice and must receive against all elements
         sinow = odat.Label
@@ -1946,11 +1962,11 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                 amtpaid = d2s(slead.Total)
             payref = odat.PayRef
             paymethod = odat.PayMeth
-            thisdepo = odat.PayAcct
+            depoacct = odat.PayAcct
             if payref is None: payref = 'Check No.'
             if paymethod is None:
                 paymethod = 'Check'
-                thisdepo = 'Undeposited Funds'
+                depoacct = 'Undeposited Funds'
             record_requested, email_requested = None, None
 
         else:
@@ -1968,8 +1984,8 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             paidon = datetime.datetime.strptime(paidon, '%Y-%m-%d')
             paymethod = request.values.get('paymethod')
             payref = request.values.get('payref')
-            thisdepo = request.values.get('acctfordeposit')
-            if paymethod == 'Cash' or paymethod == 'Check': thisdepo = 'Undeposited Funds'
+            depoacct = request.values.get('acctfordeposit')
+            if paymethod == 'Cash' or paymethod == 'Check': depoacct = 'Undeposited Funds'
 
 
         holdvec[0] = [d2s(amtpaid), paidon, payref, paymethod]
@@ -1977,18 +1993,17 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
         acctlist = ['Undeposited Funds']
         for adat in adata: acctlist.append(adat.Name)
         holdvec[1] = acctlist
-        holdvec[2] = thisdepo
+        holdvec[2] = depoacct
+
         #Create payment invoice off the unpaid invoice
         if slead is None:
+            jo = odat.Jo
             invofile = addpath(tpath('Orders-Invoice', odat.Invoice))
             cache = odat.Icache
             basefile = addpayment(invofile, cache, odat.InvoTotal, amtpaid, paidon,  payref, paymethod)
             print(f'The updated paid invoice file is {basefile}')
             odat.PaidInvoice = basefile
             odat.Icache = cache+1
-            odat.PayRef = payref
-            odat.PayMeth = paymethod
-            odat.PayAcct = thisdepo
             db.session.commit()
             print(f'The updated paid invoice file is {basefile}')
             docref = f'static/{scac}/data/vPaidInvoice/{basefile}'
@@ -2000,9 +2015,6 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             for each in odata:
                 each.PaidInvoice = basefile
                 each.Icache = cache+1
-                each.PayRef = payref
-                each.PayMeth = paymethod
-                each.PayAcct = thisdepo
             slead.Status = 4
             db.session.commit()
             print(f'The updated paid summery invoice file is {basefile}')
@@ -2017,28 +2029,14 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
 
         if record_requested or email_requested:
             if slead is None:
-                hstat = odat.Hstat
-                if hstat == 2 or hstat == 3:
-                    odat.Hstat = 5
-                odat.Istat = 5
-                odat.PaidDate = paidon
-                odat.PaidAmt = d2s(amtpaid)
+                jopaylist = [[jo, amtpaid, paidon,  payref, paymethod, depoacct]]
+                err, success = income_record(jopaylist, err)
+                if success:
+                    if email_requested: info_mimemail(emaildata)
+                    completed = True
 
-                paysofar = odat.Payments
-                if paysofar is not None:
-                    paysofar = float(paysofar)
-                else:
-                    paysofar = 0.00
-                totpaid = paysofar + float(amtpaid)
-                baldue = float(odat.InvoTotal) - totpaid
-                odat.BalDue = d2s(baldue)
-                odat.Payments = d2s(totpaid)
-
-                db.session.commit()
-                gledger_write('income', odat.Jo, thisdepo, 0)
-                if email_requested: info_mimemail(emaildata)
-                completed = True
             else:
+                jopaylist = []
                 err_check = 0
                 for each in odata:
                     odat_amount = d2s(each.InvoTotal)
@@ -2048,16 +2046,13 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                         err.append(f'Amounts do no match for JO {each.Jo} {odat_amount} vs. {scheck.Amount}')
                 if err_check == 0:
                     for each in odata:
-                        hstat = each.Hstat
-                        if hstat == 2 or hstat == 3:
-                            each.Hstat = 5
-                        each.Istat = 8
-                        each.PaidDate = paidon
-                        each.PaidAmt = d2s(each.InvoTotal)
-                        db.session.commit()
-                        gledger_write('income', each.Jo, thisdepo, 0)
-                    if email_requested: info_mimemail(emaildata)
-                    completed = True
+                        jo = each.Jo
+                        amtpaid = each.InvoTotal
+                        jopaylist.append([jo, amtpaid, paidon,  payref, paymethod, depoacct])
+                    err, success = income_record(jopaylist, err)
+                    if success:
+                        if email_requested: info_mimemail(emaildata)
+                        completed = True
                 else: err.append('Could not process paid invoice')
 
 
@@ -2152,6 +2147,15 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
                 except:
                     err.append(f'Bad Amt Received JO {odat.Jo}')
                     amts[jx] = '0.00'
+                #Check and repair odat if necessary
+                o_invototal = odat.InvoTotal
+                if o_invototal is not None:
+                    if abs(float(o_invototal) - float(invts[jx])) > .01:
+                        odat.InvoTotal = d2s(invts[jx])
+                        db.session.commit()
+                else:
+                    odat.InvoTotal = d2s(invts[jx])
+                    db.session.commit()
     else:
         #Need to get the invoice totals even on the first pass:
         for jx, odat in enumerate(odata):
@@ -2222,12 +2226,13 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
     if recordnow is not None:
         err = []
-        jolist = []
+        jopaylist = []
+        success = True
         print(f'Length of odata is {len(odata)}')
         #Apply the payments
         for jx, odat in enumerate(odata):
-
             if thechecks[jx]==1:
+            #Just means this job is included
                 if amts[jx] != '0.00':
                     invojo = odat.Jo
                     # Begin Income Creation:
@@ -2262,38 +2267,20 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
                     if rec < owe:
                         err.append(f'Warning: Payment for JO {odat.Jo} less than invoiced')
-                    else:
-                        ldata = Invoices.query.filter(Invoices.Jo == invojo).all()
-                        for data in ldata:
-                            data.Status = 'P'
-                            db.session.commit()
-
-                    hstat = odat.Hstat
-                    if hstat == 2 or hstat == 3:
-                        odat.Hstat = 5
-                    odat.Istat = 5
 
                     #odat.PaidInvoice = basefile
                     #odat.Icache = cache + 1
-                    odat.PaidAmt = recamount
-                    odat.PayRef = holdvec[8]
-                    odat.PayMeth = holdvec[14]
-                    odat.PayAcct = holdvec[10]
-                    odat.PaidDate = recdate
-                    db.session.commit()
-
-                    jolist.append(invojo)
-                    #gledger_write('income', invojo, 'Undeposited Funds', 0)
-
+                    jopaylist.append([invojo, recamount, recdate, holdvec[8], depmethod, acctdb])
                 else:
+                    success = False
                     err.append(f'Have no Invoice to Receive Against for JO={invojo}')
                     print(f'Have no Invoice to Receive Against for JO={invojo}')
-            else: print(f'The check did not pass {thechecks[jx]}')
-        print('the jo list is', jolist)
-        #gledger_write('income', invojo, acctdb, 0)
-        gledger_multi_job('income', jolist, acctdb, 0)
-        completed=True
+            else:
+                print(f'This job not included {thechecks[jx]}')
 
+        if success:
+            err, success = income_record(jopaylist, err)
+            if success: completed = True
     return completed, err, holdvec
 
 def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
@@ -2557,7 +2544,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 for sid in sids:
                     nextquery = f"{table}.query.get({sid})"
                     each_bdat = eval(nextquery)
-                    err = gledger_write('paybill', each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount)
+                    err = gledger_write(['paybill'], each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount)
                     err.append(f'Ledger paid {each_bdat.Jo} to {each_bdat.bAccount} from {each_bdat.pAccount}')
                     each_bdat.Check = docref
                     each_bdat.Ccache = cache + 1

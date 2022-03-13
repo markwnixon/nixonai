@@ -23,20 +23,16 @@ def loginvo_m(odat,ix):
             for aoder in alist:
                 aoder = nonone(aoder)
                 thisodat = Orders.query.get(aoder)
-                print(aoder,thisodat.Istat)
+                amtinvo = thisodat.InvoTotal
+                #print(aoder,thisodat.Istat)
                 jo = thisodat.Jo
-                gledger_write('invoice', jo, 0, 0)
+                gledger_write(['invoice',amtinvo], jo, 0, 0)
                 thisodat.Istat = ix
                 db.session.commit()
-        if 1 == 2:
-            odat.Links = None
-            jo = odat.Jo
-            gledger_write('invoice', jo, 0, 0)
-            odat.Istat = ix
-            db.session.commit()
     else:
         jo = odat.Jo
-        err = gledger_write('invoice', jo, 0, 0)
+        amtinvo = odat.InvoTotal
+        err = gledger_write(['invoice', amtinvo], jo, 0, 0)
         odat.Istat = ix
         db.session.commit()
     return err
@@ -575,17 +571,29 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 if abs(famt - float(old_amt)) > .005:
                     # If value changes we need to update the other databases...
                     odat = Orders.query.filter(Orders.Jo == sdat.Jo).first()
-                    odat.Amount = this_amt
                     odat.InvoTotal = this_amt
                     idata = Invoices.query.filter(Invoices.Jo == sdat.Jo).all()
                     if idata != []:
-                        idat = idata[0]
-                        newadd = famt - float(idat.Total)
-                        # the first line item increase by the amount of change in the total
-                        idat.Amount = nodollar(float(idat.Amount) + newadd)
+                        oldrest = 0.00
                         for idat in idata:
-                            idat.Total = this_amt
-                db.session.commit()
+                            idat.Total = nodollar(famt)
+                            serv = idat.Service
+                            if serv != 'Line Haul': oldrest = oldrest + float(idat.Amount)
+
+                        newlineamt = famt - oldrest
+                        for idat in idata:
+                            serv = idat.Service
+                            if serv == 'Line Haul':
+                                idat.Ea = nodollar(newlineamt)
+                                idat.Qty = 1.00
+                                idat.Amount = nodollar(newlineamt)
+                    odat.Amount = d2s(newlineamt)
+                    odat.InvoDate = today
+                    odat.BalDue = this_amt
+                    odat.Payments = '0.00'
+                    db.session.commit()
+                    err = loginvo_m(odat, 2)
+
                 #Update the descriptions if price changes
                 if abs(famt - float(old_amt)) > .005:
                     desc = set_desc(odat)
@@ -695,7 +703,60 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     return holdvec, entrydata, err, viewport, completed
 
 
+def income_record(jopaylist, err):
+    success = False
+    for jopay in jopaylist:
+        print(jopay)
+        jo, amtpaid, paidon, payref, paymethod, depoacct = [jopay[i] for i in range(6)]
+        print(jo, amtpaid, paidon, payref, paymethod, depoacct)
+        adderr = gledger_write(['income', amtpaid, paidon,  payref, paymethod], jo, depoacct, 0 )
+        if adderr == []:
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                #Successful add to ledger so now can update the database for the amount paid
+                odat.PaidDate = paidon
+                odat.PaidAmt = d2s(amtpaid)
+                odat.PayRef = payref
+                odat.PayMeth = paymethod
+                odat.PayAcct = depoacct
+                paysofar = odat.Payments
+                if paysofar is not None:
+                    paysofar = float(paysofar)
+                else:
+                    paysofar = 0.00
+                try:
+                    famt = float(odat.InvoTotal)
+                except:
+                    print(f'Cannot process InvoTotal for Jo {jo}')
+                    famt = 0.00
+                    success = False
+                totpaid = paysofar + float(amtpaid)
+                baldue = famt - totpaid
+                odat.BalDue = d2s(baldue)
+                odat.Payments = d2s(totpaid)
+                if baldue > .01:
+                    odat.Istat = 4
+                else:
+                    istat = odat.Istat
+                    hstat = odat.Hstat
+                    if istat < 5:
+                        odat.Istat = 5
+                        if hstat == 2 or hstat == 3: odat.Hstat = 5
+                    if istat == 6 or istat == 7:
+                        odat.Istat = 8
+                        if hstat == 2 or hstat == 3: odat.Hstat = 8
+                db.session.commit()
 
-
-
-
+                idata = Invoices.query.filter(Invoices.Jo == jo).all()
+                if idata != []:
+                    success = True
+                    for idat in idata:
+                        idat.Status = 'P'
+                    db.session.commit()
+                else:
+                    err.append(f'Invoice data not found for {jo}')
+            else:
+                err.append(f'Order data not found for {jo}')
+        else:
+            for addline in adderr: err.append(addline)
+    return err, success
