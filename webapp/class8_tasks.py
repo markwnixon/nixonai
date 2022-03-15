@@ -72,6 +72,8 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
     table_data = []
     labpassvec = []
     keydata = {}
+    jscripts = []
+    num_tables_on = len(tables_on)
 
     for jx, tableget in enumerate(tables_on):
         tabletitle.append(tableget)
@@ -92,16 +94,23 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
         print('boxing:',tableget,boxchecks,boxlist)
         if tableget == 'Orders':
             if 'Job' in boxlist:
-                if 'Docs' in boxlist:
-                    jscripts.append('dtTrucking')
-                else:
-                    jscripts.append('dtTrucking9')
+                if 'Docs' in boxlist: use_table = 'dtTrucking'
+                else: use_table = 'dtTrucking9'
             else:
-                jscripts.append('dtTrucking1')
+                use_table = 'dtTrucking1'
+            if num_tables_on > 1:
+                use_table = use_table + '_200'
+            jscripts.append(use_table)
+
         elif tableget == 'Interchange':
             if 'Ticket' in boxlist:
-                jscripts.append('dtInterchange')
-            else: jscripts.append('dtInterchange2')
+                use_table ='dtInterchange'
+            else: use_table = 'dtInterchange2'
+
+            if num_tables_on > 1:
+                use_table = use_table + '_200'
+            jscripts.append(use_table)
+
         else:
             jscripts.append(eval(f"{tableget}_setup['jscript']"))
 
