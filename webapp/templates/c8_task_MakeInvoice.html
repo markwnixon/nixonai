@@ -31,7 +31,7 @@
         <select class="mdb-select md-form" name="invoicestyle" onchange="this.form.submit()">
             <option value="" disabled selected>Change Invoice Style</option>
             {% for ld in invdata %}
-                <option {% if holdvec[5] == ld %} selected {% endif %} value="{{ ld }}">{{ ld }}</option>
+                <option {% if holdvec[16] == ld %} selected {% endif %} value="{{ ld }}">{{ ld }}</option>
             {% endfor %}
         </select>
     </div>

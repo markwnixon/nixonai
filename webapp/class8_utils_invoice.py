@@ -22,6 +22,7 @@ import numbers
 from webapp.utils import *
 from webapp.class8_utils import *
 
+
 def truncate_item(item,lena, fs):
     item_width = stringWidth(item, 'Helvetica', fs)
     #print(f'item width {item_width} versus limit {lena}')

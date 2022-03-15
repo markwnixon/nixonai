@@ -1,5 +1,5 @@
 from flask import request
-from webapp.models import People, Drops, Drivers, Vehicles
+from webapp.models import People, Drops, Drivers, Vehicles, Orders
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -110,6 +110,7 @@ def get_sectors(ht, odat):
     middle2data = [order, pickup, loaddatetime, deliverdatetime]
 
     if hasvalue(ht):
+        print(f'ht here is {ht}')
 
         if 'Import' in ht:
             sectors = ['Pickup Load at Port', 'Deliver To', 'Return to Port']
@@ -296,7 +297,9 @@ def makemanifest(odat):
     c.drawCentredString(x, y, sigdate)
 
     # Top Boxes (Address boxes)
-    haul_type = odat.HaulType
+    haul_type = request.values.get('HaulType')
+    if haul_type is None:
+        haul_type = odat.HaulType
     # Get the sector labels/data for the haul type chosen:
     sectors, sectorlines, dates, middle1, middle1data, middle2, middle2data = get_sectors(haul_type, odat)
     # Calculate horizonal space requirements and perform best fit

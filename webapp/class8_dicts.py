@@ -176,8 +176,8 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok', 'cc', None, 'Job'],
                                 ['Booking', 'Release', 'Release', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
                                ['Chassis', 'Chassis', '', '', 'text', 0, 'ok', 'cc', None, 'Job'],
-                                ['Date', 'Load Date', 'Pick Up Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
-                                ['Date2', 'Del Date', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date', 'Pull Date', 'Pick Up Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date2', 'Ret Date', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
                                ['Amount', 'Base$', 'Base Charge', 'text', 'float', 0, 'ok', 'cr', None, 'Job'],
                                ['InvoTotal', 'Invo$', 'Total Charge', 'disabled', 'disabled', 0, 'ok', 'cr', None, 'Money'],
                                 ['Payments', 'Paid$', 'Payments', 'disabled', 'disabled', 0, 'ok', 'cr', None, 'Money'],
@@ -249,15 +249,15 @@ Orders_setup = {'name' : 'Trucking Job',
                                 },
                 'invoicetypes' : {
                                     'Dray Import' : {
-                                                        'Top Blocks' : ['Bill To', 'Pickup and Return for Dray Import', 'Deliver To'],
-                                                        'Middle Blocks' : ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
+                                                        'Top Blocks' : ['Bill To', 'Pickup/Return Dray Import', 'Deliver To'],
+                                                        'Middle Blocks' : ['Order #', 'BOL #', 'Container #', 'Pulled', 'Returned'],
                                                         'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
                                                         'Lower Blocks' : ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
                                                         } ,
 
                                     'Dray Export': {
-                                        'Top Blocks': ['Bill To', 'Load At', 'Pickup and Return for Dray Export', ],
-                                        'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Job Start', 'Job Finished'],
+                                        'Top Blocks': ['Bill To', 'Pickup/Return Dray Export', 'Load At'],
+                                        'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Pulled', 'Returned'],
                                         'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
                                         'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
                                                       },

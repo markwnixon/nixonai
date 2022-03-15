@@ -14,6 +14,28 @@ from webapp.class8_utils import *
 from webapp.utils import *
 from webapp.class8_tasks_gledger import gledger_write
 
+import usaddress
+
+def addr2break(adv):
+    ai = ''
+    for ad in adv:
+        ai = f'{ai} {ad}'
+    testpart = usaddress.parse(ai)
+    ecity, estate, ezip = '', '', ''
+    print(testpart)
+    for te in testpart:
+        #print(te[0],te[1])
+        if te[1] == 'PlaceName':
+            ecity = ecity + te[0] + ' '
+        if te[1] == 'StateName':
+            estate = te[0].upper()
+        if te[1] == 'ZipCode':
+            ezip = te[0]
+    ecity = ecity.replace(',','')
+    ecity = ecity.strip()
+    ecity = ecity.title()
+    return ecity, estate, ezip
+
 def loginvo_m(odat,ix):
     alink = odat.Links
     print(f'ix is {ix} and alink is {alink}')
@@ -64,7 +86,13 @@ def initialize_invoice(myo, err):
                 cache = 0
             myo.Icache = cache + 1
             qty = 1
-            descript = 'Order ' + myo.Order + ' Line Haul ' + myo.Company + ' to ' + myo.Company2
+
+            dblk = myo.Dropblock2
+            dblkv = dblk.splitlines()
+            ecity,est,ezip = addr2break(dblkv)
+            cityzip = f'{ecity}, {est} {ezip}'
+            descript = f'Baltimore Seagirt to {cityzip} and return'
+
             try:
                 amount = float(myo.Amount)
             except:
@@ -197,17 +225,10 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     invoicetypes_allowed = tablesetup['invoicetypes']
     invoicetypes = [key for key, value in invoicetypes_allowed.items()]
     holdvec[3] = invoicetypes
-    # set the invoice style:
-    invostyle = request.values.get('invoicestyle')
-    if invostyle is None:
-        invostyle = 'Dray Import'
-    headers = tablesetup['invoicetypes'][invostyle]
-    print('the headers are:', headers)
-    holdvec[5] = invostyle
-
     returnhit = request.values.get('Finished')
 
-    if returnhit is not None: completed = True
+    if returnhit is not None:
+        completed = True
     else:
 
         completed = False
@@ -223,6 +244,8 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 invostyle = 'Dray Import'
             else:
                 invostyle = 'OTR"'
+        holdvec[16] = invostyle
+        headers = tablesetup['invoicetypes'][invostyle]
 
 
 
