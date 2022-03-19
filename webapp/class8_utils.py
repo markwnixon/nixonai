@@ -40,12 +40,12 @@ def container_check(num):
 
 
 def form_check(input,text,type,task,req):
-    print(' ')
-    print(f'Checking input for input:{input} text:{text} type:{type} task:{task} required:{req}')
+    #print(' ')
+    #print(f'Checking input for input:{input} text:{text} type:{type} task:{task} required:{req}')
     status = 0
     message = ''
     if type == 'disabled':
-        print('returning disabled')
+        #print('returning disabled')
         return text, status, message
 
 
@@ -70,7 +70,7 @@ def form_check(input,text,type,task,req):
 
     elif type == 'date':
         if isinstance(text, datetime.date):
-            print('date is in datetime format')
+            #print('date is in datetime format')
             status = 0
             message = 'ok'
         else:
@@ -258,7 +258,7 @@ def form_check(input,text,type,task,req):
                 message = 'Warning: this must be set when paying bill'
 
     elif type == 'paymethods':
-        print('select',text,task)
+        #print('select',text,task)
         if text == 'Choose Later':
             if task == 'PayBill':
                 status = 2
@@ -292,7 +292,7 @@ def form_check(input,text,type,task,req):
         message = 'Not a Required Input'
         if not hasinput(text): text = ''
 
-    print(f'At conclusion of input for input:{input} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
+    #print(f'At conclusion of input for input:{input} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
 
     return text, status, message
 

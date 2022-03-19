@@ -119,7 +119,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
         side_data = eval(f"{tableget}_setup['side data']")
         defaults = eval(f"{tableget}_setup['default values']")
         #print('class8_tasks.py 86 Tablemaker() For tables on get this side data:',side_data)
-        keydata = {}
+        #keydata = {}  this was commented out because with mult tables it was over weitten
         for side in side_data:
             #print(f'side is: {side}')
             for key, values in side.items():
@@ -240,7 +240,6 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         viewport[3] = 'Show Text'
         #print(f'taskon is {taskon}')
 
-
     elif tasktype == 'Single_Item_Selection':
         holdvec, entrydata = [], []
         # See if only one box is checked and if so what table it is from
@@ -257,7 +256,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             tablesetup = eval(f'{thistable}_setup')
             rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
             holdvec, entrydata, err, viewport, completed = eval(rstring)
-            #print('returned with:', viewport, completed)
+            print('returned with:', viewport, completed)
         elif nc > 1:
             err.append('Too many selections made for this task')
             completed = True
@@ -343,7 +342,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             err.append('Need to select item(s) to undo')
             completed = True
             tablesetup = None
-    print(f'Returning with viewport = {viewport}')
+    print(f'Returning with viewport = {viewport} and completed {completed}')
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
 
@@ -378,6 +377,7 @@ def Table_maker(genre):
 
         returnhit = request.values.get('Return')
         if returnhit is not None:
+            print('Resetting tables from Table_maker')
             # Asked to reset, so reset values as if not a Post (except the table filters which will be kept)
             jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
 
@@ -388,12 +388,14 @@ def Table_maker(genre):
             for filter in table_filters:
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
         else:
+
             taskon = nononestr(taskon)
+            print(f'Return hit is none so task continues with task {taskon}')
 
             # Get data only for tables that have been checked on
             genre_tables_on = checked_tables(genre_tables)
             tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
-            print(f'The tables on: {tables_on}')
+            print(f'The tables on: {tables_on} with task {taskon}')
 
             #session['table_defaults'] = tables_on
             #Check to see if a table has been turned off.  If so place it back to default status
@@ -485,15 +487,19 @@ def Table_maker(genre):
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
+    print(f'At this point the task is {taskon}')
     if hasvalue(taskon):
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
-            print(f'the tables on are: {tables_on}')
+            # If complete set the task on to none
+            taskon = None
+            print(f'completed task: the tables on are: {tables_on} with task {taskon}')
             if tables_on == []:
                 genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport, tfilters = reset_state_hard(task_boxes, genre_tables)
                 genre_data = eval(f"{genre}_genre")
                 genre_data['genre_tables_on'] = genre_tables_on
             else:
+                print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
                 jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
@@ -502,14 +508,15 @@ def Table_maker(genre):
             #if 'Created' in e:
                 #taskon = None
                 #task_iter = 0
-        if request.values.get('Cancel') is not None:
-            jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
-            err = ['Entry canceled']
-            taskon = None
-            task_iter = 0
-            holdvec = [''] * 50
-            entrydata = []
-            viewport = ['tables'] + ['0']*5
+        # Treat a cancel job as a completed task instead of this........
+        #if request.values.get('Cancel') is not None:
+            #jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
+            #err = ['Entry canceled']
+            #taskon = None
+            #task_iter = 0
+            #holdvec = [''] * 50
+            #entrydata = []
+            #viewport = ['tables'] + ['0']*5
     else:
         taskon = None
         task_iter = 0
@@ -882,7 +889,7 @@ def check_appears(tablesetup, entry):
                 print(test,havedat)
                 return colmat
         print('checkappears',testval,testmat,colmat,havedat)
-    print(f'checkvals returning {entry[3]} and {entry[4]}')
+    #print(f'checkvals returning {entry[3]} and {entry[4]}')
     return entry[3], entry[4]
 
 def New_task(tablesetup, task_iter):
@@ -1000,7 +1007,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 entry[3], entry[4] = check_appears(tablesetup, entry)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
                 print(f'Return from check_appears is {entry[3]} and {entry[4]}')
-            print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
+            #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
                 holdvec[jx] = request.values.get(f'{entry[0]}')
@@ -1083,6 +1090,11 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     #for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
             else:
                 err.append(f'Cannot update entry until input errors shown in red below are resolved')
+
+        cancel_item = request.values.get('Cancel')
+        if cancel_item is not None:
+            print('Canceling the edit')
+            completed = True
 
     else:
         # Gather the data for the selected row
@@ -1513,7 +1525,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                     entry[3], entry[4] = check_appears(tablesetup, entry)
                     entrydata[jx][3], entrydata[jx][4] = entry[3], entry[4]
                     print(f'Return from check_appears is {entry[3]} and {entry[4]}')
-                print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
+                #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
                 if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                     # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
                     holdvec[jx] = request.values.get(f'{entry[0]}')

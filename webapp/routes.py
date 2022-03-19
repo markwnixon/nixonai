@@ -276,7 +276,7 @@ def Class8Main(genre):
     if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)
 
     rightsize = 12 - leftsize
-    #print('heading to class8.html with genre:',genre)
+    print('heading to class8.html with genre:',genre, keydata)
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, checked_data = checked_data,
                            leftsize=leftsize, rightsize=rightsize, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
                            taskon=taskon, task_focus=task_focus, task_iter=task_iter, tasktype=tasktype, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, genre=genre, viewport=viewport, tablesetup=tablesetup)
