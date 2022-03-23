@@ -205,14 +205,16 @@ def get_doclist(odat, dockind):
                         newdoc = f'static/{scac}/data/vGate/{con}_Blended.pdf'
                         if os.path.isfile(addpath(newdoc)):
                             print(f'{newdoc} exists already')
+                            packitems.append(addpath(newdoc))
+                            fexist[jx] = 1
                         else:
-                            try:
+                            if 1 == 1:
                                 g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
                                 g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
                                 blendticks(addpath(g1), addpath(g2), addpath(newdoc))
                                 packitems.append(addpath(newdoc))
                                 fexist[jx] = 1
-                            except:
+                            if 1 == 2:
                                 fexist[jx] = 0
                     else:
                         try:

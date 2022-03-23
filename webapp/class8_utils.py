@@ -127,7 +127,7 @@ def form_check(input,text,type,task,req):
     elif type == 'concheck':
         #Complex checker.  We want to assess ligitimate containers for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
-        if text is not None: char1 = text[0]
+        if hasinput(text): char1 = text[0]
         else: char1 = ''
         if char1 == '*':
             status = 0

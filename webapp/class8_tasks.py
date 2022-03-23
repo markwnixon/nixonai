@@ -897,76 +897,86 @@ def New_task(tablesetup, task_iter):
     form_checks = tablesetup['form checks']['New']
     print(f'Entering New Task with task iter {task_iter}')
 
-    if task_iter > 0:
+    cancelnow = request.values.get('Cancel')
+    if cancelnow is not None:
         entrydata = tablesetup['entry data']
         masks = tablesetup['haulmask']
         if masks != []: entrydata = mask_apply(entrydata, masks)
         numitems = len(entrydata)
         holdvec = [''] * numitems
-        failed = 0
-        warned = 0
-
-        for jx, entry in enumerate(entrydata):
-            print(f'Entry loop: jx"{jx}, entry:{entry}')
-            if entry[3] == 'appears_if':
-                entry[3], entry[4] = check_appears(tablesetup, entry)
-                entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
-            print(f'form show is:{form_show}')
-            if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                if entry[1] != 'hidden':
-                    holdvec[jx] = request.values.get(f'{entry[0]}')
-                    if entry[0] in form_checks: required = True
-                    else: required = False
-                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required)
-                    if entry[5] > 1: failed = failed + 1
-                    if entry[5] == 1: warned = warned + 1
-
-        if 'bring data' in tablesetup:
-            for bring in tablesetup['bring data']:
-                tab1, sel, tab2, cat, colist1, colist2 = bring
-                print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
-                valmatch = request.values.get(sel)
-                print(valmatch)
-                escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
-                adat = eval(escript)
-                if adat is not None:
-                    for jx, col in enumerate(colist1):
-                        thisval = getattr(adat, col)
-                        for ix, entry in enumerate(entrydata):
-                            if entry[0] == colist2[jx]:
-                                holdvec[ix] = thisval
-
-        err.append(f'There are {failed} input errors and {warned} input warnings')
-
-        create_item = request.values.get('Create Item')
-        if create_item is not None:
-            if failed == 0:
-                err,sid = make_new_entry(tablesetup,holdvec)
-                err.append(f"Created new entry in {tablesetup['table']}")
-                completed = True
-                if tablesetup['table'] == 'Orders':
-                    print(f'Updating Orders with {sid}')
-                    Order_Container_Update(sid)
-                if tablesetup['table'] == 'Bills':
-                    bdat = Bills.query.filter(Bills.id>0).order_by(Bills.id.desc()).first()
-                    if bdat is not None:
-                        pdat = People.query.filter(People.Company == bdat.Company).first()
-                        if pdat is not None:
-                            bid = bdat.id
-                            bdat.Pid = pdat.id
-                            db.session.commit()
-                            bdat = Bills.query.get(bid)
-                        err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
-            else:
-                err.append(f'Cannot create entry until input errors shown in red below are resolved')
-
+        completed = True
     else:
-        holdvec = [''] * 60
-        entrydata = tablesetup['entry data']
-        for jx, entry in enumerate(entrydata):
-            if entry[0] in form_checks: required = True
-            else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required)
+
+        if task_iter > 0:
+            entrydata = tablesetup['entry data']
+            masks = tablesetup['haulmask']
+            if masks != []: entrydata = mask_apply(entrydata, masks)
+            numitems = len(entrydata)
+            holdvec = [''] * numitems
+            failed = 0
+            warned = 0
+
+            for jx, entry in enumerate(entrydata):
+                print(f'Entry loop: jx"{jx}, entry:{entry}')
+                if entry[3] == 'appears_if':
+                    entry[3], entry[4] = check_appears(tablesetup, entry)
+                    entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
+                print(f'form show is:{form_show}')
+                if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
+                    if entry[1] != 'hidden':
+                        holdvec[jx] = request.values.get(f'{entry[0]}')
+                        if entry[0] in form_checks: required = True
+                        else: required = False
+                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required)
+                        if entry[5] > 1: failed = failed + 1
+                        if entry[5] == 1: warned = warned + 1
+
+            if 'bring data' in tablesetup:
+                for bring in tablesetup['bring data']:
+                    tab1, sel, tab2, cat, colist1, colist2 = bring
+                    print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                    valmatch = request.values.get(sel)
+                    print(valmatch)
+                    escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
+                    adat = eval(escript)
+                    if adat is not None:
+                        for jx, col in enumerate(colist1):
+                            thisval = getattr(adat, col)
+                            for ix, entry in enumerate(entrydata):
+                                if entry[0] == colist2[jx]:
+                                    holdvec[ix] = thisval
+
+            err.append(f'There are {failed} input errors and {warned} input warnings')
+
+            create_item = request.values.get('Create Item')
+            if create_item is not None:
+                if failed == 0:
+                    err,sid = make_new_entry(tablesetup,holdvec)
+                    err.append(f"Created new entry in {tablesetup['table']}")
+                    completed = True
+                    if tablesetup['table'] == 'Orders':
+                        print(f'Updating Orders with {sid}')
+                        Order_Container_Update(sid)
+                    if tablesetup['table'] == 'Bills':
+                        bdat = Bills.query.filter(Bills.id>0).order_by(Bills.id.desc()).first()
+                        if bdat is not None:
+                            pdat = People.query.filter(People.Company == bdat.Company).first()
+                            if pdat is not None:
+                                bid = bdat.id
+                                bdat.Pid = pdat.id
+                                db.session.commit()
+                                bdat = Bills.query.get(bid)
+                            err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
+                else:
+                    err.append(f'Cannot create entry until input errors shown in red below are resolved')
+
+        else:
+            holdvec = [''] * 60
+            entrydata = tablesetup['entry data']
+            for jx, entry in enumerate(entrydata):
+                if entry[0] in form_checks: required = True
+                else: required = False
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required)
 
 
     return holdvec, entrydata, err, completed
@@ -1325,6 +1335,7 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
     viewport = ['0'] * 6
     holdvec = []
     entrydata = []
+    #table = tablesetup['table']
 
     if cancel is not None:
         completed=True
@@ -1355,9 +1366,12 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
             viewport[4] = f'{genre} {thistable} Item'
             ukey = eval(f"{thistable}_setup['ukey']")
             #print('the ukey=', ukey)
-            viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
-            fileout = ukey + '_' + eval(f"dat.{ukey}")
-            #print(viewport)
+            directedpart = eval(f"dat.{ukey}")
+            #viewport[5] = ukey + ': ' + eval(f"dat.{ukey}")
+            viewport[5] = f'{ukey}: {directedpart}'
+            #fileout = ukey + '_' + eval(f"dat.{ukey}")
+            fileout = f'{ukey}_{directedpart}'
+            print(f'Fileout:{fileout} ukey:{ukey}')
 
             uploadnow = request.values.get('uploadnow')
 
@@ -1375,33 +1389,43 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 elif task_focus == 'TitleDoc':
                     sname = 'Tcache'
 
-                sn = getattr(dat, sname)
-                try:
-                    sn = int(sn)
-                    bn = sn+1
-                except:
-                    sn = 0
-                    bn = 0
+                if thistable == 'Orders':
+                    sn = getattr(dat, sname)
+                    try:
+                        sn = int(sn)
+                        bn = sn+1
+                    except:
+                        sn = 0
+                        bn = 0
 
-                filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
-                output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
-                print(f'output1 for thistable {thistable}-{task_focus} = {output1}')
+                    filename1 = f'{task_focus}_{fileout}_c{str(bn)}{ext}'
+                    output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
+                    print(f'output1 for thistable {thistable}-{task_focus} = {output1}')
+
+                if thistable == 'Interchange':
+                    bn = 0
+                    filename1 = f'{task_focus}_{fileout}{ext}'
+                    output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
+                    print(f'output1 for thistable {thistable}-{task_focus} = {output1}')
+
 
                 file.save(output1)
                 viewport[2] = '/'+tpath(f'{thistable}-{task_focus}', filename1)
 
                 if bn > 0:
-                    oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
-                    oldoutput = addpath(tpath(f'{thistable}-{task_focus}', oldfile))
-                    try:
-                        os.remove(oldoutput)
-                        err.append('Cleaning up old files successful')
-                    except:
-                        err.append('Cleaning up old files NOT successful')
-                        err.append(f'Could not find {oldoutput}')
+                    if thistable == 'Orders':
+                        oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
+                        oldoutput = addpath(tpath(f'{thistable}-{task_focus}', oldfile))
+
+                        try:
+                            os.remove(oldoutput)
+                            err.append('Cleaning up old files successful')
+                        except:
+                            err.append('Cleaning up old files NOT successful')
+                            err.append(f'Could not find {oldoutput}')
 
                 setattr(dat, f'{task_focus}', filename1)
-                setattr(dat, sname, bn)
+                if thistable == 'Orders': setattr(dat, sname, bn)
                 db.session.commit()
                 err.append(f'Viewing {filename1}')
                 err.append('Hit Return to End Viewing and Return to Table View')
