@@ -127,47 +127,53 @@ def form_check(input,text,type,task,req):
     elif type == 'concheck':
         #Complex checker.  We want to assess ligitimate containers for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
-        haul = request.values.get('HaulType')
-        print(f'**********************the haul type is {haul}')
-        if haul is None:
-            if not hasinput(text):
-                status = 0
-                message = 'Not a required input yet'
-            else:
-                lenck = len(text)
-                if lenck == 11:
-                    status, message = container_check(text)
-                else:
-                    if lenck > 3:
-                        status = 2
-                        message = f'Container must have length of 11 characters not {lenck}'
-                    else:
-                        status = 2
-                        message = f'Valid container number input required'
-
+        if text is not None: char1 = text[0]
+        else: char1 = ''
+        if char1 == '*':
+            status = 0
+            message = 'Forced bypass number'
         else:
-            if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
-                if hasinput(text):
+            haul = request.values.get('HaulType')
+            print(f'**********************the haul type is {haul}')
+            if haul is None:
+                if not hasinput(text):
+                    status = 0
+                    message = 'Not a required input yet'
+                else:
                     lenck = len(text)
                     if lenck == 11:
                         status, message = container_check(text)
                     else:
-                        if lenck > 0:
+                        if lenck > 3:
                             status = 2
                             message = f'Container must have length of 11 characters not {lenck}'
                         else:
                             status = 2
                             message = f'Valid container number input required'
-                else:
-                    if 'Import' in haul:
-                        status = 2
-                        message = 'Must enter a valid container number'
-                    else:
-                        status = 1
-                        message = 'Container number required after pull'
+
             else:
-                status = 0
-                message = 'Not a required input for haul type'
+                if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
+                    if hasinput(text):
+                        lenck = len(text)
+                        if lenck == 11:
+                            status, message = container_check(text)
+                        else:
+                            if lenck > 0:
+                                status = 2
+                                message = f'Container must have length of 11 characters not {lenck}'
+                            else:
+                                status = 2
+                                message = f'Valid container number input required'
+                    else:
+                        if 'Import' in haul:
+                            status = 2
+                            message = 'Must enter a valid container number'
+                        else:
+                            status = 1
+                            message = 'Container number required after pull'
+                else:
+                    status = 0
+                    message = 'Not a required input for haul type'
 
     elif type == 'release':
         #Complex checker.  We want to assess ligitimate bookings for proper number

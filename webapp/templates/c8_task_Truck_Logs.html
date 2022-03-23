@@ -1,0 +1,58 @@
+{% set seldrv = holdvec[0] %}
+{% set drvs = holdvec[2] %}
+{% set mydata = holdvec[1] %}
+{% set thisdate = holdvec[7] %}
+{% set headers = holdvec[5] %}
+{% set checks = holdvec[4] %}
+
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-around align-items-center">
+                <div class="p-0">Viewing {{viewport[2]}}</div>
+                <div class="p-0">
+                    <button type="submit" class="btn btn-md btn-primary" name="Return">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12" align="center">
+                    <div class="row">
+                 <div class="col-sm-1"></div>
+                <div class="col-sm-10" align="center">
+                <div class="d-sm-flex justify-content-between align-items-center small">
+                    <div class="p-0">
+                    Choose Driver:
+                        <select class="form-control-inline form-control-sm" name="getdriver" onchange="this.form.submit()">
+                            <option value="" disabled selected>Choose Driver</option>
+                            {% for drv in drvs %}
+                                <option {% if drv == seldrv %} selected {% endif %} value='{{drv}}'>{{drv}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="p-0">
+                        <button type="submit" class="btn btn-group-small btn-unique my-small-btn" name="Return"
+                        data-toggle="tooltip" title="Return to Truck Tables without Action">Cancel</button>
+                    </div>
+                    <div class="p-0">
+                        Date Range Start:
+                        <input class="form-control-inline form-control-sm" type="date" value="{{ thisdate }}" name="thisdate">
+                    </div>
+                    <div class="p-0">
+                        Date Range Stop
+                        <input class="form-control-inline form-control-sm" type="date" value="{{ thisdate }}" name="thisdate">
+                    </div>
+                </div>
+                </div>
+                </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+<input type = "hidden" name="uploadtype" id="uploadtype" value="source">
+<input type = "hidden" name="username" id="username" value="{{ username }}">

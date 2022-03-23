@@ -40,8 +40,8 @@ Trucking_genre = {'table': 'Orders',
                                         'Paid Invoice'    : ['Invoice','0','0','0'],
                                         'Update w/Gate' : ['Gate Tickets','0','0','0'],
                                         'Completed IP' : ['Invoice', 'Proofs','0','0'],
-                                        'Completed IPS' : ['Invoice', 'Proofs', 'Source','0'],
-                                        'Completed IPSG' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
+                                        'Completed IPG' : ['Invoice', 'Proofs', 'Gate Tickets','0'],
+                                        'Completed IPGS' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source']
                                       },
                   'image_stamps': {
                       'X': ['x.png', 'stamps', .2],
@@ -121,7 +121,7 @@ Trucking_genre = {'table': 'Orders',
                                           'Assign Drivers': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Assign_Drivers', 'None'],
                                           'Driver Hours': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Driver_Hours', 'None'],
                                           'Driver Payroll': ['No_Item_Selection', 'Driver_Payroll', 'None'],
-                                          'Truck Logs': ['No_Item_Selection', 'Truck_Logs', 'None'],
+                                          'Truck Logs': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Truck_Logs', ''],
                                           'CMA-APL': ['No_Selection_Plus_Display', 'CMA_APL', 'None'],
                                           'Container Update': ['No_Display', 'Container_Update', 'None']
                                         }
@@ -475,6 +475,54 @@ Invoices_setup = {'name' : 'Invoice',
                   'jscript': 'dtHorizontalVerticalExample4',
                   'documents': ['None'],
                   'source': ['None'],
+                  'copyswaps' : {}
+                  }
+
+Trucklog_setup = {'name' : 'Trucklog',
+                  'table': 'Trucklog',
+                  'filter': None,
+                  'filterval': None,
+                  'checklocation': 1,
+                  'creators': [],
+                  'ukey': 'Service',
+                  'simplify': [],
+                  'entry data': [['Date', 'Date', 'Date', 'date', 'date', 0, 'ok', 'cc', None, 'Always'],
+                                 ['Unit', 'Unit', 'Unit', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Tag', 'Tag', 'Tag', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['DriverStart', 'DriverStart', 'DriverStart', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['DriverEnd', 'DriverEnd', 'DriverEnd', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['GPSin', 'GPSin', 'GPSin', 'datetime', 'datetime', 0, 'ok', 'cc', None, 'Always'],
+                                ['GPSout', 'GPSout', 'GPSout', 'datetime', 'datetime', 0, 'ok', 'cc', None, 'Always'],
+                                ['Shift', 'Shift', 'Shift', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Gotime', 'Gotime', 'Gotime', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Locationstart', 'Locationstart', 'Locationstart', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Distance', 'Distance', 'Distance', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Rdist', 'Rdist', 'Rdist', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Rloc', 'Rloc', 'Rloc', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Odomstart', 'Odomstart', 'Odomstart', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Odomstop', 'Odomstop', 'Odomstop', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Odverify', 'Odverify', 'Odverify', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+
+                                ['Maintrecord', 'Maintrecord', 'Maintrecord', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Maintid', 'Maintid', 'Maintid', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Status', 'Status', 'Status', 'text', 'text', 0, 'ok', 'cc', None, 'Always']
+                                 ],
+                  'hidden data' : [],
+                  'haulmask': [],
+                  'colorfilter': None,
+                   'filteron':  ['Driver'],
+                  'side data': [],
+                  'default values': {'get_Shipper': 'Fill This Later'},
+                  'form show': {
+                      'New': [],
+                      'Edit': []
+                  },
+                  'form checks': {
+                      'New': ['Company'],
+                      'Edit': ['Company']
+                  },
+                  'jscript': 'dtHorizontalVerticalExample4',
+                  'documents': [],
                   'copyswaps' : {}
                   }
 

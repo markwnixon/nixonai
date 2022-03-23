@@ -1,8 +1,9 @@
 from webapp import db
-from webapp.models import Orders, Interchange, StreetTurns, Vehicles, Drivers, DriverAssign, Trucklog
+from webapp.models import Orders, Interchange, StreetTurns, Vehicles, Drivers, DriverAssign
 import datetime
 from flask import request
-from webapp.utils import hasinput, d2s
+from webapp.class8_utils import *
+from webapp.utils import *
 
 today=datetime.date.today()
 
@@ -444,11 +445,7 @@ def Driver_Hours_task(err, holdvec, iter):
 
     return completed, err, holdvec
 
-def Truck_Logs_task(err):
-    print(f'Running Truck Logs task')
-    completed = True
-    err.append('Truck Logs Successful')
-    return completed, err
+
 
 def CMA_APL_task(err,holdvec, task_iter):
     print(f'Running Text Output task')

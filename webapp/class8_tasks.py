@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions
+from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions, Trucklog
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
@@ -14,7 +14,7 @@ from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpaym
 from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
 from InterchangeFuncs import Order_Container_Update
 from webapp.class8_tasks_money import get_all_sids
-from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, Truck_Logs_task, CMA_APL_task
+from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, CMA_APL_task
 import os
 import ntpath
 
@@ -91,7 +91,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
 
         boxchecks = db_data[6]
         boxlist = db_data[7]
-        print('boxing:',tableget,boxchecks,boxlist)
+        #print('boxing:',tableget,boxchecks,boxlist)
         if tableget == 'Orders':
             if 'Job' in boxlist:
                 if 'Docs' in boxlist: use_table = 'dtTrucking'
@@ -163,7 +163,6 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                     #print(f'for ix:{ix}, col: {col}, select_value:{select_value} the current filters is {filters}')
 
             if 'all()' not in filters: filters = filters+f').order_by({ktable}.{keyon}).all()'
-            print(filters)
             dbstats = eval(filters)
 
             if dbstats is not None:
@@ -342,7 +341,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             err.append('Need to select item(s) to undo')
             completed = True
             tablesetup = None
-    print(f'Returning with viewport = {viewport} and completed {completed}')
+    print(f'Returning from runthetask with viewport = {viewport} and completed {completed}')
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
 
@@ -390,20 +389,12 @@ def Table_maker(genre):
         else:
 
             taskon = nononestr(taskon)
-            print(f'Return hit is none so task continues with task {taskon}')
+            print(f'Return hit is none so task continues with task tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
 
             # Get data only for tables that have been checked on
             genre_tables_on = checked_tables(genre_tables)
             tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
             print(f'The tables on: {tables_on} with task {taskon}')
-
-            #session['table_defaults'] = tables_on
-            #Check to see if a table has been turned off.  If so place it back to default status
-            #for tab in session['table_removed']:
-                #if tab not in session['table_defaults']: session['table_removed'].remove(tab)
-            #Get the table viewing parameters that need to be set for the talbles that are on
-
-
 
             # Only check the launch boxes, filters, and task selections if no task is running
             if not hasinput(taskon):
@@ -469,7 +460,7 @@ def Table_maker(genre):
         # Default time filter on entry into table is last 60 days:
         tfilters = {'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
         jscripts = ['dtTrucking']
-        taskon, task_iter, task_focus = None, None, None
+        taskon, task_iter, task_focus, tasktype = None, None, None, None
 
 
     # Execute these parts whether it is a Post or Not:
@@ -487,19 +478,19 @@ def Table_maker(genre):
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
 
     # Execute the task here if a task is on...,,,,
-    print(f'At this point the task is {taskon}')
     if hasvalue(taskon):
+        print(f'About to execute task with tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
             # If complete set the task on to none
             taskon = None
-            print(f'completed task: the tables on are: {tables_on} with task {taskon}')
+            #print(f'completed task: the tables on are: {tables_on} with task {taskon}')
             if tables_on == []:
                 genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport, tfilters = reset_state_hard(task_boxes, genre_tables)
                 genre_data = eval(f"{genre}_genre")
                 genre_data['genre_tables_on'] = genre_tables_on
             else:
-                print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
+                #print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
                 jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else: task_iter = int(task_iter) + 1
@@ -522,7 +513,7 @@ def Table_maker(genre):
         task_iter = 0
         tasktype = ''
         holdvec = [''] * 50
-        print(f'labpassvec is {labpassvec}')
+        #print(f'labpassvec is {labpassvec}')
         entrydata = []
         err = ['All is well']
         tablesetup = None
@@ -660,6 +651,13 @@ def get_dbdata(table_setup, tfilters):
                     hfilter = f'{table}.Hstat >= 2'
                 query_adds.append(hfilter)
 
+    # Determine if haul filter applies to query:
+    if 'Driver Filter' in tfilters:
+        htest = tfilters['Driver Filter']
+        if htest is not None and htest != 'All Drivers' :
+            hfilter = f"{table}.DriverStart == '{htest}'"
+            query_adds.append(hfilter)
+
     # Put the filters together from the 3 possible pieces: time, type1, type2
     if query_adds == []:
         table_query = f'{table}.query.all()'
@@ -763,7 +761,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
@@ -776,7 +774,7 @@ def make_new_entry(tablesetup,holdvec):
         form_show = tablesetup['form show']['New']
         for jx,entry in enumerate(entrydata):
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                print(f'Data going in is:{entry[0]} {holdvec[jx]}')
+                #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
                 setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
@@ -812,7 +810,7 @@ def make_new_entry(tablesetup,holdvec):
             if hasinput(docsave):
                 newpath = addpath(tpath(table, newfile))
                 oldpath = addpath(docsave).replace('//','/')
-                print('Need to move file from', oldpath, ' to', newpath)
+                #print('Need to move file from', oldpath, ' to', newpath)
                 try:
                     shutil.move(oldpath, newpath)
                     print(f'Moved file {oldpath} to {newpath}')
@@ -840,11 +838,11 @@ def make_new_entry(tablesetup,holdvec):
 def mask_apply(entrydata, masks):
     mask_to_apply = request.values.get('HaulType')
     list = Trucking_genre['haul_types']
-    print(mask_to_apply)
+    #print(mask_to_apply)
     if mask_to_apply in list:
-        print(f'the list is {list}')
+        #print(f'the list is {list}')
         this_index = list.index(mask_to_apply)
-        print(f'the index is {this_index}')
+        #print(f'the index is {this_index}')
         for jx, entry in enumerate(entrydata):
             if 'Release' in entry[1]:
                 mask = masks['release']
@@ -861,7 +859,7 @@ def mask_apply(entrydata, masks):
             if 'Load Date' in entry[1]:
 
                 mask = masks['load1date']
-                print(f'Mask {entry[1]}, {this_index} {mask}')
+                #print(f'Mask {entry[1]}, {this_index} {mask}')
                 entrydata[jx][2] = mask[this_index]
                 #print(f'Mask {entry[2]}')
             if 'Del Date' in entry[1]:
@@ -2611,3 +2609,68 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         viewport = []
         print('Exiting in the no sids location')
         return holdvec, entrydata, err, viewport, completed
+
+
+def Truck_Logs_task(err, holdvec, task_iter):
+
+    err = [f"Running Truck_Logs task with task_iter {task_iter}"]
+    completed = False
+    returnhit = request.values.get('return')
+    if returnhit is not None: completed = True
+
+    viewport = ['0'] * 6
+
+    today = datetime.date.today()
+    daysback = 400
+    lookback = today - datetime.timedelta(days=daysback)
+    today_str = today.strftime('%Y-%m-%d')
+    err=[]
+
+    #Get a list of the active drivers:
+    drivers = ['All Drivers']
+    ddata = Drivers.query.filter(Drivers.Active == 1).all()
+    for ddat in ddata:
+        drv = ddat.Name
+        if drv not in drivers:
+            drivers.append(drv)
+    selected_driver = request.values.get('getdriver')
+    if selected_driver is None: selected_driver = 'All Drivers'
+    holdvec[0] = selected_driver
+
+    # If first time up there is not selection so set to todays date
+    if task_iter == 0:
+        holdvec[7] = today_str
+    else:
+        holdvec[7] = request.values.get('thisdate')
+
+    #This is the relevant data for the table
+    tableget = 'Trucklog'
+    table_setup = eval(f'{tableget}_setup')
+    print(table_setup['table'])
+    tfilters = {}
+    tfilters['Driver Filter'] = selected_driver
+    print(tfilters)
+    db_data, labpass = get_dbdata(table_setup, tfilters)
+    data1 = db_data[0]
+    data1id = db_data[1]
+    entrydata = db_data[4]
+    headers = []
+    for entry in entrydata:
+        headers.append(entry[1])
+    holdvec[5] = headers
+    holdvec[1] = data1
+    holdvec[6] = data1id
+    holdvec[2] = drivers
+
+    thechecks = [0]*len(data1id)
+
+    action = None
+    if action is None:
+        for jx,sid in enumerate(data1id):
+            ckon = request.values.get('oder'+str(sid))
+            if ckon is not None:
+                thechecks[jx]=1
+
+    holdvec[4] = thechecks
+
+    return completed, err, holdvec

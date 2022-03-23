@@ -162,45 +162,64 @@ def get_doclist(odat, dockind):
     for jx, thisdoc in enumerate(dockind):
         if thisdoc != '0':
             if thisdoc == 'Source':
-                fa = addpath(f'static/{scac}/data/vSource/{odat.Source}')
-                if os.path.isfile(fa):
-                    packitems.append(fa)
-                    fexist[jx] = 1
+                try:
+                    fa = addpath(f'static/{scac}/data/vSource/{odat.Source}')
+                    if os.path.isfile(fa):
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                except:
+                    print('No source file exists')
             if thisdoc == 'Invoice':
-                fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
-                if os.path.isfile(fa):
-                    packitems.append(fa)
-                    fexist[jx] = 1
+                try:
+                    fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
+                    if os.path.isfile(fa):
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                except:
+                    print('No invoice exists')
             if thisdoc == 'Proofs':
-                fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
-                print('Looking for proof file:', fa)
-                if os.path.isfile(fa):
-                    packitems.append(fa)
-                    fexist[jx] = 1
+                try:
+                    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
+                    print('Looking for proof file:', fa)
+                    if os.path.isfile(fa):
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                except:
+                    print('Proof file does not exist')
+                    fexist[jx] = 0
             if thisdoc == 'PaidInvoice':
-                fa = addpath(f'static/{scac}/data/vPaidInvoice/{odat.PaidInvoice}')
-                print('Looking for paid invoice file:', fa)
-                if os.path.isfile(fa):
-                    packitems.append(fa)
-                    fexist[jx] = 1
+                try:
+                    fa = addpath(f'static/{scac}/data/vPaidInvoice/{odat.PaidInvoice}')
+                    print('Looking for paid invoice file:', fa)
+                    if os.path.isfile(fa):
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                except:
+                    print('Paid Invoice does not exist')
             if thisdoc == 'Gate Tickets':
                 idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
                 if idata is not None:
                     if len(idata) > 1:
-                        # Get a blended ticket
+                        # Try to get a blended ticket
                         con = idata[0].Container
                         newdoc = f'static/{scac}/data/vGate/{con}_Blended.pdf'
                         if os.path.isfile(addpath(newdoc)):
                             print(f'{newdoc} exists already')
                         else:
-                            g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
-                            g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
-                            blendticks(addpath(g1), addpath(g2), addpath(newdoc))
-                        packitems.append(addpath(newdoc))
-                        fexist[jx] = 1
+                            try:
+                                g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
+                                g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
+                                blendticks(addpath(g1), addpath(g2), addpath(newdoc))
+                                packitems.append(addpath(newdoc))
+                                fexist[jx] = 1
+                            except:
+                                fexist[jx] = 0
                     else:
-                        packitems.append(addpath(f'tmp/{scac}/data/vGate/{idata[0].Source}'))
-                        fexist[jx] = 1
+                        try:
+                            packitems.append(addpath(f'tmp/{scac}/data/vGate/{idata[0].Source}'))
+                            fexist[jx] = 1
+                        except:
+                            print('Single gate ticket does not exist')
     return fexist, packitems
 
 
