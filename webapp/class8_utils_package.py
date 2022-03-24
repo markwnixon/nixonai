@@ -208,13 +208,13 @@ def get_doclist(odat, dockind):
                             packitems.append(addpath(newdoc))
                             fexist[jx] = 1
                         else:
-                            if 1 == 1:
+                            try:
                                 g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
                                 g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
                                 blendticks(addpath(g1), addpath(g2), addpath(newdoc))
                                 packitems.append(addpath(newdoc))
                                 fexist[jx] = 1
-                            if 1 == 2:
+                            except:
                                 fexist[jx] = 0
                     else:
                         try:

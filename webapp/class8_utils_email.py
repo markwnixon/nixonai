@@ -357,8 +357,8 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
 
-    elif eprof == 'Completed IPS':
-        etitle = f'Invoice/Proof/Load-Confirmation for Order: {od} | {keyval} | {con}'
+    elif eprof == 'Completed IPG':
+        etitle = f'Invoice/Proof/Gate for Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
         aname = odat.Package
         emailin1 = estatus
@@ -369,8 +369,8 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
 
-    elif eprof == 'Completed IPSG':
-        etitle = f'Invoice/Proof/Load-Con/Gate-Tickets for Order: {od} | {keyval} | {con}'
+    elif eprof == 'Completed IPGS':
+        etitle = f'Invoice Package for Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
         aname = odat.Package
         emailin1 = estatus
