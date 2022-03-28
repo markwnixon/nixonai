@@ -481,13 +481,14 @@ class Orders(db.Model):
     PayAcct = db.Column('PayAcct', db.String(45))
     BalDue = db.Column('BalDue', db.String(45))
     Payments = db.Column('Payments', db.String(45))
+    Quote = db.Column('Quote', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
-                 InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments):
+                 InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments, Quote):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -552,6 +553,7 @@ class Orders(db.Model):
         self.PayAcct = PayAcct
         self.BalDue = BalDue
         self.Payments = Payments
+        self.Quote = Quote
 
 
 class Drops(db.Model):

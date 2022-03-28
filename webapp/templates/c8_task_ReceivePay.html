@@ -6,6 +6,7 @@
 {% set paydata = holdvec[0] %}
 {% set depolist = holdvec[1] %}
 {% set thisdepo = holdvec[2] %}
+{% set iter = holdvec[12] %}
 {% set paymeths = ['Cash', 'Check', 'Credit Card', 'Direct Deposit'] %}
 
 <div class="card">
@@ -18,12 +19,19 @@
                 <td colspan="4">
                 <button type="submit" class="btn btn-mdb-color btn-sm" name="update"
                 data-toggle="tooltip" title="Use to change documentation order among tenders, proofs, invoice, etc">Update</button>
-                <button type="submit" class="btn btn-dark-green btn-sm" name="recordnow"
-                data-toggle="tooltip" title="Record the payment and finalize the invoice">Record Only</button>
-                <button type="submit" class="btn btn-dark-green btn-sm" name="emailnow"
-                data-toggle="tooltip" title="Email the Packaged material using email setup shown on left">Record & Email</button>
-                <button type="submit" class="btn btn-blue btn-sm" name="Return"
-                data-toggle="tooltip" title="Return to Tables without further execution of options">Return</button>
+                    {% if iter > 0 %}
+                        <button type="submit" class="btn btn-dark-green btn-sm" name="recordnow"
+                        data-toggle="tooltip" title="Record the payment and finalize the invoice">Record Only</button>
+                        <button type="submit" class="btn btn-dark-green btn-sm" name="emailnow"
+                        data-toggle="tooltip" title="Email the Packaged material using email setup shown on left">Record & Email</button>
+                    {% else %}
+                        <button type="submit" class="btn btn-dark-green btn-sm" name="recordnow"
+                        data-toggle="tooltip" title="Record the payment and finalize the invoice" disabled>Record Only</button>
+                        <button type="submit" class="btn btn-dark-green btn-sm" name="emailnow"
+                        data-toggle="tooltip" title="Email the Packaged material using email setup shown on left" disabled>Record & Email</button>
+                    {% endif %}
+                    <button type="submit" class="btn btn-blue btn-sm" name="Return"
+                        data-toggle="tooltip" title="Return to Tables without further execution of options">Return</button>
                 </td>
             </tr>
             <tr>

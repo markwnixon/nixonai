@@ -1,3 +1,5 @@
+import sqlalchemy.sql
+
 from webapp import db
 from webapp.models import Orders, Invoices, People, Services, Drops, SumInv, Interchange
 from flask import render_template, flash, redirect, url_for, session, logging, request
@@ -59,6 +61,34 @@ def loginvo_m(odat,ix):
         db.session.commit()
     return err
 
+def getservice(myo, service, serviceqty):
+
+    sdat = Services.query.filter(Services.Service.contains(service)).first()
+    if sdat is not None:
+        nextservice = sdat.Service
+        each = float(sdat.Price)
+        amount = serviceqty*each
+        descript = f' For {nextservice}'
+    else:
+        nextservice = 'Nothing Here'
+        each = 0.00
+        amount = 0.00
+        descript = 'Nothing'
+
+    if nextservice == 'Per Diem':
+        descript = 'Shipline invoiced per diem'
+    elif nextservice == 'Drv Detention':
+        descript = f'Actual Time of Load = {2 + serviceqty} Hours'
+    elif nextservice == 'Storage Fee':
+        descript = 'Days of Storage'
+    elif nextservice == 'Chassis Fees':
+        qty = myo.Date2 - myo.Date
+        serviceqty = qty.days + 1
+        descript = f'Days of Chassis, {myo.Date} to {myo.Date2}'
+
+    return nextservice, descript, each, serviceqty, amount
+
+
 
 def initialize_invoice(myo, err):
     # First time through: have an order to invoice
@@ -97,11 +127,48 @@ def initialize_invoice(myo, err):
                 amount = float(myo.Amount)
             except:
                 amount = 0.00
-            input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,
-                             Ea=d2s(amount), Qty=qty, Amount=d2s(amount), Total=0.00, Date=today,
-                             Original=None, Status='New')
-            db.session.add(input)
-            db.session.commit()
+
+            # If quote block exists, create invoice matching the quote:
+            qb = myo.Quote
+            if hasinput(qb):
+                qblines = qb.split('+')
+                # First element must be the job drayage amount
+                try:
+                    lineamount = float(qblines[0])
+                except:
+                    lineamount = 0.00
+                print(f'The base amount is {lineamount}')
+                input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,
+                                 Ea=d2s(amount), Qty=qty, Amount=d2s(lineamount), Total=0.00, Date=today,
+                                 Original=None, Status='New')
+                db.session.add(input)
+                db.session.commit()
+                qblines = qblines[1:]
+                print(qblines)
+                for qbl in qblines:
+                    print(f'Assessing qbl = {qbl}')
+                    if '=' in qbl:
+                        qbeaches = qbl.split('=')
+                        service = qbeaches[0]
+                        serviceqty = float(qbeaches[1])
+                    else:
+                        service = qbl
+                        serviceqty = 1.0
+
+                    nextservice, descript, each, serviceqty, amount = getservice(myo, service, serviceqty)
+
+                    input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service=nextservice, Description=descript,
+                                     Ea=d2s(each), Qty=serviceqty, Amount=d2s(amount), Total=0.00, Date=today,
+                                     Original=None, Status='New')
+                    db.session.add(input)
+                    db.session.commit()
+            else:
+                # No quote provided
+                input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,
+                                 Ea=d2s(amount), Qty=qty, Amount=d2s(amount), Total=0.00, Date=today,
+                                 Original=None, Status='New')
+                db.session.add(input)
+                db.session.commit()
     return err
 
 def add_service(myo):

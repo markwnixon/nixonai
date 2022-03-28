@@ -8,7 +8,7 @@
         {% if viewport[0] == 'split panel left' %}
             <div class="col-sm-4">
                 {% if viewport[1] == 'email setup' %}
-                    Write some stuff here {{ viewport[1] }}
+                    Viewpot in use: {{ viewport[1] }}
                     {% set emaildata = holdvec[4] %}
                     {% include 'emailprep.html' %}
                 {% endif %}

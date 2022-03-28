@@ -1974,6 +1974,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     holdvec[7] = doc_profile_names
     holdvec[10] = doc_stamps
     holdvec[11] = doc_signatures
+    holdvec[12] = task_iter
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -2062,6 +2063,14 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             db.session.commit()
             print(f'The updated paid summery invoice file is {basefile}')
             docref = f'static/{scac}/data/vPaidInvoice/{basefile}'
+
+        # Need to update the hardcoded file name just updated:
+        srcfile = emaildata[6]
+        namfile = emaildata[7]
+        if hasinput(srcfile) and hasinput(namfile):
+            if namfile == srcfile:  emaildata[7] = basefile
+        else: emaildata[7] = basefile
+        emaildata[6] = basefile
 
 
         holdvec[4] = emaildata

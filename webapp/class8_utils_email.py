@@ -178,7 +178,7 @@ def etemplate_truck(eprof,odat):
         emailin2 = eaccts
         emailcc1 = em['info']
         emailcc2 = em['expo']
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'VInvoice']
         return emaildata
 
     elif eprof == 'eprof4':
@@ -218,20 +218,20 @@ def etemplate_truck(eprof,odat):
         etitle = f'Invoice for Completed Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice for services is attached.\n\nWe greatly appreciate your business.'
         aname = odat.Invoice
-        aname = aname.replace('INV','Invoice_')
         emailin1 = estatus
         emailin2 = eaccts
         emailcc1 = em['info']
         emailcc2 = em['expo']
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vInvoice']
         return emaildata
 
 
     elif eprof == 'paidinvoice':
         etitle = f'Payment Received on Invoice {odat.Jo} for Completed Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nYour payment has been received, and your stamped invoice is attached.\n\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
-        aname = odat.Invoice
-        aname = aname.replace('INV', 'Paid_Invoice_')
+        #aname = odat.Invoice
+        #aname = aname.replace('INV', 'Paid_Invoice_')
+        aname = odat.PaidInvoice
         emailin1 = estatus
         emailin2 = eaccts
         emailcc1 = em['info']
@@ -325,13 +325,15 @@ def etemplate_truck(eprof,odat):
     elif eprof == 'Paid Invoice':
         etitle = f'Payment Received on Invoice {odat.Jo} for Completed Order: {od} | {keyval} | {con}'
         ebody = f'Dear {odat.Shipper},\n\nYour payment has been received, and your stamped invoice is attached.\n\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
-        aname = odat.Invoice
-        aname = aname.replace('INV', 'Paid_Invoice_')
+        #aname = odat.Invoice
+        #aname = aname.replace('INV', 'Paid_Invoice_')
+        aname = odat.PaidInvoice
+        print(f'aname here is {aname} {odat.PaidInvoice} {odat.Jo} {odat.Source}')
         emailin1 = estatus
         emailin2 = eaccts
         emailcc1 = em['info']
         emailcc2 = em['expo']
-        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
+        emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPaidInvoice']
         return emaildata
 
     elif eprof == 'Update w/Gate':
