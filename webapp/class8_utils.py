@@ -30,6 +30,7 @@ def container_check(num):
             check1 = check1 + value * 2 ** jx
 
     ckdigit = check1 - int(check1 / 11) * 11
+    if ckdigit == 10: ckdigit = 0
 
     if ckdigit == theckdigit:
         message = f'Container {num} is valid with cksum = {ckdigit}'
@@ -127,6 +128,7 @@ def form_check(input,text,type,task,req):
     elif type == 'concheck':
         #Complex checker.  We want to assess ligitimate containers for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
+        print(f'****************************Entering concheck with text {text}')
         if hasinput(text): char1 = text[0]
         else: char1 = ''
         if char1 == '*':
@@ -143,6 +145,7 @@ def form_check(input,text,type,task,req):
                     lenck = len(text)
                     if lenck == 11:
                         status, message = container_check(text)
+
                     else:
                         if lenck > 3:
                             status = 2
@@ -157,6 +160,7 @@ def form_check(input,text,type,task,req):
                         lenck = len(text)
                         if lenck == 11:
                             status, message = container_check(text)
+                            print(f'Container status check: {status} {message}')
                         else:
                             if lenck > 0:
                                 status = 2

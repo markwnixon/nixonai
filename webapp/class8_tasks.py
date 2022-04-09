@@ -17,6 +17,7 @@ from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, CMA_APL_task
 import os
 import ntpath
+import pyperclip
 
 from sqlalchemy import inspect
 import datetime
@@ -530,6 +531,16 @@ def Table_maker(genre):
     holdvec[47] = f'/static/{scac}/data/v'
     #print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
     #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
+
+    putbuff = request.values.get('Paste Buffer')
+    if putbuff is not None:
+        print(f'Doing the paste buffer for {checked_data}')
+        sid = checked_data[0][2][0]
+        odat = Orders.query.get(sid)
+        ht = odat.HaulType
+        if 'Export' in ht:  pyperclip.copy(f'Empty Out: *{odat.Booking}*')
+        if 'Import' in ht:  pyperclip.copy(f'Load Out: *{odat.Container} {odat.Booking}*')
+        spam = pyperclip.paste()
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
