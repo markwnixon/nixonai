@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions, Trucklog
 from flask import render_template, flash, redirect, url_for, session, logging, request
-from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
+from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
 from webapp.class8_dicts import *
@@ -17,8 +17,8 @@ from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, CMA_APL_task
 import os
 import ntpath
-import pyperclip
-
+from requests import get
+API_KEY_GEO = apikeys['gkey']
 from sqlalchemy import inspect
 import datetime
 from datetime import timedelta
@@ -32,6 +32,34 @@ from webapp.class8_utils import *
 from webapp.utils import *
 from webapp.viewfuncs import newjo
 import uuid
+
+def address_resolver(json):
+    final = {}
+    if json['results']:
+        data = json['results'][0]
+        for item in data['address_components']:
+            print(f'address resolver item {item}')
+            for category in item['types']:
+                data[category] = {}
+                data[category] = item['long_name']
+        final['street'] = data.get("route", None)
+        final['state'] = data.get("administrative_area_level_1", None)
+        final['city'] = data.get("locality", None)
+        final['county'] = data.get("administrative_area_level_2", None)
+        final['country'] = data.get("country", None)
+        final['postal_code'] = data.get("postal_code", None)
+        final['neighborhood'] = data.get("neighborhood",None)
+        final['sublocality'] = data.get("sublocality", None)
+        final['housenumber'] = data.get("housenumber", None)
+        final['postal_town'] = data.get("postal_town", None)
+        final['subpremise'] = data.get("subpremise", None)
+        final['latitude'] = data.get("geometry", {}).get("location", {}).get("lat", None)
+        final['longitude'] = data.get("geometry", {}).get("location", {}).get("lng", None)
+        final['location_type'] = data.get("geometry", {}).get("location_type", None)
+        final['postal_code_suffix'] = data.get("postal_code_suffix", None)
+        final['street_number'] = data.get('street_number', None)
+    return final
+
 
 def get_drop(loadname):
     print(f'In get_drop The LOADNAME is:{loadname}')
@@ -345,6 +373,48 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
     print(f'Returning from runthetask with viewport = {viewport} and completed {completed}')
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
+def get_address_details(address):
+    print(address)
+    address = address.replace('\n',' ').replace('\r', '')
+    address = address.replace('#', '')
+    address = address.strip()
+    address = address.replace(" ","+")
+    url = f'https://maps.googleapis.com/maps/api/geocode/json?address={address}&key={API_KEY_GEO}'
+    response = get(url)
+    data = address_resolver(response.json())
+    data['address'] = address
+    backupcity = 'None'
+    #lat = data['latitude']
+    #lon = data['longitude']
+    #print(lat,lon)
+    return data, backupcity
+
+def get_dispatch(odat):
+    ht = odat.HaulType
+    hstat = odat.Hstat
+    contype = odat.Type
+    ctext = ''
+    if '40' in contype and '9' in contype: ctext = '40HC'
+    if '40' in contype and '8' in contype: ctext = '40STD'
+    if '20' in contype: ctext = '20'
+    if 'R' in contype: ctext = ctext + ' Reefer'
+    if 'U' in contype: ctext = ctext + ' OpenTop'
+
+    address = odat.Dropblock2
+    adata, backup = get_address_details(address)
+    try:
+        city = adata['city']
+    except:
+        city = backup
+
+    if hstat is None: hstat = -1
+    if hstat < 1:
+        if 'Export' in ht: return f'Empty Out: *{odat.Booking}* ({ctext} {city})'
+        if 'Import' in ht: return f'Load Out: *{odat.Container}  {odat.Booking}* ({ctext} {city})'
+    else:
+        if 'Export' in ht: return f'Load In: *{odat.Booking}  {odat.Container}* ({ctext} {city})'
+        if 'Import' in ht: return f'Empty In: *{odat.Container}* ({ctext} {city})'
+    return ''
 
 def Table_maker(genre):
     username = session['username'].capitalize()
@@ -516,11 +586,11 @@ def Table_maker(genre):
         holdvec = [''] * 50
         #print(f'labpassvec is {labpassvec}')
         entrydata = []
-        err = ['All is well']
+        #err = ['All is well']
         tablesetup = None
 
     #print(jscripts, holdvec)
-    err = erud(err)
+
     if returnhit is not None:
         checked_data = [0,'0',['0']]
 
@@ -533,15 +603,37 @@ def Table_maker(genre):
     #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
     putbuff = request.values.get('Paste Buffer')
-    if putbuff is not None:
-        print(f'Doing the paste buffer for {checked_data}')
-        sid = checked_data[0][2][0]
-        odat = Orders.query.get(sid)
-        ht = odat.HaulType
-        if 'Export' in ht:  pyperclip.copy(f'Empty Out: *{odat.Booking}*')
-        if 'Import' in ht:  pyperclip.copy(f'Load Out: *{odat.Container} {odat.Booking}*')
-        spam = pyperclip.paste()
+    if putbuff is not None and 'Orders' in tables_on:
+        print(f'Doing the paste buffer for {checked_data} {tables_on}')
+        sids = checked_data[0][2]
+        if sids != []:
+            if len(sids) <= 2:
+                if len(sids) == 2:
+                    #Determine which to do first
+                    sid1, sid2 = sids[0], sids[1]
+                    odat1 = Orders.query.get(sid1)
+                    odat2 = Orders.query.get(sid2)
+                    hstat1 = odat1.Hstat
+                    hstat2 = odat2.Hstat
+                    if hstat1 is None: hstat1 = -1
+                    if hstat2 is None: hstat2 = -1
+                    if hstat1 > hstat2:
+                        indat = odat1
+                        outdat = odat2
+                    else:
+                        indat = odat2
+                        outdat = odat1
+                    holdvec[45] = f'{get_dispatch(indat)}\n{get_dispatch(outdat)}'
+                else:
+                    sid = sids[0]
+                    odat = Orders.query.get(sid)
+                    holdvec[45] = get_dispatch(odat)
+            else:
+                err.append('Too many selections for paste buffer task')
+        else:
+            err.append('No selection made for paste buffer task')
 
+    err = erud(err)
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
 

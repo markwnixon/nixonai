@@ -85,6 +85,10 @@
 {{oder}}<br>
 {{modlink}}<br>
 {{ genre }}<br>
+{% if holdvec[45] %}
+    <textarea id="myInput"  rows="5" cols="40">{{ holdvec[45] }}</textarea>
+    <body onload="myFunction()">
+{% endif %}
 <input type = "hidden" name ="genre" value= "{{genre}}"><br>
 <input type = "hidden" name ="oder" value= "{{oder}}"><br>
 <input type = "hidden" name ="modlink" value= "{{modlink}}"><br>
