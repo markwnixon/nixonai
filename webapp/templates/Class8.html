@@ -8,7 +8,7 @@
         {% if viewport[0] == 'split panel left' %}
             <div class="col-sm-4">
                 {% if viewport[1] == 'email setup' %}
-                    Viewpot in use: {{ viewport[1] }}
+                    Viewport in use: {{ viewport[1] }}
                     {% set emaildata = holdvec[4] %}
                     {% include 'emailprep.html' %}
                 {% endif %}
@@ -68,6 +68,13 @@
                     {% else %}
                         {% include 'includes/_controlpanelheader.html' %}
                         {% include 'includes/_truckcolorcode.html' %}
+                        {% for db_data in table_data %}
+                            {% set thistable = tabletitle[loop.index - 1] %}
+                            <br>
+                            {% if thistable == 'Orders' %}
+                                {% include 'includes/_orders.html' %}
+                            {% endif %}
+                        {% endfor %}
                     {% endif %}
                 </div>
             </div>
@@ -85,10 +92,7 @@
 {{oder}}<br>
 {{modlink}}<br>
 {{ genre }}<br>
-{% if holdvec[45] %}
-    <textarea id="myInput"  rows="5" cols="40">{{ holdvec[45] }}</textarea>
-    <body onload="myFunction()">
-{% endif %}
+
 <input type = "hidden" name ="genre" value= "{{genre}}"><br>
 <input type = "hidden" name ="oder" value= "{{oder}}"><br>
 <input type = "hidden" name ="modlink" value= "{{modlink}}"><br>

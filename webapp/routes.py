@@ -290,6 +290,12 @@ def EasyStart():
     srcpath = statpath('')
     return render_template('easystart.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
+@app.route('/CalendarTest', methods=['GET', 'POST'])
+def CalendarTest():
+    print('Working the Calendar route!!')
+    srcpath = statpath('')
+    return render_template('CalendarTest3.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
+
 
 @app.route('/Reports', methods=['GET', 'POST'])
 @login_required
