@@ -217,10 +217,10 @@ def get_doclist(odat, dockind):
                             except:
                                 fexist[jx] = 0
                     else:
-                        try:
-                            packitems.append(addpath(f'tmp/{scac}/data/vGate/{idata[0].Source}'))
+                        if os.path.isfile(addpath(f'static/{scac}/data/vGate/{idata[0].Source}')):
+                            packitems.append(addpath(f'static/{scac}/data/vGate/{idata[0].Source}'))
                             fexist[jx] = 1
-                        except:
+                        else:
                             print('Single gate ticket does not exist')
     return fexist, packitems
 

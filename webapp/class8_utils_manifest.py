@@ -91,7 +91,7 @@ def get_sectors(ht, odat):
     order=str(odat.Order)
     pickup=str(odat.Pickup)
     date1=odat.Date
-    date2=odat.Date2
+    date2=odat.Date3
     type=odat.Type
 
     try:
@@ -106,7 +106,7 @@ def get_sectors(ht, odat):
     loaddatetime=date1s
     deliverdatetime=date2s
 
-    middle2 = ['Order', 'Pickup/ShipperID', 'PU Date/Time', 'DEL Date/Time']
+    middle2 = ['Order', 'Pickup/ShipperID', 'Gate Out', 'Delivery']
     middle2data = [order, pickup, loaddatetime, deliverdatetime]
 
     if hasvalue(ht):
@@ -274,14 +274,13 @@ def makemanifest(odat):
         top=top-dh
 
     # Date and JO boxes
+
     try:
-        sigdate = request.values.get('sigdate')
-        sigdate = datetime.datetime.strptime(sigdate,'%Y-%m-%d')
+        sigdate = odat.Date3
         sigdate = sigdate.strftime('%m/%d/%Y')
-        if sigdate is None:
-            sigdate=today
     except:
-        sigdate = today
+        sigdate=today
+
     dateline = m1 + 8.2 * dl
     c.setFont('Helvetica', 11, leading=None)
     c.rect(rtm-150, m1+7*dl, 150, 2*dl, stroke=1, fill=0)

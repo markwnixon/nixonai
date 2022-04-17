@@ -290,11 +290,26 @@ def EasyStart():
     srcpath = statpath('')
     return render_template('easystart.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
+
+#@app.route('/hello', methods=['GET', 'POST'])
+#def hello():
+
+    # POST request
+    #    if request.method == 'POST':
+    #       print('Incoming..')
+    #      print(request.get_json())  # parse as JSON
+    #      return 'OK', 200
+
+    # GET request
+    #   else:
+    #       message = {'greeting':'Hello from Flask!'}
+#       return jsonify(message)  # serialize and use JSON headers
+
 @app.route('/CalendarTest', methods=['GET', 'POST'])
 def CalendarTest():
     print('Working the Calendar route!!')
     srcpath = statpath('')
-    return render_template('CalendarTest3.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
+    return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
 
 @app.route('/Reports', methods=['GET', 'POST'])

@@ -422,6 +422,7 @@ def get_dispatch(odat):
 
 def get_custlist(table, tfilters):
     dtest = tfilters['Date Filter']
+    today = datetime.date.today()
     query_adds = []
     if dtest is not None and dtest != 'Show All':
         daysback = None
@@ -438,9 +439,12 @@ def get_custlist(table, tfilters):
         elif '180' in dtest:
             daysback = 180
         elif dtest == 'Last Year':
+            thisyear = today.year
+            lastyear = thisyear - 1
             fromdate = datetime.date(lastyear, 1, 1)
             todate = datetime.date(lastyear, 12, 31)
         elif dtest == 'This Year':
+            thisyear = today.year
             fromdate = datetime.date(thisyear, 1, 1)
         if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
         if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
@@ -459,6 +463,7 @@ def get_custlist(table, tfilters):
     custlist = []
     for odat in odata:
         shipper = odat.Shipper
+        if len(shipper) > 20: shipper = shipper[0:20]
         if shipper not in custlist: custlist.append(shipper)
     custlist.sort()
     custlist.append('Show All')
@@ -508,7 +513,7 @@ def Table_maker(genre):
             for filter in table_filters:
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
 
-            if 'Orders' in tables_on: table_filters[0]['Shipper'] = get_custlist('Orders', tfilters)
+            if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
         else:
 
@@ -545,16 +550,18 @@ def Table_maker(genre):
 
             # See if a table filter has been selected, this can take place even during a task
             for filter in table_filters:
-                for key, value in filter.items(): tfilters[key] = request.values.get(key)
-            if 'Orders' in tables_on: table_filters[0]['Shipper'] = get_custlist('Orders', tfilters)
+                for key, value in filter.items():
+                    tfilters[key] = request.values.get(key)
+                    print('check1',key,tfilters[key])
+            if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
             #Reset Pay and Haul Filters if Show All selected (no filter applied)
             if 'Pay Filter' in tfilters:
                 if tfilters['Pay Filter'] == 'Show All': tfilters['Pay Filter'] = None
             if 'Haul Filter' in tfilters:
                 if tfilters['Haul Filter'] == 'Show All': tfilters['Haul Filter'] = None
-            if 'Shipper' in tfilters:
-                if tfilters['Shipper'] == 'Show All': tfilters['Shipper'] = None
+            if 'Shipper Filter' in tfilters:
+                if tfilters['Shipper Filter'] == 'Show All': tfilters['Shipper Filter'] = None
             if 'Color Filter' in tfilters:
                 if tfilters['Color Filter'] == 'Haul' or tfilters['Color Filter'] == 'Invoice':
                     #Provide filter consistency: if an invoice filter is selected make sure invoice colors are shown:
@@ -584,10 +591,10 @@ def Table_maker(genre):
         #session['table_defaults'] = tables_on
         #session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
-        tfilters = {'Shipper': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
+        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
         jscripts = ['dtTrucking']
         taskon, task_iter, task_focus, tasktype = None, None, None, None
-        if 'Orders' in tables_on: table_filters[0]['Shipper'] = get_custlist('Orders', tfilters)
+        if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
 
     # Execute these parts whether it is a Post or Not:
@@ -596,16 +603,14 @@ def Table_maker(genre):
     genre_data['genre_tables_on'] = genre_tables_on
 
     #Apply shortcut for filters for various tasks
-    if invoicehit is not None: tfilters = {'Shipper': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': 'Uninvoiced', 'Haul Filter': 'Completed', 'Color Filter': 'Both'}
-    #print('class8_tasks.py 134 Tablemaker() Working table:',genre_data['table'])
-    #print('class8_tasks.py 135 Tablemaker() Its genre tables',genre_data['genre_tables'])
-    #print('class8_tasks.py 136 Tablemaker() Its genre tables on',genre_data['genre_tables_on'])
-    #print('class8_tasks.py 137 Tablemaker() container types',genre_data['container_types'])
-    #print('class8_tasks.py 138 Tablemaker() load types',genre_data['load_types'])
-    #print('class8_tasks.py 138 Tablemaker() haul types', genre_data['haul_types'])
+    if invoicehit is not None: tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': 'Uninvoiced', 'Haul Filter': 'Completed', 'Color Filter': 'Both'}
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
+
+    # Remove the checks during reset of tables
+    if resethit is not None:
+        for check in checked_data:  check[2] = []
 
     # Execute the task here if a task is on...,,,,
     if hasvalue(taskon):
@@ -790,7 +795,7 @@ def get_dbdata(table_setup, tfilters):
             itest = tfilters['Pay Filter']
             if itest is not None and itest != 'Show All' and 'Invoice' in filteron:
                 if itest == 'Uninvoiced':
-                    pfilter = f'{table}.Istat == None'
+                    pfilter = f'({table}.Istat == None)  | ({table}.Istat < 1)'
                 elif itest == 'Unrecorded':
                     pfilter = f'{table}.Istat == 1'
                 elif itest == 'Unpaid':
@@ -814,10 +819,10 @@ def get_dbdata(table_setup, tfilters):
                 query_adds.append(hfilter)
 
         print(tfilters,filteron)
-        if 'Shipper' in tfilters:
-            stest = tfilters['Shipper']
+        if 'Shipper Filter' in tfilters:
+            stest = tfilters['Shipper Filter']
             if stest is not None and stest != 'Show All' and 'Shipper' in filteron:
-                sfilter = f"{table}.Shipper == '{stest}'"
+                sfilter = f"{table}.Shipper.contains('{stest}')"
                 query_adds.append(sfilter)
 
     # Determine if haul filter applies to query:

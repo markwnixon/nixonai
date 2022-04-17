@@ -1,80 +1,83 @@
 <!doctype html>
 <html lang="en">
   <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=yes">
-      <meta http-equiv="x-ua-compatible" content="ie=edge">
-      <title>{{cmpdata[1]}}</title>
-      <!-- Font Awesome -->
-      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
-      <!-- Bootstrap core CSS -->
-      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-      <!-- Material Design Bootstrap -->
-      <link href="/static/css/mdb.min.css" rel="stylesheet">
-      <!-- Your custom styles (optional) -->
-      <link href="/static/css/style.css" rel="stylesheet">
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=yes">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>{{cmpdata[1]}}</title>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <!-- Bootstrap core CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+  <!-- Material Design Bootstrap -->
+  <link href="/static/css/mdb.min.css" rel="stylesheet">
+  <!-- Your custom styles (optional) -->
+  <link href="/static/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap">
+      <!-- MDB -->
+    <link rel="stylesheet" href="/static/css/mdb.min.css" />
+    <link rel="stylesheet" href="/static/css/calendar.min.css" />
 
-        <!-- MDBootstrap Datatables  -->
-        <link href="/static/css/addons/datatables.min.css" rel="stylesheet">
+<!-- MDBootstrap Datatables  -->
+<link href="/static/css/addons/datatables.min.css" rel="stylesheet">
+<style>
+.my-small-btn {
+    font-size: 10px;
+    width:70px;
+    padding:3px; !important;
+}
+.my-med-btn {
+    font-size: 12px;
+    width:90px;
+    padding:5px; !important;
+}
 
-    <style>
-    .my-small-btn {
-        font-size: 10px;
-        width:70px;
-        padding:3px; !important;
-    }
-    .my-med-btn {
-        font-size: 12px;
-        width:90px;
-        padding:5px; !important;
-    }
+.my-verysmall-btn {
+    font-size: 8px;
+    width:15px;
+    padding:1px; !important;
+}
 
-    .my-verysmall-btn {
-        font-size: 8px;
-        width:15px;
-        padding:1px; !important;
-    }
-
-    .my-calsmall-btn {
-        font-size: 10px;
-        width:100px;
-        padding:3px; !important;
-    }
-
-
-    table tr td{
-       font-size: 12px;
-       height: 12px;
-       padding:3px !important;
-    }
-
-    .table th, .table td {
-        border: 0px !important;
-    }
-
-    .droparea {
-      width: 200px;
-      height: 200px;
-      border-style: solid;
-      border-width: 3px;
-      border-color: red;
-      float: left;
-      line-height: 200px;
-      text-align: center;
-    }
-
-    #pics img {
-    position:absolute;
-    display: none;
-    }
+.my-calsmall-btn {
+    font-size: 10px;
+    width:100px;
+    padding:3px; !important;
+}
 
 
-    </style>
+table tr td{
+   font-size: 12px;
+   height: 12px;
+   padding:3px !important;
+}
+
+.table th, .table td {
+    border: 0px !important;
+}
+
+.droparea {
+  width: 200px;
+  height: 200px;
+  border-style: solid;
+  border-width: 3px;
+  border-color: red;
+  float: left;
+  line-height: 200px;
+  text-align: center;
+}
+
+#pics img {
+position:absolute;
+display: none;
+}
+
+
+</style>
 
     <title>Portal</title>
 </head>
-
     <body>
       {% set navbar = 'companysite/' + scac + '/navbar7.html' %}
       {% include navbar %}
@@ -502,100 +505,6 @@ $('.dataTables_length').addClass('bs-select');
 
 
 $('.file-upload').file_upload();
-
-
-
-const events = [
-  {
-    summary: 'JS Conference',
-    start: {
-      date: Calendar.moment.format('DD/MM/YYYY'),
-    },
-    end: {
-      date: Calendar.moment.format('DD/MM/YYYY'),
-    },
-    color: {
-      background: '#1266F1',
-      foreground: 'white',
-    },
-  },
-  {
-    summary: 'Vue Meetup',
-    start: {
-      date: Calendar.moment.add(1, 'day').format('DD/MM/YYYY'),
-    },
-    end: {
-      date: Calendar.moment.add(5, 'day').format('DD/MM/YYYY'),
-    },
-    color: {
-      background: '#00B74A',
-      foreground: 'white',
-    },
-  },
-  {
-    summary: 'Angular Meetup',
-    description: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur',
-    start: {
-      date: Calendar.moment.subtract(3, 'day').format('DD/MM/YYYY'),
-      dateTime: Calendar.moment.subtract(3, 'day').format('DD/MM/YYYY') + ' 10:00',
-    },
-    end: {
-      date: Calendar.moment.add(3, 'day').format('DD/MM/YYYY'),
-      dateTime: Calendar.moment.add(3, 'day').format('DD/MM/YYYY') + ' 14:00',
-    },
-    color: {
-      background: '#F93154',
-      foreground: 'white',
-    },
-  },
-  {
-    summary: 'React Meetup',
-    start: {
-      date: Calendar.moment.add(5, 'day').format('DD/MM/YYYY'),
-    },
-    end: {
-      date: Calendar.moment.add(8, 'day').format('DD/MM/YYYY'),
-    },
-    color: {
-      background: '#39C0ED',
-      foreground: 'white',
-    },
-  },
-  {
-    summary: 'Meeting',
-    start: {
-      date: Calendar.moment.add(1, 'day').format('DD/MM/YYYY'),
-      dateTime: Calendar.moment.add(1, 'day').format('DD/MM/YYYY') + ' 8:00',
-    },
-    end: {
-      date: Calendar.moment.add(1, 'day').format('DD/MM/YYYY'),
-      dateTime: Calendar.moment.add(1, 'day').format('DD/MM/YYYY') + ' 12:00',
-    },
-    color: {
-      background: '#1266F1',
-      foreground: 'white',
-    },
-  },
-  {
-    summary: 'Call',
-    start: {
-      date: Calendar.moment.add(2, 'day').format('DD/MM/YYYY'),
-      dateTime: Calendar.moment.add(2, 'day').format('DD/MM/YYYY') + ' 11:00',
-    },
-    end: {
-      date: Calendar.moment.add(2, 'day').format('DD/MM/YYYY'),
-      dateTime: Calendar.moment.add(2, 'day').format('DD/MM/YYYY') + ' 14:00',
-    },
-    color: {
-      background: '#FFA900',
-    },
-  }
-];
-
-const calendarElement = document.getElementById('calendar');
-const calendarInstance = Calendar.getInstance(calendarElement);
-calendarInstance.addEvents(events);
-
 
 
 </script>
