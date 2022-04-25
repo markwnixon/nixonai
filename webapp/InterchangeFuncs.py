@@ -366,7 +366,7 @@ def Order_Container_Update(oder):
     if jexport and pulled and returned:
         if ao.Release != ai.Release:
             odat.Booking = ai.Release
-            odat.BOL = ao.release
+            odat.BOL = ao.Release
         else:
             odat.BOL = ai.Release
         db.session.commit()
