@@ -660,11 +660,20 @@ def info_mimemail(emaildata):
 
     msg = MIMEMultipart()
     msg["From"] = emailfrom
-    msg["To"] = emailin1
-    emailto=[emailin1]
-    if emailcc1 is not None:
+    emailto=[]
+    if hasinput(emailin1):
+        msg["To"] = emailin1
+        emailto.append(emailin1)
+    if hasinput(emailin2):
+        msg["To"] = emailin2
+        emailto.append(emailin2)
+    if hasinput(emailcc1):
         msg["CC"] = emailcc1
         emailto.append(emailcc1)
+    if hasinput(emailcc2):
+        msg["CC"] = emailcc2
+        emailto.append(emailcc2)
+
     msg["Subject"] = etitle
 
     ebody = ebody.replace('\n', '<br>') + signature
