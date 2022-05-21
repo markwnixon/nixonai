@@ -226,8 +226,8 @@ def Whatapp():
 
     if 'Attachment' in line1 and len(lines)>1:
         file1 = lines[1].strip()
-        my_path = 'https://www.onestoplogisticsco.com/'
-        #my_path = 'http://12c157d5.ngrok.io/'
+        my_path = 'https://www.oslbox.com/'
+        #my_path = 'https://7223-2601-150-100-8c10-2928-d420-6968-460f.ngrok.io/'
         my_url = my_path + file1
         print('myurl = ',my_url)
         msg.media(my_url)
