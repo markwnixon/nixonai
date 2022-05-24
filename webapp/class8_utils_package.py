@@ -198,7 +198,7 @@ def get_doclist(odat, dockind):
                     print('Paid Invoice does not exist')
             if thisdoc == 'Gate Tickets':
                 idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
-                if idata is not None:
+                if idata:
                     if len(idata) > 1:
                         # Try to get a blended ticket
                         con = idata[0].Container

@@ -434,11 +434,16 @@ def set_desc(odat):
     if odat.Shipper == 'Global Business Link':
         bk1 = odat.Booking
         bk2 = odat.BOL
+        order = odat.Order
+        if 'outside' in order.lower() or 'george' in order.lower():
+            addon = order
+        else:
+            addon = ''
         if hasinput(bk2):
             if bk1 != bk2:
-                desc = f'{desc} Pulled under booking {bk2}'
+                desc = f'{desc} Pulled under booking {bk2} {addon}'
             else:
-                desc = f'{desc} In-Out booking match.'
+                desc = f'{desc} In-Out booking match. {addon}'
         else:
             # Have to double check the interchange tables
             idata = Interchange.query.filter(Interchange.Jo == odat.Jo).all()
@@ -446,7 +451,7 @@ def set_desc(odat):
                 idat1 = idata[0]
                 idat2 = idata[1]
                 if idat1.Release == idat2.Release:
-                    desc = f'{desc} In-Out booking match.'
+                    desc = f'{desc} In-Out booking match. {addon}'
                 else:
                     if 'In' in idat1.Type:
                         bkin = idat1.Release
@@ -454,7 +459,7 @@ def set_desc(odat):
                     else:
                         bkin = idat2.Release
                         bkout = idat1.Release
-                    desc = f'{desc} Pulled under booking {bkout}'
+                    desc = f'{desc} Pulled under booking {bkout} {addon}'
                     odat.BOL = bkout
                     odat.Booking = bkin
                     db.session.commit()
