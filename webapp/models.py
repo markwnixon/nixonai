@@ -210,6 +210,57 @@ class Tolls(db.Model):
         self.Amount = Amount
         self.Unit = Unit
 
+class Quoteinput(db.Model):
+    __tablename__='quoteinput'
+    id = db.Column('id', db.Integer, primary_key=True)
+    ph_driver = db.Column('ph_driver', db.Integer)
+    ph_insurance = db.Column('ph_insurance', db.Integer)
+    ph_total = db.Column('ph_total', db.Integer)
+    pm_fuel = db.Column('pm_fuel', db.Integer)
+    pm_repairs = db.Column('pm_repairs', db.Integer)
+    pm_other = db.Column('pm_other', db.Integer)
+    pm_fees = db.Column('pm_fees', db.Integer)
+    pm_total = db.Column('pm_total', db.Integer)
+    toll = db.Column('toll', db.Integer)
+    fuelpergal = db.Column('fuelpergal', db.Integer)
+    insurance_annual_truck = db.Column('insurance_annual_truck', db.Integer)
+    ga = db.Column('ga', db.Integer)
+    mpg = db.Column('mpg', db.Integer)
+    markup = db.Column('markup', db.Integer)
+    FSC= db.Column('FSC', db.Integer)
+    chassis2= db.Column('chassis2', db.Integer)
+    chassis3= db.Column('chassis3', db.Integer)
+    prepull= db.Column('prepull', db.Integer)
+    store= db.Column('store', db.Integer)
+    detention= db.Column('detention', db.Integer)
+    extrastop= db.Column('extrastop', db.Integer)
+    overweight = db.Column('overweight', db.Integer)
+    reefer = db.Column('reefer', db.Integer)
+    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer):
+        self.ph_driver = ph_driver
+        self.ph_insurance = ph_insurance
+        self.ph_total = ph_total
+        self.pm_fuel = pm_fuel
+        self.pm_repairs = pm_repairs
+        self.pm_other = pm_other
+        self.pm_fees = pm_fees
+        self.pm_total = pm_total
+        self.toll = toll
+        self.fuelpergal = fuelpergal
+        self.insurance_annual_truck = insurance_annual_truck
+        self.ga = ga
+        self.mpg = mpg
+        self.markup = markup
+        self.FSC = FSC
+        self.chassis2 = chassis2
+        self.chassis3 = chassis3
+        self.prepull = prepull
+        self.store = store
+        self.detention = detention
+        self.extrastop = extrastop
+        self.overweight = overweight
+        self.reefer = reefer
+
 class Chassis(db.Model):
     __tablename__ = 'chassis'
     id = db.Column('id', db.Integer, primary_key=True)

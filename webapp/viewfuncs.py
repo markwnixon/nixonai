@@ -1556,6 +1556,12 @@ def dataget_Q(thismuch):
         qdata = Quotes.query.filter(Quotes.Status == -1).all()
     elif thismuch == '5':
         qdata = Quotes.query.filter(Quotes.Status != -1).all()
+    elif thismuch == '6':
+        print('thismuch6')
+        qdata = Quotes.query.filter(Quotes.Status != -1).order_by(Quotes.id.desc()).limit(20).all()
+    elif thismuch == '7':
+        stopdate = today-datetime.timedelta(days=1)
+        qdata = Quotes.query.filter( (Quotes.Status != -1) & (Quotes.Date > stopdate) ).all()
     else:
         stopdate = today - datetime.timedelta(days=10)
         qdata = Quotes.query.filter( (Quotes.Status != -1) & (Quotes.Date > stopdate) ).all()

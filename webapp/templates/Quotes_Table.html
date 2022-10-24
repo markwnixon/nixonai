@@ -1,0 +1,84 @@
+<div class="row">
+<div class="col-sm-12" align="center">
+{% include 'includes/_tablespanelQ.html' %}
+</div>
+</div>
+  <div class="row">
+    <div class="col-sm-12">
+        <table id="dtHorizontalVerticalExample7" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+            <thead>
+            <tr class="amber lighten-4 text-center" >
+                <th style="font-weight:bold">Box</th>
+                <th style="font-weight:bold">ID</th>
+                <th style="font-weight:bold">Date</th>
+                <th style="font-weight:bold">From</th>
+                <th style="font-weight:bold">Subject</th>
+                <th style="font-weight:bold">To Location</th>
+                <th style="font-weight:bold">Amount</th>
+                <th style="font-weight:bold">QuotedBy</th>
+                <th style="font-weight:bold">QuotedOn</th>
+                <th style="font-weight:bold">Status</th>
+
+
+            </tr>
+            </thead>
+            <tbody>
+            {% for data in qdata %}
+
+                {% set a = data.Status  %}
+                {% if a==3 %}
+                    {% set atc1="green text-white font-weight-bold" %}
+                {% elif a==2 %}
+                    {% set atc1="amber font-weight-bold" %}
+                {% elif a==1 %}
+                    {% set atc1="white text-primary font-weight-bold" %}
+                {% elif a == -1 %}
+                    {% set atc1="yellow font-weight-bold" %}
+                {% else %}
+                    {% set atc1="font-weight-bold" %}
+                {% endif %}
+
+                {% if data.id == quot|int %}
+                    {% set atc1="red text-white font-weight-bold" %}
+                {% endif %}
+                {% if data.Subject|length > 40 %}
+                    {% set tit = data.Subject[0:39] %}
+                {% else %}
+                    {% set tit = data.Subject %}
+                {% endif %}
+
+                {% if data.Location %}
+                    {% if data.Location|length > 20 %}
+                        {% set loc = data.Location[0:19] %}
+                    {% else %}
+                        {% set loc = data.Location %}
+                    {% endif %}
+                {% else %}
+                    {% set loc=' ' %}
+                {% endif %}
+
+
+            <tr>
+                <td align="center" >
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input type="radio" {% if data.id == quot|int %} checked {% endif %} class="form-check-input"  name="optradio" id="quot{{data.id}}" value="{{data.id}}" onchange="this.form.submit()">{{ '>>' }}
+                        </label>
+                    </div>
+
+                </td>
+                <td align="center" class="{{atc1}}">{{ data.id }}</td>
+                <td align="center" class="{{atc1}}">{{ data.Date }}</td>
+                <td align="left" class="{{atc1}}">{{ data.From }}</td>
+                <td align="left" class="{{atc1}}">{{ tit }}</td>
+                <td align="center" class="{{atc1}}">{{ loc }}</td>
+                <td align="center" class="{{atc1}}">{{ data.Amount }}</td>
+                <td align="center" class="{{atc1}}">{{ data.Responder }}</td>
+                <td align="center" class="{{atc1}}">{{ data.RespDate }}</td>
+                <td align="center" class="{{atc1}}">{{ data.Status }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

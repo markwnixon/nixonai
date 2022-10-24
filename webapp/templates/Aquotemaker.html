@@ -1,0 +1,353 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<form action="{{ url_for ('QuoteMaker') }}" method="post">
+<div class="table-responsive">
+<div class="row">
+
+{% set etype = 'Quote' %}
+
+{% if taskbox == 1 or taskbox == 5%}
+        <div class="col-sm-4" align="left">
+            {% include 'includes/emailprep.html' %}
+
+            <div class="card" align=""left">
+                <div class = "card-header">
+                    Preview
+                </div>
+                <div class="card-body">
+                {{ emaildata[1]|safe }}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-4" align="left">
+        <br>
+        {% if expdata %}
+            <div class="card">
+              <div class="card-header">
+                Experienced-Based Cost Rates <button type="submit" class="btn btn-elegant btn-sm" name="newcosts">Update Costs</button><button type="submit" class="btn btn-blue btn-sm" name="oldcosts">Return to Default</button>
+              </div>
+            <div class="card-body">
+                <table class="table table-condensed">
+                    <tbody>
+                  <tr>
+                      <td><b>Driver Rate</b></td><td><b>Fuel</b></td><td><b>MPG</b></td><td><b>Truck Insurance</b></td><td><b>Mark-Up</b></td>
+                  </tr>
+                      <td>$/hr(full burden)</td><td>$/gal</td><td>miles/gal</td><td>$/year each truck</td><td>xcost factor</td>
+                 </tr>
+                  <tr>
+                      <td><input class="form-control" type="text" name='driver' value={{ expdata[0] }}></td>
+                      <td><input class="form-control" type="text" name='fuel' value={{ expdata[1] }}></td>
+                      <td><input class="form-control" type="text" name='mpg' value={{ expdata[2] }}></td>
+                      <td><input class="form-control" type="text" name='insurance' value={{ expdata[3] }}></td>
+                      <td><input class="form-control" type="text" name='markup' value={{ expdata[4] }}></td>
+                 </tr>
+                  <tr>
+                      </td><td><b>Toll Rate</b></td><td><b>G&A Rate</b></td><td><b>R&M Rate</b></td><td><b>LicFeeReg Rate</b></td><td><b>Other</b></td>
+                  </tr>
+                      <td>5-axle rate</td><td>%</td><td>$/mile</td><td>$/mile</td><td>$/mile</td>
+                 </tr>
+                  <tr>
+                      <td><input class="form-control" type="text" name='toll' value={{ expdata[5] }}></td>
+                      <td><input class="form-control" type="text" name='gapct' value={{ expdata[6] }}></td>
+                      <td><input class="form-control" type="text" name='rm' value={{ expdata[7] }}></td>
+                      <td><input class="form-control" type="text" name='fees' value={{ expdata[8] }}></td>
+                      <td><input class="form-control" type="text" name='other' value={{ expdata[9] }}></td>
+                 </tr>
+                  <tr>
+                      <td><b>Fuel Rate</b></td><td><b>Insur Rate</b></td><td><b>Total per Mile</b></td><td><b>Total per Hour</b></td><td>&nbsp</td>
+                  </tr>
+                      <td>$/mile</td><td>$/hr</td><td>$/mile</td><td>$/hour</td><td>&nbsp</td>
+                 </tr>
+                  <tr>
+
+                      <td><input class="form-control" type="text" placeholder={{ expdata[10] }} disabled></td>
+                      <td><input class="form-control" type="text" placeholder={{ expdata[11] }} disabled></td>
+                      <td><input class="form-control" type="text" placeholder={{ expdata[12] }} disabled></td>
+                      <td><input class="form-control" type="text" placeholder={{ expdata[13] }} disabled></td>
+                      <td>&nbsp</td>
+                 </tr>
+                </tbody>
+            </table>
+            </div></div>
+
+            <div class="card">
+              <div class="card-header">
+                Accessorial Fees <button type="submit" class="btn btn-elegant btn-sm" name="newfees">Update Fees</button>
+              </div>
+            <div class="card-body">
+                <table class="table table-condensed table-hover">
+                    <tbody>
+                  <tr>
+                      <td><b>FSC</b></td><td><b>Tandem</b></td><td><b>Triaxle</b></td><td><b>Prepull</b></td><td><b>Yard</b></td>
+                  </tr>
+                      <td><b>pct</b></td><td><b>Chassis</b></td><td><b>Chassis</b></td><td><b>Fee</b></td><td><b>Storage</b></td>
+                 </tr>
+                  <tr>
+                      <td><input class="form-control" type="text" name='fsc' value={{ expdata[14] }}></td>
+                      <td><input class="form-control" type="text" name='chassis2' value={{ expdata[15] }}></td>
+                      <td><input class="form-control" type="text" name='chassis3' value={{ expdata[16] }}></td>
+                      <td><input class="form-control" type="text" name='prepull' value={{ expdata[17] }}></td>
+                      <td><input class="form-control" type="text" name='store' value={{ expdata[18] }}></td>
+                 </tr>
+                  <tr>
+                      </td><td><b>Driver</b></td><td><b>Extra</b></td><td><b>Overweight</b></td><td><b>Reefer</b></td><td></td>
+                  </tr>
+                      <td><b>Detention</b></td><td><b>Stop</b></td><td><b>Fee</b></td><td><b>Fee</b></td><td></td>
+                 </tr>
+                  <tr>
+                      <td><input class="form-control" type="text" name='detention' value={{ expdata[19] }}></td>
+                      <td><input class="form-control" type="text" name='extrastop' value={{ expdata[20] }}></td>
+                      <td><input class="form-control" type="text" name='overweight' value={{ expdata[21] }}></td>
+                      <td><input class="form-control" type="text" name='reefer' value={{ expdata[22] }}></td>
+                      <td></td>
+                 </tr>
+
+                </tbody>
+            </table>
+            </div></div>
+        {% endif %}
+        <br>
+        {% if timedata %}
+            <div class="card">
+              <div class="card-header">
+                Time and Distance Calculations for Load Quote
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                    <tbody>
+                  <tr>
+                      <td> </td><td><b>Round Trip</b></td><td><b>Port</b></td><td><b>Load</b></td><td><b>Handling</b></td><td><b>Total</b></td>
+                  </tr>
+                  <tr>
+                      <td>Time (hours)</td><td>{{ timedata[0] }}</td><td>{{ timedata[1] }}</td><td>{{ timedata[2] }}</td><td>{{ timedata[3] }}</td><td>{{ timedata[4] }}</td>
+                 </tr><tr>
+                      <td>Dist (miles)</td><td>{{ distdata[0] }}</td><td>{{ distdata[1] }}</td><td>{{ distdata[2] }}</td><td>{{ distdata[3] }}</td><td>{{ distdata[4] }}</td>
+                 </tr>
+                </tbody>
+            </table>
+             </div></div>
+        {% endif %}
+        <br>
+        {% if costdata %}
+                <div class="card">
+              <div class="card-header">
+                Cost Component Calculations for Load Quote
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                    <tbody>
+                  <tr>
+                      <td><b>Driver Cost</b></td><td><b>Fuel Cost</b></td><td><b>Toll Cost</b></td><td><b>Insurance</b></td><td><b>R&M Cost</b></td><td><b>Fees/Other Cost</b></td><td><b>G&A Cost</b></td>
+                  </tr>
+                      <td>{{ costdata[0] }}</td><td>{{ costdata[1] }}</td><td>{{ costdata[2] }}</td><td>{{ costdata[3] }}</td><td>{{ costdata[4] }}</td><td>{{ costdata[5] }}</td><td>{{ costdata[6] }}</td>
+                 </tr>
+                 <tr>
+                </tbody>
+            </table> </div></div>
+        {% endif %}
+        <br>
+        {% if biddata %}
+                <div class="card">
+              <div class="card-header">
+                Total Cost and Bids
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                <tbody>
+
+                  <tr>
+                      <td><font size = "0"><b>Total Cost</b></font></td><td><font size = "0"><b>Bid (Live Load)</b></font></td><td><font size = "0"><b>Bid (Drop-Return)</b></font></td>
+                      <td><font size = "0"><b>Bid (Drop-Pick)</b></font></td><td><font size = "0"><b>Bid+{{ expdata[14] }}% FSC</b></font></td>
+                  </font></tr>
+                  <td><font size = "+1"><b>{{ costdata[8] }}</b></font></td><td><font size = "+1"><b>{{ biddata[0] }}</b></font></td><td><font size = "+1"><b>{{ biddata[1] }}</b></font></td>
+                  <td><font size = "+1"><b>{{ biddata[2] }}</b></font></td><td><font size = "+1"><b>{{ biddata[3] }}</b></font></td>
+                 </tr>
+                 <tr>
+
+                </tbody>
+            </table> </div></div>
+        {% endif %}
+        {% if dirdata %}
+                <div class="card">
+              <div class="card-header">
+               Detailed Directions
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                <tbody>
+                {% for dirline in dirdata %}
+                    {% if 'Toll' in dirline %}
+                     {% set atc1="amber" %}
+                    {% else %}
+                    {% set atc1 = "white" %}
+                    {% endif %}
+                  <tr>
+                    <td class="{{atc1}}">{{ dirline | safe }}</td>
+                 </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div></div>
+        {% endif %}
+        </div>
+{% else %}
+    <div class="col-sm-8" align="center">
+        {% include 'Quotes_Table.html' %}
+    </div>
+
+{% endif %}
+
+{% if taskbox != 1 and taskbox != 5  %}
+    <br>
+    <div class="col-sm-4" align="left">
+    <br><br>
+        <div class="card" align=""left">
+            <div class = "card-header">
+                Quick Preview
+            </div>
+            <div class="card-body">
+                {% if qdat %}
+                    From:  {{ qdat.From|safe }}<br>
+                    Subject:  {{ qdat.Subject|safe }}<br><br>
+                    Body: {{ ebodytxt|safe }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% else %}
+
+    <div class="col-sm-4" align="left">
+    <br>
+        <div class="card">
+          <div class="card-header">
+            Enter Data for Quote
+          </div>
+        <div class="card-body">
+        <table>
+              <tr>
+                  <td align="right"> <b>To Location: &nbsp</b></td>
+                  <td colspan="3"><textarea class="form-control" type="text" name="locto" rows="2">{{locto}}</textarea></td>
+             </tr>
+              <tr>
+                  <td align="right"> <b>From Location: &nbsp</b></td>
+                  <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
+             </tr>
+            {% set types = [' Live', ' Drop-Return', ' Drop-Pick', ' FSC Live'] %}
+             {%  for jx in range(1,5) %}
+                 {% if tbox[6+loop.index]=='on' %}
+                  <tr>
+                      <td align="right"> <b>Bid/Override{{ types[loop.index-1] }}: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="bidthis{{ loop.index-1 }}" rows="1">{{bidthis[jx-1]}}</textarea></td>
+                 </tr>
+                 {% endif %}
+             {% endfor %}
+              <tr>
+                  <td align="right"> <b>Salutation Name/Override: &nbsp</b></td>
+                  <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
+             </tr>
+        </table>
+
+
+
+           <br>
+            Check accessorial items that apply:<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box1" {% if tbox[0]=='on' %} checked {% endif %} name="tbox0">
+              <label class="custom-control-label" for="box1">Chassis 2-axle</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box2" {% if tbox[1]=='on' %} checked {% endif %} name="tbox1">
+              <label class="custom-control-label" for="box2">Chassis 3-axle</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box3" {% if tbox[2]=='on' %} checked {% endif %} name="tbox2">
+              <label class="custom-control-label" for="box3">Prepull</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box4" {% if tbox[3]=='on' %} checked {% endif %} name="tbox3">
+              <label class="custom-control-label" for="box4">Yard Storage</label>
+            </div>
+        <br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box5" {% if tbox[4]=='on' %} checked {% endif %} name="tbox4">
+              <label class="custom-control-label" for="box5">Overweight</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box6" {% if tbox[5]=='on' %} checked {% endif %} name="tbox5">
+              <label class="custom-control-label" for="box6">Extra Stop</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box7" {% if tbox[6]=='on' %} checked {% endif %} name="tbox6">
+              <label class="custom-control-label" for="box7">Reefer</label>
+            </div>
+         <br><br>
+
+        Check bid type to set up email (defaults to live):<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box8" {% if tbox[7]=='on' %} checked {% endif %} name="tbox7">
+              <label class="custom-control-label" for="box8">Live</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box9" {% if tbox[8]=='on' %} checked {% endif %} name="tbox8">
+              <label class="custom-control-label" for="box9">Drop-Return</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box10" {% if tbox[9]=='on' %} checked {% endif %} name="tbox9">
+              <label class="custom-control-label" for="box10">Drop-Pick</label>
+            </div>
+        <br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box11" {% if tbox[10]=='on' %} checked {% endif %} name="tbox10">
+              <label class="custom-control-label" for="box11">FSC Live</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box12" {% if tbox[11]=='on' %} checked {% endif %} name="tbox11">
+              <label class="custom-control-label" for="box12">Multiple Loads</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box13" {% if tbox[12]=='on' %} checked {% endif %} name="tbox12">
+              <label class="custom-control-label" for="box13">Mix 20-40</label>
+            </div>
+        <br><br>
+                Indicate capacity:<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box14" {% if tbox[13]=='on' %} checked {% endif %} name="tbox13">
+              <label class="custom-control-label" for="box14">Immediate</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box15" {% if tbox[14]=='on' %} checked {% endif %} name="tbox14">
+              <label class="custom-control-label" for="box15">Next Week</label>
+            </div>
+            <br><br>
+             <button type="submit" class="btn btn-elegant btn-sm" name="GetQuote">Update<br>Quote</button>
+             <button type="submit" class="btn btn-elegant btn-sm" name="Update">Override<br>Bid/Name</button>
+             <button type="submit" class="btn btn-green btn-sm" name="UpdateE">Override<br>Email</button>
+             <button type="submit" class="btn btn-green btn-sm" name="Email">Email<br>Quote</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="Return">Return To<br>Table</button>
+
+        </div></div>
+
+
+        <div class="card" align="left">
+            <div class = "card-header">
+                Email Request
+                <input type = "hidden" name ="quotpass" value= "{{quot}}">
+                <input type = "hidden" name ="thismuch" value= "{{thismuch}}">
+                <input type = "hidden" name ="taskbox" value= "{{taskbox}}">
+            </div>
+            <div class="card-body" align=""left">
+                {% if qdat %}
+                    From:  {{ qdat.From|safe }}<br>
+                    Subject:  {{ qdat.Subject|safe }}<br><br>
+                    {{ qdat.Body|safe }}
+                {% endif %}
+
+            </div>
+        </div>
+{% endif %}
+
+
+</form>
+{% endblock %}

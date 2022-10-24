@@ -486,8 +486,8 @@ def make_default_invoice(odat, tablesetup):
         db.session.add(input)
         input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Chassis',Description='Predefined Agreement',Ea=75.00,Qty=1.00,Amount=75.00,Total=425.00,Date=today,Original=None,Status='New')
         db.session.add(input)
-        odat.Amount = d2s('350.00')
-        odat.InvoTotal = d2s('425.00')
+        odat.Amount = d2s('370.00')
+        odat.InvoTotal = d2s('445.00')
         db.session.commit()
 
         odat = Orders.query.get(sid)
@@ -499,7 +499,7 @@ def make_default_invoice(odat, tablesetup):
         docref = os.path.basename(docref)
         odat.Invoice= docref
         odat.Istat = 1
-        odat.BalDue = d2s('$425.00')
+        odat.BalDue = d2s('$445.00')
         odat.Payments = '0.00'
 
         for ldat in ldata:

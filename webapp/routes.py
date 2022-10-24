@@ -311,6 +311,13 @@ def CalendarTest():
     srcpath = statpath('')
     return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
+@app.route('/QuoteMaker', methods=['GET', 'POST'])
+def QuoteMaker():
+    from iso_Q import isoQuote
+    bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, dirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt = isoQuote()
+    return render_template('Aquotemaker.html', cmpdata=cmpdata, scac=scac, costdata = costdata, biddata=biddata, expdata = expdata, timedata = timedata,
+                           distdata = distdata, locto=locto, locfrom=locfrom, emaildata = emaildata, dirdata=dirdata, qdata = qdata, bidthis=bidthis, taskbox=taskbox, thismuch=thismuch, quot=quot, qdat=qdat, bidname=bidname, tbox=tbox, ebodytxt=ebodytxt)
+
 
 @app.route('/Reports', methods=['GET', 'POST'])
 @login_required
