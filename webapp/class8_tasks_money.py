@@ -489,7 +489,18 @@ def make_default_invoice(odat, tablesetup):
         odat.Amount = d2s('370.00')
         odat.InvoTotal = d2s('445.00')
         db.session.commit()
+    if '45' in odat.Type:
+        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Line Haul',Description='Drayage to Seagirt',Ea=370.00,Qty=1.00,Amount=370.00,Total=470.00,Date=today,Original=None,Status='New')
+        db.session.add(input)
+        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Chassis',Description='Predefined Agreement',Ea=75.00,Qty=1.00,Amount=75.00,Total=470.00,Date=today,Original=None,Status='New')
+        db.session.add(input)
+        input = Invoices(Jo=jo, SubJo=None, Pid=pid, Service='Added Charge', Description='45FT add-on',Ea=25.00, Qty=1.00, Amount=25.00, Total=470.00, Date=today, Original=None, Status='New')
+        db.session.add(input)
+        odat.Amount = d2s('370.00')
+        odat.InvoTotal = d2s('470.00')
+        db.session.commit()
 
+    if '40' in odat.Type or '45' in odat.Type:
         odat = Orders.query.get(sid)
         ldata = Invoices.query.filter(Invoices.Jo == jo).order_by(Invoices.Ea.desc()).all()
         pdata1 = People.query.filter(People.id == odat.Bid).first()
@@ -499,7 +510,8 @@ def make_default_invoice(odat, tablesetup):
         docref = os.path.basename(docref)
         odat.Invoice= docref
         odat.Istat = 1
-        odat.BalDue = d2s('$445.00')
+        if '40' in odat.Type: odat.BalDue = d2s('$445.00')
+        if '45' in odat.Type: odat.BalDue = d2s('$470.00')
         odat.Payments = '0.00'
 
         for ldat in ldata:
