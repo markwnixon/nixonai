@@ -1,0 +1,111 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+
+<div class="table-responsive">
+
+            <div class="container">
+                <div class="jumbotron">
+                    <div class="row"><div class="col-sm-12"><h3>Ocean/Air Shipping Calculator </h3></div></div>
+
+                    <div class="row">
+                        <div class="col-sm-4">
+
+                        <div class="card" style="width: 16rem;">
+                        <img class="card-img-top" src="{{srcpath}}pics/ocfreight.png" alt="ocfreight.png">
+                        <div class="card-body">
+                        <p class="card-text">Ocean shipping estimates are based on cubic meters.  This simple calculator takes your input in any selected dimension and gives you the total volume in cubic meters.  You must then round up to nearest whole value.</p>
+                            Air shipping estimates are based on volumetric weight.  The calculator provides the volumetric weight in the specified units.  If volume weight is less than actual weight then the actual weight must be used.</p>
+                        </div></div></div>
+
+
+
+                        <div class="col-sm-5">
+
+                        <form action="{{ url_for ('Calculator') }}" method="post">
+
+                        <div class="card">
+
+                          <label>Input Dimensions are:</label>
+                          <select class="form-control col-sm-5" type="text" name="unt" >
+                            <option {% if a6 == 1 %} selected {% endif %} value="1">inches</option>
+                            <option {% if a6 == 2 %} selected {% endif %} value="2">feet</option>
+                            <option {% if a6 == 3 %} selected {% endif %} value="3">centimeters</option>
+                          </select>
+                          <br>
+                                <label>Output Volumetric Weight:</label>
+                                    <select class="form-control col-sm-5" type="text" name="wtunt">
+                                    <option {% if a7 == 1 %} selected {% endif %} value="1">lbs</option>
+                                    <option {% if a7 == 2 %} selected {% endif %} value="2">kg</option>
+                                    </select>
+                          <br>
+
+                            {% if a6==1 %}{% set lunit='in' %}{% endif %}
+                            {% if a6==2 %}{% set lunit='ft' %}{% endif %}
+                            {% if a6==3 %}{% set lunit='cm' %}{% endif %}
+                            {% if a7==1 %}{% set wunit='lbs' %}{% endif %}
+                            {% if a7==2 %}{% set wunit='kg' %}{% endif %}
+
+    <table>
+      <tr>
+        <td>Length:</td>
+        <td><input class= "form-control form-fixer" type="text" name="len" {% if not a1 %} value="1" {% else %} value={{ a1 }} {% endif %}></td>
+        <td>Width:</td>
+        <td><input  type="text" Class="form-control form-fixer" name="wid" {% if not a2 %} value="1" {% else %} value={{ a2 }} {% endif %}></td>
+        <td>Height:</td>
+        <td><input  type="text" Class="form-control form-fixer" name="hei" {% if not a3 %} value="1" {% else %} value={{ a3 }} {% endif %}></td>
+      </tr>
+  </table>
+  <br>
+  <table>
+    <tr>
+      <td>Cost per Unit of Vol/Wt:</td>
+      <td><input  type="text" Class="form-control form-fixer" name="cst" {% if not b1 %} value="$25" {% else %} value="${{ b1 }}" {% endif %} ></td>
+      <td><button type="submit" class="btn btn-elegant" name="Submit">Submit</button></td>
+    </tr>
+  </table>
+    <input  type="hidden" name="alldata" value='{{ alldata }}'>
+    </div>
+                            </form>
+<br>
+
+Your total volume is: <b>{% if not a4 %} 1.0 {% else %}{{ a4 }} {% endif %}</b> cubic meters.<br>
+For air-shipping:<br> Volumetric weights are: <b>{{wtkg}}</b>kg or <b>{{wtlb}}</b>lb.<br>
+
+For sea-shipping:<br> The cost estimate is based on: <b>{% if not a5 %} 1.0 {% else %}{{ a5 }} {% endif %}</b>
+    cubic meters<br>
+    Ocean shipping (only) costs about <b> {% if b1 %} {{ '${:,.2f}'.format(b2) }} {% else %} $25.00 {% endif %}</b> for this volume.<br><br>
+
+    Note: Volume of various standard containers (Hapag-Lloyd data):<br>
+    20 ft container:    33.2 cubic meters <br>
+    40 ft container:    67.7 cubic meters (standard) <br>
+    40 ft hq container: 76.3 cubic meters<br>
+    45 ft hq container: 86.0 cubic meters
+
+                        </div>
+
+    <div class="col-sm-3">Results for this Visit:
+    {% if alldata %}
+<table>
+    <tr>
+    <td align="center"> Length </td><td align="center"> Width </td><td align="center"> Height </td><td align="center"> Weight </td>
+    </tr>
+    <tr>
+    <td align="center">({{lunit}})</td><td align="center">({{lunit}})</td><td align="center">({{lunit}})</td><td align="center">({{wunit}})</td>
+    </tr>
+        {% for j in range(alldata|length) %}
+        {% set data = alldata[j] %}
+    <tr>
+    <td align="center">{{data[0]}}</td><td align="center">{{data[1]}}</td><td align="center">{{data[2]}}</td><td align="center">{{data[3]}}</td>
+    </tr>
+        {% endfor %}
+    <tr><td align="right" colspan="3"><b>Total Weight:</b></td><td align="right"><b>{{finalwt}}</b></td></tr>
+    <tr><td align="right" colspan="3"><b>Total Cost:</b></td><td align="right"><b>${{finalcost}}</b></td></tr>
+        </table>
+    {% endif %}
+                        </div></div></div></div></div>
+
+
+
+
+{% endblock %}

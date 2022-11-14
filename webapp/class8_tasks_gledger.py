@@ -197,6 +197,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             pid=odat.Bid
             #date = odat.PaidDate
             co = get_company(pid)
+            print(f'Attempting to adb {acctdb} and {cc}')
 
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first()
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first()

@@ -1,0 +1,149 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+
+<div class="table-responsive">
+            <div class="container">
+                <div class="jumbotron">
+
+    <div class="row"><div class="col-sm-12" align="center"><h3>Employment Opportunities </h3></div></div>
+    <div class = "row"><div class="col-sm-12" align="center">&nbsp;</div></div>
+
+
+    <div class="row">
+        <div class="col-sm-4">
+                <div class="col d-flex justify-content-center">
+
+                    <div class="card" style="width: 14rem;">
+                    <img class="card-img-top" src="{{ srcpath }}pics/truckdriver.jpg" alt="truckdriver.jpg">
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">Positions Available:</li>
+                            <li class="list-group-item">Local Truck Driver</li>
+                            <li class="list-group-item">Download or Fill Out Form</li>
+
+                        <li class="list-group-item">
+                           <a class="card-link" href="{{ srcpath }}pics/DriverAPPLICATION.pdf" download>
+                            <img src="{{ srcpath }}pics/download.png" height="40px"/></a>
+                            </ul>
+
+                        </div></div>
+
+                </div>
+
+        </div>
+        <div class="col-sm-8">
+
+          <div class = "row"><div class="col-sm-12" align="center">Driver Quick Online Application</div></div>
+          <div class = "row"><div class="col-sm-12" align="center">&nbsp;</div></div>
+
+
+          <div class = "row">
+            {% if ptype=='completed' %} <div class="col-sm-6"> Thank you for submitting your application with us.  Your information has been transmitted successfully and your application confirmation number is {{appnum}}.
+            We will be in touch with you shortly.</div>
+            {% else %}
+
+
+            <div class="col-sm-6"><form action="{{ url_for ('People_Forms') }}" method="post">
+
+
+                    <table>
+                    <tbody>
+                    <tr>
+                        <td> <div class="input-group-text" align="right">First Name</div></td>
+                        <td><input class="form-control" type="text" name="fname"></td>
+                    </tr>
+                    <tr>
+                        <td align="right"> <div class="input-group-text">Last Name</div></td>
+                        <td><input class="form-control" type="text" name="lname" value=""></td>
+                    </tr>
+                    <tr>
+                        <td> <div class="input-group-text">Street Addr</div></td>
+                        <td><input class="form-control" type="text" name="addr1" value=""></td>
+                    </tr>
+                    <tr>
+                        <td align="right"> <div class="input-group-text">City/State</div></td>
+                        <td><input class="form-control" type="text" name="addr2" value=""></td>
+                    </tr>
+                    <tr>
+                        <td> <div class="input-group-text">CDL Number</div></td>
+                        <td><input class="form-control" type="text" name="tid" value=""></td>
+                    </tr>
+                    <tr>
+                        <td align="right"> <div class="input-group-text">CDL State</div></td>
+                        <td><input class="form-control" type="text" name="idtype" value=""></td>
+                    </tr>
+
+
+                    </tbody></table>
+
+
+            </div>
+
+            <div class="col-sm-6">
+                    <table>
+                    <tbody>
+                    <tr>
+                        <td align="right"> <div class="input-group-text">Telephone</div></td>
+                        <td><input class="form-control" type="text" name="tel" value=""></td>
+                    </tr>
+                    <tr>
+                        <td> <div class="input-group-text">Email</div></td>
+                        <td><input class="form-control" type="text" name="email" value=""></td>
+                    </tr>
+                    <tr>
+                        <td> <div class="input-group-text">TWIC Card Expires</div></td>
+                        <td><input class="form-control" type="text" name="assoc1" value=""></td>
+                    </tr>
+                    <tr>
+                        <td align="right"> <div class="input-group-text">Medical Expires</div></td>
+                        <td><input class="form-control" type="text" name="assoc2" value=""></td>
+                    </tr>
+                    <tr>
+                        <td> <div class="input-group-text"> Years Experience</div></td>
+                        <td><input class="form-control" type="text" name="yrs" value=""></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" align="center"><input type="submit" name='driver' value="Submit Application"></td>
+                    </tr>
+
+                    </tbody></table>
+
+            </div></div>
+
+            <div class = "row"><div class="col-sm-12" align="center">&nbsp;</div></div>
+            <div class = "row">
+
+            <div class="col-sm-12">
+
+                          <div class="card">
+                            <div class="card-body">
+                              <h5 class="card-title text-danger">Application Instructions:</h5>
+                              <ul class="list-group list-group-flush">
+                                <li class="list-group-item">Download the pdf file if you wish to fill out the application
+                                  on paper.
+                                <li class="list-group-item">
+                                  Otherwise, please fill out the Quick Summary Application above.  This
+                                  will provide us basic information to assess your fit with our current openings.</li>
+                                <li class="list-group-item">
+                                  You may follow up the application process by calling us at {{phone}}.  We will also attempt to contact you via the email and/or phone number you provide.</li>
+                                  <li class="list-group-item">
+                                  What we will need to complete your application:  Under DOT/FMCSA and Insurance requirements we must assess your past expereience and have you approved for work under our insurance.  To do this we will need scanned copies of your CDL, your Medical Card, and your Driving Record.  Please plan to provide us those items either in person or via email at <a href="mailto:{{email}}">{{email}}</a></li>
+                              </ul>
+                            </div>
+                            <div class="card-footer text-center">
+                              <small class="text-muted">Last Updated on {{today}}</small>
+                            </div>
+                          </div>
+
+
+
+              </div>
+              </div>
+              </div>
+
+    {% endif %}
+
+            </div>
+          </div></div></div></div>
+{% endblock %}

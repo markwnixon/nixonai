@@ -1,7 +1,7 @@
 from flask import render_template, flash, redirect, url_for, session, logging, request, jsonify
 
 from webapp import app, db
-from webapp.models import Orders
+from webapp.models import Orders, People
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from flask_login import login_required
@@ -263,6 +263,162 @@ def AboutClass8():
     srcpath = statpath('')
     return render_template('AboutClass8.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, info = info)
 
+@app.route('/People_Forms', methods=['GET', 'POST'])
+def People_Forms():
+    if request.method == 'POST':
+        today = datetime.datetime.today().strftime('%Y-%m-%d')
+        appnum = 0
+        vals = ['fname', 'mnames', 'lname', 'addr1', 'addr2', 'addr3',
+                'idtype', 'tid', 'tel', 'email', 'assoc1', 'assoc2', 'date1', 'yrs']
+        a = list(range(len(vals)))
+        i = 0
+        for v in vals:
+            a[i] = request.values.get(v)
+            i = i+1
+        exporter = request.values.get('exporter')
+        consignee = request.values.get('consignee')
+        notify = request.values.get('notify')
+        driver = request.values.get('driver')
+        if exporter is not None:
+            ptype = "exporter"
+        if consignee is not None:
+            ptype = "consignee"
+        if notify is not None:
+            ptype = "notify"
+        if driver is not None:
+            ptype = "applicant"
+        try:
+            company = a[0] + ' ' + a[2]
+        except:
+            company = a[0]
+
+        input = People(Ptype=ptype, Company=company, First=a[0], Middle=a[1], Last=a[2], Addr1=a[3], Addr2=a[4], Addr3=a[5], Temp1=a[13], Temp2='NewApp',
+                       Idtype=a[6], Idnumber=a[7], Telephone=a[8], Email=a[9], Associate1=a[10], Associate2=a[11], Date1=today, Date2=None, Source=None, Accountid=None)
+        db.session.add(input)
+        db.session.commit()
+
+        if exporter is not None:
+            ptype = "consignee"
+        if consignee is not None:
+            ptype = "notify"
+        if notify is not None:
+            ptype = "completed"
+            pdata = People.query.filter(People.Temp2 == 'NewApp').all()
+            for pdat in pdata:
+                pdat.Temp2 = '2'
+                db.session.commit()
+            from email_appl import email_app_exporter
+            email_app_exporter(pdata)
+
+        if driver is not None:
+
+            pdat = People.query.filter((People.Ptype == 'applicant') &
+                                       (People.Company == company)).first()
+            appnum = 'Fapp'+str(pdat.id)
+            ptype = "completed"
+            from email_appl import email_app
+            email_app(pdat)
+
+            return render_template('employment.html', cmpdata=cmpdata, scac=scac, ptype=ptype, appnum=appnum, phone=phone, today=today)
+    else:
+        ptype = "exporter"
+
+    srcpath = statpath('')
+    return render_template(f'companysite/{scac}/pforms.html', cmpdata=cmpdata, scac=scac, ptype=ptype, srcpath=srcpath)
+
+@app.route('/Employment')
+def Employment():
+    ptype = 'driver'
+    srcpath = statpath('')
+    return render_template('employment.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, ptype=ptype, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
+
+@app.route('/Calculator', methods=['GET', 'POST'])
+def Calculator():
+    import ast
+    from viewfuncs import d2s
+    if request.method == 'POST':
+        alldata = request.values.get('alldata')
+        alldata = ast.literal_eval(alldata)
+        print(alldata)
+        l = len(alldata)
+        print(l)
+        a1 = request.form['len']
+        a2 = request.form['wid']
+        a3 = request.form['hei']
+        a4 = float(a1)*float(a2)*float(a3)
+        a6 = request.form['unt']
+        a7 = request.form['wtunt']
+        b1 = request.form['cst']
+        b1 = Decimal(b1.strip('$'))
+        a6 = int(a6)
+        a7 = int(a7)
+        if a6 == 1:
+            a4 = a4/61023.7
+        if a6 == 2:
+            a4 = a4/35.3147
+        if a6 == 3:
+            a4 = a4/1000000.
+        wtkg = a4*166.67
+        wtlb = wtkg*2.20462
+        wtkgstr = d2s(str(wtkg))
+        wtlbstr = d2s(str(wtlb))
+        a5 = math.ceil(a4)
+        a4 = round(a4, 2)
+        b2 = a5*float(b1)
+        if a7 == 1:
+            wt = wtlbstr
+        else:
+            wt = wtkgstr
+        total = float(wt)
+        for data in alldata:
+            total = total+float(data[3])
+
+        alldata.append([a1, a2, a3, wt])
+
+        # Recalculate all in case units have changed
+        newalldata = []
+        total = 0
+        for data in alldata:
+            a1 = data[0]
+            a2 = data[1]
+            a3 = data[2]
+            a4 = float(a1)*float(a2)*float(a3)
+            if a6 == 1:
+                a4 = a4/61023.7
+            if a6 == 2:
+                a4 = a4/35.3147
+            if a6 == 3:
+                a4 = a4/1000000.
+            if a7 == 2:
+                wt = a4*166.67
+            if a7 == 1:
+                wt = a4*166.67*2.20462
+            total = total+float(wt)
+            newalldata.append([a1, a2, a3, d2s(wt)])
+        a4 = round(a4, 2)
+        finalcost = total*float(b1)
+        finalwt = d2s(total)
+        finalcost = d2s(finalcost)
+
+    else:
+        a1 = 1
+        a2 = 1
+        a3 = 1
+        a4 = 1
+        a5 = 1
+        a6 = 1
+        a7 = 1
+        b1 = 25
+        b2 = 1
+        wtkgstr = ''
+        wtlbstr = ''
+        alldata = []
+        fdata = []
+        newalldata = []
+        finalwt = ''
+        finalcost = ''
+    srcpath = statpath('')
+    return render_template('calculator.html', srcpath=srcpath,cmpdata=cmpdata, scac=scac, finalcost=finalcost, a1=a1, a2=a2, a3=a3, a4=a4, a5=a5, a6=a6, a7=a7, b1=b1, b2=b2, wtkg=wtkgstr, wtlb=wtlbstr, alldata=newalldata, finalwt=finalwt)
 
 
 @app.route('/Class8Main/<genre>', methods=['GET', 'POST'])
