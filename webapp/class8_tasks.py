@@ -666,6 +666,17 @@ def Table_maker(genre):
     #print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
     #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
+    getpin = request.values.get('PinGet')
+    if getpin is not None and 'Orders' in tables_on:
+        print(f'Running the pin script')
+        #tes = subprocess.run(['ssh', '10.0.0.105','/home/mark/flask/crontasks/getpin.sh','FELA'], timeout=120)
+        tes = subprocess.run(['ssh', 'mark@70.88.236.49', '/crontasks/getpin.sh', f'{scac}'], timeout=120)
+        print(tes)
+        print(f'The pin script is completed')
+        #res = command.run(['ls'])
+        #print(res.output)
+        #print(res.exit)
+
     putbuff = request.values.get('Paste Buffer')
     if putbuff is not None and 'Orders' in tables_on:
         print(f'Doing the paste buffer for {checked_data} {tables_on}')
