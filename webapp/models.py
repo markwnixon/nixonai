@@ -1576,11 +1576,11 @@ class Drivers(db.Model):
     PreScreen = db.Column('PreScreen', db.DateTime)
     LastTested = db.Column('LastTested', db.DateTime)
     Active = db.Column('Active', db.Integer)
-
+    Carrier = db.Column('Carrier', db.String(45))
 
     def __init__(self, Name, Addr1, Addr2, Phone, Email, Truck, Tag, ScanCDL, ScanMed, ScanMVR, ScanTwic, JobStart,
                  JobEnd, Tagid, Pin, CDLnum, CDLstate, CDLissue, CDLexpire, DOB, MedExpire, TwicExpire, TwicNum,
-                 PreScreen, LastTested, Active):
+                 PreScreen, LastTested, Active, Carrier):
         self.Name = Name
         self.Addr1 = Addr1
         self.Addr2 = Addr2
@@ -1607,3 +1607,42 @@ class Drivers(db.Model):
         self.PreScreen = PreScreen
         self.LastTested = LastTested
         self.Active = Active
+        self.Carrier = Carrier
+
+class Pins(db.Model):
+    __tablename__ = 'pins'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Date = db.Column('Date', db.DateTime)
+    Driver = db.Column('Driver', db.String(45))
+    InBook = db.Column('InBook', db.String(45))
+    InCon = db.Column('InCon', db.String(45))
+    InChas = db.Column('InChas', db.String(45))
+    InPin = db.Column('InPin', db.String(45))
+    OutBook = db.Column('OutBook', db.String(45))
+    OutCon = db.Column('OutCon', db.String(45))
+    OutChas = db.Column('OutChas', db.String(45))
+    OutPin = db.Column('OutPin', db.String(45))
+    Unit = db.Column('Unit', db.String(45))
+    Tag = db.Column('Tag', db.String(45))
+    Phone = db.Column('Phone', db.String(45))
+    Carrier = db.Column('Carrier', db.String(45))
+    Intext = db.Column('Intext', db.String(200))
+    Outtext = db.Column('Outtext', db.String(200))
+
+    def __init__(self, Date, Driver, InBook, InCon, InChas, InPin, OutBook, OutCon, OutChas, OutPin, Unit, Tag, Phone, Carrier, Intext, Outtext):
+        self.Date = Date
+        self.Driver = Driver
+        self.InBook = InBook
+        self.InCon = InCon
+        self.InChas = InChas
+        self.InPin = InPin
+        self.OutBook = OutBook
+        self.OutCon = OutCon
+        self.OutChas = OutChas
+        self.OutPin = OutPin
+        self.Unit = Unit
+        self.Tag = Tag
+        self.Phone = Phone
+        self.Carrier = Carrier
+        self.Intext = Intext
+        self.Outtext = Outtext

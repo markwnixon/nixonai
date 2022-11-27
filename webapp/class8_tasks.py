@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions, Trucklog
+from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions, Trucklog, Pins
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
@@ -392,6 +392,10 @@ def get_dispatch(odat):
     ht = odat.HaulType
     hstat = odat.Hstat
     contype = odat.Type
+    try:
+        rel4 = odat.Booking[-4:]
+    except:
+        rel4 = odat.Booking
     ctext = ''
     if '40' in contype and '9' in contype: ctext = '40HC'
     if '40' in contype and '8' in contype: ctext = '40STD'
@@ -414,11 +418,87 @@ def get_dispatch(odat):
     if hstat is None: hstat = -1
     if hstat < 1:
         if 'Export' in ht: return f'Empty Out: *{odat.Booking}* ({ctext} {city})'
-        if 'Import' in ht: return f'Load Out: *{odat.Container}  {odat.Booking}* ({ctext} {city})'
+        if 'Import' in ht: return f'Load Out: *{rel4}  {odat.Container}* ({ctext} {city})'
     else:
         if 'Export' in ht: return f'Load In: *{odat.Booking}  {odat.Container}* ({ctext} {city})'
         if 'Import' in ht: return f'Empty In: *{odat.Container}* ({ctext} {city})'
     return ''
+
+def addtopins(thisdate, opair):
+    driver = None
+    inbook = None
+    incon = None
+    inchas = None
+    inpin = '0'
+    outbook = None
+    outcon = None
+    outchas = None
+    outpin = '0'
+    unit = None
+    tag = None
+    phone = None
+    carrier = None
+    intext = None
+    outtext = None
+    for odat in opair:
+        if odat is not None:
+            ht = odat.HaulType
+            hstat = odat.Hstat
+            contype = odat.Type
+            try:
+                rel4 = odat.Booking[-4:]
+            except:
+                rel4 = odat.Booking
+            ctext = ''
+            if '40' in contype and '9' in contype: ctext = '40HC'
+            if '40' in contype and '8' in contype: ctext = '40STD'
+            if '20' in contype: ctext = '20'
+            if 'R' in contype: ctext = ctext + ' Reefer'
+            if 'U' in contype: ctext = ctext + ' OpenTop'
+
+            address = odat.Dropblock2
+            adata, backup = get_address_details(address)
+            try:
+                city = adata['city']
+            except:
+                city = backup
+
+            if city == 'Baltimore':
+                citiline = odat.Shipper
+                citiline = citiline.split()
+                city = citiline[0]
+
+            if hstat is None: hstat = -1
+            if hstat < 1:
+                if 'Export' in ht:
+                    outbook = odat.Booking
+                    outtext = f'Empty Out: *{odat.Booking}* ({ctext} {city})'
+                if 'Import' in ht:
+                    outbook = rel4
+                    outcon = odat.Container
+                    outtext =  f'Load Out: *{rel4}  {odat.Container}* ({ctext} {city})'
+            else:
+                if 'Export' in ht:
+                    inbook = odat.Booking
+                    incon = odat.Container
+                    inchas = odat.Chassis
+                    intext = f'Load In: *{odat.Booking}  {odat.Container}* ({ctext} {city})'
+                if 'Import' in ht:
+                    incom = odat.Container
+                    inchas = odat.Chassis
+                    intext = f'Empty In: *{odat.Container}* ({ctext} {city})'
+
+    if intext: print(f'About to add {len(intext)} {intext}')
+    if outtext: print(f'About to add {len(outtext)} {outtext}')
+
+    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Carrier=carrier, Intext=intext, Outtext=outtext)
+    db.session.add(input)
+    db.session.commit()
+
+
+
+
+    return
 
 def get_custlist(table, tfilters):
     dtest = tfilters['Date Filter']
@@ -678,7 +758,57 @@ def Table_maker(genre):
         #print(res.exit)
 
     putbuff = request.values.get('Paste Buffer')
-    if putbuff is not None and 'Orders' in tables_on:
+    thisdate = datetime.datetime.today()
+    thisdate = thisdate.date()
+    movedate = thisdate
+    print(thisdate, thisdate.weekday())
+    holdvec[46] = []
+    holdvec[44] = [Drivers.query.filter(Drivers.Active == 1).all(),Vehicles.query.filter(Vehicles.Active == 1).all()]
+    for idate in range(4):
+        modnow = request.values.get(f'mod{idate}')
+        movedate = thisdate + timedelta(idate)
+        if modnow is not None:
+            print(f'Modifying the selection')
+            pdata = Pins.query.filter(Pins.Date == movedate).all()
+            for jx, pdat in enumerate(pdata):
+                driver = request.values.get(f'drv{idate}{jx}')
+                unit = request.values.get(f'unit{idate}{jx}')
+                chas = request.values.get(f'chas{idate}{jx}')
+
+                if driver is not None:
+                    print(f'The selected driver is {driver}')
+                    pdat.Driver = driver
+                    ddat = Drivers.query.filter(Drivers.Name == driver).first()
+                    if ddat is not None:
+                        pdat.Phone = ddat.Phone
+                        pdat.Carrier = ddat.Carrier
+
+                if unit is not None:
+                    print(f'The selected unit is {unit}')
+                    pdat.Unit = unit
+                    vdat = Vehicles.query.filter(Vehicles.Unit == unit).first()
+                    if vdat is not None:
+                        pdat.Tag = vdat.Plate
+
+                if chas is not None:
+                    print(f'The selected chassis is {chas}')
+                    pdat.InChas = chas
+                    pdat.OutChas = chas
+                db.session.commit()
+            print(f'Modifying the selection')
+
+        #collect data section
+
+        holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
+
+        anyamber = 0
+        for idate in range(4):
+            addnow = request.values.get(f'add{idate}')
+            if addnow is not None: anyamber = 1
+
+
+    if (putbuff is not None or anyamber) and 'Orders' in tables_on:
+        holdvec[46] = []
         print(f'Doing the paste buffer for {checked_data} {tables_on}')
         sids = checked_data[0][2]
         if sids != []:
@@ -698,13 +828,29 @@ def Table_maker(genre):
                     else:
                         indat = odat2
                         outdat = odat1
+
+                    for idate in range(4):
+                        addnow = request.values.get(f'add{idate}')
+                        movedate = thisdate + timedelta(idate)
+                        if addnow is not None:
+                            print(f'Adding the dispatch selection to date {movedate}')
+                            addtopins(movedate, [indat,outdat])
                     holdvec[45] = f'{get_dispatch(indat)}\n{get_dispatch(outdat)}'
                 else:
                     sid = sids[0]
                     odat = Orders.query.get(sid)
                     holdvec[45] = get_dispatch(odat)
+                    for idate in range(4):
+                        addnow = request.values.get(f'add{idate}')
+                        movedate = thisdate + timedelta(idate)
+                        if addnow is not None:
+                            print(f'Adding the dispatch selection to date {movedate}')
+                            addtopins(movedate,[odat])
             else:
                 err.append('Too many selections for paste buffer task')
+        for idate in range(4):
+            movedate = thisdate + timedelta(idate)
+            holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
         else:
             err.append('No selection made for paste buffer task')
 

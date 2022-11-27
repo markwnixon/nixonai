@@ -51,4 +51,70 @@
     </tbody>
   </table>
 
+
 </div>
+
+{% if holdvec[46] %}
+    {% for setdata in holdvec[46] %}
+        {% set thisdate = setdata[0] %}
+        {% set but = setdata[1] %}
+        {% set pdata = setdata[2] %}
+        {% set drvdata = holdvec[44][0] %}
+        {% set trkdata = holdvec[44][1] %}
+                <br>
+                    <div class="card">
+                      <div class="card-header">
+                               <div class="d-flex justify-content-around align-items-center">
+                                   <div class="p-0">
+                                        Schedule for {{ thisdate }}
+                                   </div>
+                               </div>
+
+                      </div>
+
+                      <table class="table table-striped table-bordered table-sm w-auto">
+                        <tbody>
+                            <tr>
+
+                                <td>
+                                <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="add{{ but }}"
+                                    data-toggle="tooltip" title="Add dispatch to schedule for today">Add For<br>Date{{ but }}</button>
+                                <button type="submit" class="btn btn-group-small btn-black my-small-btn" name="mod{{ but }}"
+                                    data-toggle="tooltip" title="Update schedule for selected driver/truck">Update<br>Driver/Trk</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                      </table>
+                     <table>
+                      {% for pdat in pdata %}
+                          {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
+                          <tr>
+                          <td> <input type="checkbox" class="custom-control-input" id="inline{{box}}"  name="box{{ but }}{{ loop.index-1 }}"> </td>
+                          <td>{{ pdat.Intext }}<br> {{ pdat.Outtext }}[{{ loop.index-1 }}]</td>
+                              <td>
+                                  <select class="mdb-select md-form" name="drv{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
+                                    {% for drv in drvdata %}
+                                            <option {% if drv.Name == pdat.Driver %} selected {% endif %} value="{{ drv.Name }}">{{ drv.Name }}</option>
+                                    {% endfor %}
+                                  </select>
+                              </td>
+
+                              <td>
+                                  <select class="mdb-select md-form" name="unit{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
+                                    {% for truck in trkdata %}
+                                            <option {% if truck.Unit == pdat.Unit %} selected {% endif %} value="{{ truck.Unit }}">{{ truck.Unit }}</option>
+                                    {% endfor %}
+                                  </select>
+                              </td>
+
+                                <td>
+                                    <input class="form-control form-control-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}></td>
+                              </td>
+                          </tr>
+                    {% endfor %}
+                     </table>
+
+
+                </div>
+    {% endfor %}
+{% endif %}
