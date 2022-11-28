@@ -824,7 +824,6 @@ def Table_maker(genre):
                 pdat = Pins.query.get(tid)
                 pdat.Date = pdat.Date + timedelta(1)
                 db.session.commit()
-        #collect data section
 
         holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
 
