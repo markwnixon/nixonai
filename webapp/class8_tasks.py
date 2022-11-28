@@ -750,9 +750,12 @@ def Table_maker(genre):
     if getpin is not None and 'Orders' in tables_on:
         print(f'Running the pin script')
         #tes = subprocess.run(['ssh', '10.0.0.105','/home/mark/flask/crontasks/getpin.sh','FELA'], timeout=120)
-        tes = subprocess.run(['ssh', 'mark@70.88.236.49', '/crontasks/getpin.sh', f'{scac}'], timeout=120)
-        print(tes)
-        print(f'The pin script is completed')
+        try:
+            tes = subprocess.run(['ssh', 'mark@70.88.236.49', '/crontasks/getpin.sh', f'{scac}'], timeout=180)
+            print(tes)
+            print(f'The pin script is completed')
+        except:
+            print('The subprocess had at least one error')
         #res = command.run(['ls'])
         #print(res.output)
         #print(res.exit)
@@ -764,16 +767,26 @@ def Table_maker(genre):
     print(thisdate, thisdate.weekday())
     holdvec[46] = []
     holdvec[44] = [Drivers.query.filter(Drivers.Active == 1).all(),Vehicles.query.filter(Vehicles.Active == 1).all()]
+    anyamber = 0
     for idate in range(4):
+        boxid = []
         modnow = request.values.get(f'mod{idate}')
+        delthis = request.values.get(f'del{idate}')
+        moveup = request.values.get(f'moveup{idate}')
+        movedn = request.values.get(f'movedn{idate}')
         movedate = thisdate + timedelta(idate)
-        if modnow is not None:
+        if modnow is not None or delthis is not None or moveup is not None or movedn is not None:
             print(f'Modifying the selection')
+            anyamber = 1
             pdata = Pins.query.filter(Pins.Date == movedate).all()
             for jx, pdat in enumerate(pdata):
                 driver = request.values.get(f'drv{idate}{jx}')
                 unit = request.values.get(f'unit{idate}{jx}')
                 chas = request.values.get(f'chas{idate}{jx}')
+                box = request.values.get(f'box{idate}{jx}')
+                if box == 'on':
+                    boxid.append(pdat.id)
+                print(f'box is {box} {boxid}')
 
                 if driver is not None:
                     print(f'The selected driver is {driver}')
@@ -797,15 +810,23 @@ def Table_maker(genre):
                 db.session.commit()
             print(f'Modifying the selection')
 
+        #Perform moveup or movedn actions
+        for tid in boxid:
+            print(f'Performing action on id= {tid}')
+            if delthis is not None:
+                Pins.query.filter(Pins.id == tid).delete()
+                db.session.commit()
+            if moveup is not None:
+                pdat = Pins.query.get(tid)
+                pdat.Date = pdat.Date - timedelta(1)
+                db.session.commit()
+            if movedn is not None:
+                pdat = Pins.query.get(tid)
+                pdat.Date = pdat.Date + timedelta(1)
+                db.session.commit()
         #collect data section
 
         holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
-
-        anyamber = 0
-        for idate in range(4):
-            addnow = request.values.get(f'add{idate}')
-            if addnow is not None: anyamber = 1
-
 
     if (putbuff is not None or anyamber) and 'Orders' in tables_on:
         holdvec[46] = []

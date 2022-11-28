@@ -78,9 +78,15 @@
 
                                 <td>
                                 <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="add{{ but }}"
-                                    data-toggle="tooltip" title="Add dispatch to schedule for today">Add For<br>Date{{ but }}</button>
+                                    data-toggle="tooltip" title="Add dispatch to schedule for today">Add For<br>Date</button>
                                 <button type="submit" class="btn btn-group-small btn-black my-small-btn" name="mod{{ but }}"
                                     data-toggle="tooltip" title="Update schedule for selected driver/truck">Update<br>Driver/Trk</button>
+                                    <button type="submit" class="btn btn-group-small btn-red my-small-btn" name="del{{ but }}"
+                                    data-toggle="tooltip" title="Delete selected dispatch">Delete<br>Selected</button>
+                                    <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="moveup{{ but }}"
+                                    data-toggle="tooltip" title="Move date one day previous">Move<br>Date -1</button>
+                                    <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="movedn{{ but }}"
+                                    data-toggle="tooltip" title="Move date one day later">Move<br>Date +1</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -89,8 +95,8 @@
                       {% for pdat in pdata %}
                           {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
                           <tr>
-                          <td> <input type="checkbox" class="custom-control-input" id="inline{{box}}"  name="box{{ but }}{{ loop.index-1 }}"> </td>
-                          <td>{{ pdat.Intext }}<br> {{ pdat.Outtext }}[{{ loop.index-1 }}]</td>
+                          <td align="center" ><input class="align-middle" type="checkbox"  name="box{{ but }}{{ loop.index-1 }}"></td>
+                          <td>{{ pdat.Intext }}<br> {{ pdat.Outtext }}</td>
                               <td>
                                   <select class="mdb-select md-form" name="drv{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
                                     {% for drv in drvdata %}
