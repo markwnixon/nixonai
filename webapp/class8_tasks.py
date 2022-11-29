@@ -770,13 +770,13 @@ def Table_maker(genre):
     anyamber = 0
     for idate in range(4):
         boxid = []
+        addnow = request.values.get(f'add{idate}')
         modnow = request.values.get(f'mod{idate}')
         delthis = request.values.get(f'del{idate}')
         moveup = request.values.get(f'moveup{idate}')
         movedn = request.values.get(f'movedn{idate}')
         movedate = thisdate + timedelta(idate)
-        if modnow is not None or delthis is not None or moveup is not None or movedn is not None:
-            print(f'Modifying the selection')
+        if modnow is not None or delthis is not None or moveup is not None or movedn is not None or addnow is not None:
             anyamber = 1
             pdata = Pins.query.filter(Pins.Date == movedate).all()
             for jx, pdat in enumerate(pdata):
