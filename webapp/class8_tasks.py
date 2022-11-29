@@ -484,7 +484,7 @@ def addtopins(thisdate, opair):
                     inchas = odat.Chassis
                     intext = f'Load In: *{odat.Booking}  {odat.Container}* ({ctext} {city})'
                 if 'Import' in ht:
-                    incom = odat.Container
+                    incon = odat.Container
                     inchas = odat.Chassis
                     intext = f'Empty In: *{odat.Container}* ({ctext} {city})'
 
