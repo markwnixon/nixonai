@@ -1495,6 +1495,7 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
             odat = eval(rstring)
             if 'Haul' in task_focus:
                 nstat = odat.Hstat
+                if nstat == None: nstat = 0
                 if task_focus == 'Haul+1':
                     if nstat+1 < 5: odat.Hstat = nstat+1
                 if task_focus == 'Haul-1':
@@ -1502,6 +1503,7 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
                 if task_focus == 'Haul Done': odat.Hstat = 3
             if 'Inv' in task_focus:
                 nstat = odat.Istat
+                if nstat == None: nstat = 0
                 if task_focus == 'Inv+1':
                     if nstat+1 < 5: odat.Istat = nstat+1
                 if task_focus == 'Inv-1':
