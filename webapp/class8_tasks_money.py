@@ -17,6 +17,7 @@ from webapp.utils import *
 from webapp.class8_tasks_gledger import gledger_write
 
 import usaddress
+from datetime import timedelta
 
 def addr2break(adv):
     ai = ''
@@ -61,14 +62,18 @@ def loginvo_m(odat,ix):
         db.session.commit()
     return err
 
-def getservice(myo, service, serviceqty):
+def getservice(myo, service, serviceqty, serviceamt, servicestr):
 
     sdat = Services.query.filter(Services.Service.contains(service)).first()
     if sdat is not None:
         nextservice = sdat.Service
-        each = float(sdat.Price)
-        amount = serviceqty*each
-        descript = f' For {nextservice}'
+        if str(serviceamt) == 'default':
+            each = float(sdat.Price)
+        else:
+            each = serviceamt
+        if str(serviceqty) == 'default':
+            amount = each
+            descript = f' For {nextservice}'
     else:
         nextservice = 'Nothing Here'
         each = 0.00
@@ -78,13 +83,36 @@ def getservice(myo, service, serviceqty):
     if nextservice == 'Per Diem':
         descript = 'Shipline invoiced per diem'
     elif nextservice == 'Drv Detention':
-        descript = f'Actual Time of Load = {2 + serviceqty} Hours'
+        if servicestr == 'default':
+            descript = f'Actual Time of Load = {2 + serviceqty} Hours'
+        else:
+            time1 = datetime.datetime.strptime(servicestr, '%H:%M')
+            time2 = time1 + timedelta(2/24)
+            time3 = time2 + timedelta(serviceqty/24)
+            time1 = datetime.datetime.strftime(time1, '%H:%M')
+            time2 = datetime.datetime.strftime(time2, '%H:%M')
+            time3 = datetime.datetime.strftime(time3, '%H:%M')
+            descript = f'Free time {time1}-{time2}, detention {time2}-{time3}'
+            amount = each * serviceqty
+
     elif nextservice == 'Storage Fee':
-        descript = 'Days of Storage'
+        if str(serviceqty) == 'default':
+            qty = myo.Date2 - myo.Date
+            serviceqty = qty.days - 1
+            if serviceqty <= 0: serviceqty = 1
+        dt1 = myo.Date + timedelta(1)
+        dt2 = myo.Date2 - timedelta(1)
+        descript = f'Days of Yard Storage, {dt1} to {dt2}'
+        amount = each*serviceqty
     elif nextservice == 'Chassis Fees':
-        qty = myo.Date2 - myo.Date
-        serviceqty = qty.days + 1
+        if str(serviceqty) == 'default':
+            qty = myo.Date2 - myo.Date
+            serviceqty = qty.days + 1
+            if serviceqty <= 0: serviceqty = 1
+        amount = each * serviceqty
         descript = f'Days of Chassis, {myo.Date} to {myo.Date2}'
+
+    if str(serviceqty) == 'default': serviceqty = 1.0
 
     return nextservice, descript, each, serviceqty, amount
 
@@ -139,7 +167,7 @@ def initialize_invoice(myo, err):
                     lineamount = 0.00
                 print(f'The base amount is {lineamount}')
                 input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,
-                                 Ea=d2s(amount), Qty=qty, Amount=d2s(lineamount), Total=0.00, Date=today,
+                                 Ea=d2s(lineamount), Qty=qty, Amount=d2s(lineamount*qty), Total=0.00, Date=today,
                                  Original=None, Status='New')
                 db.session.add(input)
                 db.session.commit()
@@ -150,12 +178,48 @@ def initialize_invoice(myo, err):
                     if '=' in qbl:
                         qbeaches = qbl.split('=')
                         service = qbeaches[0]
-                        serviceqty = float(qbeaches[1])
+                        remainder = qbeaches[1]
+                        if '$' in remainder:
+                            qbnext = remainder.split('$')
+                            serviceqty = float(qbnext[0])
+                            remainder = qbnext[1]
+                            if '*' in remainder:
+                                qbnext = remainder.split('*')
+                                serviceamt = float(qbnext[0])
+                                servicestr = qbnext[1]
+                            else:
+                                serviceamt = float(qbnext[1])
+                                servicestr = 'default'
+                        elif '*' in remainder:
+                            qbnext = remainder.split('*')
+                            serviceqty = float(qbnext[0])
+                            serviceamt = 'default'
+                            servicestr= qbnext[1]
+                        else:
+                            serviceqty = float(qbeaches[1])
+                            serviceamt = 'default'
+                            servicestr = 'default'
+
+                    elif '$' in qbl:
+                        qbeaches = qbl.split('$')
+                        service = qbeaches[0]
+                        remainder = qbeaches[1]
+                        serviceqty = 1.0
+                        if '*' in remainder:
+                            qbnext = remainder.split('*')
+                            serviceamt = float(qbnext[0])
+                            servicestr = qbnext[1]
+                        else:
+                            serviceamt = float(qbeaches[1])
+                            servicestr = 'default'
+
                     else:
                         service = qbl
-                        serviceqty = 1.0
+                        serviceqty = 'default'
+                        serviceamt = 'default'
+                        servicestr = 'default'
 
-                    nextservice, descript, each, serviceqty, amount = getservice(myo, service, serviceqty)
+                    nextservice, descript, each, serviceqty, amount = getservice(myo, service, serviceqty, serviceamt, servicestr)
 
                     input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service=nextservice, Description=descript,
                                      Ea=d2s(each), Qty=serviceqty, Amount=d2s(amount), Total=0.00, Date=today,

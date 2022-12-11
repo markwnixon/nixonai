@@ -347,7 +347,7 @@ def Order_Container_Update(oder):
         ao.Company = odat.Shipper
         ao.Jo = odat.Jo
         odat.Date = ao.Date
-        if odat.Istat == -1: odat.Istat = 0
+        if odat.Istat < 0: odat.Istat = 0
         if jexport:
             odat.Container = ao.Container
         odat.Chassis = ao.Chassis
@@ -355,7 +355,7 @@ def Order_Container_Update(oder):
         db.session.commit()
     if returned:
         if not hasinput(container): odat.Container = ai.Container
-        if odat.Istat == -1: odat.Istat = 0
+        if odat.Istat < 0: odat.Istat = 0
         ai.Company = odat.Shipper
         ai.Jo = odat.Jo
         odat.Hstat = 2

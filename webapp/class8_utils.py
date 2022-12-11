@@ -4,6 +4,7 @@ from flask import request
 from webapp.utils import *
 import datetime
 import math
+from webapp.models import Orders
 today = datetime.datetime.today()
 
 def sameall(lst):
@@ -290,6 +291,29 @@ def form_check(input,text,type,task,req):
         if not hasinput(text):
             status = 2
             message = 'Must include this location information'
+
+    elif type == 'quotehistory':
+        sh = request.values.get('Shipper')
+        ld = request.values.get('Dropblock2')
+
+        if not hasinput(text) or 'History' in text:
+            if hasinput(sh) and not hasinput(ld):
+                #initiate the values from previous history
+                text = f'History for {sh} coming with delivery location'
+            if hasinput(sh) and hasinput(ld):
+                coz = ld.splitlines()
+                co = coz[0].strip()
+                gdat = Orders.query.filter((Orders.Shipper == sh) & (Orders.Company2 == co) & (Orders.Amount != '')).order_by(Orders.id.desc()).first()
+                if gdat is not None:
+                    print(f'Search for history with sh {sh} and co {co} found the *{gdat.Amount}*')
+                    bc = gdat.Amount
+                    qh = gdat.Quote
+                    if input == 'Amount':
+                        text = bc
+                    if input == 'Quote':
+                        text = qh
+                else:
+                    text=f'History for {sh} not found'
 
     else:
         status = 2

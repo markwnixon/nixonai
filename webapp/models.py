@@ -489,6 +489,9 @@ class Orders(db.Model):
     Time = db.Column('Time', db.String(20))
     Date2 = db.Column('Date2', db.DateTime)
     Date3 = db.Column('Date3', db.DateTime)
+    Date4 = db.Column('Date4', db.DateTime)
+    Date5 = db.Column('Date5', db.DateTime)
+    Date6 = db.Column('Date6', db.DateTime)
     Time2 = db.Column('Time2', db.String(20))
     Time3 = db.Column('Time3', db.String(20))
     PaidInvoice = db.Column('PaidInvoice', db.String(100))
@@ -539,7 +542,7 @@ class Orders(db.Model):
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
-                 InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments, Quote):
+                 Date4, Date5, Date6, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments, Quote):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -596,6 +599,9 @@ class Orders(db.Model):
         self.Dropblock3 = Dropblock3
         self.Location3 = Location3
         self.Date3 = Date3
+        self.Date4 = Date4
+        self.Date5 = Date5
+        self.Date6 = Date6
         self.InvoDate = InvoDate
         self.PaidDate = PaidDate
         self.PaidAmt = PaidAmt

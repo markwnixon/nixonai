@@ -33,6 +33,42 @@ from webapp.utils import *
 from webapp.viewfuncs import newjo
 import uuid
 
+def Add_New_Drop(dropblock):
+    droplist=dropblock.splitlines()
+    avec=['']*5
+    for j,drop in enumerate(droplist):
+        avec[j]=stripper(drop)
+    entity=avec[0]
+    addr1=avec[1]
+    edat=Drops.query.filter((Drops.Entity==entity) & (Drops.Addr1==addr1)).first()
+    if edat is None:
+        input = Drops(Entity=entity,Addr1=addr1,Addr2=avec[2],Phone=avec[3],Email=avec[4])
+        db.session.add(input)
+        db.session.commit()
+        edat = Drops.query.filter((Drops.Entity==entity) & (Drops.Addr1==addr1)).first()
+    return edat
+
+def Order_Addresses_Update(sid):
+    odat = Orders.query.get(sid)
+    if odat is not None:
+        pdat = People.query.filter(People.Company == odat.Shipper).first()
+        if pdat is not None:
+            odat.Bid = pdat.id
+        ldat = Drops.query.filter(Drops.Entity == odat.Company2).first()
+        if ldat is None: ldat = Add_New_Drop(odat.Dropblock2)
+        odat.Lid = ldat.id
+
+        ddat = Drops.query.filter(Drops.Entity == odat.Company).first()
+        if ddat is None: ddat = Add_New_Drop(odat.Dropblock1)
+        odat.Did = ddat.id
+        # Also set the gate date estimates based on the delivery date
+        d3 = odat.Date3
+        d2 = d3 + timedelta(1)
+        d1 = d3 - timedelta(1)
+        odat.Date = d1
+        odat.Date2 = d2
+
+        db.session.commit()
 def address_resolver(json):
     final = {}
     if json['results']:
@@ -1127,7 +1163,7 @@ def make_new_entry(tablesetup,holdvec):
         form_show = tablesetup['form show']['New']
         for jx,entry in enumerate(entrydata):
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
-                #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
+                print(f'Data going in is:{entry[0]} {holdvec[jx]}')
                 setattr(dat, f'{entry[0]}', holdvec[jx])
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
@@ -1270,11 +1306,11 @@ def New_task(tablesetup, task_iter):
             warned = 0
 
             for jx, entry in enumerate(entrydata):
-                print(f'Entry loop: jx"{jx}, entry:{entry}')
+                #print(f'Entry loop: jx"{jx}, entry:{entry}')
                 if entry[3] == 'appears_if':
                     entry[3], entry[4] = check_appears(tablesetup, entry)
                     entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
-                print(f'form show is:{form_show}')
+                #print(f'form show is:{form_show}')
                 if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                     if entry[1] != 'hidden':
                         holdvec[jx] = request.values.get(f'{entry[0]}')
@@ -1301,6 +1337,7 @@ def New_task(tablesetup, task_iter):
 
             err.append(f'There are {failed} input errors and {warned} input warnings')
 
+
             create_item = request.values.get('Create Item')
             if create_item is not None:
                 if failed == 0:
@@ -1309,6 +1346,7 @@ def New_task(tablesetup, task_iter):
                     completed = True
                     if tablesetup['table'] == 'Orders':
                         print(f'Updating Orders with {sid}')
+                        Order_Addresses_Update(sid)
                         Order_Container_Update(sid)
                     if tablesetup['table'] == 'Bills':
                         bdat = Bills.query.filter(Bills.id>0).order_by(Bills.id.desc()).first()
@@ -1427,6 +1465,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
                 if table == 'Orders':
                     print(f'Updating Orders with {sid}')
+                    Order_Addresses_Update(sid)
                     Order_Container_Update(sid)
                 #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
