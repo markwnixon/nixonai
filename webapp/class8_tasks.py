@@ -63,11 +63,13 @@ def Order_Addresses_Update(sid):
         odat.Did = ddat.id
         # Also set the gate date estimates based on the delivery date
         d3 = odat.Date3
-        d2 = d3 + timedelta(1)
-        d1 = d3 - timedelta(1)
-        odat.Date = d1
-        odat.Date2 = d2
-
+        #Dont mess with gate dates once pulls start
+        idat = Interchange.query.filter(Interchange.Jo == odat.Jo).first()
+        if idat is None:
+            d2 = d3 + timedelta(1)
+            d1 = d3 - timedelta(1)
+            odat.Date = d1
+            odat.Date2 = d2
         db.session.commit()
 def address_resolver(json):
     final = {}
