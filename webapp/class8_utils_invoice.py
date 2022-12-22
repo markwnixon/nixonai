@@ -242,7 +242,7 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
     logo_width = logoi[1]
     logo_height = logoi[2]
     logox = 300 - logo_width / 2.0
-    c.drawImage(logo, logox, 670, mask='auto')
+    c.drawImage(logo, logox, logoi[4], mask='auto')
 
     #create background lines
     for i in fulllinesat:

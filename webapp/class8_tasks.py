@@ -68,8 +68,8 @@ def Order_Addresses_Update(sid):
         if idat is None:
             d2 = d3 + timedelta(1)
             d1 = d3 - timedelta(1)
-            odat.Date = d1
-            odat.Date2 = d2
+            if odat.Date is None: odat.Date = d1
+            if odat.Date2 is None: odat.Date2 = d2
         db.session.commit()
 def address_resolver(json):
     final = {}
@@ -1448,7 +1448,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 for jx, entry in enumerate(entrydata):
                     if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                         if entry[0] not in creators:
-                            #print(f'Setting entry {entry[0]} to {holdvec[jx]}')
+                            print(f'Setting entry {entry[0]} to {holdvec[jx]}')
                             setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
                 for jx, entry in enumerate(hiddendata):
@@ -1458,7 +1458,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         thissubvalue = thisvalue[0]
                     except:
                         thissubvalue = ''
-                    #print('Updating Entry with', entry[0], thissubvalue)
+                    print('Updating Entry with', entry[0], thissubvalue)
                     setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
                 # The amount could change on a bill, so if a bill need to update

@@ -258,7 +258,7 @@ def makemanifest(odat):
     logo_width = logoi[1]
     logo_height = logoi[2]
     logox = 300 - logo_width / 2.0
-    c.drawImage(logo, logox, 650, mask='auto')
+    c.drawImage(logo, logox, logoi[3], mask='auto')
 
     #Title block
     c.setLineWidth(1.5)

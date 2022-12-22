@@ -72,7 +72,7 @@ def form_check(input,text,type,task,req):
 
     elif type == 'date':
         if isinstance(text, datetime.date):
-            #print('date is in datetime format')
+            print('date is in datetime format')
             status = 0
             message = 'ok'
         else:
@@ -80,7 +80,7 @@ def form_check(input,text,type,task,req):
                 dt = datetime.datetime.strptime(text,'%Y-%m-%d')
                 status = 0
                 message = 'ok'
-                print('date is text that can be converted')
+                print(f'date {text} is text that can be converted')
             except:
                 text = today.strftime('%Y-%m-%d')
                 status = 1
