@@ -47,7 +47,8 @@ Trucking_genre = {'table': 'Orders',
                   'image_stamps': {
                       'X': ['x.png', 'stamps', .2],
                       'Check': ['check.png', 'stamps', .5],
-                      'Paid': ['paid.png', 'stamps', 1]
+                      'Paid': ['paid.png', 'stamps', 1],
+                      'Factor': ['NOA Stamp.png', 'stamps', 1]
                   },
                   'signature_stamps': {
                       'Mark': ['mark.png', 'signatures', .2],
