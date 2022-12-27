@@ -138,20 +138,28 @@ def blendticks(gfile1,gfile2,outfile):
 
     reader2 = PdfFileReader(open(gfile2, 'rb'))
     p2 = reader2.getPage(0)
+
+    g3 = addpath(f'static/{scac}/data/vGate/blank.pdf')
+    reader3 = PdfFileReader(open(g3, 'rb'))
+    p3 = reader3.getPage(0)
     #p2.cropBox.lowerLeft = (50,400)
     #p2.cropBox.upperRight = (600,700)
+    #translate first page
+    p3.mergeTranslatedPage(p1, 0, -100, expand=False)
+
 
     #offset_x = p2.mediaBox[2]
     offset_x = 0
-    offset_y = -280
+    #offset_y = -280
+    offset_y = -325
 
     # add second page to first one
-    p1.mergeTranslatedPage(p2, offset_x, offset_y, expand=False)
-    p1.cropBox.lowerLeft = (50,250)
-    p1.cropBox.upperRight = (550,800)
+    p3.mergeTranslatedPage(p2, offset_x, offset_y, expand=False)
+    p3.cropBox.lowerLeft = (50,250)
+    p3.cropBox.upperRight = (550,800)
 
     output = PdfFileWriter()
-    output.addPage(p1)
+    output.addPage(p3)
 
     with open(outfile, "wb") as out_f:
         output.write(out_f)
