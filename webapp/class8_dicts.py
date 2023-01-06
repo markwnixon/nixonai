@@ -817,7 +817,7 @@ Billing_genre =   {'table': 'Bills',
                                     'Adding':
                                         {
                                          'New Bill': ['Table_Selected', 'New', 'Bills'],
-                                         'New Vendor' : ['Table_Selected', 'New', 'Customers'],
+                                         'New Vendor' : ['Table_Selected', 'New', 'Vendors'],
                                          'Upload Bill' : ['Single_Item_Selection', 'Upload', 'Source'],
                                          'Upload Payment' : ['Single_Item_Selection', 'Upload', 'Proof']
                                          },
@@ -944,18 +944,21 @@ Vendors_setup = {'name' : 'Vendor',
                                   ['Date1', 'Added Date', 'Added Date', 'date', 'date', 0, 'ok', 'cc', None, 'Always']],
                    'hidden data' : [],
                    'haulmask': [],
+                   'haulmask': [],
                    'colorfilter': None,
-                    'filteron':  [],
-                   'side data': [],
-                   'default values': {'get_Co': 'N'},
-                     'form checks': {
-                         'New': [],
-                         'Edit': [],
-                         'PayBill': [],
-                         'PrintChecks': []
-                     },
-                   'jscript': 'dtHorizontalVerticalExample3',
-                   'documents': ['Source'],
-                   'sourcenaming': [None, None,'Company'],
-                   'copyswaps' : {}
-                   }
+                    'filteron': [],
+                    'side data': [],
+                    'default values': {'get_Shipper': 'Fill This Later'},
+                    'form show': {
+                        'New': [],
+                        'Edit': []
+                    },
+                    'form checks': {
+                        'New': ['Company'],
+                        'Edit': ['Company']
+                    },
+                    'jscript': 'dtHorizontalVerticalExample3',
+                    'documents': ['Source'],
+                    'sourcenaming': [None, None, 'Company'],
+                    'copyswaps': {}
+                    }

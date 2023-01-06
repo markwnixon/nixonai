@@ -1117,6 +1117,7 @@ def make_new_entry(tablesetup,holdvec):
     creators = tablesetup['creators']
     ukey = tablesetup['ukey']
     documents = tablesetup['documents']
+    print(f'filter={filter},filterval={filterval}')
     if 'Source' in documents:
         sourcekeys = tablesetup['sourcenaming']
         if sourcekeys[0] is not None: basename = sourcekeys[0]
@@ -1152,7 +1153,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()

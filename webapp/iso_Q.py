@@ -436,7 +436,7 @@ def sendquote(bidthis):
     emailcc2 = request.values.get('edat5')
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
     # Add the accessorial table and signature to the email body:
-    send_mimemail(emaildata,'quot')
+    send_mimemail(emaildata,'qsnd')
     #print(etitle)
     #print(ebody)
     #print(emailin1)
