@@ -3,7 +3,8 @@ from flask import render_template, flash, redirect, url_for, session, logging, r
 from requests import get
 from CCC_system_setup import apikeys
 from CCC_system_setup import myoslist, addpath, tpath, companydata, usernames, passwords, scac, imap_url, accessorials, signoff
-from viewfuncs import d2s, d1s
+from webapp.viewfuncs import d2s, stat_update, hasinput, d1s
+#from viewfuncs import d2s, d1s
 import imaplib, email
 import math
 import re
@@ -301,7 +302,7 @@ def add_quote_emails():
     print(len(subjectlist), len(alist), len(contentlist), len(fromlist), len(bodylist), len(midlist))
     print(alist)
     print(contentlist)
-    for jx in range(n_mess):
+    for jx in range(n_mess-1,-1,-1):
         mid = midlist[jx]
         print("=" * 100)
         print(jx)
@@ -675,6 +676,7 @@ def isoQuote():
     qdat=None
     from viewfuncs import dataget_Q, nonone, numcheck
     if request.method == 'POST':
+        print('This is a POST')
         emailgo = request.values.get('Email')
         updatego = request.values.get('GetQuote')
         updatebid = request.values.get('Update')
@@ -691,10 +693,15 @@ def isoQuote():
         thismuch = request.values.get('thismuch')
         taskbox = request.values.get('taskbox')
         taskbox = nonone(taskbox)
+        qbid = request.values.get('quickbid')
+        if qbid is not None: taskbox = 1
+        refresh = request.values.get('refresh')
+        if refresh is not None: taskbox = 6
         quotbut = request.values.get('optradio')
         updatecosts = request.values.get('newcosts')
         def_costs = request.values.get('oldcosts')
         updatefees = request.values.get('newfees')
+        print(f'The taskbox is {taskbox}')
 
         if updatecosts is not None or updatefees is not None:
             alist = [request.values.get('driver'), request.values.get('fuel'), request.values.get('mpg'), request.values.get('insurance'), request.values.get('markup'),
@@ -771,7 +778,11 @@ def isoQuote():
             taskbox = 0
             quot = 0
 
+        #If no radio button selected then go with generic
+        if taskbox == 1 and quot == 0: taskbox = 5
+
         if taskbox == 2:
+            print(f'quot is {quot}')
             qdat.Status = -1
             db.session.commit()
             taskbox = 0
@@ -802,6 +813,7 @@ def isoQuote():
                     qdat.From = emailto
                     db.session.commit()
             else:
+                print('No radio button selected')
                 comdata = companydata()
                 locto = comdata[6]
                 emailto = usernames['serv']
@@ -826,7 +838,8 @@ def isoQuote():
                         qdat.Location = locto
                         qdat.From = emailto
                         try:
-                            qdat.Amount = max(float(bidthis))
+                            bidshort = [float(bid) for bid in bidthis if hasinput(bid)]
+                            qdat.Amount = d2s(max(bidshort))
                         except:
                             qdat.Amount = '0.00'
                         qdat.Person = bidname
@@ -1060,6 +1073,7 @@ def isoQuote():
 
 
     else:
+        print('This is NOT a Post')
         ebodytxt = ''
         print('Entering Quotes1',flush=True)
         username = session['username'].capitalize()
