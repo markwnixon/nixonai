@@ -193,7 +193,7 @@ def add_quote_emails():
                 subject, encoding = decode_header(msg["Subject"])[0]
                 if isinstance(subject, bytes):
                     # if it's a bytes, decode to str
-                    subject = subject.decode(encoding)
+                    if encoding is not None: subject = subject.decode(encoding)
 
                 # decode the email id
                 mid, encoding = decode_header(msg["Message-ID"])[0]
