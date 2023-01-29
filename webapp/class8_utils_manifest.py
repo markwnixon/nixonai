@@ -82,7 +82,7 @@ def get_sectors(ht, odat):
     truck = odat.Truck
     tdata = Vehicles.query.filter(Vehicles.Unit == truck).first()
     if tdata is None:
-        tdata = Vehicles.query.filter(Vehicles.id > 1).first()
+        tdata = Vehicles.query.filter(Vehicles.id >= 1).first()
     truck = str(tdata.Unit)
     tag = str(tdata.Plate)
     middle1 = ['SCAC', 'Driver', 'Truck #', 'Tag #', 'Booking', 'Container', 'Size/Type', 'Seal']
