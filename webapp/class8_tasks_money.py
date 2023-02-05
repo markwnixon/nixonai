@@ -4,7 +4,6 @@ from webapp import db
 from webapp.models import Orders, Invoices, People, Services, Drops, SumInv, Interchange
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
-from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.class8_utils_email import etemplate_truck, emaildata_update, invoice_mimemail, etemplate_suminv
 from webapp.class8_dicts import Trucking_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup
 from webapp.class8_utils_manifest import makemanifest
@@ -505,7 +504,7 @@ def set_desc(odat):
             addon = ''
         if hasinput(bk2):
             if bk1 != bk2:
-                desc = f'{desc} Pulled under booking {bk2} {addon}'
+                desc = f'{desc} Pulled under booking {bk1} {addon}'
             else:
                 desc = f'{desc} In-Out booking match. {addon}'
         else:
@@ -524,8 +523,8 @@ def set_desc(odat):
                         bkin = idat2.Release
                         bkout = idat1.Release
                     desc = f'{desc} Pulled under booking {bkout} {addon}'
-                    odat.BOL = bkout
-                    odat.Booking = bkin
+                    odat.BOL = bkin
+                    odat.Booking = bkout
                     db.session.commit()
     return desc
 
@@ -682,7 +681,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             #Kill all the invoices on the summary
             sdat = SumInv.query.filter( (SumInv.Si == sinow) & (SumInv.Status == 1) ).first()
             if sdat is not None:
-                #Even if start over the SI number will be same so dont want to restart teh cache
+                #Even if start over the SI number will be same so dont want to restart the cache
                 cache_start = sdat.Cache
                 print(f'Deleting {sinow} from database')
                 SumInv.query.filter(SumInv.Si == sinow).delete()
@@ -739,7 +738,11 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 thetotal += famt
                 this_amt = d2s(this_amt)
                 sdat.Amount = this_amt
-                if abs(famt - float(old_amt)) > .005:
+                try:
+                    old_amt = float(old_amt)
+                except:
+                    old_amt = 0.00
+                if abs(famt - old_amt) > .005:
                     # If value changes we need to update the other databases...
                     odat = Orders.query.filter(Orders.Jo == sdat.Jo).first()
                     odat.InvoTotal = this_amt
@@ -822,7 +825,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     docref = f'{si}.pdf'
                     amt = d2s(odat.InvoTotal)
                     print(f'amt input to suminv for jo {jo} is {amt} for {odat.InvoTotal}')
-                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.Booking, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
+                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.BOL, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
                     db.session.add(input)
                     odat.Label = si
                     odat.Istat = 6

@@ -290,7 +290,7 @@ Orders_setup = {'name' : 'Trucking Job',
                                             'Top Blocks': ['Bill To', 'Pickup and Return for Dray Import', 'Deliver To'],
                                             'Middle Blocks': ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
                                             'Middle Items': ['Order', 'Booking', 'Container', 'Date', 'Date2'],
-                                            'Lower Blocks': ['JO', 'Gate Out-In', 'Booking', 'Container', 'Description/Notes', 'Amt']
+                                            'Lower Blocks': ['JO', 'Gate Out-In', 'In-Booking', 'Container', 'Description/Notes', 'Amt']
                                         }
 
                                     }
@@ -463,7 +463,7 @@ Summaries_setup = {'name' : 'Summaries',
                            'Top Blocks': ['Bill To', 'Pickup and Return for Dray Import', 'Deliver To'],
                            'Middle Blocks': ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
                            'Middle Items': ['Order', 'Booking', 'Container', 'Date', 'Date2'],
-                           'Lower Blocks': ['JO', 'Gate Out-In', 'Booking', 'Container', 'Description/Notes', 'Amt']
+                           'Lower Blocks': ['JO', 'Gate Out-In', 'In-Booking', 'Container', 'Description/Notes', 'Amt']
                        }}
                   }
 
@@ -766,7 +766,7 @@ Autos_setup = {'name' : 'Auto Job',
                                             'Top Blocks': ['Bill To', 'Pickup and Return for Dray Import', 'Deliver To'],
                                             'Middle Blocks': ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
                                             'Middle Items': ['Order', 'Booking', 'Container', 'Date', 'Date2'],
-                                            'Lower Blocks': ['JO', 'Gate Out-In', 'Booking', 'Container', 'Description/Notes', 'Amt']
+                                            'Lower Blocks': ['JO', 'Gate Out-In', 'In-Booking', 'Container', 'Description/Notes', 'Amt']
                                         }
 
                                     }
@@ -919,7 +919,7 @@ Bills_setup = {'name' : 'Billing',
                                             'Top Blocks': ['Bill To', 'Pickup and Return for Dray Import', 'Deliver To'],
                                             'Middle Blocks': ['Order #', 'BOL #', 'Container #', 'Job Start', 'Job Finished'],
                                             'Middle Items': ['Order', 'Booking', 'Container', 'Date', 'Date2'],
-                                            'Lower Blocks': ['JO', 'Gate Out-In', 'Booking', 'Container', 'Description/Notes', 'Amt']
+                                            'Lower Blocks': ['JO', 'Gate Out-In', 'In-Booking', 'Container', 'Description/Notes', 'Amt']
                                         }
 
                                     }

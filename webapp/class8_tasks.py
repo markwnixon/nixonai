@@ -2,7 +2,6 @@ from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions, Trucklog, Pins
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
-from webapp.InterchangeFuncs import Order_Container_Update, Match_Trucking_Now, Match_Ticket
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
 from webapp.class8_dicts import *
 #Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup, Billing_genre, Bills_setup
