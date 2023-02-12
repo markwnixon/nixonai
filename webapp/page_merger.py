@@ -1,5 +1,5 @@
 from PyPDF2 import PdfFileReader, PdfFileWriter
-from PyPDF2.pdf import PageObject
+#from PyPDF2 import PageObject
 from webapp.CCC_system_setup import myoslist, addpath, addpath2, addtxt, scac
 import os
 import subprocess
