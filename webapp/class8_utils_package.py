@@ -5,7 +5,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
 from PyPDF2 import PdfFileReader, PdfFileWriter, PdfFileMerger
-from PyPDF2.pdf import PageObject
+#from PyPDF2.pdf import PageObject
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import datetime
 import shutil
