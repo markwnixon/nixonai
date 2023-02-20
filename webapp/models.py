@@ -654,10 +654,12 @@ class Services(db.Model):
     id = db.Column('id', db.Integer, primary_key=True)
     Service = db.Column('Service', db.String(40))
     Price = db.Column('Price', db.Numeric(10, 2))
+    Code = db.Column('Code', db.String(40))
 
-    def __init__(self, Service, Price):
+    def __init__(self, Service, Price, Code):
         self.Service = Service
         self.Price = Price
+        self.Code = Code
 
 
 class Gledger(db.Model):

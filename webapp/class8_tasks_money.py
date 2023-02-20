@@ -61,18 +61,42 @@ def loginvo_m(odat,ix):
         db.session.commit()
     return err
 
+def gettimes(input):
+    try:
+        each = input.split('-')
+        time1 = each[0]
+        time1 = datetime.datetime.strptime(each[0], '%H:%M')
+        time2 = time1 + timedelta(2 / 24)
+        time3 = each[1]
+        time3 = datetime.datetime.strptime(each[1], '%H:%M')
+        serviceqty = time3 - time2
+        serviceqty = serviceqty.seconds/3600
+
+        time1 = time1.strftime('%H:%M')
+        time2 = time2.strftime('%H:%M')
+        time3 = time3.strftime('%H:%M')
+        status = 1
+    except:
+        time1, time2, time3, serviceqty, status ='0:00','0:00','0:00',1.0,0
+
+    return time1, time2, time3, serviceqty, status
+
+
 def getservice(myo, service, serviceqty, serviceamt, servicestr):
 
-    sdat = Services.query.filter(Services.Service.contains(service)).first()
+    sdat = Services.query.filter(Services.Code == service).first()
     if sdat is not None:
+        print(f'Evaluating {service}, {serviceqty}, {serviceamt}, {servicestr}')
         nextservice = sdat.Service
         if str(serviceamt) == 'default':
             each = float(sdat.Price)
         else:
-            each = serviceamt
+            each = float(serviceamt)
         if str(serviceqty) == 'default':
             amount = each
             descript = f' For {nextservice}'
+        else:
+            amount = each*float(serviceqty)
     else:
         nextservice = 'Nothing Here'
         each = 0.00
@@ -85,14 +109,13 @@ def getservice(myo, service, serviceqty, serviceamt, servicestr):
         if servicestr == 'default':
             descript = f'Actual Time of Load = {2 + serviceqty} Hours'
         else:
-            time1 = datetime.datetime.strptime(servicestr, '%H:%M')
-            time2 = time1 + timedelta(2/24)
-            time3 = time2 + timedelta(serviceqty/24)
-            time1 = datetime.datetime.strftime(time1, '%H:%M')
-            time2 = datetime.datetime.strftime(time2, '%H:%M')
-            time3 = datetime.datetime.strftime(time3, '%H:%M')
-            descript = f'Free time {time1}-{time2}, detention {time2}-{time3}'
-            amount = each * serviceqty
+            time1, time2, time3, serviceqty, status = gettimes(servicestr)
+            if status == 1:
+                descript = f'Free time {time1}-{time2}, detention {time2}-{time3}'
+                amount = each * serviceqty
+            else:
+                amount = 0.00
+                descript = 'Improper times provided on inpu'
 
     elif nextservice == 'Storage Fee':
         if str(serviceqty) == 'default':
@@ -211,6 +234,11 @@ def initialize_invoice(myo, err):
                         else:
                             serviceamt = float(qbeaches[1])
                             servicestr = 'default'
+
+                    elif '*' in qbl:
+                        qbeaches = qbl.split('*')
+                        service = qbeaches[0]
+                        servicestr = qbeaches[1]
 
                     else:
                         service = qbl

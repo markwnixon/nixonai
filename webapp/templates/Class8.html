@@ -78,7 +78,24 @@
                     {% endif %}
                 </div>
             </div>
-
+           <div class="row">
+                <div class="col-sm-12">
+                    <br>
+                    Instructions for Quote Shorthand:<br>
+                    Follows formt: [line amt]+[servic code]=[service qty]$[amount each]*[service info]<br>
+                    where all [ ] terms after [line amt] are options.  Examples:<br>
+                    <b>500+ch</b> will invoice $500 line haul and add chassis fees automatically.<br>
+                    Chassis qty calculated from in-out gate tickets<br>
+                    Chassis $/day calculated from the amount the service uses by default.<br><br>
+                    <b>600+ch=2$40</b> will invoice $600 line haul and add chassis fees automatically.<br>
+                    Chassis qty overridden by the the qty 2 (=2)<br>
+                    Chassis $/day overridden as $40/day. ($40)<br><br>
+                    <b>450+ch=2$40+dd*13:25-17:51+pd$1500</b> will invoice $450 for line haul,<br>
+                    then will add a line item for chassis (2 days at $40/day),<br>
+                    then will add a line item for driver detention (time start 1:25pm and time end 5:51pm),<br>
+                    then will add a line item for per diem at $1500
+                </div>
+            </div>
             <div class="row">
                 <div class="col-sm-12">
                     <br><br><br><br><br><br>

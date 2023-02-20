@@ -59,6 +59,7 @@ def form_check(input,text,type,task,req):
         else:
             status = 0
             message = 'Ok'
+            text = text.strip()
 
     elif type == 'multitext':
 
@@ -129,6 +130,7 @@ def form_check(input,text,type,task,req):
     elif type == 'concheck':
         #Complex checker.  We want to assess ligitimate containers for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
+        text = text.strip()
         print(f'****************************Entering concheck with text {text}')
         if hasinput(text): char1 = text[0]
         else: char1 = ''
@@ -191,6 +193,7 @@ def form_check(input,text,type,task,req):
         else:
             if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
                 if text is not None:
+                    text = text.strip()
                     lenck = len(text)
 
                     if lenck < 4:
@@ -314,7 +317,17 @@ def form_check(input,text,type,task,req):
                         text = qh
                 else:
                     text=f'History for {sh} not found'
-
+        else:
+            #The input has a value provided so try to convert to a dollar value
+            text = text.strip()
+            try:
+                dt = float(text)
+                text = d2s(dt)
+                status = 0
+                message = 'ok'
+            except:
+                status = 1
+                message = 'Warning: could not set a numerical value for this input'
     else:
         status = 2
         message = 'Input Required but not Found'
