@@ -239,6 +239,8 @@ def initialize_invoice(myo, err):
                         qbeaches = qbl.split('*')
                         service = qbeaches[0]
                         servicestr = qbeaches[1]
+                        serviceqty = 1.0
+                        serviceamt = 'default'
 
                     else:
                         service = qbl
