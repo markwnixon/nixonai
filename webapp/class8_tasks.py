@@ -720,7 +720,7 @@ def Table_maker(genre):
     genre_data['genre_tables_on'] = genre_tables_on
 
     #Apply shortcut for filters for various tasks
-    if invoicehit is not None: tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': 'Uninvoiced', 'Haul Filter': 'Completed', 'Color Filter': 'Both'}
+    if invoicehit is not None: tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': 'Unsent', 'Haul Filter': 'Completed', 'Color Filter': 'Both'}
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
@@ -1012,6 +1012,8 @@ def get_dbdata(table_setup, tfilters):
                     pfilter = f'({table}.Istat == None)  | ({table}.Istat < 1)'
                 elif itest == 'Unrecorded':
                     pfilter = f'{table}.Istat == 1'
+                elif itest == 'Unsent':
+                    pfilter = f'({table}.Istat == None)  | ({table}.Istat < 3)'
                 elif itest == 'Unpaid':
                     pfilter = f'{table}.Istat != 5'
                 elif itest == 'InvoSummaries':

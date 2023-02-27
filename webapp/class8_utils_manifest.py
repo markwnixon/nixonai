@@ -50,6 +50,7 @@ def get_padding(sectors, sectorlines, fs1, fs2, margin, ltm, rtm):
     space_available = total_width - total_need
     lt = len(sectors) - 1
     padding = space_available/lt
+    print(f'The calculated dimensions for sector padding are: total_width: {total_width}, total_need: {total_need}, space_available: {space_available}, padding: {padding}')
     return padding
 
 def get_shipper(odat):
@@ -60,7 +61,7 @@ def get_shipper(odat):
             bid = int(odat.Bid)
             print(shipper,bid)
             pdat = People.query.get(bid)
-            return [pdat.Company, pdat.Addr1, pdat.Addr2, pdat.Telephone, pdat.Email]
+            return [pdat.Company, pdat.Addr1, pdat.Addr2, pdat.Telephone, '']
         except:
             print(shipper)
             pdat = People.query.filter(People.Company == shipper).first()
@@ -68,7 +69,7 @@ def get_shipper(odat):
     else:
         pdat = People.query.filter(People.Company == shipper).first()
     if pdat is not None:
-        return [pdat.Company, pdat.Addr1, pdat.Addr2, pdat.Telephone, pdat.Email]
+        return [pdat.Company, pdat.Addr1, pdat.Addr2, pdat.Telephone, '']
     else:
         return ['']*5
 
@@ -117,16 +118,16 @@ def get_sectors(ht, odat):
             sectorlocs[1] = odat.Dropblock1.splitlines()
             sectorlocs[2] = odat.Dropblock2.splitlines()
             sectorlocs[3] = odat.Dropblock1.splitlines()
-            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'BOL', 'Container' ,'Size/Type', 'Seal']
-            middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Seal]
+            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'BOL', 'Container' ,'Size/Type', 'Chassis']
+            middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Chassis]
 
         elif 'Export' in ht:
             sectors = ['Pickup Empty at Port', 'Load At', 'Return to Port']
             sectorlocs[1] = odat.Dropblock1.splitlines()
             sectorlocs[2] = odat.Dropblock2.splitlines()
             sectorlocs[3] = odat.Dropblock1.splitlines()
-            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Booking', 'Container' ,'Size/Type', 'Seal']
-            middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Seal]
+            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Booking', 'Container' ,'Size/Type', 'Chassis']
+            middle1data = [scac,odat.Driver,truck,tag,odat.Booking,odat.Container,odat.Type,odat.Chassis]
 
         elif 'OTR' in ht:
             sectors = ['Pickup Location', 'Delivery Location']
@@ -302,15 +303,24 @@ def makemanifest(odat):
     # Get the sector labels/data for the haul type chosen:
     sectors, sectorlines, dates, middle1, middle1data, middle2, middle2data = get_sectors(haul_type, odat)
     # Calculate horizonal space requirements and perform best fit
-    padding = get_padding(sectors, sectorlines, 11, 10, 3*bump, ltm, rtm)
+    padding = -1
+    iter = 1
+    fs1 = 11
+    fs2 = 10
+    while padding < 0 and iter < 8:
+        padding = get_padding(sectors, sectorlines, fs1, fs2, 3*bump, ltm, rtm)
+        if padding < 0:
+            fs1 = fs1 - .25
+            fs2 = fs2 - .25
+            iter = iter + 1
 
-    c.setFont('Helvetica', 11, leading=None)
+    c.setFont('Helvetica', fs1, leading=None)
     level1 = m1 + 5 * dl
     leftstart = ltm
     for jx, sector in enumerate(sectors):
 
         lineitems = sectorlines[jx]
-        width_need = minbox_write(sector, lineitems, 11, 10)
+        width_need = minbox_write(sector, lineitems, fs1, fs2)
 
         boxwidth = bump*3+width_need+bump*3
 
@@ -319,7 +329,7 @@ def makemanifest(odat):
 
         c.drawString(leftstart + bump * 3, m1 + 5 * dl + bump * 2, sector)
         print('lineitems', lineitems)
-        top = scroll_write(c, 'Helvetica', 10, level1 - dh, leftstart + bump * 3, 13, lineitems, 175)
+        top = scroll_write(c, 'Helvetica', fs2, level1 - dh, leftstart + bump * 3, 13, lineitems, 175)
         leftstart = leftstart + boxwidth + padding
 
     # Middle Boxes Top Level
@@ -403,7 +413,7 @@ def makemanifest(odat):
     note[0]='All appointments must be met.  If late the load may be refused or worked in without detention.'
     note[1]='If shipper and receiver addresses do not match BOL contact office immediately'
     note[2]='Dates for arrivals and departures are local.'
-    note[3]='Dates, times, and estimates are given without any gurantee and are subject to change without prior notice.'
+    note[3]='Dates, times, and estimates are given without any guarantee and are subject to change without prior notice.'
     dh=12
     full_lines = [hls - 20 * dl, hls - 24* dl]
     for full_line in full_lines: c.line(ltm, full_line, rtm, full_line)
