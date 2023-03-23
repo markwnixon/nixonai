@@ -429,6 +429,8 @@ def get_dispatch(odat):
     ht = odat.HaulType
     hstat = odat.Hstat
     contype = odat.Type
+    booking = odat.Booking
+    newbook = booking.split('-', 1)[0]
     try:
         rel4 = odat.Booking[-4:]
     except:
@@ -454,10 +456,10 @@ def get_dispatch(odat):
 
     if hstat is None: hstat = -1
     if hstat < 1:
-        if 'Export' in ht: return f'Empty Out: *{odat.Booking}* ({ctext} {city})'
+        if 'Export' in ht: return f'Empty Out: *{newbook}* ({ctext} {city})'
         if 'Import' in ht: return f'Load Out: *{rel4}  {odat.Container}* ({ctext} {city})'
     else:
-        if 'Export' in ht: return f'Load In: *{odat.Booking}  {odat.Container}* ({ctext} {city})'
+        if 'Export' in ht: return f'Load In: *{newbook}  {odat.Container}* ({ctext} {city})'
         if 'Import' in ht: return f'Empty In: *{odat.Container}* ({ctext} {city})'
     return ''
 
@@ -509,24 +511,29 @@ def addtopins(thisdate, opair):
             if hstat < 1:
                 if 'Export' in ht:
                     outbook = odat.Booking
-                    outtext = f'Empty Out: *{odat.Booking}* ({ctext} {city})'
+                    outbook = outbook.split('-',1)[0]
+                    outtext = f'Empty Out: *{outbook}* ({ctext} {city})'
+                    outchas = odat.Chassis
                 if 'Import' in ht:
                     outbook = rel4
                     outcon = odat.Container
                     outtext =  f'Load Out: *{rel4}  {odat.Container}* ({ctext} {city})'
+                    outchas = odat.Chassis
             else:
                 if 'Export' in ht:
                     inbook = odat.Booking
+                    inbook = inbook.split('-', 1)[0]
                     incon = odat.Container
                     inchas = odat.Chassis
-                    intext = f'Load In: *{odat.Booking}  {odat.Container}* ({ctext} {city})'
+                    intext = f'Load In: *{inbook}  {odat.Container}* ({ctext} {city})'
                 if 'Import' in ht:
                     incon = odat.Container
                     inchas = odat.Chassis
                     intext = f'Empty In: *{odat.Container}* ({ctext} {city})'
+                    inchas = odat.Chassis
 
-    if intext: print(f'About to add {len(intext)} {intext}')
-    if outtext: print(f'About to add {len(outtext)} {outtext}')
+    if intext: print(f'About to add {len(intext)} {intext} {inchas}')
+    if outtext: print(f'About to add {len(outtext)} {outtext} {outchas}')
 
     input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Carrier=carrier, Intext=intext, Outtext=outtext)
     db.session.add(input)
@@ -1619,6 +1626,11 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                     Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
                     Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
                     db.session.commit()
+
+                elif table == 'Orders' and task_focus == 'Docs':
+                    print('Working to remove the document references')
+
+
                 else:
 
                     for each in odata:
@@ -1859,6 +1871,7 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     viewport = None
 
     #Swaps are to auto-change the copy to have compliment values to the original value
+    print('*******Running NewCopy_task************')
     swaps = tablesetup['copyswaps']
     ckswaps = [key for key, value in swaps.items()]
 
