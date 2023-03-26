@@ -92,15 +92,16 @@
                       <td><input class="form-control" type="text" name='store' value={{ expdata[18] }}></td>
                  </tr>
                   <tr>
-                      </td><td><b>Driver</b></td><td><b>Extra</b></td><td><b>Overweight</b></td><td><b>Reefer</b></td><td></td>
+                      </td><td><b>Driver</b></td><td><b>Extra</b></td><td><b>Overweight</b></td><td><b>Reefer</b></td><td><b>Scale</b></td>
                   </tr>
-                      <td><b>Detention</b></td><td><b>Stop</b></td><td><b>Fee</b></td><td><b>Fee</b></td><td></td>
+                      <td><b>Detention</b></td><td><b>Stop</b></td><td><b>Fee/Mile</b></td><td><b>Fee</b></td><td><b>Tickets</b></td>
                  </tr>
                   <tr>
                       <td><input class="form-control" type="text" name='detention' value={{ expdata[19] }}></td>
                       <td><input class="form-control" type="text" name='extrastop' value={{ expdata[20] }}></td>
                       <td><input class="form-control" type="text" name='overweight' value={{ expdata[21] }}></td>
                       <td><input class="form-control" type="text" name='reefer' value={{ expdata[22] }}></td>
+                      <td><input class="form-control" type="text" name='scale' value={{ expdata[23] }}></td>
                       <td></td>
                  </tr>
 
@@ -159,10 +160,10 @@
 
                   <tr>
                       <td><font size = "0"><b>Total Cost</b></font></td><td><font size = "0"><b>Bid (Live Load)</b></font></td><td><font size = "0"><b>Bid (Drop-Return)</b></font></td>
-                      <td><font size = "0"><b>Bid (Drop-Pick)</b></font></td><td><font size = "0"><b>Bid+{{ expdata[14] }}% FSC</b></font></td>
+                      <td><font size = "0"><b>Bid (Drop-Pick)</b></font></td><td><font size = "0"><b>Bid+{{ expdata[14] }}% FSC</b></font></td><td><font size = "0"><b>All-In</b></font></td>
                   </font></tr>
                   <td><font size = "+1"><b>{{ costdata[8] }}</b></font></td><td><font size = "+1"><b>{{ biddata[0] }}</b></font></td><td><font size = "+1"><b>{{ biddata[1] }}</b></font></td>
-                  <td><font size = "+1"><b>{{ biddata[2] }}</b></font></td><td><font size = "+1"><b>{{ biddata[3] }}</b></font></td>
+                  <td><font size = "+1"><b>{{ biddata[2] }}</b></font></td><td><font size = "+1"><b>{{ biddata[3] }}</b></font></td><td><font size = "+1"><b>{{ biddata[4] }}</b></font></td>
                  </tr>
                  <tr>
 
@@ -217,7 +218,7 @@
         </div>
     </div>
 {% else %}
-
+    {% set ncit = multibid[1]|int %}
     <div class="col-sm-4" align="left">
     <br>
         <div class="card">
@@ -225,34 +226,75 @@
             Enter Data for Quote
           </div>
         <div class="card-body">
-        <table>
-              <tr>
-                  <td align="right"> <b>To Location: &nbsp</b></td>
-                  <td colspan="3"><textarea class="form-control" type="text" name="locto" rows="2">{{locto}}</textarea></td>
-             </tr>
-              <tr>
-                  <td align="right"> <b>From Location: &nbsp</b></td>
-                  <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
-             </tr>
-            {% set types = [' Live', ' Drop-Return', ' Drop-Pick', ' FSC Live'] %}
-             {%  for jx in range(1,5) %}
-                 {% if tbox[6+loop.index]=='on' %}
-                  <tr>
-                      <td align="right"> <b>Bid/Override{{ types[loop.index-1] }}: &nbsp</b></td>
-                      <td colspan="3"><textarea class="form-control" type="text" name="bidthis{{ loop.index-1 }}" rows="1">{{bidthis[jx-1]}}</textarea></td>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="mb" {% if multibid[0] =='on' %} checked {% endif %} name="multibid">
+              <label class="custom-control-label" for="mb">Mutiple Cities Bid Mode{{ ncit }}</label>&nbsp;&nbsp;
+                <select class="form-select" aria-label="Default select example" name="numcit" onchange="this.form.submit()">
+                      <option {% if ncit == 0 %} selected {% endif %}>Number of Cities</option>
+                      <option {% if ncit == 1 %} selected {% endif %} value=1>One</option>
+                      <option {% if ncit == 2 %} selected {% endif %} value=2>Two</option>
+                      <option {% if ncit == 3 %} selected {% endif %} value=3>Three</option>
+                      <option {% if ncit == 4 %} selected {% endif %} value=4>Four</option>
+                      <option {% if ncit == 5 %} selected {% endif %} value=5>Five</option>
+                      <option {% if ncit == 6 %} selected {% endif %} value=6>Six</option>
+                </select>
+
+            </div>
+        {% if multibid[0] == 'on' %}
+            {% set loci = multibid[2] %}
+            {% set mbids = multibid[3] %}
+            <table>
+                <tr>
+                      <td align="right"> <b>From Location: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
+
+                </tr>
+                {% for ix in range(ncit) %}
+
+                    <tr>
+                      <td align="right"> <b>To Location: &nbsp{{ ix+1 }}</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="locto{{ ix }}" rows="2">{{loci[ix]}}</textarea></td>
+                      <td colspan="1"><textarea class="form-control" type="text" name="bidto{{ ix }}" rows="1">{{mbids[ix]}}</textarea></td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                      <td align="right"> <b>Salutation Name/Override: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
                  </tr>
-                 {% endif %}
-             {% endfor %}
-              <tr>
-                  <td align="right"> <b>Salutation Name/Override: &nbsp</b></td>
-                  <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
-             </tr>
-        </table>
+
+            </table>
+        {% else %}
+
+            <table>
+                  <tr>
+                      <td align="right"> <b>To Location: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="locto" rows="2">{{locto}}</textarea></td>
+                 </tr>
+                  <tr>
+                      <td align="right"> <b>From Location: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
+                 </tr>
+                {% set types = [' Live', ' Drop-Return', ' Drop-Pick', ' FSC Live'] %}
+                 {%  for jx in range(1,5) %}
+                     {% if tbox[6+loop.index]=='on' %}
+                      <tr>
+                          <td align="right"> <b>Bid/Override{{ types[loop.index-1] }}: &nbsp</b></td>
+                          <td colspan="3"><textarea class="form-control" type="text" name="bidthis{{ loop.index-1 }}" rows="1">{{bidthis[jx-1]}}</textarea></td>
+                     </tr>
+                     {% endif %}
+                 {% endfor %}
+                  <tr>
+                      <td align="right"> <b>Salutation Name/Override: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
+                 </tr>
+            </table>
+        {% endif %}
 
 
 
            <br>
             Check accessorial items that apply:<br>
+
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box1" {% if tbox[0]=='on' %} checked {% endif %} name="tbox0">
               <label class="custom-control-label" for="box1">Chassis 2-axle</label>
@@ -272,7 +314,7 @@
         <br>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box5" {% if tbox[4]=='on' %} checked {% endif %} name="tbox4">
-              <label class="custom-control-label" for="box5">Overweight</label>
+              <label class="custom-control-label" for="box5">Overweight/Mile</label>
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box6" {% if tbox[5]=='on' %} checked {% endif %} name="tbox5">
@@ -281,6 +323,10 @@
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box7" {% if tbox[6]=='on' %} checked {% endif %} name="tbox6">
               <label class="custom-control-label" for="box7">Reefer</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box16" {% if tbox[15]=='on' %} checked {% endif %} name="tbox15">
+              <label class="custom-control-label" for="box16">Scale Tickets</label>
             </div>
          <br><br>
 
@@ -296,6 +342,10 @@
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box10" {% if tbox[9]=='on' %} checked {% endif %} name="tbox9">
               <label class="custom-control-label" for="box10">Drop-Pick</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box17" {% if tbox[16]=='on' %} checked {% endif %} name="tbox16">
+              <label class="custom-control-label" for="box17">All-In</label>
             </div>
         <br>
             <div class="custom-control custom-checkbox custom-control-inline">
@@ -326,6 +376,7 @@
              <button type="submit" class="btn btn-green btn-sm" name="UpdateE">Override<br>Email</button>
              <button type="submit" class="btn btn-green btn-sm" name="Email">Email<br>Quote</button>
              <button type="submit" class="btn btn-blue btn-sm" name="Return">Return To<br>Table</button>
+             <button type="submit" class="btn btn-red btn-sm" name="RemoveGo">Remove &<br>Next</button>
 
         </div></div>
 

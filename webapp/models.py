@@ -236,7 +236,8 @@ class Quoteinput(db.Model):
     extrastop= db.Column('extrastop', db.Integer)
     overweight = db.Column('overweight', db.Integer)
     reefer = db.Column('reefer', db.Integer)
-    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer):
+    scale = db.Column('scale', db.Integer)
+    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale):
         self.ph_driver = ph_driver
         self.ph_insurance = ph_insurance
         self.ph_total = ph_total
@@ -260,6 +261,7 @@ class Quoteinput(db.Model):
         self.extrastop = extrastop
         self.overweight = overweight
         self.reefer = reefer
+        self.scale = scale
 
 class Chassis(db.Model):
     __tablename__ = 'chassis'
