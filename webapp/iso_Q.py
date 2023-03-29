@@ -531,27 +531,36 @@ def get_directions(start,end):
 
     return dists, duras, lats, lons, hts, tot_dist, tot_dura
 
-def get_place(body, subject):
+def get_place(body, subject, multibid):
+    loci = []
+    if multibid[0]:
+        loops = multibid[1]
+    else:
+        loops = 1
     zip_p = re.compile("((\w+)[,.]?\s+(\w+)[,.]?\s+[0-9]{5})")
     testp = zip_p.findall(subject)
     testq = zip_p.findall(body)
     testx = zip_p.findall('Upper Marlboro, MD  20743')
-    print(f'the address is {testp}, {testq} {testx}')
-    try:
-        s = testp[0]
-        x = list(s)
-        location = x[0]
-        print(location)
-    except:
+    print(f'the address is {testp}, {testq}, {testx}, {loops}')
+    for ix in range(loops):
         try:
-            s = testq[0]
-            x=list(s)
+            s = testp[ix]
+            x = list(s)
             location = x[0]
-            print(location)
+            print(f'Loop {ix}: location is {location}')
         except:
-            location = 'Upper Marlboro, MD  20743'
-    if len(location) > 199: location = location[0:199]
-    return location
+            try:
+                s = testq[ix]
+                x=list(s)
+                location = x[0]
+                print(location)
+            except:
+                location = 'Upper Marlboro, MD  20743'
+        if len(location) > 199: location = location[0:199]
+        loci.append(location)
+
+    print(f'Loop {ix}: location is {location}')
+    return location, loci
 
 def friendly(emailin):
     try:
@@ -569,7 +578,7 @@ def emailonly(emailin):
     except:
         return emailin
 
-def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid):
+def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle):
     sen, tbox, btype, stype, mixtype = insert_adds(tbox,expdata,takedef,distdata,multibid)
     print(f'btype is {btype}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
@@ -577,6 +586,10 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
     if multibid[0]:
         loci = multibid[2]
         bids = multibid[3]
+        etitle = f'{cdata[0]} Quotes to'
+        for loc in loci:
+            if hasinput(loc): etitle = etitle + f' {loc};'
+        etitle = etitle[:-1]
         if 'all-in' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer the following <b>All-In</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
@@ -670,7 +683,7 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
     if len(btype) > 1 and mixtype == 'mix':
         ebody = ebody.replace('is inclusive','is for both 20ft and 40ft containers and is inclusive')
 
-    return ebody, tbox
+    return ebody, tbox, etitle
 
 def insert_adds(tbox, expdata, takedef, distdata, multibid):
     print('Making the inserts')
@@ -918,6 +931,7 @@ def isoQuote():
         for ix in range(multibid[1]):
             locs.append(request.values.get(f'locto{ix}'))
         multibid[2] = locs
+
         if qbid is not None: taskbox = 1
         if qdel is not None: taskbox = 2
         refresh = request.values.get('refresh')
@@ -1013,6 +1027,7 @@ def isoQuote():
             if qdat is not None:
                 quot = qdat.id
                 quotbut = qdat.id
+            multibid = [0]*4
 
         #If no radio button selected then go with generic
         if taskbox == 1 and quot == 0: taskbox = 5
@@ -1048,9 +1063,17 @@ def isoQuote():
             if quot>0 and qdat is not None:
                 locto = qdat.Location
                 if locto is None:
-                    locto = get_place(qdat.Subject, qdat.Body)
+                    locto, loci = get_place(qdat.Subject, qdat.Body, multibid)
                     qdat.Location = locto
+                    multibid[2] = loci
                     db.session.commit()
+                if multibid[0]:
+                    # Test if all locs are None then try to extract from email:
+                    testloc, testloci = get_place(qdat.Subject, qdat.Body, multibid)
+                    locs = multibid[2]
+                    for ix in range(multibid[1]):
+                        if not hasinput(locs[ix]): locs[ix] = testloci[ix]
+
                 emailto = qdat.From
                 if emailto is None:
                     emailto = qdat.From
@@ -1282,7 +1305,7 @@ def isoQuote():
                     except:
                         bidname = ''
                     db.session.commit()
-                    ebody, tbox = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid)
+                    ebody, tbox, etitle = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle)
                     ebody = ebody + maketable(expdata)
                     emailin1 = request.values.get('edat2')
                     if updatego is None:
@@ -1297,7 +1320,7 @@ def isoQuote():
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
                         etitle = f'{cdata[0]} Quote to {locto} from {locfrom}'
-                        ebody, tbox = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata,multibid)
+                        ebody, tbox, etitle = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata,multibid, etitle)
                         ebody = ebody + maketable(expdata)
                     else:
                         etitle = request.values.get('edat0')
