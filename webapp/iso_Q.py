@@ -531,7 +531,7 @@ def get_directions(start,end):
 
     return dists, duras, lats, lons, hts, tot_dist, tot_dura
 
-def get_place(body, subject, multibid):
+def get_place(subject, body, multibid):
     loci = []
     if multibid[0]:
         loops = multibid[1]
@@ -541,25 +541,27 @@ def get_place(body, subject, multibid):
     testp = zip_p.findall(subject)
     testq = zip_p.findall(body)
     testx = zip_p.findall('Upper Marlboro, MD  20743')
+    print('The body is:',body)
     print(f'the address is {testp}, {testq}, {testx}, {loops}')
     for ix in range(loops):
         try:
             s = testp[ix]
             x = list(s)
             location = x[0]
-            print(f'Loop {ix}: location is {location}')
+            print(f'Loop {ix} in subject: location is {location}')
         except:
             try:
                 s = testq[ix]
                 x=list(s)
                 location = x[0]
-                print(location)
+                print(f'Loop {ix} in body: location is {location}')
             except:
                 location = 'Upper Marlboro, MD  20743'
+                print(f'Loop {ix} both suject and body failed')
         if len(location) > 199: location = location[0:199]
         loci.append(location)
 
-    print(f'Loop {ix}: location is {location}')
+    print(f'Loop {ix}: location picked is {location}')
     return location, loci
 
 def friendly(emailin):
