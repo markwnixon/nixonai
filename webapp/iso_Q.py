@@ -17,6 +17,8 @@ from bs4 import BeautifulSoup
 import datetime
 from webapp.models import Quotes, Quoteinput
 from send_mimemail import send_mimemail
+from pyzipcode import ZipCodeDatabase
+zcdb = ZipCodeDatabase()
 
 API_KEY_GEO = apikeys['gkey']
 API_KEY_DIS = apikeys['dkey']
@@ -164,7 +166,7 @@ def add_quote_emails():
     dayback = 4
     datefrom = (datetime.date.today() - datetime.timedelta(dayback)).strftime("%d-%b-%Y")
     dateback = datetime.date.today() - datetime.timedelta(dayback)
-    print(username, password, datefrom, imap_url)
+    #print(username, password, datefrom, imap_url)
 
     imap = imaplib.IMAP4_SSL(imap_url)
     imap.login(username, password)
@@ -185,7 +187,7 @@ def add_quote_emails():
     qtest = Quotes.query.filter(Quotes.Date > dateback).all()
     for qt in qtest:
         midexist.append(qt.Mid)
-    print(f'There are currently {len(midexist)} emails in table since {dateback}')
+    #print(f'There are currently {len(midexist)} emails in table since {dateback}')
 
 
     N = 50
@@ -434,7 +436,7 @@ def maketable(expdata):
     blist = ['Per Day', 'Per Day', 'Per Pull', 'Per Day', 'Per Hour', 'Per Stop', 'Per mile', '', '']
     clist = expdata[15:]
     for jx, item in enumerate(alist):
-        print(item,blist[jx],clist[jx])
+        #print(item,blist[jx],clist[jx])
         bdata = bdata + f'<tr><td><font size="+0">{item}&nbsp;</font></td><td>&nbsp&nbsp&nbsp&nbsp</td><td><font size="+0">{blist[jx]}&nbsp;</font></td><td>&nbsp&nbsp&nbsp&nbsp</td><td><font size="+0">${clist[jx]}&nbsp;</font></td></tr>\n'
     bdata = bdata + '</table><br><br>'
     bdata = bdata + f'<em>{signoff}</em>'
@@ -533,35 +535,53 @@ def get_directions(start,end):
 
 def get_place(subject, body, multibid):
     loci = []
-    if multibid[0]:
-        loops = multibid[1]
-    else:
-        loops = 1
-    zip_p = re.compile("((\w+)[,.]?\s+(\w+)[,.]?\s+[0-9]{5})")
+    location = 'Upper Marlboro, MD  20743'
+    #zip_p = re.compile("((\w+)[,.]?\s+(\w+)[,.]?\s+[0-9]{5})")
+    zip_p = re.compile(r'[\s,]\d{5}(?:[-\s]\d{4})?\b')
     testp = zip_p.findall(subject)
     testq = zip_p.findall(body)
-    testx = zip_p.findall('Upper Marlboro, MD  20743')
+    print(f'the subject has these zipcodes {testp}')
+    print(f'the body has these zipcodes {testq}')
     print('The body is:',body)
-    print(f'the address is {testp}, {testq}, {testx}, {loops}')
-    for ix in range(loops):
+    #print(f'the address is {testp}, {testq}, {testx}, {loops}')
+    for test in testp:
+        ziptest = test.strip()
         try:
-            s = testp[ix]
-            x = list(s)
-            location = x[0]
-            print(f'Loop {ix} in subject: location is {location}')
+            zb = zcdb[ziptest]
+            location = f'{zb.city}, {zb.state}  {ziptest}'
+            # print(zcdb[location])
+            # print(f'zb is {zb} {zb.city}')
+            print(f'In subject: test is {test} and location is **{location}**')
         except:
-            try:
-                s = testq[ix]
-                x=list(s)
-                location = x[0]
-                print(f'Loop {ix} in body: location is {location}')
-            except:
-                location = 'Upper Marlboro, MD  20743'
-                print(f'Loop {ix} both suject and body failed')
-        if len(location) > 199: location = location[0:199]
-        loci.append(location)
+            print(f'{ziptest} does not work')
+            location = 'nogood'
 
-    print(f'Loop {ix}: location picked is {location}')
+        if location != 'nogood' and multibid[0]=='off': loci.append(location)
+
+    for test in testq:
+        ziptest = test.strip()
+        try:
+            zb = zcdb[ziptest]
+            location = f'{zb.city}, {zb.state}  {ziptest}'
+            print(f'In body: test is {test} and location is **{location}**')
+        except:
+            print(f'{ziptest} does not work')
+            location = 'nogood'
+
+        if location != 'nogood': loci.append(location)
+
+
+    if (len(testp)==0 and len(testq)==0) or len(loci)==0:
+        location = 'Upper Marlboro, MD  20743'
+        print(f'Both subject and body failed to find a location')
+    else:
+        #Find best and most likely loci
+        print('loci is:', loci)
+        location = loci[0]
+
+    if len(location) > 199: location = location[0:199]
+
+
     return location, loci
 
 def friendly(emailin):
@@ -582,10 +602,10 @@ def emailonly(emailin):
 
 def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle):
     sen, tbox, btype, stype, mixtype = insert_adds(tbox,expdata,takedef,distdata,multibid)
-    print(f'btype is {btype}')
+    #print(f'btype is {btype}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     ebody = ''
-    if multibid[0]:
+    if multibid[0] == 'on':
         loci = multibid[2]
         bids = multibid[3]
         etitle = f'{cdata[0]} Quotes to'
@@ -688,7 +708,6 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
     return ebody, tbox, etitle
 
 def insert_adds(tbox, expdata, takedef, distdata, multibid):
-    print('Making the inserts')
     sen = ''
     adds = []
     btype = []
@@ -700,9 +719,8 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
     if not takedef:
         for ix in range(len(tbox)):
             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-            print(ix,tbox[ix])
-    for ix in range(len(tbox)):
-        print(ix, tbox[ix])
+            #print(ix,tbox[ix])
+
     if 'all-in' not in btype:
         if tbox[0]:
             adds.append(f'Standard 2-axle Chassis:  <b>${expdata[15]}/day</b>')
@@ -724,7 +742,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
     num_items = len(adds)
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     if len(btype) == 1:
-        if multibid[0]:
+        if multibid[0] == 'on':
             if num_items == 1:
                 sen = '<br><br>An added charge to these quotes will include: '
             elif num_items > 1:
@@ -898,10 +916,10 @@ def isoQuote():
     bidthis = [0]*5
     expdata=[]
     costdata=[]
-    multibid=[0]*4
+    multibid=['off', 1, 0, 0]
     locs = []
     ebodytxt=''
-    qdat=None
+    qdat = None
     from viewfuncs import dataget_Q, nonone, numcheck
     if request.method == 'POST':
         print('This is a POST')
@@ -924,15 +942,25 @@ def isoQuote():
         taskbox = nonone(taskbox)
         qbid = request.values.get('quickbid')
         qdel = request.values.get('quickdel')
-        multibid[0] = request.values.get('multibid')
-        try:
-            multibid[1] = int(request.values.get('numcit'))
-        except:
+        getnumq = request.values.get('numcit')
+        if getnumq is not None:
+            if 1 == 1:
+                try: multibid[1] = int(getnumq)
+                except: multibid[1] = 1
+                if multibid[1] > 1:
+                    multibid[0] = 'on'
+                    for ix in range(multibid[1]):
+                        locs.append(request.values.get(f'locto{ix}'))
+                    multibid[2] = locs
+                else: multibid[0] = 'off'
+            elif 1 == 2:
+                multibid[0] = 'off'
+                multibid[1] = 1
+        else:
+            multibid[0] = 'off'
             multibid[1] = 1
         print(f'mutlibid is {multibid[0]} and {multibid[1]}')
-        for ix in range(multibid[1]):
-            locs.append(request.values.get(f'locto{ix}'))
-        multibid[2] = locs
+
 
         if qbid is not None: taskbox = 1
         if qdel is not None: taskbox = 2
@@ -1029,7 +1057,7 @@ def isoQuote():
             if qdat is not None:
                 quot = qdat.id
                 quotbut = qdat.id
-            multibid = [0]*4
+            multibid = ['off', 1, 0, 0]
 
         #If no radio button selected then go with generic
         if taskbox == 1 and quot == 0: taskbox = 5
@@ -1069,7 +1097,7 @@ def isoQuote():
                     qdat.Location = locto
                     multibid[2] = loci
                     db.session.commit()
-                if multibid[0]:
+                if multibid[0] == 'on':
                     # Test if all locs are None then try to extract from email:
                     testloc, testloci = get_place(qdat.Subject, qdat.Body, multibid)
                     locs = multibid[2]
@@ -1096,7 +1124,7 @@ def isoQuote():
                     locfrom = 'Seagirt Marine Terminal, Baltimore, MD 21224'
 
                 if updatego is not None or updatebid is not None or emailgo is not None or updateE is not None:
-                    if multibid[0]:
+                    if multibid[0] == 'on':
                         mbids = []
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
@@ -1144,9 +1172,24 @@ def isoQuote():
                         qdat.Status = 2
                         db.session.commit()
                     emaildata = sendquote(bidthis)
-                    taskbox=0
-                    quot=0
-
+                    # Now get the new item not removed from the list
+                    qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
+                    if qdat is not None:
+                        quot = qdat.id
+                        quotbut = qdat.id
+                        multibid = ['off', 1, 0, 0]
+                        taskbox=5
+                        emailto = qdat.From
+                        if emailto is None:
+                            emailto = qdat.From
+                            qdat.From = emailto
+                            db.session.commit()
+                        locto, loci = get_place(qdat.Subject, qdat.Body, multibid)
+                        qdat.Location = locto
+                        db.session.commit()
+                    else:
+                        taskbox = 0
+                        quot = 0
 
                 print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
                 try:
@@ -1302,7 +1345,7 @@ def isoQuote():
                     #Try to use just first name as default
                     try:
                         bidnamelist = customer.split()
-                        print(bidnamelist)
+                        #print(bidnamelist)
                         bidname = bidnamelist[0]
                     except:
                         bidname = ''
@@ -1348,8 +1391,8 @@ def isoQuote():
                 ebody = qdat.Body
                 soup = BeautifulSoup(ebody)
                 ebodytxt = soup.get_text()
-                print(f'the length of body is {len(qdat.Body)}')
-                print(ebodytxt)
+                #print(f'the length of body is {len(qdat.Body)}')
+                #print(ebodytxt)
             else:
                 ebody = f'Regirgitation from the input'
             efrom = usernames['quot']
@@ -1373,7 +1416,7 @@ def isoQuote():
     else:
         print('This is NOT a Post')
         ebodytxt = ''
-        print('Entering Quotes1',flush=True)
+        #print('Entering Quotes1',flush=True)
         username = session['username'].capitalize()
         tbox = [0] * 21
         tbox[0] = 'on'
@@ -1395,16 +1438,17 @@ def isoQuote():
         bidthis = None
         bidname = None
 
-        print('Entering Quotes2', flush=True)
+        #print('Entering Quotes2', flush=True)
         timedata = []
         distdata = []
         add_quote_emails()
         thismuch = '6'
         taskbox = 0
         quot=0
-        print('Entering Quotes3', flush=True)
+        #print('Entering Quotes3', flush=True)
 
 
     qdata = dataget_Q(thismuch)
     print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
+    print(f'mutlibid on exit is {multibid[0]} and {multibid[1]}')
     return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt, multibid
