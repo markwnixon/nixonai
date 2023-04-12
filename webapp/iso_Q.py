@@ -581,6 +581,11 @@ def get_place(subject, body, multibid):
 
     if len(location) > 199: location = location[0:199]
 
+    # if multibid is on need to make sure loci has same number of locations as multibid request
+    requested = multibid[1]
+    if len(loci) < requested:
+        while len(loci) < requested:
+            loci.append('Upper Marlboro, MD  20743')
 
     return location, loci
 
@@ -1101,6 +1106,8 @@ def isoQuote():
                     # Test if all locs are None then try to extract from email:
                     testloc, testloci = get_place(qdat.Subject, qdat.Body, multibid)
                     locs = multibid[2]
+                    print(f'Here is multibid[1]:{multibid[1]} and here is multibid[2]: {multibid[2]}')
+                    print(f'Here is locs:{locs} and here is testloci:{testloci}')
                     for ix in range(multibid[1]):
                         if not hasinput(locs[ix]): locs[ix] = testloci[ix]
 
