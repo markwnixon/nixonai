@@ -433,7 +433,7 @@ def maketable(expdata):
     bdata = '<br><br>\n'
     bdata = bdata + '<table>\n'
     alist = ['Tandem Chassis', 'Triaxle Chassis', 'Prepull Fee', 'Yard Storage', 'Driver Detention', 'Extra Stop', 'Overweight', 'Reefer Fee', 'Scale Tickets']
-    blist = ['Per Day', 'Per Day', 'Per Pull', 'Per Day', 'Per Hour', 'Per Stop', 'Per mile', '', '']
+    blist = ['Per Day', 'Per Day', 'Per Pull', 'Per Day', 'Per Hour', 'Per Stop', '$75.00 + Per mile', '', '']
     clist = expdata[15:]
     for jx, item in enumerate(alist):
         #print(item,blist[jx],clist[jx])
@@ -618,13 +618,13 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
             if hasinput(loc): etitle = etitle + f' {loc};'
         etitle = etitle[:-1]
         if 'all-in' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer the following <b>All-In</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>All-In</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'{sen}<br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
 
         elif 'live' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b>is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
@@ -632,21 +632,21 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
 
 
         elif 'dr' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer the following <b>Drop-Return-for-Pickup</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b>is pleased to offer the following <b>Drop-Pick</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.'
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
 
         elif 'dp' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer the following <b>Drop-Pick</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Hook</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.  A return container must be available and ready upon delivery or bobtail charges may apply.'
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
 
         elif 'fsc' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 ebody = ebody + f'{tabover}<b>{bids[ix]}plus {d1s(expdata[5])}% FSC</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
@@ -654,25 +654,25 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
 
     else:
         if 'all-in' in btype:
-            ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto}.' \
+            ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto}.' \
                     f'\nThe quote is inclusive of tolls, 2-days chassis, pre-pull, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
             ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
         elif len(btype) == 1:
 
             if 'live' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} is pleased to offer a quote of <b>${bidthis[0]}</b> for this live load to {locto}.' \
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[0]}</b> for this live load to {locto}.' \
                         f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
 
             if 'dr' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} is pleased to offer a quote of <b>${bidthis[1]}</b> for this drop-and-return load at {locto}.' \
-                        f'\nThe quote is inclusive of tolls and fuel.'
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[1]}</b> for this drop-pick load at {locto}.' \
+                        f'\nThe quote is inclusive of tolls and fuel and two bobtails to load site.'
 
             if 'dp' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} is pleased to offer a quote of <b>${bidthis[2]}</b> for this drop-pick load to {locto}.' \
-                        f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[2]}</b> for this drop-hook load to {locto}.' \
+                        f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).  No bobtailing included for drop-hook.'
 
             if 'fsc' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} is pleased to offer a quote of <b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for this load to {locto}.' \
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for this load to {locto}.' \
                         f'\nThe quote is inclusive of tolls and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
 
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
@@ -680,18 +680,18 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
 
         elif len(btype) > 1:
             if mixtype == 'mix':
-                ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer these quotes for loads to {locto}, which apply to both 20ft and 40ft containers.<br><br>'
+                ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}, which apply to both 20ft and 40ft containers.<br><br>'
             else:
-                ebody = f'Hello {customer}, <br><br>{cdata[0]} is pleased to offer these quotes for loads to {locto}.<br><br>'
+                ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}.<br><br>'
 
             if 'live' in btype:
                 ebody =  ebody + f'<b>${bidthis[0]}</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
 
             if 'dr' in btype:
-                ebody = ebody + f'<b>${bidthis[1]}</b> for a drop and return for pick-up.<br>'
+                ebody = ebody + f'<b>${bidthis[1]}</b> for a drop-pick (two bobtails included).<br>'
 
             if 'dp' in btype:
-                ebody = ebody + f'<b>${bidthis[2]}</b> for a drop-pick load (pick ready when dropped).<br>'
+                ebody = ebody + f'<b>${bidthis[2]}</b> for a drop-hook (no bobtailing).<br>'
 
             if 'fsc' in btype:
                 ebody = ebody + f'<b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
@@ -736,7 +736,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
         if tbox[3]:
             adds.append(f'Yard Storage: <b>${expdata[18]}/day</b>')
         if tbox[4]:
-            owfee = round(int(float(expdata[21]) * float(distdata[0])/2)/10)*10
+            owfee = round(int(float(expdata[21]) * float(distdata[0])/2)/10)*10 + 75.00
             adds.append(f'Overweight Fee:  <b>${d2s(owfee)}</b>')
         if tbox[5]:
             adds.append(f'Extra Stop Fee: <b>${expdata[20]}</b>')
@@ -1062,6 +1062,16 @@ def isoQuote():
             if qdat is not None:
                 quot = qdat.id
                 quotbut = qdat.id
+                # Check to see if we have rolled into a new date, if so then go back to the table
+                datethis = f'{qdat.Date}'
+                datelast = request.values.get('datelast')
+                print(f'comparing {datethis} to {datelast}')
+                if datelast is not None:
+                    if datethis == datelast:
+                        print('they are the same')
+                    else:
+                        taskbox = 0
+                        quot = 0
             multibid = ['off', 1, 0, 0]
 
         #If no radio button selected then go with generic
@@ -1179,24 +1189,40 @@ def isoQuote():
                         qdat.Status = 2
                         db.session.commit()
                     emaildata = sendquote(bidthis)
+
                     # Now get the new item not removed from the list
                     qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
                     if qdat is not None:
                         quot = qdat.id
                         quotbut = qdat.id
-                        multibid = ['off', 1, 0, 0]
-                        taskbox=5
-                        emailto = qdat.From
-                        if emailto is None:
-                            emailto = qdat.From
-                            qdat.From = emailto
-                            db.session.commit()
-                        locto, loci = get_place(qdat.Subject, qdat.Body, multibid)
-                        qdat.Location = locto
-                        db.session.commit()
+
+                        # Check to see if we have tolled into a new date, if so then go back to the table
+                        datethis = f'{qdat.Date}'
+                        datelast = request.values.get('datelast')
+                        print(f'comparing {datethis} to {datelast}')
+                        if datelast is not None:
+                            if datethis == datelast:
+                                multibid = ['off', 1, 0, 0]
+                                taskbox = 5
+                                emailto = qdat.From
+                                if emailto is None:
+                                    emailto = qdat.From
+                                    qdat.From = emailto
+                                    db.session.commit()
+                                locto, loci = get_place(qdat.Subject, qdat.Body, multibid)
+                                qdat.Location = locto
+                                db.session.commit()
+                            else:
+                                taskbox = 0
+                                quot = 0
+                        else:
+                            taskbox = 0
+                            quot = 0
                     else:
                         taskbox = 0
                         quot = 0
+
+
 
                 print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
                 try:
@@ -1328,7 +1354,7 @@ def isoQuote():
 
                 # Set checkbox defaults if first time through
                 #print(updatebid, updatego, updateE,emailgo)
-                if updatebid is None and updatego is None and updateE is None and emailgo is None:
+                if updatebid is None and updatego is None and updateE is None:
                     tbox = [0] * 21
                     tbox[0] = 'on'
                     tbox[7] = 'on'

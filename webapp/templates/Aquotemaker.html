@@ -159,8 +159,8 @@
                 <tbody>
 
                   <tr>
-                      <td><font size = "0"><b>Total Cost</b></font></td><td><font size = "0"><b>Bid (Live Load)</b></font></td><td><font size = "0"><b>Bid (Drop-Return)</b></font></td>
-                      <td><font size = "0"><b>Bid (Drop-Pick)</b></font></td><td><font size = "0"><b>Bid+{{ expdata[14] }}% FSC</b></font></td><td><font size = "0"><b>All-In</b></font></td>
+                      <td><font size = "0"><b>Total Cost</b></font></td><td><font size = "0"><b>Bid (Live Load)</b></font></td><td><font size = "0"><b>Bid (Drop-Pick)</b></font></td>
+                      <td><font size = "0"><b>Bid (Drop-Hook)</b></font></td><td><font size = "0"><b>Bid+{{ expdata[14] }}% FSC</b></font></td><td><font size = "0"><b>All-In</b></font></td>
                   </font></tr>
                   <td><font size = "+1"><b>{{ costdata[8] }}</b></font></td><td><font size = "+1"><b>{{ biddata[0] }}</b></font></td><td><font size = "+1"><b>{{ biddata[1] }}</b></font></td>
                   <td><font size = "+1"><b>{{ biddata[2] }}</b></font></td><td><font size = "+1"><b>{{ biddata[3] }}</b></font></td><td><font size = "+1"><b>{{ biddata[4] }}</b></font></td>
@@ -336,11 +336,11 @@
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box9" {% if tbox[8]=='on' %} checked {% endif %} name="tbox8">
-              <label class="custom-control-label" for="box9">Drop-Return</label>
+              <label class="custom-control-label" for="box9">Drop-Pick</label>
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box10" {% if tbox[9]=='on' %} checked {% endif %} name="tbox9">
-              <label class="custom-control-label" for="box10">Drop-Pick</label>
+              <label class="custom-control-label" for="box10">Drop-Hook</label>
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box17" {% if tbox[16]=='on' %} checked {% endif %} name="tbox16">
@@ -386,11 +386,13 @@
                 <input type = "hidden" name ="quotpass" value= "{{quot}}">
                 <input type = "hidden" name ="thismuch" value= "{{thismuch}}">
                 <input type = "hidden" name ="taskbox" value= "{{taskbox}}">
+                <input type = "hidden" name ="datelast" value= "{{qdat.Date}}">
             </div>
             <div class="card-body" align=""left">
                 {% if qdat %}
                     From:  {{ qdat.From|safe }}<br>
-                    Subject:  {{ qdat.Subject|safe }}<br><br>
+                    Subject:  {{ qdat.Subject|safe }}<br>
+                    Date: {{ qdat.Date|safe }}<br><br>
                     {{ qdat.Body|safe }}
                 {% endif %}
 
