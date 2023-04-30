@@ -237,7 +237,11 @@ class Quoteinput(db.Model):
     overweight = db.Column('overweight', db.Integer)
     reefer = db.Column('reefer', db.Integer)
     scale = db.Column('scale', db.Integer)
-    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale):
+    residential = db.Column('residential', db.Integer)
+    congestion = db.Column('congestion', db.Integer)
+    chassplit = db.Column('chassplit', db.Integer)
+    owmile = db.Column('owmile', db.Integer)
+    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile):
         self.ph_driver = ph_driver
         self.ph_insurance = ph_insurance
         self.ph_total = ph_total
@@ -262,6 +266,10 @@ class Quoteinput(db.Model):
         self.overweight = overweight
         self.reefer = reefer
         self.scale = scale
+        self.residential = residential
+        self.congestion = congestion
+        self.chassplit = chassplit
+        self.owmile = owmile
 
 class Chassis(db.Model):
     __tablename__ = 'chassis'
@@ -718,22 +726,22 @@ class Quotes(db.Model):
     Date = db.Column('Date', db.DateTime)
     From = db.Column('From', db.String(200))
     Subject = db.Column('Subject', db.String(200))
-    Body = db.Column('Body', db.String(500))
     Mid = db.Column('Mid', db.String(200))
     Person = db.Column('Person', db.String(100))
-    Response = db.Column('Response', db.String(500))
+    Response = db.Column('Response', db.String(2000))
     Amount = db.Column('Amount', db.String(45))
     Location = db.Column('Location', db.String(200))
     Status = db.Column('Status', db.Integer)
     Responder = db.Column('Responder', db.String(45))
     RespDate = db.Column('RespDate', db.DateTime)
     Start = db.Column('Start', db.String(45))
+    Emailto = db.Column('Emailto', db.String(45))
+    Subjectsend = db.Column('Subjectsend', db.String(100))
 
-    def __init__(self, Date, From, Subject, Body, Response, Amount, Location, Status, Responder, RespDate, Start, Mid, Person):
+    def __init__(self, Date, From, Subject, Response, Amount, Location, Status, Responder, RespDate, Start, Mid, Person, Emailto, Subjectsend):
         self.Date = Date
         self.From = From
         self.Subject = Subject
-        self.Body = Body
         self.Response = Response
         self.Amount = Amount
         self.Location = Location
@@ -743,6 +751,8 @@ class Quotes(db.Model):
         self.Start = Start
         self.Mid = Mid
         self.Person = Person
+        self.Emailto = Emailto
+        self.Subjectsend = Subjectsend
 
 
 class DriverAssign(db.Model):

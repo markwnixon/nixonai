@@ -26,7 +26,9 @@
             {% for data in qdata %}
 
                 {% set a = data.Status  %}
-                {% if a==3 %}
+                {% if a==7 %}
+                    {% set atc1="blue text-white font-weight-bold" %}
+                {% elif a==3 %}
                     {% set atc1="green text-white font-weight-bold" %}
                 {% elif a==2 %}
                     {% set atc1="amber font-weight-bold" %}

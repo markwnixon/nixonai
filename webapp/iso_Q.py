@@ -12,6 +12,7 @@ from email.header import decode_header
 import webbrowser
 import os
 from email.utils import parsedate_tz, mktime_tz
+from email.utils import parsedate_to_datetime
 from bs4 import BeautifulSoup
 
 import datetime
@@ -160,195 +161,67 @@ def clean(text):
     # clean text for creating a folder
     return "".join(c if c.isalnum() else "_" for c in text)
 
+def extract_for_code(data):
+    text, encoding = decode_header(data)[0]
+    if isinstance(text, bytes):
+        if encoding is not None: text = text.decode(encoding)
+    return text
+
+
 def add_quote_emails():
     username = usernames['quot']
     password = passwords['quot']
-    dayback = 4
-    datefrom = (datetime.date.today() - datetime.timedelta(dayback)).strftime("%d-%b-%Y")
-    dateback = datetime.date.today() - datetime.timedelta(dayback)
-    #print(username, password, datefrom, imap_url)
-
     imap = imaplib.IMAP4_SSL(imap_url)
     imap.login(username, password)
     status, messages = imap.select('INBOX')
     # total number of emails
     messages = int(messages[0])
     print(f'Total number of messages in inbox is {messages}')
-    subjectlist = []
-    fromlist = []
-    bodylist = []
-    contentlist = []
-    alist = []
-    midlist = []
-    midexist = []
-    datelist = []
-    writefiles = 0
-    # Get a list of message IDs so we do not duplicate putting into database...this is last 7 days from database
-    qtest = Quotes.query.filter(Quotes.Date > dateback).all()
-    for qt in qtest:
-        midexist.append(qt.Mid)
-    #print(f'There are currently {len(midexist)} emails in table since {dateback}')
-
 
     N = 50
-    for i in range(messages, messages - N, -1):
+    #for i in range(messages, messages - N, -1):
+    for i in range(messages - N + 1, messages + 1):
         # fetch the email message by ID
-        res, msg = imap.fetch(str(i), "(RFC822)")
-        for response in msg:
-            if isinstance(response, tuple):
-                body = '0'
-                # parse a bytes email into a message object
-                msg = email.message_from_bytes(response[1])
-                # decode the email subject
-                subject, encoding = decode_header(msg["Subject"])[0]
-                if isinstance(subject, bytes):
-                    # if it's a bytes, decode to str
-                    if encoding is not None: subject = subject.decode(encoding)
+        #res, msg = imap.fetch(str(i), "(RFC822)")
+        # Insert the GPTChat solution
+        result, email_data = imap.fetch(str(i), "(RFC822)")
+        # convert the email message data into an email object
+        email_message = email.message_from_bytes(email_data[0][1])
 
-                # decode the email id
-                mid, encoding = decode_header(msg["Message-ID"])[0]
-                if isinstance(mid, bytes):
-                    # if it's a bytes, decode to str
-                    mid = mid.decode(encoding)
+        # extract the subject of the email
+        subject = extract_for_code(email_message["Subject"])
+        mid = extract_for_code(email_message["Message-ID"])
+        fromp = extract_for_code(email_message["From"])
 
-                if mid in midexist: break
+        # extract the date and time the email was sent
+        date_time_str = email_message["Date"]
+        date_time = parsedate_to_datetime(date_time_str)
 
-                # decode the email date
-                thisdate, encoding = decode_header(msg["Date"])[0]
-                if isinstance(thisdate, bytes):
-                    # if it's a bytes, decode to str
-                    thisdate = thisdate.decode(encoding)
-                #Now convvert to timestamp
-                timestamp = mktime_tz(parsedate_tz(thisdate))
-                dtobj = datetime.datetime.fromtimestamp(timestamp)
-                edate = dtobj.date()
+        # print the email content
+        thisdate = date_time.date()
+        thistime = date_time.time()
+        print("Message ID: " + mid)
+        print("Subject: " + subject)
+        print("From: " + fromp)
+        print("Date: " + str(thisdate))
+        print("Time: " + str(thistime))
 
-                print(f' This date is {edate}')
-
-                # decode email sender
-                From, encoding = decode_header(msg.get("From"))[0]
-                if isinstance(From, bytes):
-                    From = From.decode(encoding)
-
-                subjectlist.append(subject)
-                fromlist.append(From)
-                midlist.append(mid)
-                datelist.append(timestamp)
-
-                # if the email message is multipart
-                if msg.is_multipart():
-                    bodyparams = []
-                    # iterate over email parts
-                    for part in msg.walk():
-                        # extract content type of email
-                        content_type = part.get_content_type()
-                        content_disposition = str(part.get("Content-Disposition"))
-                        try:
-                            # get the email body
-                            body = part.get_payload(decode=True).decode()
-                        except:
-                            pass
-                        if content_type == "text/plain" and "attachment" not in content_disposition:
-                            # print text/plain emails and skip attachments
-                            try:
-                                bodyparams.append(body)
-                            except:
-                                pass
-                        elif writefiles and "attachment" in content_disposition:
-                            # download attachment
-                            filename = part.get_filename()
-                            if filename:
-                                folder_name = f'quotefiles/{clean(subject)}'
-                                if not os.path.isdir(folder_name):
-                                    # make a folder for this email (named after the subject)
-                                    os.mkdir(folder_name)
-                                filepath = os.path.join(folder_name, filename)
-                                bodyparams.append(filepath)
-                                # download attachment and save it
-                                open(filepath, "wb").write(part.get_payload(decode=True))
-
-                    alist.append('multi')
-
-                else:
-                    bodyparams = []
-                    # extract content type of email
-                    alist.append('single')
-                    content_type = msg.get_content_type()
-                    # get the email body
-                    body = msg.get_payload(decode=True).decode()
-                    if content_type == "text/plain":
-                        # print only text email parts
-                        bodyparams.append(body)
-
-                if writefiles and content_type == "text/html":
-                    # if it's HTML, create a new HTML file and open it in browser
-                    folder_name = f'quotefiles/{clean(subject)}'
-                    if not os.path.isdir(folder_name):
-                        # make a folder for this email (named after the subject)
-                        os.mkdir(folder_name)
-                    filename = "index.html"
-                    filepath = os.path.join(folder_name, filename)
-                    # write the file
-                    open(filepath, "w").write(body)
-                    # open in the default browser
-                    #webbrowser.open(filepath)
-                #print("=" * 100)
-                contentlist.append(content_type)
-                #Check body for bad decode
-                newbody = ''
-                if body:
-                    if isinstance(body, bytes):
-                        print(f'The attribute of body is bytes')
-                    elif isinstance(body, str):
-                        print(f'The attribute of body is string')
-                        #This eliminates all non-utf8 characters or we cannot store in database
-                        body = body.encode('ascii','ignore').decode("utf-8")
-                    else:
-                        print(f'Body is something else')
-                else:
-                    body = 'No body'
-                bodylist.append(body)
+        qdat = Quotes.query.filter(Quotes.Mid == mid).first()
+        if qdat is None:
+            try:
+                input = Quotes(Date=date_time, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
+                               Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD')
+                db.session.add(input)
+                db.session.commit()
+            except:
+                print(f'Could not input the body of the email with subject {subject}')
 
     # close the connection and logout
     imap.close()
     imap.logout()
+    return
 
-    n_mess = len(subjectlist)
-    print(f'There are {n_mess} valid emails to show')
-    print(len(subjectlist), len(alist), len(contentlist), len(fromlist), len(bodylist), len(midlist))
-    print(alist)
-    print(contentlist)
-    for jx in range(n_mess-1,-1,-1):
-        mid = midlist[jx]
-        print("=" * 100)
-        print(jx)
-        print(mid)
-        print(datelist[jx])
-        print(subjectlist[jx])
-        print(fromlist[jx])
-        print(alist[jx])
-        print(contentlist[jx])
-        #print(bodylist[jx])
 
-        timestamp = datelist[jx]
-        dtobj = datetime.datetime.fromtimestamp(timestamp)
-        thisdate = dtobj.date()
-        print(thisdate)
-        thisfrom = fromlist[jx]
-        subject = subjectlist[jx]
-        body = bodylist[jx]
-        print(f'Body length: {len(body)}')
-        if len(body) < 30000:
-            qdat = Quotes.query.filter(Quotes.Mid == mid).first()
-            if qdat is None:
-                try:
-                    input = Quotes(Date=thisdate, From=thisfrom, Subject=subject, Mid=mid, Body=body, Person=None, Response=None,
-                                   Amount=None, Location=None, Status=0, Responder=None, RespDate=None,
-                                   Start='Seagirt Marine Terminal, Baltimore, MD')
-                    db.session.add(input)
-                    db.session.commit()
-                except:
-                    print(f'Could not imput the body of the email with subject {subject}')
 
 
 def extract_values(obj, key):
@@ -432,8 +305,8 @@ def checkcross(lam,la_last,la,lom,lo_last,lo):
 def maketable(expdata):
     bdata = '<br><br>\n'
     bdata = bdata + '<table>\n'
-    alist = ['Tandem Chassis', 'Triaxle Chassis', 'Prepull Fee', 'Yard Storage', 'Driver Detention', 'Extra Stop', 'Overweight', 'Reefer Fee', 'Scale Tickets']
-    blist = ['Per Day', 'Per Day', 'Per Pull', 'Per Day', 'Per Hour', 'Per Stop', '$75.00 + Per mile', '', '']
+    alist = ['Tandem Chassis', 'Triaxle Chassis', 'Prepull Fee', 'Yard Storage', 'Driver Detention', 'Extra Stop', 'Overweight', 'Overweight', 'Reefer Fee', 'Scale Tickets', 'Residential', 'Port Congestion', 'Chassis Split']
+    blist = ['Per Day', 'Per Day', 'Per Pull', 'Per Day', 'Per Hour', 'Per Stop', 'Base Fee', 'Per Mile', '', '', '', '', '']
     clist = expdata[15:]
     for jx, item in enumerate(alist):
         #print(item,blist[jx],clist[jx])
@@ -444,7 +317,7 @@ def maketable(expdata):
     return bdata
 
 
-def sendquote(bidthis):
+def sendquote():
     etitle = request.values.get('edat0')
     ebody = request.values.get('edat1')
     emailin1 = request.values.get('edat2')
@@ -452,12 +325,7 @@ def sendquote(bidthis):
     emailcc1 = request.values.get('edat4')
     emailcc2 = request.values.get('edat5')
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
-    # Add the accessorial table and signature to the email body:
     send_mimemail(emaildata,'qsnd')
-    #print(etitle)
-    #print(ebody)
-    #print(emailin1)
-    #print(emailcc1)
     return emaildata
 
 
@@ -536,13 +404,22 @@ def get_directions(start,end):
 def get_place(subject, body, multibid):
     loci = []
     location = 'Upper Marlboro, MD  20743'
-    #zip_p = re.compile("((\w+)[,.]?\s+(\w+)[,.]?\s+[0-9]{5})")
+    zip_c = re.compile(r'\w+[,.]?\s+\w+[,.]?\s+[0-9]{5}')
     zip_p = re.compile(r'[\s,]\d{5}(?:[-\s]\d{4})?\b')
+    nozip = re.compile(r'\w+[,.]?\s+(MD|PA|VA|DE|NJ|OH|NC)')
     testp = zip_p.findall(subject)
+    testp2 = zip_c.findall(subject)
     testq = zip_p.findall(body)
+    testq2 = zip_c.findall(body)
+    testp3 = nozip.match(subject)
+    testq3 = nozip.match(body)
     print(f'the subject has these zipcodes {testp}')
     print(f'the body has these zipcodes {testq}')
-    print('The body is:',body)
+    print(f'the subject has these city-zips {testp2}')
+    print(f'the body has these city-zips {testq2}')
+    print(f'the subject has these city-states {testp3}')
+    print(f'the body has these city-states {testq3}')
+    #print('The body is:',body)
     #print(f'the address is {testp}, {testq}, {testx}, {loops}')
     for test in testp:
         ziptest = test.strip()
@@ -716,15 +593,15 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
     sen = ''
     adds = []
     btype = []
-    if tbox[7]: btype.append('live')
-    if tbox[8]: btype.append('dr')
-    if tbox[9]: btype.append('dp')
-    if tbox[10]: btype.append('fsc')
-    if tbox[16]: btype.append('all-in')
+    if tbox[12]: btype.append('live')
+    if tbox[13]: btype.append('dr')
+    if tbox[14]: btype.append('dp')
+    if tbox[16]: btype.append('fsc')
+    if tbox[15]: btype.append('all-in')
     if not takedef:
         for ix in range(len(tbox)):
             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-            #print(ix,tbox[ix])
+            print(ix,tbox[ix])
 
     if 'all-in' not in btype:
         if tbox[0]:
@@ -736,14 +613,23 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
         if tbox[3]:
             adds.append(f'Yard Storage: <b>${expdata[18]}/day</b>')
         if tbox[4]:
-            owfee = round(int(float(expdata[21]) * float(distdata[0])/2)/10)*10 + 75.00
-            adds.append(f'Overweight Fee:  <b>${d2s(owfee)}</b>')
+            owfee1 = round(int(float(expdata[21])))
+            adds.append(f'Overweight Base Fee:  <b>${d2s(owfee1)}</b>')
         if tbox[5]:
-            adds.append(f'Extra Stop Fee: <b>${expdata[20]}</b>')
+            owfee2 = round(int(float(expdata[22]) * float(distdata[0])/2)/10)*10
+            adds.append(f'Overweight Miles:  <b>${d2s(owfee2)}</b>')
         if tbox[6]:
-            adds.append(f'Reefer Fee:  <b>${expdata[22]}</b>')
-        if tbox[15]:
-            adds.append(f'Scale Ticket Set:  <b>${expdata[23]}</b>')
+            adds.append(f'Extra Stop Fee: <b>${expdata[20]}</b>')
+        if tbox[7]:
+            adds.append(f'Reefer Fee:  <b>${expdata[23]}</b>')
+        if tbox[8]:
+            adds.append(f'Scale Ticket Set:  <b>${expdata[24]}</b>')
+        if tbox[9]:
+            adds.append(f'Residential Fee:  <b>${expdata[25]}</b>')
+        if tbox[10]:
+            adds.append(f'Port Congestion:  <b>${expdata[26]}/hr</b> over 2 hrs')
+        if tbox[11]:
+            adds.append(f'Chassis Split:  <b>${expdata[27]}</b>')
     num_items = len(adds)
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     if len(btype) == 1:
@@ -765,14 +651,14 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
     if num_items>0: sen = sen + '.  '
     stype = 'reg'
     mixtype = 'none'
-    if tbox[11]: stype = 'ml'
-    if tbox[12]:
+    if tbox[17]: stype = 'ml'
+    if tbox[18]:
         mixtype = 'mix'
         stype = 'ml'
 
-    if tbox[13] and tbox[14]:  sen = sen + f'<br><br>We have immediate capacity and capacity into next week to execute the job quoted. '
-    elif tbox[13]: sen = sen + f'<br><br>We have immediate capacity to execute the job quoted. '
-    elif tbox[14]: sen = sen + f'<br><br>We have capacity for next week and beyond to execute the job quoted. '
+    if tbox[19] and tbox[20]:  sen = sen + f'<br><br>We have immediate capacity and capacity into next week to execute the job quoted. '
+    elif tbox[19]: sen = sen + f'<br><br>We have immediate capacity to execute the job quoted. '
+    elif tbox[20]: sen = sen + f'<br><br>We have capacity for next week and beyond to execute the job quoted. '
 
     return sen, tbox, btype, stype, mixtype
 
@@ -802,6 +688,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     overweight = float(qidat.overweight) / 100
     reefer = float(qidat.reefer) / 100
     scale = float(qidat.scale) / 100
+    resid = float(qidat.residential) / 100
 
     # Calculate road tolls
     tollroadlist = ['I-76', 'NJ Tpke']
@@ -914,10 +801,61 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     biddata = [d2s(roundup(bid)), d2s(roundup(drbid)), d2s(roundup(dpbid)), d2s(roundup(fuelbid)), d2s(roundup(allbid))]
     return biddata
 
+def get_body_text(qdat):
+
+    mid = qdat.Mid
+    username = usernames['quot']
+    password = passwords['quot']
+    imap = imaplib.IMAP4_SSL(imap_url)
+    imap.login(username, password)
+    status, messages = imap.select('INBOX')
+    result, data = imap.search(None, f'HEADER Message-ID {mid}')
+    msg_id_list = data[0].split()
+    result, data = imap.fetch(msg_id_list[0], '(RFC822)')
+    email_message = email.message_from_bytes(data[0][1])
+
+    # extract the subject of the email
+    subject = extract_for_code(email_message["Subject"])
+    print(f'****Getting the Body Text***** for Subject: {subject}')
+
+    # Set default text particulars
+    plain_text_content = ''
+    html_content = None
+
+    # extract the email content as a string
+    if email_message.is_multipart():
+        for part in email_message.walk():
+            if part.get_content_type() == 'text/plain':
+                try:
+                    plain_text_content = part.get_payload(decode=True).decode('utf-8')
+                except UnicodeDecodeError as e:
+                    plain_text_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
+            if part.get_content_type() == "text/html":
+                try:
+                    html_content = part.get_payload(decode=True).decode("utf-8")
+                except UnicodeDecodeError as e:
+                    html_content = part.get_payload(decode=True).decode("utf-8", errors='replace')
+
+                soup = BeautifulSoup(html_content, "html.parser")
+                plain_text_content = soup.get_text()
+    else:
+        plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
+
+    #print('Returning from get_body_text', plain_text_content)
+    return plain_text_content, html_content
+
+
 def isoQuote():
     username = session['username'].capitalize()
+    #define User variables
+    # Qote being worked
+    uquot = f'{username}_quot'
+    uiter = f'{username}_iter'
+    umid= f'{username}_mid'
+    utext= f'{username}_text'
+    uhtml= f'{username}_html'
     quot=0
-    tbox = [0]*21
+    tbox = [0]*28
     bidthis = [0]*5
     expdata=[]
     costdata=[]
@@ -925,9 +863,30 @@ def isoQuote():
     locs = []
     ebodytxt=''
     qdat = None
+    htmltext = None
+    plaintext = None
+    mid = ''
+    locto = None
+
+
     from viewfuncs import dataget_Q, nonone, numcheck
+
     if request.method == 'POST':
-        print('This is a POST')
+        try:
+            iter = int(os.environ[uiter])
+            oldmid = os.environ[umid]
+        except:
+            iter = 1
+            oldmid = 'Not Defined'
+        try:
+            plaintext = os.environ[utext]
+        except:
+            plaintext = ''
+        try:
+            htmltext = os.environ[uhtml]
+        except:
+            htmltext = ''
+        print(f'This is a POST with iter {iter} and last mid {oldmid}')
         emailgo = request.values.get('Email')
         updatego = request.values.get('GetQuote')
         updatebid = request.values.get('Update')
@@ -935,6 +894,12 @@ def isoQuote():
         returnhit = request.values.get('Return')
         removego = request.values.get('RemoveGo')
         bidname = request.values.get('bidname')
+        ware = request.values.get('Ware')
+        exitnow = request.values.get('exitquotes')
+        if exitnow is not None:
+            print('Exiting quotes')
+            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None
+
         for jx in range(5):
             #print(f'jx={jx} and bidthis[jx]={bidthis[jx]}')
             bidthis[jx] = request.values.get(f'bidthis{jx}')
@@ -980,7 +945,8 @@ def isoQuote():
             alist = [request.values.get('driver'), request.values.get('fuel'), request.values.get('mpg'), request.values.get('insurance'), request.values.get('markup'),
                      request.values.get('toll'), request.values.get('gapct'), request.values.get('rm'), request.values.get('fees'), request.values.get('other'),
                      request.values.get('fsc'), request.values.get('chassis2'), request.values.get('chassis3'), request.values.get('prepull'), request.values.get('store'), request.values.get('detention'),
-                     request.values.get('extrastop'),request.values.get('overweight'), request.values.get('reefer'), request.values.get('scale')]
+                     request.values.get('extrastop'),request.values.get('overweight'), request.values.get('reefer'), request.values.get('scale'), request.values.get('residential'),
+                     request.values.get('congestion'), request.values.get('chassplit'), request.values.get('owmile')]
             blist = [int(float(a)*100) for a in alist]
             pmf=int(100*float(alist[1])/float(alist[2]))
             phi=int(100*float(alist[3])/1992)
@@ -988,7 +954,7 @@ def isoQuote():
             pmt = pmf+blist[7]+blist[8]+blist[9]
             pht = blist[0] + phi
             input = Quoteinput(ph_driver=blist[0],fuelpergal=blist[1],mpg=blist[2],insurance_annual_truck=blist[3],markup=blist[4],toll=blist[5],ga=blist[6],pm_repairs=blist[7],pm_fees=blist[8],pm_other=blist[9],pm_fuel=pmf,ph_insurance=phi,pm_total=pmt,ph_total=pht,FSC=blist[10],
-                               chassis2=blist[11], chassis3=blist[12], prepull=blist[13], store=blist[14], detention=blist[15], extrastop=blist[16], overweight=blist[17], reefer=blist[18], scale=blist[19])
+                               chassis2=blist[11], chassis3=blist[12], prepull=blist[13], store=blist[14], detention=blist[15], extrastop=blist[16], overweight=blist[17], reefer=blist[18], scale=blist[19], residential=blist[20], congestion=blist[21], chassplit=blist[22], owmile=blist[23])
             db.session.add(input)
             db.session.commit()
             qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
@@ -1000,7 +966,8 @@ def isoQuote():
             input = Quoteinput(ph_driver=qidat.ph_driver, fuelpergal=qidat.fuelpergal, mpg=qidat.fuelpergal, insurance_annual_truck=qidat.insurance_annual_truck,
                                markup=qidat.markup, toll=qidat.toll, ga=qidat.toll, pm_repairs=qidat.pm_repairs, pm_fees=qidat.pm_fees,
                                pm_other=qidat.pm_other, pm_fuel=qidat.pm_fuel, ph_insurance=qidat.ph_insurance, pm_total=qidat.pm_total, ph_total=qidat.ph_total,
-                               FSC=qfdat.FSC, chassis2=qfdat.chassis2, chassis3=qfdat.chassis3, prepull=qfdat.prepull, store=qfdat.detention, extrastop=qfdat.extrastop, overweight=qfdat.overweight, reefer=qfdat.reefer, scale=qfdat.scale)
+                               FSC=qfdat.FSC, chassis2=qfdat.chassis2, chassis3=qfdat.chassis3, prepull=qfdat.prepull, store=qfdat.detention, extrastop=qfdat.extrastop, overweight=qfdat.overweight,
+                               reefer=qfdat.reefer, scale=qfdat.scale, residential=qfdat.residential, congestion=qfdat.congestion, chassplit=qfdat.chassplit, owmile=qfdat.owmile)
             db.session.add(input)
             db.session.commit()
             #This makes first and last records the same so from now on will get original values until a change is made
@@ -1031,11 +998,16 @@ def isoQuote():
         overweight = float(qidat.overweight) / 100
         reefer = float(qidat.reefer)/100
         scale = float(qidat.scale) / 100
+        resid = float(qidat.residential) / 100
+        congest = float(qidat.congestion) / 100
+        chassplit = float(qidat.chassplit) / 100
+        owmile = float(qidat.owmile) / 100
 
         #print(f'ph_driver is {ph_driver} and d2s gives {d2s(ph_driver)}')
         expdata = [d2s(ph_driver), d2s(fuel), d2s(mpg), d2s(ins), d2s(markup), d2s(toll), d2s(gapct),
                    d2s(pm_repairs), d2s(pm_fees), d2s(pm_other), d2s(pm_fuel), d2s(ph_insurance), d2s(pmc), d2s(phc),
-                   d1s(fsc), d2s(chassis2), d2s(chassis3), d2s(prepull), d2s(store), d2s(detention), d2s(extrastop), d2s(overweight), d2s(reefer), d2s(scale)]
+                   d1s(fsc), d2s(chassis2), d2s(chassis3), d2s(prepull), d2s(store), d2s(detention), d2s(extrastop),
+                   d2s(overweight), d2s(owmile), d2s(reefer), d2s(scale), d2s(resid), d2s(congest), d2s(chassplit)]
 
         qdata = dataget_Q(thismuch)
         #quot, numchecked = numcheck(1, qdata, 0, 0, 0, 0, ['quot'])
@@ -1048,14 +1020,21 @@ def isoQuote():
 
         qdat = Quotes.query.get(quot)
         print(f'quot:{quot} quotbut:{quotbut} username:{username} taskbox:{taskbox}')
+        if qdat is not None:
+            mid = qdat.Mid
+            if mid == oldmid:
+                print(f'No need to update, this is the same mid {mid}')
+            else:
+                print(f'Getting body_text 1011 because mid is {mid} and oldmid is {oldmid}')
+                plaintext, htmltext = get_body_text(qdat)
 
         if returnhit is not None:
             taskbox = 0
             quot = 0
 
-        if removego is not None:
-            print(f'The current quot is {quot} now making status -1')
-            qdat.Status = -1
+        if removego is not None or ware is not None:
+            if removego is not None:  qdat.Status = -1
+            else: qdat.Status = 7
             db.session.commit()
             #New get the new item not removed from the list
             qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
@@ -1065,10 +1044,20 @@ def isoQuote():
                 # Check to see if we have rolled into a new date, if so then go back to the table
                 datethis = f'{qdat.Date}'
                 datelast = request.values.get('datelast')
-                print(f'comparing {datethis} to {datelast}')
+
                 if datelast is not None:
+                    try:
+                        datethis = datethis[0:10]
+                        datelast = datelast[0:10]
+                    except:
+                        datethis = '0'
+                        datelast = '1'
+                    print(f'comparing {datethis} to {datelast}')
                     if datethis == datelast:
-                        print('they are the same')
+                        print(f'Getting body_text because it is a successful remove and go')
+                        plaintext, htmltext = get_body_text(qdat)
+                        mid = qdat.Mid
+                        oldmid = qdat.Mid
                     else:
                         taskbox = 0
                         quot = 0
@@ -1096,8 +1085,22 @@ def isoQuote():
                 db.session.commit()
                 taskbox = 0
 
+        if taskbox == 7:
+            if qdat is not None:
+                qdat.Status = 7
+                db.session.commit()
+                taskbox = 0
+
         if taskbox == 6:
             add_quote_emails()
+            # Set quotes to top of the table:
+            qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
+            if qdat is not None:
+                quot = qdat.id
+                quotbut = qdat.id
+                mid = qdat.Mid
+                print(f'Getting body_text because we just refreshed the emails')
+                plaintext, htmltext = get_body_text(qdat)
 
         if taskbox == 1 or taskbox == 5:
             if qdat is None:
@@ -1105,16 +1108,19 @@ def isoQuote():
                 if qdat is not None:
                     quot = qdat.id
                     quotbut = qdat.id
+                    locto = qdat.Location
             if quot>0 and qdat is not None:
-                locto = qdat.Location
+                if mid != oldmid:
+                    print(f'Getting body_text because we are updating but mid: {mid} not oldmid {oldmid}')
+                    plaintext, htmltext = get_body_text(qdat)
                 if locto is None:
-                    locto, loci = get_place(qdat.Subject, qdat.Body, multibid)
+                    locto, loci = get_place(qdat.Subject, plaintext, multibid)
                     qdat.Location = locto
                     multibid[2] = loci
                     db.session.commit()
                 if multibid[0] == 'on':
                     # Test if all locs are None then try to extract from email:
-                    testloc, testloci = get_place(qdat.Subject, qdat.Body, multibid)
+                    testloc, testloci = get_place(qdat.Subject, plaintext, multibid)
                     locs = multibid[2]
                     print(f'Here is multibid[1]:{multibid[1]} and here is multibid[2]: {multibid[2]}')
                     print(f'Here is locs:{locs} and here is testloci:{testloci}')
@@ -1151,11 +1157,11 @@ def isoQuote():
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
                                 biddata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
                                 print(biddata)
-                                if tbox[16]: mbids.append(biddata[4])
-                                elif tbox[7]: mbids.append(biddata[0])
-                                elif tbox[8]: mbids.append(biddata[1])
-                                elif tbox[9]: mbids.append(biddata[2])
-                                elif tbox[10]: mbids.append(biddata[3])
+                                if tbox[15]: mbids.append(biddata[4])
+                                elif tbox[12]: mbids.append(biddata[0])
+                                elif tbox[13]: mbids.append(biddata[1])
+                                elif tbox[14]: mbids.append(biddata[2])
+                                elif tbox[16]: mbids.append(biddata[3])
                             else:
                                 mbids.append('0.00')
                         print(mbids)
@@ -1185,22 +1191,36 @@ def isoQuote():
 
                 if emailgo is not None:
                     print(f'The task box is {taskbox}')
+                    emaildata = sendquote()
                     if taskbox == 1 or taskbox == 5:
                         qdat.Status = 2
+                        qdat.Subjectsend = emaildata[0]
+                        qdat.Response = emaildata[1]
+                        qdat.Emailto = emaildata[2]
                         db.session.commit()
-                    emaildata = sendquote(bidthis)
+
 
                     # Now get the new item not removed from the list
                     qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
                     if qdat is not None:
                         quot = qdat.id
                         quotbut = qdat.id
+                        if mid != oldmid:
+                            print(f'Getting body_text because we are doing email and go but mid: {mid} not oldmid {oldmid}')
+                            plaintext, htmltext = get_body_text(qdat)
 
                         # Check to see if we have tolled into a new date, if so then go back to the table
                         datethis = f'{qdat.Date}'
                         datelast = request.values.get('datelast')
-                        print(f'comparing {datethis} to {datelast}')
+
                         if datelast is not None:
+                            try:
+                                datethis = datethis[0:10]
+                                datelast = datelast[0:10]
+                            except:
+                                datethis = '0'
+                                datelast = '1'
+                            print(f'comparing {datethis} to {datelast}')
                             if datethis == datelast:
                                 multibid = ['off', 1, 0, 0]
                                 taskbox = 5
@@ -1209,7 +1229,7 @@ def isoQuote():
                                     emailto = qdat.From
                                     qdat.From = emailto
                                     db.session.commit()
-                                locto, loci = get_place(qdat.Subject, qdat.Body, multibid)
+                                locto, loci = get_place(qdat.Subject, plaintext, multibid)
                                 qdat.Location = locto
                                 db.session.commit()
                             else:
@@ -1340,11 +1360,11 @@ def isoQuote():
                     if updatego is not None or quotbut is not None or (taskbox == 5 and updatebid is None):
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-                        if tbox[7]: bidthis[0] = d2s(roundup(bid))
-                        if tbox[8]: bidthis[1] = d2s(roundup(drbid))
-                        if tbox[9]: bidthis[2] = d2s(roundup(dpbid))
-                        if tbox[10]: bidthis[3] = d2s(roundup(fuelbid))
-                        if tbox[16]: bidthis[4] = d2s(roundup(allbid))
+                        if tbox[12]: bidthis[0] = d2s(roundup(bid))
+                        if tbox[13]: bidthis[1] = d2s(roundup(drbid))
+                        if tbox[14]: bidthis[2] = d2s(roundup(dpbid))
+                        if tbox[16]: bidthis[3] = d2s(roundup(fuelbid))
+                        if tbox[15]: bidthis[4] = d2s(roundup(allbid))
                 except:
                     timedata = []
                     distdata = []
@@ -1355,9 +1375,9 @@ def isoQuote():
                 # Set checkbox defaults if first time through
                 #print(updatebid, updatego, updateE,emailgo)
                 if updatebid is None and updatego is None and updateE is None:
-                    tbox = [0] * 21
+                    tbox = [0] * 24
                     tbox[0] = 'on'
-                    tbox[7] = 'on'
+                    tbox[12] = 'on'
                     if biddata:
                         if len(biddata)>0:
                             bidthis[0] = biddata[0]
@@ -1398,7 +1418,7 @@ def isoQuote():
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
                         etitle = f'{cdata[0]} Quote to {locto} from {locfrom}'
-                        ebody, tbox, etitle = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata,multibid, etitle)
+                        ebody, tbox, etitle = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle)
                         ebody = ebody + maketable(expdata)
                     else:
                         etitle = request.values.get('edat0')
@@ -1417,23 +1437,23 @@ def isoQuote():
             quot = request.values.get('optradio')
             if quot is not None:
                 qdat = Quotes.query.get(quot)
+                print(f'Getting body_text because this is not a post so we are getting new values')
+                plaintext, htmltext = get_body_text(qdat)
+                if htmltext is None:
+                    showtext = plaintext
+                else:
+                    showtext = htmltext
+            else:
+                showtext = ''
             locto = 'Capitol Heights, MD  20743'
             locfrom = 'Baltimore Seagirt'
             etitle = f'{cdata[0]} Quote for Drayage to {locto} from {locfrom}'
-            if qdat is not None:
-                ebody = qdat.Body
-                soup = BeautifulSoup(ebody)
-                ebodytxt = soup.get_text()
-                #print(f'the length of body is {len(qdat.Body)}')
-                #print(ebodytxt)
-            else:
-                ebody = f'Regirgitation from the input'
             efrom = usernames['quot']
             eto1 = 'unknown'
             eto2 = ''
             ecc1 = usernames['serv']
             ecc2 = usernames['info']
-            emaildata = [etitle, ebody, eto1, eto2, ecc1, ecc2, efrom]
+            emaildata = [etitle, showtext, eto1, eto2, ecc1, ecc2, efrom]
             costdata = None
             biddata = None
             newdirdata = None
@@ -1447,13 +1467,15 @@ def isoQuote():
 
 
     else:
+        iter = 1
+        os.environ['MID'] = 'None Selected'
         print('This is NOT a Post')
         ebodytxt = ''
         #print('Entering Quotes1',flush=True)
         username = session['username'].capitalize()
-        tbox = [0] * 21
+        tbox = [0] * 27
         tbox[0] = 'on'
-        tbox[7] = 'on'
+        tbox[12] = 'on'
         qdat=None
         locto = 'Upper Marlboro, MD  20772'
         locfrom = 'Baltimore Seagirt'
@@ -1470,18 +1492,36 @@ def isoQuote():
         newdirdata = None
         bidthis = None
         bidname = None
-
-        #print('Entering Quotes2', flush=True)
         timedata = []
         distdata = []
-        add_quote_emails()
+        quot=0
+        # Set quotes to top of the table:
+        qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
+        if qdat is not None:
+            quot = qdat.id
+            quotbut = qdat.id
+            print(f'Getting body_text because this is not a post and we set pointer to top of table')
+            plaintext, htmltext = get_body_text(qdat)
+        else:
+            add_quote_emails()
         thismuch = '6'
         taskbox = 0
-        quot=0
-        #print('Entering Quotes3', flush=True)
 
 
     qdata = dataget_Q(thismuch)
+    if htmltext is None:
+        showtext = plaintext
+    else:
+        showtext = htmltext
     print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
     print(f'mutlibid on exit is {multibid[0]} and {multibid[1]}')
-    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt, multibid
+    #Save all the session variables that may have been updated...
+    iter = iter + 1
+    os.environ[uiter] = str(iter)
+    if plaintext is None: plaintext = ''
+    if htmltext is None: htmltext = ''
+    os.environ[utext] = plaintext
+    os.environ[uhtml] = htmltext
+    os.environ[umid] = mid
+    print(f'Exiting with iter = {iter} and mid: {mid}')
+    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid

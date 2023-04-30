@@ -10,6 +10,7 @@
             <option {% if thismuch == '3' %} selected {% endif %} value='3'>Filter: Jobs Won</option>
             <option {% if thismuch == '4' %} selected {% endif %} value='4'>Filter: Show Removed</option>
             <option {% if thismuch == '5' %} selected {% endif %} value='5'>Filter: Show All</option>
+            <option {% if thismuch == '8' %} selected {% endif %} value='8'>Filter: Warehouse Jobs</option>
 
         </select>
     </div>
@@ -23,10 +24,12 @@
             <option value="3">Reinstate Removed Item</option>
             <option value="4">Mark Item Bid Won</option>
             <option value="6">Refresh Emails</option>
+            <option value="7">Mark for Warehouse Bidding</option>
         </select>
         <button type="submit" class="btn btn-green btn-sm" name="quickbid">&nbsp &nbsp Bid &nbsp &nbsp</button>
         <button type="submit" class="btn btn-red btn-sm" name="quickdel">&nbsp Delete &nbsp</button>
         <button type="submit" class="btn btn-blue btn-sm" name="refresh">Refresh</button>
+        <button type="submit" class="btn btn-blue btn-sm" name="exitquotes">Exit Quotes</button>
     </div>
 
 </div>

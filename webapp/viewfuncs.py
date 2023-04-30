@@ -1562,6 +1562,9 @@ def dataget_Q(thismuch):
     elif thismuch == '7':
         stopdate = today-datetime.timedelta(days=1)
         qdata = Quotes.query.filter( (Quotes.Status != -1) & (Quotes.Date > stopdate) ).all()
+    elif thismuch == '8':
+        stopdate = today-datetime.timedelta(days=1)
+        qdata = Quotes.query.filter(Quotes.Status == 7).all()
     else:
         stopdate = today - datetime.timedelta(days=10)
         qdata = Quotes.query.filter( (Quotes.Status != -1) & (Quotes.Date > stopdate) ).all()
