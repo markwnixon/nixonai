@@ -804,19 +804,24 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 def get_body_text(qdat):
 
     mid = qdat.Mid
+    print(f'this mid is {mid}')
     username = usernames['quot']
     password = passwords['quot']
     imap = imaplib.IMAP4_SSL(imap_url)
     imap.login(username, password)
     status, messages = imap.select('INBOX')
-    result, data = imap.search(None, f'HEADER Message-ID {mid}')
-    msg_id_list = data[0].split()
-    result, data = imap.fetch(msg_id_list[0], '(RFC822)')
-    email_message = email.message_from_bytes(data[0][1])
+    try:
+        result, data = imap.search(None, f'HEADER Message-ID {mid}')
+        msg_id_list = data[0].split()
+        result, data = imap.fetch(msg_id_list[0], '(RFC822)')
+        email_message = email.message_from_bytes(data[0][1])
 
-    # extract the subject of the email
-    subject = extract_for_code(email_message["Subject"])
-    print(f'****Getting the Body Text***** for Subject: {subject}')
+        # extract the subject of the email
+        subject = extract_for_code(email_message["Subject"])
+        print(f'****Getting the Body Text***** for Subject: {subject}')
+    except:
+        print('Could not locate this email header')
+        return 'This email has been deleted', None
 
     # Set default text particulars
     plain_text_content = ''
@@ -1205,9 +1210,8 @@ def isoQuote():
                     if qdat is not None:
                         quot = qdat.id
                         quotbut = qdat.id
-                        if mid != oldmid:
-                            print(f'Getting body_text because we are doing email and go but mid: {mid} not oldmid {oldmid}')
-                            plaintext, htmltext = get_body_text(qdat)
+                        mid = qdat.Mid
+                        plaintext, htmltext = get_body_text(qdat)
 
                         # Check to see if we have tolled into a new date, if so then go back to the table
                         datethis = f'{qdat.Date}'
