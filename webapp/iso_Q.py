@@ -405,7 +405,7 @@ def get_place(subject, body, multibid):
     loci = []
     location = 'Upper Marlboro, MD  20743'
     zip_c = re.compile(r'\w+[,.]?\s+\w+[,.]?\s+[0-9]{5}')
-    zip_p = re.compile(r'[\s,]\d{5}(?:[-\s]\d{4})?\b')
+    zip_p = re.compile(r'[\s,]\d{5}(?:[-\s]\d{4})?')
     nozip = re.compile(r'\w+[,.]?\s+(MD|PA|VA|DE|NJ|OH|NC)')
     testp = zip_p.findall(subject)
     testp2 = zip_c.findall(subject)
@@ -419,8 +419,8 @@ def get_place(subject, body, multibid):
     print(f'the body has these city-zips {testq2}')
     print(f'the subject has these city-states {testp3}')
     print(f'the body has these city-states {testq3}')
-    #print('The body is:',body)
-    #print(f'the address is {testp}, {testq}, {testx}, {loops}')
+    print('The body is:',body)
+    print(f'the address is {testp}, {testq}, {testq2}, {testq3}')
     for test in testp:
         ziptest = test.strip()
         try:
@@ -463,6 +463,8 @@ def get_place(subject, body, multibid):
     if len(loci) < requested:
         while len(loci) < requested:
             loci.append('Upper Marlboro, MD  20743')
+    if len(loci) > requested:
+        loci = loci[0:requested]
 
     return location, loci
 
@@ -821,7 +823,7 @@ def get_body_text(qdat):
         print(f'****Getting the Body Text***** for Subject: {subject}')
     except:
         print('Could not locate this email header')
-        return 'This email has been deleted', None
+        return 'Email ID not found', None
 
     # Set default text particulars
     plain_text_content = ''
