@@ -881,9 +881,11 @@ def isoQuote():
     if request.method == 'POST':
         try:
             iter = int(os.environ[uiter])
-            oldmid = os.environ[umid]
         except:
             iter = 1
+        try:
+            oldmid = os.environ[umid]
+        except:
             oldmid = 'Not Defined'
         try:
             plaintext = os.environ[utext]
@@ -908,10 +910,8 @@ def isoQuote():
             return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None
 
         for jx in range(5):
-            #print(f'jx={jx} and bidthis[jx]={bidthis[jx]}')
             bidthis[jx] = request.values.get(f'bidthis{jx}')
             bidthis[jx] = d2s(bidthis[jx])
-            #print(f'after jx={jx} and bidthis[jx]={bidthis[jx]}')
 
         locfrom = request.values.get('locfrom')
         thismuch = request.values.get('thismuch')
@@ -936,7 +936,7 @@ def isoQuote():
         else:
             multibid[0] = 'off'
             multibid[1] = 1
-        print(f'mutlibid is {multibid[0]} and {multibid[1]}')
+        print(f'mutlibid is {multibid[0]} and {multibid[1]} locs are {locs}')
 
 
         if qbid is not None: taskbox = 1
@@ -1030,7 +1030,7 @@ def isoQuote():
         if qdat is not None:
             mid = qdat.Mid
             if mid == oldmid:
-                print(f'No need to update, this is the same mid {mid}')
+                print(f'No need grab email from inbox, this is the same mid {mid}')
             else:
                 print(f'Getting body_text 1011 because mid is {mid} and oldmid is {oldmid}')
                 plaintext, htmltext = get_body_text(qdat)
@@ -1118,9 +1118,9 @@ def isoQuote():
                     locto = qdat.Location
             if quot>0 and qdat is not None:
                 if mid != oldmid:
-                    print(f'Getting body_text because we are updating but mid: {mid} not oldmid {oldmid}')
+                    print(f'Getting body_text because this is a new mid: {mid} not oldmid {oldmid}')
                     plaintext, htmltext = get_body_text(qdat)
-                if locto is None:
+                if multibid[0] == 'off' and locto is None:
                     locto, loci = get_place(qdat.Subject, plaintext, multibid)
                     qdat.Location = locto
                     multibid[2] = loci
@@ -1529,5 +1529,5 @@ def isoQuote():
     os.environ[utext] = plaintext
     os.environ[uhtml] = htmltext
     os.environ[umid] = mid
-    print(f'Exiting with iter = {iter} and mid: {mid}')
+    print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
     return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid
