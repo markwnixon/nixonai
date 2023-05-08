@@ -1256,8 +1256,8 @@ def isoQuote():
                     miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
 
                     #Calculate road tolls
-                    tollroadlist = ['I-76','NJ Tpke']
-                    tollroadcpm = [.784, .275]
+                    tollroadlist = ['I-76','NJ Tpke','MD-200']
+                    tollroadcpm = [.784, .275, .35]
                     legtolls = len(dirdata)*[0.0]
                     legcodes = len(dirdata)*['None']
                     for lx,mi in enumerate(miles):
@@ -1271,11 +1271,14 @@ def isoQuote():
                     bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
                     fsk_tollbox = [39.232770, -76.502453, 39.202279, -76.569906]
                     bay_tollbox = [39.026893, -76.417512, 38.964938, -76.290104]
-                    sus_tollbox = [39.585193, -76.142883, 39.552328, -76.033975]
+                    sus_tollbox = [39.585193, -76.142883, 39.572328, -76.033975]
                     new_tollbox = [39.647121, -75.774523, 39.642613, -75.757187] #Newark Delaware Toll Center
                     dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
-                    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB']
-                    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox]
+                    thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055] # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
+                    dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659] # Dulles Toll Rd Plaza
+                    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
+                    onceonly = []
+                    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox, dtr_tollbox]
 
                     for jx,lat in enumerate(lats):
                         stat1 = 'ok'
@@ -1295,8 +1298,13 @@ def isoQuote():
                                 if lo > lol and lo < loh:
                                     stat2 = 'toll'
                                     tollcode = tollcodes[kx]
-                                    legtolls[jx] = 24.00
-                                    legcodes[jx] = tollcode
+                                    if tollcode not in onceonly:
+                                        if tollcode == 'DTR':
+                                            legtolls[jx] = 10.50
+                                        else:
+                                            legtolls[jx] = 24.00
+                                        legcodes[jx] = tollcode
+                                        onceonly.append(tollcode)
                             if jx > 0:
                                 lam = (lah + lal)/2.0
                                 lom = (loh + lol)/2.0
@@ -1305,7 +1313,10 @@ def isoQuote():
                                 stat3, stat4 = checkcross(lam,la_last,la,lom,lo_last,lo)
                                 if stat3 == 1 and stat4 ==1:
                                     tollcode = tollcodes[kx]
-                                    legtolls[jx] = 24.00
+                                    if tollcode == 'DTR':
+                                        legtolls[jx] = 10.50
+                                    else:
+                                        legtolls[jx] = 24.00
                                     legcodes[jx] = tollcode
                         ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
 
