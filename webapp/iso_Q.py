@@ -200,11 +200,11 @@ def add_quote_emails():
         # print the email content
         thisdate = date_time.date()
         thistime = date_time.time()
-        print("Message ID: " + mid)
-        print("Subject: " + subject)
-        print("From: " + fromp)
-        print("Date: " + str(thisdate))
-        print("Time: " + str(thistime))
+        print(f'Message ID: {mid}')
+        print(f'Subject: {subject}')
+        print(f'From: {fromp}')
+        print(f'Date: {str(thisdate)}')
+        print(f'Time: {str(thistime)}')
 
         qdat = Quotes.query.filter(Quotes.Mid == mid).first()
         if qdat is None:
@@ -245,6 +245,7 @@ def extract_values(obj, key):
 
 def direct_resolver(json):
     di, du, ht, la, lo = [],[],[],[],[]
+    print(json['routes'])
     t1 = json['routes'][0]['legs'][0]['steps']
     for t2 in t1:
         di.append(t2['distance']['text'])
@@ -363,7 +364,7 @@ def get_directions(start,end):
     end = end.replace(" ", "+")
     url = f'https://maps.googleapis.com/maps/api/directions/json?origin={start}&destination={end}'
     url = url + f'&key={API_KEY_DIS}'
-    #print(url)
+    print(url)
     response = get(url)
     dis, dus, hts, las, los  = direct_resolver(response.json())
 
@@ -913,6 +914,7 @@ def isoQuote():
             bidthis[jx] = request.values.get(f'bidthis{jx}')
             bidthis[jx] = d2s(bidthis[jx])
 
+        #locto = request.values.get('locto')
         locfrom = request.values.get('locfrom')
         thismuch = request.values.get('thismuch')
         taskbox = request.values.get('taskbox')
@@ -929,7 +931,9 @@ def isoQuote():
                     for ix in range(multibid[1]):
                         locs.append(request.values.get(f'locto{ix}'))
                     multibid[2] = locs
-                else: multibid[0] = 'off'
+                else:
+                    multibid[0] = 'off'
+                    locs.append(request.values.get(f'locto'))
             elif 1 == 2:
                 multibid[0] = 'off'
                 multibid[1] = 1
@@ -1121,6 +1125,7 @@ def isoQuote():
                     print(f'Getting body_text because this is a new mid: {mid} not oldmid {oldmid}')
                     plaintext, htmltext = get_body_text(qdat)
                 if multibid[0] == 'off' and locto is None:
+                    print('Getting new locations because multibid is off and locto is None ')
                     locto, loci = get_place(qdat.Subject, plaintext, multibid)
                     qdat.Location = locto
                     multibid[2] = loci
