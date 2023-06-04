@@ -217,6 +217,11 @@ def form_check(input,text,type,task,req):
             status = 2
             message = 'Must select a container type'
 
+    elif type == 'pickupdata':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must select a pick up location'
+
     elif type == 'haul_types':
         if text == 'Choose Later' or not hasinput(text):
             status = 2
@@ -226,6 +231,11 @@ def form_check(input,text,type,task,req):
         if text == 'Choose Later' or not hasinput(text):
             status = 2
             message = 'Must select a customer'
+
+    elif type == 'shipdata':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must select a ship'
 
     elif type == 'vendordata':
         if text == 'Choose Later':
@@ -346,6 +356,17 @@ def form_check(input,text,type,task,req):
 def colorcode(table, incol):
     #print(f'This table for color is {table}')
     if table == 'Orders':
+        if incol == 5: return 'green text-white font-weight-bold'
+        elif incol == 3: return'amber font-weight-bold'
+        elif incol == 2: return'purple text-white font-weight-bold'
+        elif incol == 1: return 'blue text-white font-weight-bold'
+        elif incol == -1: return 'yellow font-weight-bold'
+        elif incol == 6: return 'grey white-text font-weight-bold'
+        elif incol == 7: return 'orange font-weight-bold'
+        elif incol == 8: return 'light-green font-weight-bold'
+        elif incol == 4: return 'black text-white font-weight-bold'
+        else: return 'white font-weight-bold'
+    elif table == 'Newjobs':
         if incol == 5: return 'green text-white font-weight-bold'
         elif incol == 3: return'amber font-weight-bold'
         elif incol == 2: return'purple text-white font-weight-bold'

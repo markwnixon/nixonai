@@ -67,7 +67,8 @@
                         {% include 'c8_task_'+taskfile+'.html' %}
                     {% else %}
                         {% include 'includes/_controlpanelheader.html' %}
-                        {% include 'includes/_truckcolorcode.html' %}
+                        {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
+                        {%  if genre == 'Planning' %} {% include 'includes/_plancolorcode.html' %} {% endif %}
                         {% for db_data in table_data %}
                             {% set thistable = tabletitle[loop.index - 1] %}
                             <br>

@@ -474,6 +474,82 @@ class Focusareas(db.Model):
         self.Co = Co
         self.Focusid = Focusid
 
+class Ships(db.Model):
+    __tablename__ = 'ships'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Ship = db.Column('Ship', db.String(45))
+    Date = db.Column('Date', db.DateTime)  # Ship arrives
+    Date2 = db.Column('Date2', db.DateTime)  # Ship completes unload
+    Description = db.Column('Description', db.String(45))
+    Active = db.Column('Active', db.Integer, default=None)
+    def __init__(self, Ship, Date, Date2, Description, Active):
+        self.Ship = Ship
+        self.Date = Date
+        self.Date2 = Date2
+        self.Descrption = Description
+        self.Active = Active
+class Newjobs(db.Model):
+    __tablename__ = 'newjobs'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Status = db.Column('Status', db.Integer, default=None)
+    Jo = db.Column('Jo', db.String(25), nullable=False)
+    Shipper = db.Column('Shipper', db.String(45))
+    HaulType = db.Column('HaulType', db.String(45), default=None)
+    Release = db.Column('Release', db.String(45),nullable=False) #booking out or bol out
+    Bookingin = db.Column('Bookingin', db.String(45), default=None) #booking export brought into port
+    Container = db.Column('Container', db.String(45),default=None)
+    Type = db.Column('Type', db.String(45)) # Container type
+    Pickup = db.Column('Pickup', db.String(45))
+    Delivery = db.Column('Delivery', db.String(45))
+    Ship = db.Column('Ship', db.String(45))
+    Date = db.Column('Date', db.DateTime) #Projected available
+    Date2 = db.Column('Date2', db.DateTime) #Delivery date
+    Date3 = db.Column('Date3', db.DateTime) #Import Window: release #Export window erd
+    Date4 = db.Column('Date4', db.DateTime) #Import Window: LFD  #Export window cutoff
+    Date5 = db.Column('Date5', db.DateTime) #Must return once pulled date
+    Date6 = db.Column('Date6', db.DateTime) #Planned pull from port date
+    Date7 = db.Column('Date7', db.DateTime) #Planned return to port date
+    Time2 = db.Column('Time2', db.String(20)) # Time or time range for delivery in string format
+    Time3 = db.Column('Time3', db.DateTime) # Early part of time range for delivery in datetime format
+    Source = db.Column('Source', db.String(45))
+    Portbyday = db.Column('Portbyday', db.String(45)) #pdf record of port reported window for booking or import
+    Scache = db.Column('Scache', db.Integer)
+    Pcache = db.Column('Pcache', db.Integer)
+    Truck = db.Column('Truck', db.String(45)) #what truck delivered it
+    Driver = db.Column('Driver', db.String(45)) # what driver delivered it
+    Hstat = db.Column('Hstat', db.Integer)
+    SSL = db.Column('SSL', db.String(45))  # Steam Ship Ling
+    def __init__(self, Status, Jo, Shipper, HaulType, Release, Bookingin, Container, Type, Pickup,
+                 Delivery, Ship, Date, Date2, Date3, Date4, Date5, Date6, Date7, Time2, Time3,
+                 Source, Portbyday, Scache, Pcache, Truck, Driver, Hstat, SSL):
+        self.Status = Status
+        self.Jo = Jo
+        self.Shipper = Shipper
+        self.HaulType = HaulType
+        self.Release = Release
+        self.Bookingin = Bookingin
+        self.Container = Container
+        self.Type = Type
+        self.Pickup = Pickup
+        self.Delivery = Delivery
+        self.Ship = Ship
+        self.Date = Date
+        self.Date2 = Date2
+        self.Date3 = Date3
+        self.Date4 = Date4
+        self.Date5 = Date5
+        self.Date6 = Date6
+        self.Date7 = Date7
+        self.Time2 = Time2
+        self.Time3 = Time3
+        self.Source = Source
+        self.Portbyday = Portbyday
+        self.Scache = Scache
+        self.Pcache = Pcache
+        self.Truck = Truck
+        self.Driver = Driver
+        self.Hstat = Hstat
+        self.SSL = SSL
 
 class Orders(db.Model):
     __tablename__ = 'orders'

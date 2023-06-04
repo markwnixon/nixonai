@@ -39,6 +39,7 @@
                                 {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
                                 {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
                                 {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
+                                {% elif entry[4] == 'pickupdata' %}{% set klist = genre_data['pickupdata'] %}
                                 {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
                                 {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
                                 {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
@@ -46,6 +47,7 @@
                                 {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
                                 {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
                                 {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
+                                {% elif entry[4] == 'shipdata' %}{% set klist = keydata.shipdata %}
 
                                 {% endif %}
 

@@ -209,6 +209,16 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ['Company2','hidden', 'Dropblock2'],
                                 ['Location3', 'hidden', 'Dropblock3']
                                 ],
+                'defaults': [
+                                ['Hstat', -1],
+                                ['Istat', -1],
+                                ['Proof', None],
+                                ['Invoice', None],
+                                ['Gate', None],
+                                ['Package', None],
+                                ['Manifest', None],
+                                ['PaidInvoice', None]
+                                 ],
                 'colorfilter': ['Hstat','Istat'],
                 'filteron':  ['Shipper', 'Date', 'Invoice', 'Haul'],
                 'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
@@ -700,6 +710,7 @@ Autos_setup = {'name' : 'Auto Job',
                'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
                              {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
                              {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                             {'shipdata': ['Ships', [['Active', 1]], 'Ship']},
                              {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
                              {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
                              {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
@@ -773,6 +784,266 @@ Autos_setup = {'name' : 'Auto Job',
 
                                     }
                 }
+
+
+Planning_genre =   {'table': 'Newjobs',
+                  'genre_tables': ['Newjobs', 'Ships', 'Orders', 'Interchange'],
+                  'genre_tables_on': ['on', 'off', 'off', 'off'],
+                  'quick_buttons': ['New Job', 'Edit Item', 'Update Planner', 'Mark Delivered'],
+                  'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 180 Days', 'Last Year', 'This Year', 'Show All']},
+                                    {'Delivery Filter': ['Unscheduled', 'Yesterday', 'Today', 'Tomorrow', 'This Week', 'Next Week', 'This Month', 'Show All']},
+                                    {'Haul Filter': ['Not Started', 'In-Progress', 'Incomplete', 'Completed',
+                                                     'Show All']},
+                                    {'Color Filter': ['Haul', 'Status', 'Both']}],
+                  'task_boxes': [{'Adding': ['New Job', 'New From Copy',]},
+                                 {'Editing': ['Edit Item', 'Match', 'Accept', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
+                                                 'Inv-1', 'Inv Emailed', 'Set Col To']},
+                                 {'View Docs': ['Purchase Receipt', 'Tow BOL', 'Title', 'Invoice',
+                                                'Paid Invoice', 'Package']},
+                                 {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment']},
+                                 {'Tasks': ['Street Turn', 'Unpulled Containers', 'Assign Drivers', 'Driver Hours',
+                                            'Truck Logs', 'CMA-APL', 'Container Update']}],
+                  'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
+                                      '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
+                                      '53\' Dry', 'LCL', 'RORO'],
+                  'pickupdata': ['Baltimore Seagirt', 'CSX Rail', 'East Coast CES', 'Belts'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
+                  'document_profiles'  : {
+                                        'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
+                                        'Signed Load Con' : ['Source','0','0','0'],
+                                        'Update w/Source'   : ['Source','0','0','0'],
+                                        'Update w/Proof'    : ['Proofs','0','0','0'],
+                                        'Update w/Invoice'    : ['Invoice','0','0','0'],
+                                        'Paid Invoice'    : ['Invoice','0','0','0'],
+                                        'Update w/Gate' : ['Gate Tickets','0','0','0'],
+                                        'Completed IP' : ['Invoice', 'Proofs','0','0'],
+                                        'Completed IPS' : ['Invoice', 'Proofs', 'Source','0'],
+                                        'Completed IPSG' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
+                                      },
+                  'image_stamps': {
+                      'X': ['x.png', 'stamps', .2],
+                      'Check': ['check.png', 'stamps', .5],
+                      'Paid': ['paid.png', 'stamps', 1]
+                  },
+                  'signature_stamps': {
+                      'Mark': ['mark.png', 'signatures', .2],
+                      'Norma': ['norma.png', 'signatures', .2]
+                  },
+                  'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
+                                   'Source':'CT', 'Proof':'CT', 'View':'CT'},
+                  'task_box_map': {
+                                    'Quick' :
+                                        {
+                                            'New Job' : ['Table_Selected', 'New', 'Newjobs'],
+                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
+                                            'Update Planner' : ['Table_Selected', 'UpdatePlanner', 'Newjobs'],
+                                            'Mark Delivered' : ['Single_Item_Selection', 'MarkDelivered', 'MarkDelivered']
+                                        },
+                                    'Adding':
+                                        {
+                                         'New Job': ['Table_Selected', 'New', 'Newjobs'],
+                                         'New Customer' : ['Table_Selected', 'New', 'Customers'],
+                                         'New Interchange' : ['Table_Selected', 'New', 'Interchange'],
+                                         'New Service' : ['Table_Selected', 'New', 'Services'],
+                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', ''],
+                                         'New Manifest' : ['Single_Item_Selection', 'New_Manifest', ''],
+                                         'Upload Purchase' : ['Single_Item_Selection', 'Upload', 'Source'],
+                                         'Upload Tow BOL' : ['Single_Item_Selection', 'Upload', 'Proof'],
+                                         'Upload Title' : ['Single_Item_Selection', 'Upload', 'TitleDoc']
+                                         },
+
+                                    'Editing':
+                                        {
+                                         'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
+                                         'Match': ['Two_Item_Selection', 'Match', ''],
+                                         'Accept': ['All_Item_Selection', 'Accept', ''],
+                                         'Haul+1': ['All_Item_Selection', 'Status', 'Haul+1'],
+                                         'Haul-1': ['All_Item_Selection', 'Status', 'Haul-1'],
+                                         'Haul Done': ['All_Item_Selection', 'Status', 'Haul Done'],
+                                         'Inv+1': ['All_Item_Selection', 'Status', 'Inv+1'],
+                                         'Inv-1': ['All_Item_Selection', 'Status', 'Inv-1'],
+                                         'Inv Emailed': ['All_Item_Selection', 'Status', 'Inv Emailed'],
+                                         'Set Col To': ['All_Item_Selection', 'SetCol', '']
+                                        },
+
+                                    'Money Flow':
+                                        {
+                                         'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
+                                         'Edit Summary Inv' : ['One_Table_Multi_Item_Selection', 'MakeSummary', 'Invoice'],
+                                         'Send Package' : ['Single_Item_Selection', 'MakePackage', 'Package'],
+                                         'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
+                                         'Receive by Acct' : ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'ReceiveByAccount', '']
+                                        },
+
+                                    'View Docs':
+                                        {
+                                         'Purchase Receipt' : ['Single_Item_Selection', 'View', 'Source'],
+                                         'Tow BOL' : ['Single_Item_Selection', 'View', 'Proof'],
+                                         'Title' : ['Single_Item_Selection', 'View', 'TitleDoc'],
+                                         'Invoice' : ['Single_Item_Selection', 'View', 'Invoice'],
+                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'PaidInvoice'],
+                                         'Package' : ['Single_Item_Selection', 'View', 'Package']
+                                         },
+
+                                    'Undo':
+                                        {
+                                          'Delete Item': ['All_Item_Selection', 'Undo', 'Delete'],
+                                          'Undo Invoice': ['All_Item_Selection', 'Undo', 'Invoice'],
+                                          'Undo Payment': ['All_Item_Selection', 'Undo', 'Payment']
+                                        },
+                                    'Tasks':
+                                        {
+                                          'Street Turn': ['No_Selection_Plus_Display', 'Street_Turn', 'None'],
+                                          'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None'],
+                                          'Assign Drivers': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Assign_Drivers', 'None'],
+                                          'Driver Hours': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Driver_Hours', 'None'],
+                                          'Driver Payroll': ['No_Item_Selection', 'Driver_Payroll', 'None'],
+                                          'Truck Logs': ['No_Item_Selection', 'Truck_Logs', 'None'],
+                                          'CMA-APL': ['No_Selection_Plus_Display', 'CMA_APL', 'None'],
+                                          'Container Update': ['No_Display', 'Container_Update', 'None']
+                                        }
+
+                                    }
+                    }
+
+Newjobs_setup = {'name' : 'New Jobs',
+                'table': 'Newjobs',
+                'filter': None,
+                'filterval': None,
+                'checklocation': 10,
+                'creators': ['Jo'],
+                'ukey': 'Jo',
+                'simplify': ['Job','Tow','Money','Docs'],
+                'entry data': [['Jo', 'JO', 'JO', jobcode, 'text', 0, 'ok', 'cc', None, 'Always'],
+                               ['Shipper', 'Shipper', 'Select Customer', 'select', 'customerdata', 0, 'ok', 'cl', 15, 'Always'],
+                               ['HaulType', 'HaulType', 'Select Haul Type', 'select', 'haul_types', 0, 'ok', 'cl', None, 'Job'],
+                               ['Release', 'Release', 'Release', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
+                               ['Bookingin', 'In-Book', 'In-Book', 'text', 'release', 0, 'ok', 'cc', None, 'Gate'],
+                                ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok', 'cc', None, 'Job'],
+                                ['Source', 'Src', 'Source', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                                ['Portbyday', 'PBD', 'PBD', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
+                                ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Job'],
+                                ['Pickup', 'Pickup', 'Select Pick Up Location', 'select', 'pickupdata', 0, 'ok', 'cc', None, 'Job'],
+                                ['Delivery', 'Delivery', 'Set Delivery Location', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
+                                ['Ship', 'Ship', 'Select Ship', 'select', 'shipdata', 0, 'ok', 'cc', None, 'Job'],
+                                ['SSL', 'SSL', 'Enter SSL', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date', 'Arrival', 'Arrival Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date2', 'Delivery', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Time2', 'Del Time', 'Delivery Time', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date3', 'Win1', 'Window Start', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date4', 'Win2', 'Window Stop', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date5', 'Detn', 'Date Much Retn', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date6', 'Pull', 'Date Pulled', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date7', 'Retn', 'Date Returned', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                               ['Driver', 'Driver', 'Select Driver',  'select', 'driverdata', 0, 'ok', 'cc', None, 'Job'],
+                               ['Truck', 'Truck', 'Select Truck', 'select', 'truckdata', 0, 'ok', 'cc', None, 'Job'],
+                               ],
+                'hidden data' : [],
+                'colorfilter': ['Hstat', 'Status'],
+                'filteron':  ['Date', 'Haul'],
+               'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
+                             {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
+                             {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                             {'shipdata': ['Ships', [['Active', 1]], 'Ship']},
+                             {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
+                             {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
+                             {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
+                             ],
+               'default values': {'get_Shipper': 'Fill This Later'},
+               'form show': {
+                   'New': ['Job', 'Tow', 'Work'],
+                   'Edit': ['Job', 'Tow', 'Work']
+               },
+               'form checks': {
+                   'New': ['Customer', 'Date', 'Date2'],
+                   'Edit': ['Customer', 'Date', 'Date2']
+               },
+                'jscript': 'dtTrucking',
+                'documents': ['Source', 'Portbyday'],
+                'sourcenaming': ['Source_Jo', 'c0', 'Jo'],
+                'source': ['vorders', 'Source', 'Jo'],
+                'copyswaps' : {},
+                'haulmask' : {
+                                'release': ['Release: BOL', 'Release: Booking', 'Release: BOL', 'Release: Booking', 'OTR Release BOL', 'OTR Release BOL', 'Transload Release', 'Release: BOL', 'Release: BOL', 'Release: BOL'],
+                                'container': ['Container', 'Container', 'Container', 'Container', 'Trailer No.', 'Trailer No.', 'Trailer No.', 'Container', 'Trailer No.', 'Container'],
+                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up From'],
+                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date'],
+                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To'],
+                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date'],
+                                'load3': ['no', 'no', 'Stop2', 'Stop2', 'no'],
+                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no']
+                              },
+                'matchfrom':    {
+                                 'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
+                                 'Interchange': [['Booking', 'Release'], ['Container', 'Container'], ['Type', 'ConType'], ['Chassis', 'Chassis']],
+                                 'Customers': [['Shipper', 'Shipper']],
+                                 'Services': []
+                                }
+
+                }
+
+Ships_setup = {'name' : 'Ships',
+                'table': 'Ships',
+                'filter': None,
+                'filterval': None,
+                'checklocation': 1,
+                'creators': [],
+                #'ukey': 'Jo',
+                'simplify': ['Job','Docs'],
+                'entry data': [
+                               ['Ship', 'Ship', 'Select Ship', 'select', 'shipdata', 0, 'ok', 'cl', 15, 'Always'],
+                                ['Date', 'Arrival', 'Arrival', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date2', 'Unloaded', 'Unloaded', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Description', 'Desc', 'Desc', 'text', 'text', 0, 'ok', 'cl', 15, 'Always'],
+                                ['Active', 'Active', 'Active', 'integer', 'integer', 0, 'ok', 'cl', 15, 'Always']
+                               ],
+                'hidden data' : [],
+                'colorfilter': ['Active'],
+                'filteron':  ['Date'],
+               'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
+                             {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
+                             {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                             {'shipdata': ['Ships', [['Active', 1]], 'Ship']},
+                             {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
+                             {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
+                             {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
+                             ],
+               'default values': {'get_Shipper': 'Fill This Later'},
+               'form show': {
+                   'New': ['Job', 'Tow', 'Work'],
+                   'Edit': ['Job', 'Tow', 'Work']
+               },
+               'form checks': {
+                   'New': ['Customer', 'Date', 'Date2'],
+                   'Edit': ['Customer', 'Date', 'Date2']
+               },
+                'jscript': 'dtTrucking',
+                'documents': ['Source', 'Portbyday'],
+                'sourcenaming': ['Source_Jo', 'c0', 'Jo'],
+                'source': ['vorders', 'Source', 'Jo'],
+                'copyswaps' : {},
+                'haulmask' : {
+                                'release': ['Release: BOL', 'Release: Booking', 'Release: BOL', 'Release: Booking', 'OTR Release BOL', 'OTR Release BOL', 'Transload Release', 'Release: BOL', 'Release: BOL', 'Release: BOL'],
+                                'container': ['Container', 'Container', 'Container', 'Container', 'Trailer No.', 'Trailer No.', 'Trailer No.', 'Container', 'Trailer No.', 'Container'],
+                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up From'],
+                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date'],
+                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To'],
+                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date'],
+                                'load3': ['no', 'no', 'Stop2', 'Stop2', 'no'],
+                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no']
+                              },
+                'matchfrom':    {
+                                 'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
+                                 'Interchange': [['Booking', 'Release'], ['Container', 'Container'], ['Type', 'ConType'], ['Chassis', 'Chassis']],
+                                 'Customers': [['Shipper', 'Shipper']],
+                                 'Services': []
+                                }
+
+                }
+
+
+
 
 billcode = co[10] + 'B'
 Billing_genre =   {'table': 'Bills',

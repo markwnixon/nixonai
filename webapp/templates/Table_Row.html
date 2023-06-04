@@ -1,4 +1,4 @@
-{% set genre = genre_data['table'] %}
+{% set leadtable = genre_data['table'] %}
 {% set genre_tables = genre_data['genre_tables'] %}
 {% set genre_tables_on = genre_data['genre_tables_on'] %}
 {% set qbuttons = genre_data['quick_buttons'] %}
@@ -31,7 +31,7 @@
         {% endfor %}
     {% endfor %}
 
-                {% if genre == 'Orders' %}
+                {% if leadtable == 'Orders' %}
                     <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Job"
                       data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Job  </button>
                 ->
@@ -45,7 +45,21 @@
                         data-toggle="tooltip" title="Receive money and apply toward a selected Job/Invoice">Receive<br>Payment</button>
 
                 {% endif %}
-                {% if genre == 'Bills' %}
+                 {% if leadtable == 'Newjobs' %}
+                    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Job"
+                      data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Job  </button>
+                ->
+                          <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Item"
+                        data-toggle="tooltip" title="MODIFY information associated with any selected item">Edit<br>Item</button>
+                ->
+                              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Update Planner"
+                        data-toggle="tooltip" title="Update all jobs to move status forward">Update<br>Planner</button>
+                ->
+                            <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Mark Delivered"
+                        data-toggle="tooltip" title="Mark selected job as loaded/unloaded at site">Mark<br>Delivered</button>
+
+                {% endif %}
+                {% if leadtable == 'Bills' %}
                     <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Bill"
                       data-toggle="tooltip" title="CREATE a New Item in Table">  New<br>Bill  </button>
                 ->

@@ -1,5 +1,7 @@
 from webapp import db
-from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns, SumInv, Autos, Bills, Divisions, Trucklog, Pins
+from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
+                          Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -697,6 +699,7 @@ def Table_maker(genre):
 
                 if tfilters['Color Filter'] == 'Haul':
                     Orders_setup['colorfilter'] = ['Hstat']
+                    Newjobs_setup['colorfilter'] = ['Hstat']
                 elif tfilters['Color Filter'] == 'Invoice':
                     Orders_setup['colorfilter'] = ['Istat']
                 elif tfilters['Color Filter'] == 'Both':
@@ -772,7 +775,7 @@ def Table_maker(genre):
         task_iter = 0
         tasktype = ''
         holdvec = [''] * 50
-        #print(f'labpassvec is {labpassvec}')
+        print(f'labpassvec is {labpassvec}')
         entrydata = []
         #err = ['All is well']
         tablesetup = None
@@ -952,9 +955,8 @@ def get_dbdata(table_setup, tfilters):
     filteron = table_setup['filteron']
     #print(entrydata)
     color_selector = table_setup['colorfilter']
-    #print(f' For table {table} the color selector is {color_selector}')
+    print(f' For table {table} the color selector is {color_selector}')
     labpass = None
-
 
     boxchecks = []
     try:
@@ -987,8 +989,8 @@ def get_dbdata(table_setup, tfilters):
         query_adds.append(f"{table}.{highfilter} {logic} '{highfilter_value}'")
 
     # If this table has no color capability then it cannot be filtered by date or type
+    print(f'the color_selector is {color_selector}')
     if color_selector is not None:
-
         # Determine if time filter applies to query:
         if 'Date Filter' in tfilters:
             dtest = tfilters['Date Filter']
@@ -1041,7 +1043,7 @@ def get_dbdata(table_setup, tfilters):
                     hfilter = f'{table}.Hstat >= 2'
                 query_adds.append(hfilter)
 
-        print(tfilters,filteron)
+        print(f'the tfilters are: {tfilters}, and filteron is {filteron}')
         if 'Shipper Filter' in tfilters:
             stest = tfilters['Shipper Filter']
             if stest is not None and stest != 'Show All' and 'Shipper' in filteron:
@@ -1083,7 +1085,8 @@ def get_dbdata(table_setup, tfilters):
         if color_selector is not None:
             for kx, selector in enumerate(color_selector):
                 color_selector_value = getattr(odat, selector)
-                #print(f'for {odat.Jo} color selector value is {color_selector_value} on selector {selector}')
+                #print(f'for {odat.Jo} color selector value is {color_selector_value} on selector {selector} and kx={kx}')
+                #print(f'table is {table}')
                 if kx == 0: rowcolors1.append(colorcode(table, color_selector_value))
                 if kx == 1: rowcolors2.append(colorcode(table, color_selector_value))
         else:
@@ -1103,6 +1106,8 @@ def get_dbdata(table_setup, tfilters):
     if color_selector is not None:
         if len(color_selector) == 1: rowcolors2 = rowcolors1
 
+    #print(f'the rowcolors1 are {rowcolors1}')
+    #print(f'the rowcolors2 are {rowcolors2}')
     return [data1, data1id, rowcolors1, rowcolors2, entrydata, simpler, boxchecks, boxlist], labpass
 
 def get_new_Jo(input):
@@ -1114,6 +1119,10 @@ def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
     masks = tablesetup['haulmask']
+    try:
+        defaults = tablesetup['defaults']
+    except:
+        defaults = False
     id = None
     if masks != []: entrydata = mask_apply(entrydata, masks)
     try:
@@ -1186,6 +1195,11 @@ def make_new_entry(tablesetup,holdvec):
                     thissubvalue = ''
                 setattr(dat, f'{entry[0]}', thissubvalue)
         db.session.commit()
+        if defaults:
+            for jx, entry in enumerate(defaults):
+                    print(f'setting {entry[0]} to {entry[1]}')
+                    setattr(dat, f'{entry[0]}', entry[1])
+            db.session.commit()
         #err.append(f"Updated entry in {tablesetup['table']}")
 
         if sourcekeys is not None:
@@ -1257,7 +1271,6 @@ def mask_apply(entrydata, masks):
                 mask = masks['load2']
                 entrydata[jx][2] = mask[this_index]
             if 'Load Date' in entry[1]:
-
                 mask = masks['load1date']
                 #print(f'Mask {entry[1]}, {this_index} {mask}')
                 entrydata[jx][2] = mask[this_index]
@@ -1289,6 +1302,131 @@ def check_appears(tablesetup, entry):
         print('checkappears',testval,testmat,colmat,havedat)
     #print(f'checkvals returning {entry[3]} and {entry[4]}')
     return entry[3], entry[4]
+
+def UpdatePlanner_task(tablesetup, task_iter):
+    completed = True
+    holdvec = [''] * 60
+    err = [f"Running UpdatePlanner task with task_iter {task_iter} using {tablesetup['table']}"]
+    form_show = tablesetup['form show']['New']
+    form_checks = tablesetup['form checks']['New']
+    print(f'Entering UpdatePlanner Task with task iter {task_iter}')
+    entrydata = tablesetup['entry data']
+    # Set some date criteria:
+    today = datetime.datetime.today()
+    today = today.date()
+    cutoff = today - timedelta(7)
+    cuthigh = today + timedelta(7)
+    tomorrow = today + timedelta(1)
+    lookbackto = today - timedelta(30)
+
+
+    # Add jobs from the Orders database that are not in the planner:
+    odata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date > lookbackto)).all()
+    for odat in odata:
+        jo = odat.Jo
+        print(f'Looking for jo {jo}')
+        ndat = Newjobs.query.filter(Newjobs.Jo == jo).first()
+        if ndat is None:
+            # Need to add this order to the newjobs data.
+            print(odat.Source, odat.Company, odat.Company2)
+            input = Newjobs(Status=1, Jo=jo, Shipper=odat.Shipper, HaulType=odat.HaulType, Release=odat.Booking,
+                            Bookingin=None, Container=odat.Container,
+                            Type=odat.Type, Pickup=odat.Company, Delivery=odat.Company2, Ship=None, Date=odat.Date,
+                            Date2=odat.Date2, Date3=None,
+                            Date4=None, Date5=None, Date6=None, Date7=None, Time2='', Time3=None, Source=odat.Source,
+                            Portbyday=None,
+                            Scache=odat.Scache, Pcache=0, Truck=odat.Truck, Driver=odat.Driver, Hstat=odat.Hstat,
+                            SSL=None, Changes='')
+            db.session.add(input)
+            db.session.commit()
+            print(f'Added Jo {jo} to Newjobs')
+
+
+    ndata = Newjobs.query.filter(Newjobs.Status<8).all()
+    for ndat in ndata:
+        jo = ndat.Jo
+        status = ndat.Status
+        ship = ndat.Ship
+        ht = ndat.HaulType
+        sdat = Ships.query.filter(Ships.Ship == ship).first()
+        if sdat is None:
+            ndat.Status = 0
+        else:
+            win1 = ndat.Date3
+            win2 = ndat.Date4
+
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                ndat.Hstat = odat.Hstat
+                hstat = odat.Hstat
+            # Now push the planning along
+            ts = -1
+            if sdat is not None: ts = 0
+            # Check if delivery set:
+            del_date = ndat.Date2
+            del_time = ndat.Time2
+            if del_date is not None and del_time is not None:
+                if ts == 0: ts = 1
+
+            if 'Import' in ht:
+                shiparrival = sdat.Date
+                ndays = shiparrival - today
+                ndays = ndays.days
+                print(f'Today is {today} and the ship arrives {shiparrival} which is in {ndays} days')
+                if ndays < 3: #ship arrives within 3 days
+                    ts = 2
+                if win1 is not None:
+                    ndays1 = win1 - today
+                    ndays1 = ndays1.days
+                    if ndays1 <= 0: ts = 3
+                if win2 is not None:
+                    ndays2 = win2 - today
+                    ndays2 = ndays2.days
+                    if ndays2 <= 0: ts = 4
+                if del_date is not None and del_time is not None:
+                    if ts == 3: ts = 5 #Both active and planned delivery date
+                    if ts == 4 and hstat > 0: ts = 5
+                proof = odat.Proof
+                if proof is not None and hstat == 1: ts = 6
+                if hstat == 1:
+                    #check to see how long container out
+                    pulled = odat.Date
+                    ndays3 = pulled - today
+                    ndays3 = ndays3.days
+                    if ndays3 <= 0: ts = 7
+                if hstat > 1 and proof is not None: ts = 8
+
+            if 'Export' in ht:
+                if win1 is not None:
+                    ndays1 = win1 - today
+                    ndays1 = ndays1.days
+                    if ndays1 > 4: ts = 1
+                    elif ndays1 > 0: ts = 2
+                    elif ndays1 <= 0: ts = 3
+                if win2 is not None:
+                    ndays2 = win2 - today
+                    ndays2 = ndays2.days
+                    if ndays2 <= 0: ts = 4
+                if del_date is not None and del_time is not None:
+                    if ts == 3: ts = 5 #Both active and planned delivery date
+                    if ts == 4 and hstat > 0: ts = 5
+                proof = odat.Proof
+                if proof is not None and hstat == 1: ts = 6
+                if hstat == 1:
+                    #check to see how long container out
+                    pulled = odat.Date
+                    ndays3 = pulled - today
+                    ndays3 = ndays3.days
+                    if ndays3 <= 0: ts = 7
+                if hstat > 1 and proof is not None: ts = 8
+
+        ndat.Status = ts
+        db.session.commit()
+
+    return holdvec, entrydata, err, completed
+
+
+
 
 def New_task(tablesetup, task_iter):
     completed = False
@@ -1862,6 +2000,10 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     creators = tablesetup['creators']    # Gather the data for the selected row
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
+    try:
+        defaults = tablesetup['defaults']
+    except:
+        defaults = False
 
     from sqlalchemy import inspect
     inst = eval(f"inspect({table})")
@@ -1905,6 +2047,9 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
                 # Check if thisvalue requires a compliment value
                 if thisvalue in ckswaps:
                     thisvalue = swaps[thisvalue]
+                if defaults:
+                    for thisdef in defaults:
+                        if col in thisdef:  thisvalue = thisdef[1]
                 if isinstance(thisvalue, numbers.Number): dbnew = dbnew + f", {col}={thisvalue}"
                 # String requires the triple single quotes because of the container type 45'96" quotes
                 elif isinstance(thisvalue, str): dbnew = dbnew + f", {col}='''{thisvalue}'''"
