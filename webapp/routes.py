@@ -55,6 +55,7 @@ def FileUpload():
     scache = odat.Scache
     fileob = request.files["file2upload"]
     name, ext = os.path.splitext(fileob.filename)
+    ext = ext.lower()
     if uptype == 'proof':
         filename1 = f'Proof_{jo}_c{str(pcache)}{ext}'
         filename2 = f'Proof_{jo}_c{str(pcache)}.pdf'

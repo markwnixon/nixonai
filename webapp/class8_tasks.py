@@ -1706,128 +1706,185 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
     return holdvec, entrydata, err, viewport, completed
 
 def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
+    err = []
     print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, tids= {tids} tabs= {tabs}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
-        print('table', table)
-        for sid in tids[jx]:
-            if task_focus == 'Delete':
-                #print('made it here with jx, thistable sid', jx, thistable, sid)
-                rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
-                eval(rstring)
-                db.session.commit()
-            elif task_focus == 'Invoice':
-                # Need to add the undo of the journal entries
-                rstring = f'{table}.query.get({sid})'
-                odat = eval(rstring)
-                odat.Invoice = None
-                odat.Istat = 0
-                odat.Links = None
-                odat.BalDue = None
-                odat.InvoTotal = None
-                odat.Payments = '0.00'
-                db.session.commit()
-                Invoices.query.filter(Invoices.Jo == odat.Jo).delete()
-                Income.query.filter(Income.Jo == odat.Jo).delete()
-                Gledger.query.filter(Gledger.Tcode == odat.Jo).delete()
-                db.session.commit()
 
-            elif table == 'Orders' and task_focus == 'Payment':
-                rstring = f'{table}.query.get({sid})'
-                odat = eval(rstring)
-                sinow = odat.Label
-                slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
-                odata = Orders.query.filter(Orders.Label == sinow).all()
-                if slead is not None: print(f'Undoing sinow {sinow} slead id {slead.id} number of odata {len(odata)}')
-
-                if slead is None:
-                    odat.Istat = 3
-                    if odat.Hstat == 5:
-                        odat.Hstat = 3
-                    odat.PaidInvoice = None
-                    odat.PayRef = None
-                    odat.PayMeth = None
-                    odat.PayAcct = None
-                    odat.PaidDate = None
-                    odat.PaidAmt = None
+        #Convert to allow on single item undo:
+        if len(tids[jx]) > 1:
+            err.append('Too Many Selections')
+        else:
+            for sid in tids[jx]:
+                err.append('Working on single item {sid}')
+                if task_focus == 'Delete':
+                    #print('made it here with jx, thistable sid', jx, thistable, sid)
+                    rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
+                    eval(rstring)
+                    db.session.commit()
+                elif task_focus == 'Invoice':
+                    # Need to add the undo of the journal entries
+                    rstring = f'{table}.query.get({sid})'
+                    odat = eval(rstring)
+                    odat.Invoice = None
+                    odat.Istat = 0
+                    odat.Links = None
+                    odat.BalDue = None
+                    odat.InvoTotal = None
                     odat.Payments = '0.00'
-                    odat.BalDue = odat.InvoTotal
                     db.session.commit()
-                    jo = odat.Jo
-                    idata = Invoices.query.filter(Invoices.Jo == jo).all()
-                    for data in idata:
-                        data.Status = 'New'
-                    db.session.commit()
-                    Income.query.filter(Income.Jo == jo).delete()
-                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
-                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
-                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
+                    Invoices.query.filter(Invoices.Jo == odat.Jo).delete()
+                    Income.query.filter(Income.Jo == odat.Jo).delete()
+                    Gledger.query.filter(Gledger.Tcode == odat.Jo).delete()
                     db.session.commit()
 
-                elif table == 'Orders' and task_focus == 'Docs':
-                    print('Working to remove the document references')
+                elif table == 'Orders' and task_focus == 'Payment':
+                    rstring = f'{table}.query.get({sid})'
+                    odat = eval(rstring)
+                    sinow = odat.Label
+                    slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
+                    odata = Orders.query.filter(Orders.Label == sinow).all()
+                    if slead is not None: print(f'Undoing sinow {sinow} slead id {slead.id} number of odata {len(odata)}')
 
-
-                else:
-
-                    for each in odata:
-                        each.PaidInvoice = None
-                        each.PayRef = None
-                        each.PayMeth = None
-                        each.PayAcct = None
-                        each.PaidDate = None
-                        each.PaidAmt = None
-                        each.Istat = 6
-                        if each.Hstat == 5:
-                            each.Hstat = 3
-
-                        jo = each.Jo
+                    if slead is None:
+                        odat.Istat = 3
+                        if odat.Hstat == 5:
+                            odat.Hstat = 3
+                        odat.PaidInvoice = None
+                        odat.PayRef = None
+                        odat.PayMeth = None
+                        odat.PayAcct = None
+                        odat.PaidDate = None
+                        odat.PaidAmt = None
+                        odat.Payments = '0.00'
+                        odat.BalDue = odat.InvoTotal
+                        db.session.commit()
+                        jo = odat.Jo
                         idata = Invoices.query.filter(Invoices.Jo == jo).all()
                         for data in idata:
                             data.Status = 'New'
+                        db.session.commit()
+                        Income.query.filter(Income.Jo == jo).delete()
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
-                    slead.Status = 2
-                    db.session.commit()
+                        db.session.commit()
 
-            elif table == 'Bills' and task_focus == 'Payment':
-                print('In the unpay bill section')
-                rstring = f'{table}.query.get({sid})'
-                odat = eval(rstring)
-                if odat is not None:
-                    if odat.Status == 'Paid':
-                        check = odat.Check
-                        pacctlist = odat.PacctList
-                        if pacctlist is None: multi = False
-                        else: multi = True
-                        if multi:
-                            kill_list = eval(pacctlist)
-                            for k in kill_list:
-                                kdat = Bills.query.get(k)
-                                kdat.Status = None
-                                kdat.PmtList = None
-                                kdat.PacctList = None
-                                kdat.Pmulti = None
-                                kdat.PAmount2 = None
-                                jo = kdat.Jo
+                    else:
+
+                        for each in odata:
+                            each.PaidInvoice = None
+                            each.PayRef = None
+                            each.PayMeth = None
+                            each.PayAcct = None
+                            each.PaidDate = None
+                            each.PaidAmt = None
+                            each.Istat = 6
+                            if each.Hstat == 5:
+                                each.Hstat = 3
+
+                            jo = each.Jo
+                            idata = Invoices.query.filter(Invoices.Jo == jo).all()
+                            for data in idata:
+                                data.Status = 'New'
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
+                        slead.Status = 2
+                        db.session.commit()
+
+                elif table == 'Bills' and task_focus == 'Payment':
+                    print('In the unpay bill section')
+                    rstring = f'{table}.query.get({sid})'
+                    odat = eval(rstring)
+                    if odat is not None:
+                        if odat.Status == 'Paid':
+                            check = odat.Check
+                            pacctlist = odat.PacctList
+                            if pacctlist is None: multi = False
+                            else: multi = True
+                            if multi:
+                                kill_list = eval(pacctlist)
+                                for k in kill_list:
+                                    kdat = Bills.query.get(k)
+                                    kdat.Status = None
+                                    kdat.PmtList = None
+                                    kdat.PacctList = None
+                                    kdat.Pmulti = None
+                                    kdat.PAmount2 = None
+                                    jo = kdat.Jo
+                                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
+                                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
+                            else:
+                                odat.Status = None
+                                jo = odat.Jo
                                 Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
                                 Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
-                        else:
-                            odat.Status = None
-                            jo = odat.Jo
-                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
-                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
 
 
-                db.session.commit()
+                    db.session.commit()
+
+                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'DocsNotSource' or task_focus == 'xProof'):
+                    rstring = f'{table}.query.get({sid})'
+                    odat = eval(rstring)
+                    source = addpath(tpath(f'{thistable}-Source',odat.Source))
+                    proof = addpath(tpath(f'{thistable}-Proof',odat.Proof))
+                    manifest = addpath(tpath(f'{thistable}-Manifest',odat.Manifest))
+                    gate = addpath(tpath(f'{thistable}-Gate',odat.Gate))
+                    invoice = addpath(tpath(f'{thistable}-Invoice',odat.Invoice))
+                    package = addpath(tpath(f'{thistable}-Package',odat.Package))
+
+                    if task_focus == 'xProof':
+                        try:
+                            os.remove(proof)
+                        except:
+                            print(f'File {proof} not found')
+                        odat.Proof = None
+                        db.session.commit()
+                    else:
+
+                        if task_focus == 'Docs':
+                            try:
+                                os.remove(source)
+                            except:
+                                print(f'File {source} not found')
+
+                        try:
+                            os.remove(proof)
+                        except:
+                            print(f'File {proof} not found')
+
+                        try:
+                            os.remove(manifest)
+                        except:
+                            print(f'File {manifest} not found')
+
+                        try:
+                            os.remove(gate)
+                        except:
+                            print(f'File {gate} not found')
+
+                        try:
+                            os.remove(invoice)
+                        except:
+                            print(f'File {invoice} not found')
+
+                        try:
+                            os.remove(package)
+                        except:
+                            print(f'File {package} not found')
+
+                        if task_focus == 'Docs':  odat.Source = None
+                        odat.Proof = None
+                        odat.Manifest = None
+                        odat.Gate = None
+                        odat.Invoice = None
+                        odat.Package = None
+                        db.session.commit()
 
 
-
-    #db.session.commit()
-
-    holdvec, entrydata, err = [], [], []
+    holdvec, entrydata = [], []
     viewport = ['0'] * 6
     completed = True
 
@@ -1929,7 +1986,8 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 if file.filename == '':
                     err.append('No file selected for uploading')
 
-                name, ext = os.path.splitext(file.filename)
+                name, exto = os.path.splitext(file.filename)
+                ext = exto.lower()
                 if task_focus == 'Source':
                     sname = 'Scache'
                 elif task_focus == 'Proof':
@@ -1962,8 +2020,9 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
                 if bn > 0:
                     if thistable == 'Orders':
-                        oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
+                        oldfile = f'{task_focus}_{fileout}_c{str(sn)}{exto}'
                         oldoutput = addpath(tpath(f'{thistable}-{task_focus}', oldfile))
+                        print(f'the old file is {oldfile}')
 
                         try:
                             os.remove(oldoutput)

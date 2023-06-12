@@ -24,7 +24,7 @@ Trucking_genre = {'table': 'Orders',
                                                   'Receive by Acct']},
                                  {'View Docs': ['Source', 'Proof', 'Manifest', 'Interchange', 'Invoice',
                                                 'Paid Invoice', 'Package']},
-                                 {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment', 'Undo Docs']},
+                                 {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment', 'Undo Docs', 'Undo Docs xSource', 'Undo Proof']},
                                  {'Tasks': ['Street Turn', 'Unpulled Containers', 'Assign Drivers', 'Driver Hours',
                                             'Truck Logs', 'CMA-APL', 'Container Update']}],
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
@@ -115,7 +115,9 @@ Trucking_genre = {'table': 'Orders',
                                           'Delete Item': ['All_Item_Selection', 'Undo', 'Delete'],
                                           'Undo Invoice': ['All_Item_Selection', 'Undo', 'Invoice'],
                                           'Undo Payment': ['All_Item_Selection', 'Undo', 'Payment'],
-                                          'Undo Docs': ['All_Item_Selection', 'Undo', 'Docs']
+                                          'Undo Docs': ['All_Item_Selection', 'Undo', 'Docs'],
+                                          'Undo Docs xSource': ['All_Item_Selection', 'Undo', 'DocsNotSource'],
+                                          'Undo Proof': ['All_Item_Selection', 'Undo', 'xProof']
                                         },
                                     'Tasks':
                                         {
