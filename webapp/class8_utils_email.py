@@ -220,8 +220,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Invoice
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vInvoice']
         return emaildata
 
@@ -234,8 +234,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.PaidInvoice
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
@@ -245,8 +245,8 @@ def etemplate_truck(eprof,odat):
         aname = f'Package_{odat.Jo}.pdf'
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
@@ -256,8 +256,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
@@ -267,8 +267,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         outname = f'Package_{odat.Jo}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
@@ -317,7 +317,7 @@ def etemplate_truck(eprof,odat):
         aname = aname.replace('INV','Invoice_')
         emailin1 = estatus
         emailin2 = ''
-        emailcc1 = em['info']
+        emailcc1 = em['invo']
         emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPackage']
         return emaildata
@@ -331,8 +331,8 @@ def etemplate_truck(eprof,odat):
         print(f'aname here is {aname} {odat.PaidInvoice} {odat.Jo} {odat.Source}')
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, aname, 'vPaidInvoice']
         return emaildata
 
@@ -353,8 +353,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         outname = f'Invoice-Proof_{odat.Jo}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
@@ -365,8 +365,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         outname = f'Invoice-Package_{odat.Jo}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
@@ -377,8 +377,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         outname = f'Invoice-Package_{odat.Jo}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
@@ -389,8 +389,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Source
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         outname = f'Invoice_Summary_{odat.Si}_{today_str}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vinvoice']
         return emaildata
@@ -410,8 +410,8 @@ def etemplate_truck(eprof,odat):
     except:
         emailin1 = 'Not Found'
     emailin2 = ''
-    emailcc1 = em['info']
-    emailcc2 = em['serv']
+    emailcc1 = em['invo']
+    emailcc2 = ''
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, '']
 
     return emaildata

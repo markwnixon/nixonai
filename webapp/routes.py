@@ -4,6 +4,7 @@ from webapp import app, db
 from webapp.models import Orders, People
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
+from webapp.revenues import get_revenues
 from flask_login import login_required
 
 
@@ -436,6 +437,16 @@ def Class8Main(genre):
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, checked_data = checked_data,
                            leftsize=leftsize, rightsize=rightsize, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
                            taskon=taskon, task_focus=task_focus, task_iter=task_iter, tasktype=tasktype, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, genre=genre, viewport=viewport, tablesetup=tablesetup)
+
+
+@app.route('/Revenue', methods=['GET', 'POST'])
+@login_required
+
+def Revenue():
+    print('Made it to the Revenue Data Center')
+    title1,col1,data1,title2,col2,data2 = get_revenues()
+    return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2)
+
 
 
 @app.route('/EasyStart', methods=['GET', 'POST'])

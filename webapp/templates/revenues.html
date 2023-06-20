@@ -1,0 +1,47 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+
+<div class="table-responsive">
+
+<div class="row"> &nbsp' </div>
+<div class="row">
+            <div class="col-sm-4" align="center">
+                <h1>Monthly Income Report</h1>
+                <h5>{{ title1 }}</h5>
+                 <table class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+                   <tr>
+                         {% for col in col1 %}
+                             <td align="right" ><b><large>{{ col }}</large></b></td></td>
+                         {% endfor %}
+                   </tr>
+                   {% for data in data1 %}
+                       <tr>{% for dat in data %} <td align="right" ><b>{{ dat }}</b></td> {% endfor %}</tr>
+                   {% endfor %}
+                 </table>
+            </div>
+
+            <div class="col-sm-4" align="center">
+            <h1>Open Balance Report</h1>
+                <h5>{{ title2 }}</h5>
+                 <table class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+                   <tr>
+                         {% for col in col2 %}
+                            <td align="right" ><b>{{ col }}</b></td>
+                         {% endfor %}
+                   </tr>
+                   {% for data in data2 %}
+                       <tr>{% for dat in data %} <td align="right" ><b>{{ dat }}</b></td> {% endfor %}</tr>
+                   {% endfor %}
+                 </table>
+            </div>
+            <div class="col-sm-4" align="center">
+              These are the income reports
+            </div>
+
+
+
+
+</div>
+
+{% endblock %}

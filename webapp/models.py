@@ -1340,32 +1340,35 @@ class SumInv(db.Model):
 class Income(db.Model):
     __tablename__ = 'income'
     id = db.Column('id', db.Integer, primary_key=True)
-    Jo = db.Column('Jo', db.String(25))
-    Account = db.Column('Account', db.String(99))
-    Pid = db.Column('Pid', db.Integer)
-    Description = db.Column('Description', db.String(200))
-    Amount = db.Column('Amount', db.String(45))
-    Ref = db.Column('Ref', db.String(25))
-    Date = db.Column('Date', db.DateTime)
-    Original = db.Column('Original', db.String(99))
-    From = db.Column('From', db.String(45))
-    Bank = db.Column('Bank', db.String(45))
-    Date2 = db.Column('Date2', db.DateTime)
-    Depositnum = db.Column('Depositnum', db.String(45))
-
-    def __init__(self, Jo, Account, Pid, Description, Amount, Ref, Date, Original, From, Bank, Date2, Depositnum):
-        self.Jo = Jo
-        self.Account = Account
-        self.Pid = Pid
+    Month = db.Column('Month', db.String(99))
+    Mrev = db.Column('Mrev', db.Integer)
+    Crev = db.Column('Crev', db.Integer)
+    Revcoll = db.Column('Revcoll', db.Integer)
+    Open = db.Column('Open', db.Integer)
+    Description = db.Column('Description', db.String(100))
+    def __init__(self, Month, Mrev, Crev, Revcoll, Open, Description):
+        self.Month = Month
+        self.Mrev = Mrev
+        self.Crev = Crev
+        self.Revcoll = Revcoll
+        self.Open = Open
         self.Description = Description
-        self.Amount = Amount
-        self.Ref = Ref
-        self.Date = Date
-        self.Original = Original
-        self.From = From
-        self.Bank = Bank
-        self.Date2 = Date2
-        self.Depositnum = Depositnum
+
+class Openi(db.Model):
+    __tablename__ = 'openi'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Company = db.Column('Company', db.String(99))
+    Over30 = db.Column('Over30', db.Integer)
+    Under30 = db.Column('Under30', db.Integer)
+    Total = db.Column('Total', db.Integer)
+    Description = db.Column('Description', db.String(100))
+    def __init__(self, Company, Over30, Under30, Total, Description):
+        self.Company = Company
+        self.Over30 = Over30
+        self.Under30 = Under30
+        self.Total = Total
+        self.Description = Description
+
 
 class Deposits(db.Model):
     __tablename__ = 'deposits'
