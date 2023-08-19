@@ -488,6 +488,8 @@ def addtopins(thisdate, opair):
             ht = odat.HaulType
             hstat = odat.Hstat
             contype = odat.Type
+            ochassis = odat.Chassis
+            if not hasinput(ochassis): ochassis=f'{scac}007'
             try:
                 rel4 = odat.Booking[-4:]
             except:
@@ -511,30 +513,34 @@ def addtopins(thisdate, opair):
                 citiline = citiline.split()
                 city = citiline[0]
 
+            if not hasinput(city):
+                citiline = odat.Deliver
+                citiline = citiline.split()
+                city = citiline[0]
+
             if hstat is None: hstat = -1
             if hstat < 1:
                 if 'Export' in ht:
                     outbook = odat.Booking
                     outbook = outbook.split('-',1)[0]
                     outtext = f'Empty Out: *{outbook}* ({ctext} {city})'
-                    outchas = odat.Chassis
+                    outchas = ochassis
                 if 'Import' in ht:
                     outbook = rel4
                     outcon = odat.Container
                     outtext =  f'Load Out: *{rel4}  {odat.Container}* ({ctext} {city})'
-                    outchas = odat.Chassis
+                    outchas = ochassis
             else:
                 if 'Export' in ht:
                     inbook = odat.Booking
                     inbook = inbook.split('-', 1)[0]
                     incon = odat.Container
-                    inchas = odat.Chassis
+                    inchas = ochassis
                     intext = f'Load In: *{inbook}  {odat.Container}* ({ctext} {city})'
                 if 'Import' in ht:
                     incon = odat.Container
-                    inchas = odat.Chassis
+                    inchas = ochassis
                     intext = f'Empty In: *{odat.Container}* ({ctext} {city})'
-                    inchas = odat.Chassis
 
     if intext: print(f'About to add {len(intext)} {intext} {inchas}')
     if outtext: print(f'About to add {len(outtext)} {outtext} {outchas}')
