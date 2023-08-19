@@ -94,9 +94,16 @@
                      <table>
                       {% for pdat in pdata %}
                           {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
+                          {% if pdat.OutPin == '0' %}
+                                {% if pdat.Driver %}{% set col1 = 'green-text font-weight-bold' %}{% else %}{% set col1 = 'black-text' %}{% endif %}
+                          {% else %}
+                                {% set col1 = 'blue-text font-weight-bold' %}
+                          {% endif %}
                           <tr>
                           <td align="center" ><input class="align-middle" type="checkbox"  name="box{{ but }}{{ loop.index-1 }}"></td>
-                          <td>{{ pdat.Intext }}<br> {{ pdat.Outtext }}</td>
+                              <td><span class="{{ col1 }}">{{ pdat.Intext }}<br> {{ pdat.Outtext }}</span>
+                              {% if pdat.Carrier %}<br><span class="red-text">{{ pdat.Carrier }}</span>{% endif %}
+                          </td>
                               <td>
                                   <select class="mdb-select md-form" name="drv{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
                                     {% for drv in drvdata %}
@@ -116,6 +123,7 @@
                                     <input class="form-control form-control-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}></td>
                               </td>
                           </tr>
+
                     {% endfor %}
                      </table>
 

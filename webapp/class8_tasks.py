@@ -443,6 +443,8 @@ def get_dispatch(odat):
     if '20' in contype: ctext = '20'
     if 'R' in contype: ctext = ctext + ' Reefer'
     if 'U' in contype: ctext = ctext + ' OpenTop'
+    if '45' in contype and '9' in contype: ctext = '45HC'
+    if '45' in contype and '8' in contype: ctext = '45STD'
 
     address = odat.Dropblock2
     adata, backup = get_address_details(address)
@@ -793,20 +795,6 @@ def Table_maker(genre):
     #print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
     #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
-    getpin = request.values.get('PinGet')
-    if getpin is not None and 'Orders' in tables_on:
-        print(f'Running the pin script')
-        #tes = subprocess.run(['ssh', '10.0.0.105','/home/mark/flask/crontasks/getpin.sh','FELA'], timeout=120)
-        try:
-            tes = subprocess.run(['ssh', 'mark@70.88.236.49', '/crontasks/getpin.sh', f'{scac}'], timeout=180)
-            print(tes)
-            print(f'The pin script is completed')
-        except:
-            print('The subprocess had at least one error')
-        #res = command.run(['ls'])
-        #print(res.output)
-        #print(res.exit)
-
     putbuff = request.values.get('Paste Buffer')
     thisdate = datetime.datetime.today()
     thisdate = thisdate.date()
@@ -841,11 +829,18 @@ def Table_maker(genre):
                     ddat = Drivers.query.filter(Drivers.Name == driver).first()
                     if ddat is not None:
                         pdat.Phone = ddat.Phone
-                        pdat.Carrier = ddat.Carrier
+                        # Carrier no longer used in pin system, using it to display warnings
+                        pdat.Carrier = None
+                        default_unit = ddat.Truck
+                        #pdat.Unit = default_unit
 
                 if unit is not None:
                     print(f'The selected unit is {unit}')
                     pdat.Unit = unit
+                    if unit != default_unit:
+                        pdat.Carrier = f'Warning: Unit {unit} is not driver default {default_unit}'
+                    else:
+                        pdat.Carrier = None
                     vdat = Vehicles.query.filter(Vehicles.Unit == unit).first()
                     if vdat is not None:
                         pdat.Tag = vdat.Plate
