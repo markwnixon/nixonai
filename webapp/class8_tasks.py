@@ -514,7 +514,7 @@ def addtopins(thisdate, opair):
                 city = citiline[0]
 
             if not hasinput(city):
-                citiline = odat.Deliver
+                citiline = odat.Shipper
                 citiline = citiline.split()
                 city = citiline[0]
 
