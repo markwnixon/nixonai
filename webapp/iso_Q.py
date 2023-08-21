@@ -617,10 +617,13 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
             adds.append(f'Yard Storage: <b>${expdata[18]}/day</b>')
         if tbox[4]:
             owfee1 = round(int(float(expdata[21])))
-            adds.append(f'Overweight Base Fee:  <b>${d2s(owfee1)}</b>')
+            distloaded = float(distdata[0]) / 2
+            owfee2 = round(int(float(expdata[22]) * float(distdata[0]) / 2) / 10) * 10
+            owfeetot = owfee1+owfee2
+            adds.append(f'Overweight Fee:  <b>${d2s(owfeetot)}</b> ({d2s(owfee1)} + {d1s(distloaded)} OW miles)')
         if tbox[5]:
-            owfee2 = round(int(float(expdata[22]) * float(distdata[0])/2)/10)*10
-            adds.append(f'Overweight Miles:  <b>${d2s(owfee2)}</b>')
+            permitfee = 90.00
+            adds.append(f'Permits Fee:  <b>${d2s(expdata[28])}</b>')
         if tbox[6]:
             adds.append(f'Extra Stop Fee: <b>${expdata[20]}</b>')
         if tbox[7]:
@@ -957,7 +960,8 @@ def isoQuote():
                      request.values.get('toll'), request.values.get('gapct'), request.values.get('rm'), request.values.get('fees'), request.values.get('other'),
                      request.values.get('fsc'), request.values.get('chassis2'), request.values.get('chassis3'), request.values.get('prepull'), request.values.get('store'), request.values.get('detention'),
                      request.values.get('extrastop'),request.values.get('overweight'), request.values.get('reefer'), request.values.get('scale'), request.values.get('residential'),
-                     request.values.get('congestion'), request.values.get('chassplit'), request.values.get('owmile')]
+                     request.values.get('congestion'), request.values.get('chassplit'), request.values.get('owmile'), request.values.get('permits')]
+            for a in alist: print(a)
             blist = [int(float(a)*100) for a in alist]
             pmf=int(100*float(alist[1])/float(alist[2]))
             phi=int(100*float(alist[3])/1992)
@@ -965,7 +969,7 @@ def isoQuote():
             pmt = pmf+blist[7]+blist[8]+blist[9]
             pht = blist[0] + phi
             input = Quoteinput(ph_driver=blist[0],fuelpergal=blist[1],mpg=blist[2],insurance_annual_truck=blist[3],markup=blist[4],toll=blist[5],ga=blist[6],pm_repairs=blist[7],pm_fees=blist[8],pm_other=blist[9],pm_fuel=pmf,ph_insurance=phi,pm_total=pmt,ph_total=pht,FSC=blist[10],
-                               chassis2=blist[11], chassis3=blist[12], prepull=blist[13], store=blist[14], detention=blist[15], extrastop=blist[16], overweight=blist[17], reefer=blist[18], scale=blist[19], residential=blist[20], congestion=blist[21], chassplit=blist[22], owmile=blist[23])
+                               chassis2=blist[11], chassis3=blist[12], prepull=blist[13], store=blist[14], detention=blist[15], extrastop=blist[16], overweight=blist[17], reefer=blist[18], scale=blist[19], residential=blist[20], congestion=blist[21], chassplit=blist[22], owmile=blist[23], permits=blist[24])
             db.session.add(input)
             db.session.commit()
             qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
@@ -978,7 +982,7 @@ def isoQuote():
                                markup=qidat.markup, toll=qidat.toll, ga=qidat.toll, pm_repairs=qidat.pm_repairs, pm_fees=qidat.pm_fees,
                                pm_other=qidat.pm_other, pm_fuel=qidat.pm_fuel, ph_insurance=qidat.ph_insurance, pm_total=qidat.pm_total, ph_total=qidat.ph_total,
                                FSC=qfdat.FSC, chassis2=qfdat.chassis2, chassis3=qfdat.chassis3, prepull=qfdat.prepull, store=qfdat.detention, extrastop=qfdat.extrastop, overweight=qfdat.overweight,
-                               reefer=qfdat.reefer, scale=qfdat.scale, residential=qfdat.residential, congestion=qfdat.congestion, chassplit=qfdat.chassplit, owmile=qfdat.owmile)
+                               reefer=qfdat.reefer, scale=qfdat.scale, residential=qfdat.residential, congestion=qfdat.congestion, chassplit=qfdat.chassplit, owmile=qfdat.owmile, permits=qfdat.permits)
             db.session.add(input)
             db.session.commit()
             #This makes first and last records the same so from now on will get original values until a change is made
@@ -1013,12 +1017,13 @@ def isoQuote():
         congest = float(qidat.congestion) / 100
         chassplit = float(qidat.chassplit) / 100
         owmile = float(qidat.owmile) / 100
+        permits = float(qidat.permits) / 100
 
         #print(f'ph_driver is {ph_driver} and d2s gives {d2s(ph_driver)}')
         expdata = [d2s(ph_driver), d2s(fuel), d2s(mpg), d2s(ins), d2s(markup), d2s(toll), d2s(gapct),
                    d2s(pm_repairs), d2s(pm_fees), d2s(pm_other), d2s(pm_fuel), d2s(ph_insurance), d2s(pmc), d2s(phc),
                    d1s(fsc), d2s(chassis2), d2s(chassis3), d2s(prepull), d2s(store), d2s(detention), d2s(extrastop),
-                   d2s(overweight), d2s(owmile), d2s(reefer), d2s(scale), d2s(resid), d2s(congest), d2s(chassplit)]
+                   d2s(overweight), d2s(owmile), d2s(reefer), d2s(scale), d2s(resid), d2s(congest), d2s(chassplit), d2s(permits)]
 
         qdata = dataget_Q(thismuch)
         #quot, numchecked = numcheck(1, qdata, 0, 0, 0, 0, ['quot'])

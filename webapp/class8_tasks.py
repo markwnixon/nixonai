@@ -166,7 +166,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                 else: use_table = 'dtTrucking9'
             else:
                 use_table = 'dtTrucking1'
-            if num_tables_on > 1:
+            if num_tables_on > 1 or tfilters['Viewer'] == 'Top-Bot':
                 use_table = use_table + '_200'
             jscripts.append(use_table)
 
@@ -570,8 +570,8 @@ def get_custlist(table, tfilters):
             daysback = 90
         elif '120' in dtest:
             daysback = 120
-        elif '180' in dtest:
-            daysback = 180
+        elif '360' in dtest:
+            daysback = 360
         elif dtest == 'Last Year':
             thisyear = today.year
             lastyear = thisyear - 1
@@ -726,7 +726,7 @@ def Table_maker(genre):
         #session['table_defaults'] = tables_on
         #session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
-        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both'}
+        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both', 'Viewer': '8x4'}
         jscripts = ['dtTrucking']
         taskon, task_iter, task_focus, tasktype = None, None, None, None
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
@@ -921,7 +921,13 @@ def Table_maker(genre):
             holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
         else:
             err.append('No selection made for paste buffer task')
-
+    leftcheck = tfilters['Viewer']
+    if leftcheck == '7x5': leftsize = 7
+    if leftcheck == '8x4': leftsize = 8
+    if leftcheck == '9x3': leftsize = 9
+    if leftcheck == '10x2': leftsize = 10
+    if leftcheck == 'Top-Bot': leftsize = 12
+    print(f'Leftsize on exit is {leftsize}')
     err = erud(err)
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
@@ -1736,7 +1742,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                     odat.Payments = '0.00'
                     db.session.commit()
                     Invoices.query.filter(Invoices.Jo == odat.Jo).delete()
-                    Income.query.filter(Income.Jo == odat.Jo).delete()
+                    #Income.query.filter(Income.Jo == odat.Jo).delete()
                     Gledger.query.filter(Gledger.Tcode == odat.Jo).delete()
                     db.session.commit()
 

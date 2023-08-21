@@ -241,7 +241,8 @@ class Quoteinput(db.Model):
     congestion = db.Column('congestion', db.Integer)
     chassplit = db.Column('chassplit', db.Integer)
     owmile = db.Column('owmile', db.Integer)
-    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile):
+    permits = db.Column('permits', db.Integer)
+    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile, permits):
         self.ph_driver = ph_driver
         self.ph_insurance = ph_insurance
         self.ph_total = ph_total
@@ -270,6 +271,7 @@ class Quoteinput(db.Model):
         self.congestion = congestion
         self.chassplit = chassplit
         self.owmile = owmile
+        self.permits = permits
 
 class Chassis(db.Model):
     __tablename__ = 'chassis'

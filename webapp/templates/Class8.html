@@ -4,7 +4,9 @@
 <form action="{{ url_for ('Class8Main',genre=genre) }}" method="post" enctype="multipart/form-data">
 <div class="table-responsive">
 
-<div class="row">
+{% if leftsize < 12 %}
+   <div class="row">
+
         {% if viewport[0] == 'split panel left' %}
             <div class="col-sm-4">
                 {% if viewport[1] == 'email setup' %}
@@ -24,10 +26,12 @@
                 {% if viewport[2] == 'upload_doc_left' %}
                     {% include 'uploaddocs.html' %}
                 {% elif viewport[2] == 'show_doc_left' %}
-                    <div class="row"><div class="col-sm-12" align="right">
-                            Looking for: {{viewport[3]}}<br>
-                            <embed src="{{viewport[3]}}" width="750px" height="900px"/>
-                    </div></div>
+
+                        <div class="row"><div class="col-sm-12" align="right">
+                                Looking for: {{viewport[3]}}<br>
+                                <embed src="{{viewport[3]}}" width="750px" height="900px"/>
+                        </div></div>
+
                 {% endif %}
             </div>
 
@@ -57,10 +61,53 @@
             </div>
 
         {% endif %}
-
-        <div class="col-sm-{{rightsize}}" align = "left">
+    {% endif %}
+    {% if leftsize == 12 %}
+           <div class="row">
+             <div class="col-sm-12" align = "center">
+               {% if (viewport[0] == 'show_doc_left') or (viewport[0] == 'upload_doc_left') %}
+                    {% include 'the_tables_hidden.html' %}
+                {% else %}
+                    {% include 'the_tables.html' %}
+                {% endif %}
+             </div>
+            </div>
             <div class="row">
-                <div class="col-sm-12" align=""center">
+                    {% if taskon %}
+                        <div class="col-sm-6" align = "center">
+                             {% set taskfile = taskon | replace(" ","_") %}
+                             {% include 'includes/_controlpanelheader.html' %}
+                             {% if viewport[0] == 'show_doc_left' %}
+                                <div class="row"><div class="col-sm-12" align="right">
+                                        Looking for: {{viewport[2]}}<br>
+                                        <embed src="{{viewport[2]}}" width="750px" height="900px"/>
+                                </div></div>
+                             {% endif %}
+                        </div>
+                        <div class="col-sm-6" align = "center">
+                             {% include 'c8_task_'+taskfile+'.html' %}
+                        </div>
+                    {% else %}
+                        <div class="col-sm-4" align = "center">
+                                {% include 'includes/_controlpanelheader.html' %}
+                                {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
+                                {%  if genre == 'Planning' %} {% include 'includes/_plancolorcode.html' %} {% endif %}
+                        </div>
+                        <div class="col-sm-8" align = "center">
+                                {% for db_data in table_data %}
+                                    {% set thistable = tabletitle[loop.index - 1] %}
+                                    {% if thistable == 'Orders' %}
+                                        {% include 'includes/_orders.html' %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+            </div>
+        {% else %}
+
+            <div class="col-sm-{{rightsize}}" align = "left">
+              <div class="row">
+                <div class="col-sm-12" align= "center">
                     {% if taskon %}
                         {% set taskfile = taskon | replace(" ","_") %}
                         {% include 'includes/_controlpanelheader.html' %}
@@ -79,7 +126,6 @@
                     {% endif %}
                 </div>
             </div>
-           <div class="row">
                 <div class="col-sm-12">
                     <br>
                     Instructions for Quote Shorthand:<br>
@@ -96,7 +142,6 @@
                     then will add a line item for driver detention (time start 1:25pm and time end 5:51pm),<br>
                     then will add a line item for per diem at $1500
                 </div>
-            </div>
             <div class="row">
                 <div class="col-sm-12">
                     <br><br><br><br><br><br>
@@ -104,6 +149,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
 </div>
 </div>

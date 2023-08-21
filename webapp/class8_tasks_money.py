@@ -64,10 +64,8 @@ def loginvo_m(odat,ix):
 def gettimes(input):
     try:
         each = input.split('-')
-        time1 = each[0]
         time1 = datetime.datetime.strptime(each[0], '%H:%M')
         time2 = time1 + timedelta(2 / 24)
-        time3 = each[1]
         time3 = datetime.datetime.strptime(each[1], '%H:%M')
         serviceqty = time3 - time2
         serviceqty = serviceqty.seconds/3600
@@ -115,7 +113,7 @@ def getservice(myo, service, serviceqty, serviceamt, servicestr):
                 amount = each * serviceqty
             else:
                 amount = 0.00
-                descript = 'Improper times provided on inpu'
+                descript = 'Improper times provided on input'
 
     elif nextservice == 'Storage Fee':
         if str(serviceqty) == 'default':
@@ -137,6 +135,89 @@ def getservice(myo, service, serviceqty, serviceamt, servicestr):
     if str(serviceqty) == 'default': serviceqty = 1.0
 
     return nextservice, descript, each, serviceqty, amount
+
+
+def get_digits_after_character(input_string, character):
+    found_character = False
+    digits = []
+
+    for char in input_string:
+        if found_character:
+            if char.isdigit():
+                digits.append(char)
+            else:
+                break
+        elif char == character:
+            found_character = True
+
+    return ''.join(digits)
+
+def get_invo_data(qblines, myo):
+    codes = []
+    qtys = []
+    prices = []
+    descs = []
+    labels = []
+    for qbl in qblines:
+        code = qbl[0:2]
+        sdat = Services.query.filter(Services.Code == code).first()
+        if sdat is not None:
+            codes.append(qbl[0:2])
+            price = float(sdat.Price)
+            qty = 1.0
+            label = sdat.Service
+            desc = f'Code {code} description'
+
+            #Special services based on dates
+
+            if code == 'ch':
+                qty = myo.Date2 - myo.Date
+                qty = qty.days + 1
+                desc = f'Days of Chassis, {myo.Date} - {myo.Date2}'
+
+            if code == 'sf':
+                qty = myo.Date2 - myo.Date
+                qty = qty.days
+                date2 = myo.Date2
+                stodate2 = date2 - timedelta(1)
+                desc = f'Days of Storage, {myo.Date} - {stodate2}'
+
+            if code == 'dd':
+                desc = 'Free time 0700-0900, detention 0900-1000'
+
+            if '=' in qbl:
+                newqty = get_digits_after_character(qbl, '=')
+                try:
+                    qty = int(newqty)
+                except:
+                    continue
+
+            if '$' in qbl:
+                newamt = get_digits_after_character(qbl, '$')
+                try:
+                    price = float(newamt)
+                except:
+                    continue
+
+            if '*' in qbl:
+                #Need everything after the # sign
+                brstrings = qbl.split('*')
+                timedata = brstrings[1]
+                time1, time2, time3, qty, status = gettimes(timedata)
+                print(time1, time2, time2, qty)
+                if status == 1:
+                    desc = f'Free time {time1}-{time2}, detention {time2}-{time3}'
+                else:
+                    desc = 'Improper times provided on input'
+
+
+
+            qtys.append(qty)
+            prices.append(price)
+            descs.append(desc)
+            labels.append(label)
+
+    return codes, labels, descs, qtys, prices
 
 
 
@@ -193,68 +274,30 @@ def initialize_invoice(myo, err):
                                  Original=None, Status='New')
                 db.session.add(input)
                 db.session.commit()
-                qblines = qblines[1:]
-                print(qblines)
-                for qbl in qblines:
-                    print(f'Assessing qbl = {qbl}')
-                    if '=' in qbl:
-                        qbeaches = qbl.split('=')
-                        service = qbeaches[0]
-                        remainder = qbeaches[1]
-                        if '$' in remainder:
-                            qbnext = remainder.split('$')
-                            serviceqty = float(qbnext[0])
-                            remainder = qbnext[1]
-                            if '*' in remainder:
-                                qbnext = remainder.split('*')
-                                serviceamt = float(qbnext[0])
-                                servicestr = qbnext[1]
-                            else:
-                                serviceamt = float(qbnext[1])
-                                servicestr = 'default'
-                        elif '*' in remainder:
-                            qbnext = remainder.split('*')
-                            serviceqty = float(qbnext[0])
-                            serviceamt = 'default'
-                            servicestr= qbnext[1]
-                        else:
-                            serviceqty = float(qbeaches[1])
-                            serviceamt = 'default'
-                            servicestr = 'default'
 
-                    elif '$' in qbl:
-                        qbeaches = qbl.split('$')
-                        service = qbeaches[0]
-                        remainder = qbeaches[1]
-                        serviceqty = 1.0
-                        if '*' in remainder:
-                            qbnext = remainder.split('*')
-                            serviceamt = float(qbnext[0])
-                            servicestr = qbnext[1]
-                        else:
-                            serviceamt = float(qbeaches[1])
-                            servicestr = 'default'
+                if len(qblines) > 1:
+                    qblines = qblines[1:]
+                    print(qblines)
+                    codes, labels, descs, qtys, prices = get_invo_data(qblines, myo)
+                    print(codes)
+                    print(labels)
+                    print(descs)
+                    print(qtys)
+                    print(prices)
+                    #nextservice, descript, each, serviceqty, amount = getservice(myo, service, serviceqty, serviceamt, servicestr)
+                    if len(codes)>0:
+                        for jx,code in enumerate(codes):
+                            label = labels[jx]
+                            descript = descs[jx]
+                            each = prices[jx]
+                            qty = qtys[jx]
+                            amount = float(each*qty)
 
-                    elif '*' in qbl:
-                        qbeaches = qbl.split('*')
-                        service = qbeaches[0]
-                        servicestr = qbeaches[1]
-                        serviceqty = 1.0
-                        serviceamt = 'default'
-
-                    else:
-                        service = qbl
-                        serviceqty = 'default'
-                        serviceamt = 'default'
-                        servicestr = 'default'
-
-                    nextservice, descript, each, serviceqty, amount = getservice(myo, service, serviceqty, serviceamt, servicestr)
-
-                    input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service=nextservice, Description=descript,
-                                     Ea=d2s(each), Qty=serviceqty, Amount=d2s(amount), Total=0.00, Date=today,
-                                     Original=None, Status='New')
-                    db.session.add(input)
-                    db.session.commit()
+                            input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service=label, Description=descript,
+                                             Ea=d2s(each), Qty=qty, Amount=d2s(amount), Total=0.00, Date=today,
+                                             Original=None, Status='New')
+                            db.session.add(input)
+                        db.session.commit()
             else:
                 # No quote provided
                 input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,

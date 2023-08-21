@@ -90,7 +90,7 @@
                       <td><input class="form-control" type="text" name='store' value={{ expdata[18] }}></td>
                  </tr>
                   <tr>
-                      </td><td><b>Driver Det</b></td><td><b>Extra Stop</b></td><td><b>Overwt Base</b></td><td><b>OW per mile</b></td><td><b>Reefer</b></td>
+                      <td><b>Driver Det</b></td><td><b>Extra Stop</b></td><td><b>Overwt Base</b></td><td><b>OW per mile</b></td><td><b>Reefer</b></td>
                   <tr>
                       <td><input class="form-control" type="text" name='detention' value={{ expdata[19] }}></td>
                       <td><input class="form-control" type="text" name='extrastop' value={{ expdata[20] }}></td>
@@ -99,13 +99,14 @@
                       <td><input class="form-control" type="text" name='reefer' value={{ expdata[23] }}></td>
                  </tr>
                   <tr>
-                      </td><td><b>Scale Tick</b></td><td><b>Residential</b></td><td><b>Port Congest</b></td><td><b>Chass Splt</b></td><td></td>
+                      <td><b>Scale Tick</b></td><td><b>Residential</b></td><td><b>Port Congest</b></td><td><b>Chass Splt</b></td><td><b>Permits</b></td>
                   <tr>
                  <tr>
                       <td><input class="form-control" type="text" name='scale' value={{ expdata[24] }}></td>
                       <td><input class="form-control" type="text" name='residential' value={{ expdata[25] }}></td>
                       <td><input class="form-control" type="text" name='congestion' value={{ expdata[26] }}></td>
                       <td><input class="form-control" type="text" name='chassplit' value={{ expdata[27] }}></td>
+                      <td><input class="form-control" type="text" name='permits' value={{ expdata[28] }}></td>
                  </tr>
 
                 </tbody>
@@ -316,11 +317,11 @@
         <br>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box4" {% if tbox[4]=='on' %} checked {% endif %} name="tbox4">
-              <label class="custom-control-label" for="box4">OW Base</label>
+              <label class="custom-control-label" for="box4">Overweight</label>
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box5" {% if tbox[5]=='on' %} checked {% endif %} name="tbox5">
-              <label class="custom-control-label" for="box5">OW/mile</label>
+              <label class="custom-control-label" for="box5">Permits</label>
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box6" {% if tbox[6]=='on' %} checked {% endif %} name="tbox6">
