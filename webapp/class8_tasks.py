@@ -263,7 +263,7 @@ def reset_state_hard(task_boxes, genre_tables):
     genre_tables_on[0] = 'on'
     tables_on = ['Orders']
     # Default time filter on entry into table is last 60 days:
-    tfilters = {'Shipper': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul'}
+    tfilters = {'Shipper': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Haul', 'Viewer': '8x4'}
     jscripts = ['dtTrucking']
     taskon, task_iter, task_focus = None, None, None
     viewport = ['tables'] + ['0'] * 5
