@@ -1017,7 +1017,8 @@ def isoQuote():
         congest = float(qidat.congestion) / 100
         chassplit = float(qidat.chassplit) / 100
         owmile = float(qidat.owmile) / 100
-        permits = float(qidat.permits) / 100
+        try: permits = float(qidat.permits) / 100
+        except: permits = 0.00
 
         #print(f'ph_driver is {ph_driver} and d2s gives {d2s(ph_driver)}')
         expdata = [d2s(ph_driver), d2s(fuel), d2s(mpg), d2s(ins), d2s(markup), d2s(toll), d2s(gapct),
