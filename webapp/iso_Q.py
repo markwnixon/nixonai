@@ -850,7 +850,10 @@ def get_body_text(qdat):
                 soup = BeautifulSoup(html_content, "html.parser")
                 plain_text_content = soup.get_text()
     else:
-        plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
+        try:
+            plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
+        except:
+            plain_text_content = 'Could not decode payload'
 
     #print('Returning from get_body_text', plain_text_content)
     return plain_text_content, html_content
