@@ -13,7 +13,7 @@ from webapp.class8_utils_package import makepackage
 from webapp.class8_utils_email import emaildata_update
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
 from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
-from webapp.InterchangeFuncs import Order_Container_Update
+from webapp.InterchangeFuncs import Order_Container_Update, Gate_Update
 from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Assign_Drivers_task, Driver_Hours_task, CMA_APL_task
 import os
@@ -431,7 +431,8 @@ def get_dispatch(odat):
     ht = odat.HaulType
     hstat = odat.Hstat
     contype = odat.Type
-    booking = odat.Booking
+    if hasinput(odat.BOL): booking = odat.BOL
+    else: booking = odat.Booking
     newbook = booking.split('-', 1)[0]
     try:
         rel4 = odat.Booking[-4:]
@@ -1505,6 +1506,8 @@ def New_task(tablesetup, task_iter):
                         print(f'Updating Orders with {sid}')
                         Order_Addresses_Update(sid)
                         Order_Container_Update(sid)
+                    if tablesetup['table'] == 'Interchange':
+                        Gate_Update(sid)
                     if tablesetup['table'] == 'Bills':
                         bdat = Bills.query.filter(Bills.id>0).order_by(Bills.id.desc()).first()
                         if bdat is not None:
@@ -1624,6 +1627,8 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
                     Order_Container_Update(sid)
+                if table == 'Interchange':
+                    Gate_Update(sid)
                 #err.append(f"Updated entry in {tablesetup['table']}")
                 completed = True
 
@@ -1690,13 +1695,19 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
             rstring = f'{table}.query.get({sid})'
             odat = eval(rstring)
             if 'Haul' in task_focus:
-                nstat = odat.Hstat
-                if nstat == None: nstat = 0
-                if task_focus == 'Haul+1':
-                    if nstat+1 < 5: odat.Hstat = nstat+1
-                if task_focus == 'Haul-1':
-                    if nstat-1 > -1: odat.Hstat = nstat-1
-                if task_focus == 'Haul Done': odat.Hstat = 3
+                try:
+                    nstat = odat.Hstat
+                    valid = 1
+                except:
+                    nstat = 0
+                    valid = 0
+                if valid:
+                    if nstat == None: nstat = 0
+                    if task_focus == 'Haul+1':
+                        if nstat+1 < 5: odat.Hstat = nstat+1
+                    if task_focus == 'Haul-1':
+                        if nstat-1 > -1: odat.Hstat = nstat-1
+                    if task_focus == 'Haul Done': odat.Hstat = 3
             if 'Inv' in task_focus:
                 nstat = odat.Istat
                 if nstat == None: nstat = 0
