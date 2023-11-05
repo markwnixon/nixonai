@@ -49,6 +49,25 @@ def Add_New_Drop(dropblock):
         edat = Drops.query.filter((Drops.Entity==entity) & (Drops.Addr1==addr1)).first()
     return edat
 
+def Review_Drop(dropblock):
+    droplist = dropblock.splitlines()
+    avec=['']*5
+    for j,drop in enumerate(droplist):
+        avec[j]=stripper(drop)
+    entity=avec[0]
+    addr1=avec[1]
+    dropdat=Drops.query.filter((Drops.Entity==entity) & (Drops.Addr1==addr1)).first()
+    if dropdat is not None:
+        # This entity already exists
+        return dropblock
+    else:
+        input = Drops(Entity=entity,Addr1=addr1,Addr2=avec[2],Phone=avec[3],Email=avec[4])
+        db.session.add(input)
+        db.session.commit()
+        return dropblock
+
+
+
 def Order_Addresses_Update(sid):
     odat = Orders.query.get(sid)
     if odat is not None:
@@ -104,16 +123,17 @@ def get_drop(loadname):
     print(f'In get_drop The LOADNAME is:{loadname}')
     dropdat = Drops.query.filter(Drops.Entity == loadname).first()
     if dropdat is not None:
-        #print('dropdat',dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
+        print('dropdat',dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
         dline = f'{dropdat.Entity}\n{dropdat.Addr1}\n{dropdat.Addr2}\n{dropdat.Phone}\n{dropdat.Email}'
         dline = dline.replace('None','')
         return dline
     else:
-        #print(f'the lenght of loadname is...{len(loadname)}')
+        print(f'the length of loadname is...{len(loadname)}')
         if len(loadname) == 3:
-            dropdat = Drops.query.filter(Drops.Entity.contains(loadname)).first()
+            #dropdat = Drops.query.filter(Drops.Entity.contains(loadname)).first()
+            dropdat = Drops.query.filter(Drops.Entity.like(f'{loadname}%')).order_by(Drops.id.desc()).first()
             if dropdat is not None:
-                #print('dropdat', dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
+                print('dropdat', dropdat.Entity, dropdat.Addr1, dropdat.Addr2, dropdat.Phone, dropdat.Email)
                 dline = f'{dropdat.Entity}\n{dropdat.Addr1}\n{dropdat.Addr2}\n{dropdat.Phone}\n{dropdat.Email}'
                 dline = dline.replace('None', '')
                 return dline
@@ -1133,7 +1153,7 @@ def make_new_entry(tablesetup,holdvec):
     except:
         defaults = False
     id = None
-    if masks != []: entrydata = mask_apply(entrydata, masks)
+    if masks != []: entrydata = mask_apply(entrydata, masks, None)
     try:
         hiddendata = tablesetup['hidden data']
     except:
@@ -1258,10 +1278,13 @@ def make_new_entry(tablesetup,holdvec):
     return err, id
 
 #def New_task(task_iter, tablesetup, task_focus, checked_data):
-def mask_apply(entrydata, masks):
+def mask_apply(entrydata, masks, ht):
     mask_to_apply = request.values.get('HaulType')
+    if mask_to_apply is None:
+        mask_to_apply = ht
+    print(f'The final mask being applied is: {mask_to_apply}')
     list = Trucking_genre['haul_types']
-    #print(mask_to_apply)
+    print(mask_to_apply)
     if mask_to_apply in list:
         #print(f'the list is {list}')
         this_index = list.index(mask_to_apply)
@@ -1273,7 +1296,10 @@ def mask_apply(entrydata, masks):
             if 'Container' in entry[1]:
                 mask = masks['container']
                 entrydata[jx][2] = mask[this_index]
-            if 'Load At' in entry[1]:
+            if 'In-Book' in entry[1]:
+                mask = masks['inbook']
+                entrydata[jx][2] = mask[this_index]
+            if 'Terminal' in entry[1]:
                 mask = masks['load1']
                 entrydata[jx][2] = mask[this_index]
             if 'Deliver To' in entry[1]:
@@ -1293,24 +1319,41 @@ def mask_apply(entrydata, masks):
             if 'Third Date' in entry[1]:
                 mask = masks['load3date']
                 entrydata[jx][2] = mask[this_index]
+            if '1st Call' in entry[1]:
+                mask = masks['date4']
+                entrydata[jx][2] = mask[this_index]
+            if '2nd Call' in entry[1]:
+                mask = masks['date5']
+                entrydata[jx][2] = mask[this_index]
+            if '3rd Call' in entry[1]:
+                mask = masks['date6']
+                entrydata[jx][2] = mask[this_index]
+            if 'Chassis' in entry[1]:
+                mask = masks['chassis']
+                entrydata[jx][2] = mask[this_index]
 
         entrydata = [v for v in entrydata if v[2] != 'no']
     return entrydata
 
-def check_appears(tablesetup, entry):
+def check_appears(tablesetup, entry, htold):
     checks = tablesetup['appears_if']
     testval = entry[4]
     testmat = checks[testval]
-    colmat = checks[entry[0]]
-    havedat = request.values.get(testval)
-    if havedat is not None:
-        for test in testmat:
-            if test in havedat:
-                print(test,havedat)
-                return colmat
-        print('checkappears',testval,testmat,colmat,havedat)
-    #print(f'checkvals returning {entry[3]} and {entry[4]}')
-    return entry[3], entry[4]
+    ht = request.values.get(testval)
+    if ht is None: ht = htold
+    print(f'*******************************It should appear if {testval} {ht} in {testmat}')
+    if any(ht in x for x in testmat):
+        print('It should appear')
+        colmat = checks[entry[0]]
+        havedat = request.values.get(testval)
+        if havedat is not None:
+            for test in testmat:
+                if test in havedat:
+                    print(test,havedat)
+                    return colmat
+        return entry[3], entry[4]
+    else:
+        return None, None
 
 def UpdatePlanner_task(tablesetup, task_iter):
     completed = True
@@ -1443,21 +1486,24 @@ def New_task(tablesetup, task_iter):
     form_show = tablesetup['form show']['New']
     form_checks = tablesetup['form checks']['New']
     print(f'Entering New Task with task iter {task_iter}')
+    htold = ''
 
     cancelnow = request.values.get('Cancel')
     if cancelnow is not None:
         entrydata = tablesetup['entry data']
         masks = tablesetup['haulmask']
-        if masks != []: entrydata = mask_apply(entrydata, masks)
+        if masks != []: entrydata = mask_apply(entrydata, masks, htold)
         numitems = len(entrydata)
         holdvec = [''] * numitems
         completed = True
     else:
 
         if task_iter > 0:
+            htold = request.values.get('haultype')
+            if htold is None: htold = ''
             entrydata = tablesetup['entry data']
             masks = tablesetup['haulmask']
-            if masks != []: entrydata = mask_apply(entrydata, masks)
+            if masks != []: entrydata = mask_apply(entrydata, masks, htold)
             numitems = len(entrydata)
             holdvec = [''] * numitems
             failed = 0
@@ -1466,7 +1512,7 @@ def New_task(tablesetup, task_iter):
             for jx, entry in enumerate(entrydata):
                 #print(f'Entry loop: jx"{jx}, entry:{entry}')
                 if entry[3] == 'appears_if':
-                    entry[3], entry[4] = check_appears(tablesetup, entry)
+                    entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                     entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
                 #print(f'form show is:{form_show}')
                 if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
@@ -1474,7 +1520,7 @@ def New_task(tablesetup, task_iter):
                         holdvec[jx] = request.values.get(f'{entry[0]}')
                         if entry[0] in form_checks: required = True
                         else: required = False
-                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required)
+                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold)
                         if entry[5] > 1: failed = failed + 1
                         if entry[5] == 1: warned = warned + 1
 
@@ -1527,7 +1573,7 @@ def New_task(tablesetup, task_iter):
             for jx, entry in enumerate(entrydata):
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold)
 
 
     return holdvec, entrydata, err, completed
@@ -1540,8 +1586,19 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
+
+    nextquery = f"{table}.query.get({sid})"
+    olddat = eval(nextquery)
+    try:
+        htold = olddat.HaulType
+    except:
+        htold = ''
+
     masks = tablesetup['haulmask']
-    if masks != []: entrydata = mask_apply(entrydata, masks)
+    #print(f'masks is {masks}')
+    if masks != []:
+        entrydata = mask_apply(entrydata, masks, htold)
+        #print(f'After mask applied entrydata is: {entrydata}')
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
@@ -1550,38 +1607,41 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     filterval = tablesetup['filterval']
     colorcol = tablesetup['colorfilter']
     creators = tablesetup['creators']  # Gather the data for the selected row
-    nextquery = f"{table}.query.get({sid})"
-    olddat = eval(nextquery)
+
     form_show = tablesetup['form show']['Edit']
     form_checks = tablesetup['form checks']['Edit']
 
-    print(f'Running edit with task_iter {task_iter}')
+    #print('')
+    #print(f'*********************************************************************')
+    #print(f'***Running edit with task_iter {task_iter} and old data is {htold}***')
+    #print(f'*********************************************************************')
 
     if task_iter > 0:
         failed = 0
         warned = 0
 
         for jx, entry in enumerate(entrydata):
+            #print(f'Running entry {entry}')
             if entry[3] == 'appears_if':
-                entry[3], entry[4] = check_appears(tablesetup, entry)
+                entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
-                print(f'Return from check_appears is {entry[3]} and {entry[4]}')
+                #print(f'Return from check_appears is {entry[3]} and {entry[4]}')
             #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
                 holdvec[jx] = request.values.get(f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold)
                 if entry[5] > 1: failed = failed + 1
                 if entry[5] == 1: warned = warned + 1
 
         if 'bring data' in tablesetup:
             for bring in tablesetup['bring data']:
                 tab1, sel, tab2, cat, colist1, colist2 = bring
-                print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                #print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
                 valmatch = request.values.get(sel)
-                print(valmatch)
+                #print(valmatch)
                 escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
                 adat = eval(escript)
                 if adat is not None:
@@ -1606,7 +1666,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 for jx, entry in enumerate(entrydata):
                     if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                         if entry[0] not in creators:
-                            print(f'Setting entry {entry[0]} to {holdvec[jx]}')
+                            #print(f'Setting entry {entry[0]} to {holdvec[jx]}')
                             setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
                 for jx, entry in enumerate(hiddendata):
@@ -1616,7 +1676,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         thissubvalue = thisvalue[0]
                     except:
                         thissubvalue = ''
-                    print('Updating Entry with', entry[0], thissubvalue)
+                    #print('Updating Entry with', entry[0], thissubvalue)
                     setattr(olddat, f'{entry[0]}', thissubvalue)
                 db.session.commit()
                 # The amount could change on a bill, so if a bill need to update
@@ -1624,7 +1684,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     bdat = eval(nextquery)
                     err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
                 if table == 'Orders':
-                    print(f'Updating Orders with {sid}')
+                    #print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
                     Order_Container_Update(sid)
                 if table == 'Interchange':
@@ -1636,17 +1696,17 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 if 'bring data' in tablesetup:
                     for bring in tablesetup['bring data']:
                         tab1, sel, tab2, cat, colist1, colist2 = bring
-                        print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
+                        #print(f'Bring Data: {tab1} {sel} {tab2} {cat} {colist1} {colist2}')
                         valmatch = request.values.get(sel)
-                        print(valmatch)
+                        #print(valmatch)
                         escript = f'{tab2}.query.filter({tab2}.{cat} == valmatch).first()'
-                        print(escript)
+                        #print(escript)
                         adat = eval(escript)
                         if adat is not None:
                             for jx, col in enumerate(colist1):
                                 thisval = getattr(adat, col)
                                 setattr(olddat, colist2[jx], thisval)
-                                print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+                                #print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
                             db.session.commit()
                     #olddat = eval(nextquery)
                     #for jx, entry in enumerate(entrydata): holdvec[jx] = getattr(olddat, f'{entry[0]}')
@@ -1655,23 +1715,17 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
         cancel_item = request.values.get('Cancel')
         if cancel_item is not None:
-            print('Canceling the edit')
+            #print('Canceling the edit')
             completed = True
 
     else:
-        # Gather the data for the selected row
-        nextquery = f"{table}.query.get({sid})"
-        olddat = eval(nextquery)
 
         for jx, entry in enumerate(entrydata):
-            if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry)
+            if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry, htold)
             holdvec[jx] = getattr(olddat, f'{entry[0]}')
             if entry[0] in form_checks: required = True
             else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required)
-
-
-
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold)
 
 
     try:
@@ -2154,11 +2208,20 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
+
+    nextquery = f"{table}.query.get({sid})"
+    modata = eval(nextquery)
+    try:
+        htold = modata.HaulType
+    except:
+        htold = 'temp'
+
+
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
     masks = tablesetup['haulmask']
-    if masks != []: entrydata = mask_apply(entrydata, masks)
+    if masks != []: entrydata = mask_apply(entrydata, masks, htold)
 
     form_checks = tablesetup['form checks']['Manifest']
     form_show = tablesetup['form show']['Manifest']
@@ -2166,8 +2229,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
     creators = tablesetup['creators']  # Gather the data for the selected row
-    nextquery = f"{table}.query.get({sid})"
-    modata = eval(nextquery)
+
 
 
     returnhit = request.values.get('Finished')
@@ -2178,7 +2240,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
             warned = 0
             for jx, entry in enumerate(entrydata):
                 if entry[3] == 'appears_if':
-                    entry[3], entry[4] = check_appears(tablesetup, entry)
+                    entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                     entrydata[jx][3], entrydata[jx][4] = entry[3], entry[4]
                     print(f'Return from check_appears is {entry[3]} and {entry[4]}')
                 #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
@@ -2187,7 +2249,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                     holdvec[jx] = request.values.get(f'{entry[0]}')
                     if entry[0] in form_checks: required = True
                     else: required = False
-                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required)
+                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold)
                     if entry[5] > 1: failed = failed + 1
                     if entry[5] == 1: warned = warned + 1
 
@@ -2243,13 +2305,13 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
             modata = eval(nextquery)
 
             for jx, entry in enumerate(entrydata):
-                if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry)
+                if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry, htold)
                 holdvec[jx] = getattr(modata, f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold)
 
-        docref = makemanifest(modata)
+        docref = makemanifest(modata, tablesetup)
         try:
             modata.Mcache = int(modata.Mcache) + 1
             modata.Manifest = ntpath.basename(docref)
@@ -2981,7 +3043,7 @@ def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
             holdvec[jx] = request.values.get(f'{entry[0]}')
             if entry[0] in form_checks: required = True
             else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required)
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required, task_iter, 'unknown')
             if entry[5] > 1: failed = failed + 1
             if entry[5] == 1: warned = warned + 1
 

@@ -439,20 +439,11 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         nextquery = f"{table}.query.get({sid})"
         odata1 = eval(nextquery)
         haultype = getattr(odata1, 'HaulType')
-        invostyle = request.values.get('invoicestyle')
-        if invostyle is None:
-            if 'Export' in haultype:
-                invostyle = 'Dray Export'
-            elif 'Import' in haultype:
-                invostyle = 'Dray Import'
-            else:
-                invostyle = 'OTR"'
+        #invostyle = request.values.get('invoicestyle')
+        invostyle = getattr(odata1, 'HaulType')
         holdvec[16] = invostyle
+        print(f'The invoice style is {invostyle}')
         headers = tablesetup['invoicetypes'][invostyle]
-
-
-
-
 
         #Need to jump over to invoice database
         jo = getattr(odata1, 'Jo')
@@ -513,7 +504,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
-        holdvec[2] = Services.query.all()
+        holdvec[2] = Services.query.order_by(Services.Service).all()
 
         loginvo = request.values.get('logInvo')
         if loginvo is not None:

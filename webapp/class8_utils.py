@@ -41,9 +41,9 @@ def container_check(num):
         return 2, message
 
 
-def form_check(input,text,type,task,req):
+def form_check(input,text,type,task,req, task_iter, haultype):
     #print(' ')
-    #print(f'Checking input for input:{input} text:{text} type:{type} task:{task} required:{req}')
+    #print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req}')
     status = 0
     message = ''
     if type == 'disabled':
@@ -73,7 +73,7 @@ def form_check(input,text,type,task,req):
 
     elif type == 'date':
         if isinstance(text, datetime.date):
-            print('date is in datetime format')
+            #print('date is in datetime format')
             status = 0
             message = 'ok'
         else:
@@ -81,7 +81,7 @@ def form_check(input,text,type,task,req):
                 dt = datetime.datetime.strptime(text,'%Y-%m-%d')
                 status = 0
                 message = 'ok'
-                print(f'date {text} is text that can be converted')
+                #print(f'date {text} is text that can be converted')
             except:
                 text = today.strftime('%Y-%m-%d')
                 status = 1
@@ -130,18 +130,17 @@ def form_check(input,text,type,task,req):
     elif type == 'concheck':
         #Complex checker.  We want to assess ligitimate containers for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
+        if text is None: text = 'Missing'
         text = text.strip()
-        print(f'****************************Entering concheck with text {text}')
+        #print(f'****************************Entering concheck with text {text}')
         if hasinput(text): char1 = text[0]
         else: char1 = ''
         if char1 == '*':
             status = 0
             message = 'Forced bypass number'
         else:
-            haul = request.values.get('HaulType')
-            print(f'**********************the haul type is {haul}')
-            if haul is None:
-                if not hasinput(text):
+            if haultype is None:
+                if not hasinput(text) or task_iter == 0:
                     status = 0
                     message = 'Not a required input yet'
                 else:
@@ -158,12 +157,12 @@ def form_check(input,text,type,task,req):
                             message = f'Valid container number input required'
 
             else:
-                if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
+                if 'Dray' in haultype or 'Export' in haultype or 'Import' in haultype:
                     if hasinput(text):
                         lenck = len(text)
                         if lenck == 11:
                             status, message = container_check(text)
-                            print(f'Container status check: {status} {message}')
+                            #print(f'Container status check: {status} {message}')
                         else:
                             if lenck > 0:
                                 status = 2
@@ -172,7 +171,7 @@ def form_check(input,text,type,task,req):
                                 status = 2
                                 message = f'Valid container number input required'
                     else:
-                        if 'Import' in haul:
+                        if 'Import' in haultype:
                             status = 2
                             message = 'Must enter a valid container number'
                         else:
@@ -185,13 +184,11 @@ def form_check(input,text,type,task,req):
     elif type == 'release':
         #Complex checker.  We want to assess ligitimate bookings for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
-        haul = request.values.get('HaulType')
-        print(f'**********************the haul type is {haul}')
-        if haul is None:
+        if haultype is None:
             status = 0
             message = 'Not a required input yet'
         else:
-            if 'Dray' in haul or 'Export' in haul or 'Import' in haul:
+            if 'Dray' in haultype or 'Export' in haultype or 'Import' in haultype:
                 if text is not None:
                     text = text.strip()
                     lenck = len(text)
@@ -201,12 +198,12 @@ def form_check(input,text,type,task,req):
                         message = f'Must have at least 4 characters not {lenck}'
                     else:
                         status = 0
-                        if 'Export' in haul: message = 'Booking number entered'
-                        if 'Import' in haul: message = 'BOL number entered'
+                        if 'Export' in haultype: message = 'Booking number entered'
+                        if 'Import' in haultype: message = 'BOL number entered'
                 else:
                     status = 2
-                    if 'Export' in haul: message = 'Must enter a booking number'
-                    if 'Import' in haul: message = 'Must enter a BOL number'
+                    if 'Export' in haultype: message = 'Must enter a booking number'
+                    if 'Import' in haultype: message = 'Must enter a BOL number'
 
             else:
                 status = 0
@@ -292,18 +289,22 @@ def form_check(input,text,type,task,req):
                 message = 'Warning: this must be set when paying bill'
 
     elif type == 'dropblock1' or type == 'dropblock2' or type == 'dropblock3':
-        from webapp.class8_tasks import get_drop
+        from webapp.class8_tasks import get_drop, Review_Drop
+        #print(f'*********************starting this test for type {type} with text: {text}')
         if hasinput(text):
             testtext = text.strip()
+            #print(f'The length of testtest is {len(testtext)}')
             if len(testtext) < 6:
                 text = get_drop(testtext)
         if not hasinput(text):
             loadname = request.values.get(type)
             if loadname is not None:
                 text = get_drop(loadname)
-        if not hasinput(text):
+        if not hasinput(text) and task_iter > 0:
             status = 2
             message = 'Must include this location information'
+        if hasinput(text):
+            text = Review_Drop(text)
 
     elif type == 'quotehistory':
         sh = request.values.get('Shipper')
@@ -318,7 +319,7 @@ def form_check(input,text,type,task,req):
                 co = coz[0].strip()
                 gdat = Orders.query.filter((Orders.Shipper == sh) & (Orders.Company2 == co) & (Orders.Amount != '')).order_by(Orders.id.desc()).first()
                 if gdat is not None:
-                    print(f'Search for history with sh {sh} and co {co} found the *{gdat.Amount}*')
+                    #print(f'Search for history with sh {sh} and co {co} found the *{gdat.Amount}*')
                     bc = gdat.Amount
                     qh = gdat.Quote
                     if input == 'Amount':
@@ -349,7 +350,7 @@ def form_check(input,text,type,task,req):
         message = 'Not a Required Input'
         if not hasinput(text): text = ''
 
-    #print(f'At conclusion of input for input:{input} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
+    #print(f'At conclusion of input for input:{input} type: {type} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
 
     return text, status, message
 

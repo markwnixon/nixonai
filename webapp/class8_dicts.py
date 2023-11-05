@@ -33,7 +33,7 @@ Trucking_genre = {'table': 'Orders',
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
-                  'haul_types': ['Dray Import', 'Dray Export', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'document_profiles'  : {
                                         'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
@@ -184,7 +184,7 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Job'],
                                 ['Booking', 'Release', 'Release', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
                                ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok', 'cc', None, 'Job'],
-                                ['BOL', 'In-Book', 'In-Book', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
+                                ['BOL', 'In-Book', 'In-Book', 'text', 'inbook', 0, 'ok', 'cc', None, 'Job'],
                                ['Chassis', 'Chassis', 'Chassis', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
                                 ['Date', 'Gate Out', 'Gate Out', 'date', 'date', 0, 'ok', 'cc', None, 'Gate'],
                                 ['Date2', 'Gate In', 'Gate In', 'date', 'date', 0, 'ok', 'cc', None, 'Gate'],
@@ -246,7 +246,7 @@ Orders_setup = {'name' : 'Trucking Job',
                     'Manifest': ['Driver','Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3', 'Dropblock1', 'Dropblock2', 'Dropblock3']
                 },
                 'appears_if': {
-                    'HaulType': ['Extra Stop', 'Transload'],
+                    'HaulType': ['Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'Dray-Transload-Deliver'],
                     'Dropblock3': ['multitext', 'dropblock3'],
                     'Date3': ['date', 'date']
                 },
@@ -255,15 +255,21 @@ Orders_setup = {'name' : 'Trucking Job',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
                 'sourcenaming': ['Source_Jo', 'c0', 'Jo'],
                 'copyswaps' : {},
+                #'haul_types': ['Dray Import', 'Dray Export', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                 'haulmask' : {
-                                'release': ['Release: BOL', 'Release: Booking', 'Release: BOL', 'Release: Booking', 'OTR Release BOL', 'OTR Release BOL', 'Transload Release', 'Release: BOL', 'Release: BOL', 'Release: BOL'],
-                                'container': ['Container', 'Container', 'Container', 'Container', 'Trailer No.', 'Trailer No.', 'Trailer No.', 'Container', 'Trailer No.', 'Container'],
-                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up and Return', 'Pick Up From', 'Pick Up From','Pick Up From','Pick Up From','Pick Up From'],
-                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date', 'Pick Up From','Pick Up From','Pick Up From'],
-                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To', 'Deliver To','Deliver To','Deliver To','Deliver To','Deliver To'],
+                                'release': ['Release: BOL', 'Release: Booking Out', 'Release: BOL', 'Release: Booking Out',    'Release: BOL', 'Release: Booking Out', 'OTR Release', 'no', 'Trailer-In', 'Release: BOL', 'Trailer-In', 'Release: BOL'],
+                                'container': ['Container', 'Container', 'Container', 'Container', 'Container', 'Container',    'Trailer No.', 'no', 'Trailer-Out', 'Container', 'Trailer-Out', 'Container'],
+                                'inbook': ['no', 'In-Book', 'no', 'In-Book', 'no', 'In-Book',    'no', 'no', 'no','Trailer-Out', 'Delivery Vehicle', 'Delivery Vehicle'],
+                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up From', 'Pick Up From', 'Pick Up and Return', 'Pick Up and Return',    'Pick Up From', 'Pick Up From', 'no', 'Dray Terminal', 'Deliver To','Dray Terminal'],
+                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date', 'Dray Terminal','Pick Up From','Pick Up From'],
+                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To', 'Load At',     'Deliver To', 'Deliver To','Transload Location','Transload Location','Transload Location','Transload Location'],
                                 'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date', 'no', 'no'],
-                                'load3': ['no', 'no', 'Stop2', 'Stop2', 'no', 'Stop2', 'Load Out', 'no', 'Delivery To', 'Delivery To'],
-                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no','Stop2 Date','no', 'Stop2 Date','Stop2 Date','Stop2 Date']
+                                'load3': ['no', 'no', 'Return To', 'Return To', 'Extra Stop', 'Extra Stop',     'no', 'no', 'no', 'no', 'no', 'Delivery After Transload'],
+                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no','Stop2 Date','no', 'Stop2 Date','Stop2 Date','Stop2 Date'],
+                                'date4': ['Import Available','Export ERD', 'Import Available', 'Export ERD', 'Import Available','Export ERD',    'no','no', 'no','no', 'no', 'no'],
+                                'date5': ['Port LFD', 'Export Cut', 'Port LFD', 'Export Cut', 'Port LFD', 'Export Cut',    'no','no', 'no','no', 'no', 'no'],
+                                'date6': ['Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD',    'no', 'no', 'no','no', 'no','no'],
+                                'chassis': ['Chassis', 'Chassis', 'Chassis', 'Chassis', 'Chassis', 'Chassis',    'no', 'no', 'no','no', 'no','no']
                               },
                 'matchfrom':    {
                                  'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
@@ -274,31 +280,100 @@ Orders_setup = {'name' : 'Trucking Job',
                 'invoicetypes' : {
                                     'Dray Import' : {
                                                         'Top Blocks' : ['Bill To', 'Pickup/Return Dray Import', 'Deliver To'],
-                                                        'Middle Blocks' : ['Order #', 'BOL #', 'Container #', 'Pulled', 'Returned'],
-                                                        'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
+                                                        'Middle Blocks' : ['Order #', 'Job Type', 'BOL #', 'Container #', 'Chassis', 'Pulled', 'Returned'],
+                                                        'Middle Items' : ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
                                                         'Lower Blocks' : ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
-                                                        } ,
+                                                        },
+
+                                    'Dray Import 2T': {
+                                        'Top Blocks': ['Bill To', 'Pickup From 1st Terminal', 'Deliver To', 'Return To 2nd Terminal'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Container #', 'Chassis', 'Pulled',
+                                                          'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    },
 
                                     'Dray Export': {
                                         'Top Blocks': ['Bill To', 'Pickup/Return Dray Export', 'Load At'],
-                                        'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Pulled', 'Returned'],
-                                        'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'Booking #', 'Container #', 'Chassis', 'Pulled', 'Returned'],
+                                        'Middle Items' : ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
                                         'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
-                                                      },
-                                    'Trailer Moves': {
-                                        'Top Blocks': ['Bill To', 'Location Start', 'Location Included'],
-                                        'Middle Blocks': ['Order #', 'Trailer #', 'Trailer #', 'Job Start', 'Job Finished'],
-                                        'Middle Items' : ['Order', 'Container', 'Booking', 'Date', 'Date2'],
+                                     },
+
+                                    'Dray Export 2T': {
+                                        'Top Blocks': ['Bill To', 'Pickup From 1st Terminal', 'Deliver To', 'Return To 2nd Terminal'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Container #', 'Chassis', 'Pulled',
+                                                          'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
                                         'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    },
+
+                                    'Import Extra Stop': {
+                                        'Top Blocks': ['Bill To', 'Pickup/Return Terminal', 'Deliver To', 'Extra Stop'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Container #', 'Chassis', 'Pulled',
+                                                          'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    },
+
+                                    'Export Extra Stop': {
+                                        'Top Blocks': ['Bill To', 'Pickup/Return Terminal', 'Deliver To', 'Extra Stop'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Container #', 'Chassis', 'Pulled',
+                                                          'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    },
+
+
+                                    'Box Truck': {
+                                        'Top Blocks': ['Bill To', 'Pickup Location', 'Delivery Location'],
+                                        'Middle Blocks': ['Order #', 'Unit #', 'Job Type',  'Job Start',
+                                                          'Job Finished'],
+                                        'Middle Items': ['Order', 'Truck', 'HaulType', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each',
+                                                         'Amount']
                                                      },
                                      'OTR':         {
                                           'Top Blocks': ['Bill To', 'Pickup Location', 'Delivery Location'],
-                                          'Middle Blocks': ['Order #', 'Unit #', 'Trailer #', 'Job Start',
+                                          'Middle Blocks': ['Order #', 'Unit #', 'Job Type', 'Trailer #', 'Job Start',
                                                             'Job Finished'],
-                                          'Middle Items' : ['Order', 'Truck', 'Container', 'Date', 'Date2'],
+                                          'Middle Items' : ['Order', 'Truck', 'HaulType', 'Container', 'Date', 'Date2'],
                                           'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each',
                                                            'Amount']
-                                                    }
+                                                    },
+                                    'Transload Only': {
+                                        'Top Blocks': ['Bill To', 'Transload Location'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'Trailer In', 'Trailer Out', 'Job Start',
+                                                          'Job Finished'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each',
+                                                         'Amount']
+                                    },
+
+                                    'Dray-Transload': {
+                                        'Top Blocks': ['Bill To', 'Pickup/Return Terminal', 'Transload Location'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Container #', 'Chassis', 'Pulled', 'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    },
+
+                                    'Transload-Deliver': {
+                                        'Top Blocks': ['Bill To', 'Transload Location', 'Delivery Location'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Trailer-In', 'Delivery Vehicle', 'Pulled',
+                                                          'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'BOL', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    },
+
+                                    'Dray-Transload-Deliver': {
+                                        'Top Blocks': ['Bill To', 'Pickup/Return Terminal', 'Transload Location', 'Delivery Location'],
+                                        'Middle Blocks': ['Order #', 'Job Type', 'BOL #', 'Trailer-In', 'Delivery Vehicle', 'Pulled',
+                                                          'Returned'],
+                                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'BOL', 'Date', 'Date2'],
+                                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                                    }
+
+
 
                                 },
                 'summarytypes': {
@@ -576,7 +651,7 @@ Auto_genre =   {'table': 'Autos',
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
-                  'haul_types': ['Dray Import', 'Dray Export', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'document_profiles'  : {
                                         'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
@@ -1056,7 +1131,8 @@ Billing_genre =   {'table': 'Bills',
                   'genre_tables_on': ['on', 'off'],
                   'quick_buttons': ['New Bill', 'Edit Item', 'Pay Bill'],
                   'table_filters': [{'Date Filter': ['Last 60 Days', 'Last 120 Days', 'Last 360 Days', 'Last Year', 'This Year', 'Show All']},
-                                    {'Pay Filter': ['Unpaid', 'Show All']}],
+                                    {'Pay Filter': ['Unpaid', 'Show All']},
+                                    {'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
                   'task_boxes': [{'Adding': ['New Bill', 'New Vendor', 'Upload Bill', 'Upload Payment']},
                                  {'Editing': ['Edit Item', 'Match']},
                                  {'View Docs': ['Bill Source', 'Receipt', 'Pay Record']},

@@ -10,6 +10,7 @@ from webapp.viewfuncs import parseline, parselinenoupper
 from webapp.CCC_system_setup import addpath, bankdata, scac
 from webapp.class8_utils_invoice import scroll_write, center_write, write_lines
 from webapp.utils import *
+from webapp.class8_utils_invoice import make_topline_headers
 
 
 def manfile(joborder, cache):
@@ -137,6 +138,14 @@ def get_sectors(ht, odat):
             middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Trailer #','Size/Type', 'Seal']
             middle1data = [scac,odat.Driver,truck,tag,odat.Container,odat.Type,odat.Seal]
 
+        elif ht == 'Dray-Transload-Deliver':
+            sectors = ['Pickup Load at Port', 'Transload At', 'Deliver To']
+            sectorlocs[1] = odat.Dropblock1.splitlines()
+            sectorlocs[2] = odat.Dropblock2.splitlines()
+            sectorlocs[3] = odat.Dropblock3.splitlines()
+            middle1 = ['SCAC','Driver', 'Truck #', 'Tag #', 'Trailer #','Size/Type', 'Seal']
+            middle1data = [scac,odat.Driver,truck,tag,odat.Container,odat.Type,odat.Seal]
+
     sectors = ['Shipper/Agent'] + sectors
     return sectors, sectorlocs, dates, middle1, middle1data, middle2, middle2data
 
@@ -145,10 +154,12 @@ def center_write_items(headers, headeritems, fs1, fs2, ltm, rtm):
     maxw = []
     # headeritems are the header data
     # headers are the labels for the column data to be shown on the invoice
+    print(headeritems)
     for ix, item in enumerate(headeritems):
         header_width = stringWidth(headers[ix], 'Helvetica', fs1)
-        if item is None: item = ''
-        print(item)
+        #if item is None: item = ''
+        if not isinstance(item, str): item = ''
+        print(f'The item is {item}')
         headerval_width = stringWidth(item, 'Helvetica', fs2)
         maxval = max(header_width, headerval_width)
         # Store the max lengths in a list
@@ -226,7 +237,7 @@ def nonone(input):
 
 
 
-def makemanifest(odat):
+def makemanifest(odat, tablesetup):
     # All dates must begin in datetime format and will be converted to strings as required
 
     joborder = odat.Jo
@@ -300,37 +311,45 @@ def makemanifest(odat):
     haul_type = request.values.get('HaulType')
     if haul_type is None:
         haul_type = odat.HaulType
+
     # Get the sector labels/data for the haul type chosen:
     sectors, sectorlines, dates, middle1, middle1data, middle2, middle2data = get_sectors(haul_type, odat)
-    # Calculate horizonal space requirements and perform best fit
-    padding = -1
-    iter = 1
-    fs1 = 11
-    fs2 = 10
-    while padding < 0 and iter < 8:
-        padding = get_padding(sectors, sectorlines, fs1, fs2, 3*bump, ltm, rtm)
-        if padding < 0:
-            fs1 = fs1 - .25
-            fs2 = fs2 - .25
-            iter = iter + 1
 
-    c.setFont('Helvetica', fs1, leading=None)
-    level1 = m1 + 5 * dl
-    leftstart = ltm
-    for jx, sector in enumerate(sectors):
+    if 1 == 2:
+        # Calculate horizonal space requirements and perform best fit
+        padding = -1
+        iter = 1
+        fs1 = 11
+        fs2 = 10
+        while padding < 0 and iter < 8:
+            padding = get_padding(sectors, sectorlines, fs1, fs2, 3*bump, ltm, rtm)
+            if padding < 0:
+                fs1 = fs1 - .25
+                fs2 = fs2 - .25
+                iter = iter + 1
 
-        lineitems = sectorlines[jx]
-        width_need = minbox_write(sector, lineitems, fs1, fs2)
+        c.setFont('Helvetica', fs1, leading=None)
+        level1 = m1 + 5 * dl
+        leftstart = ltm
+        for jx, sector in enumerate(sectors):
 
-        boxwidth = bump*3+width_need+bump*3
+            lineitems = sectorlines[jx]
+            width_need = minbox_write(sector, lineitems, fs1, fs2)
 
-        c.rect(leftstart, m1 + dl, boxwidth , 5 * dl, stroke=1, fill=0)
-        c.line(leftstart, level1, leftstart+boxwidth , level1)
+            boxwidth = bump*3+width_need+bump*3
 
-        c.drawString(leftstart + bump * 3, m1 + 5 * dl + bump * 2, sector)
-        print('lineitems', lineitems)
-        top = scroll_write(c, 'Helvetica', fs2, level1 - dh, leftstart + bump * 3, 13, lineitems, 175)
-        leftstart = leftstart + boxwidth + padding
+            c.rect(leftstart, m1 + dl, boxwidth , 5 * dl, stroke=1, fill=0)
+            c.line(leftstart, level1, leftstart+boxwidth , level1)
+
+            c.drawString(leftstart + bump * 3, m1 + 5 * dl + bump * 2, sector)
+            print('lineitems', lineitems)
+            top = scroll_write(c, 'Helvetica', fs2, level1 - dh, leftstart + bump * 3, 13, lineitems, 175)
+            leftstart = leftstart + boxwidth + padding
+
+    ctm = 218
+    level1 = m1+5*dl
+    pdata1 = People.query.filter(People.id == odat.Bid).first()
+    make_topline_headers(c, tablesetup, pdata1, odat, odat.HaulType, ltm, m1, dl, bump, ctm, rtm, level1, dh)
 
     # Middle Boxes Top Level
     full_lines = [hls - .5*dl, hls-1.5*dl, hls - 2.5 * dl]
@@ -341,6 +360,7 @@ def makemanifest(odat):
         c.drawCentredString(thisctr[jx], full_lines[1] + tb, header)
     c.setFont('Helvetica', 9, leading=None)
     for jx, header in enumerate(middle1data):
+        if not isinstance(header, str): header = ''
         c.drawCentredString(thisctr[jx], full_lines[2] + tb, nononestr(header))
     for lft in thislft:
         c.line(lft, full_lines[0], lft, full_lines[2])

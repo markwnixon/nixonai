@@ -187,6 +187,137 @@ def addpayment(file1, cache, amtowed, payment, paidon, payref, paymethod):
     os.rename(addpath(docrefx), file2)
     return os.path.basename(file2)
 
+def make_topline_headers(c, tablesetup, pdata1, odata, invostyle, ltm, m1, dl, bump, ctm, rtm, level1, dh):
+    header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
+    lh1 = len(header1)
+    print(f'Making invoice for lh1: {lh1}')
+
+    if lh1 < 4:
+        if lh1 > 0:
+            c.rect(ltm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
+            c.line(ltm, level1, ltm + 175, level1)
+            c.drawString(ltm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[0]}')
+            billto = list(range(5))
+            if pdata1 is not None:
+                billto[0] = comporname(pdata1.Company, fullname(pdata1.First, pdata1.Middle, pdata1.Last))
+                billto[1] = nononestr(pdata1.Addr1)
+                billto[2] = nononestr(pdata1.Addr2)
+                billto[3] = nononestr(pdata1.Telephone)
+                # billto[4]=nononestr(pdata1.Email)
+                billto[4] = ' '
+            else:
+                for i in range(5):
+                    billto[i] = ' '
+            top = scroll_write(c, 'Helvetica', 10, level1 - dh, ltm + bump * 3, 13, billto, 175 - bump * 5)
+
+        if lh1 > 1:
+            c.rect(ctm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
+            c.line(ctm, level1, ctm + 175, level1)
+            c.drawString(ctm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[1]}')
+            pdata2 = odata.Dropblock1
+            try:
+                pdata2 = pdata2.splitlines()
+            except:
+                pdata2 = []
+            loadat = []
+            for dat in pdata2:
+                loadat.append(dat)
+            if loadat == []:
+                for i in range(5):
+                    loadat.append('')
+            top = scroll_write(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat, 175 - bump * 5)
+
+        if lh1 > 2:
+            c.rect(rtm - 175, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
+            c.line(rtm - 175, level1, rtm, level1)
+            c.drawString(rtm - 170 + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[2]}')
+            pdata3 = odata.Dropblock2
+            try:
+                pdata3 = pdata3.splitlines()
+            except:
+                pdata3 = []
+            shipto = []
+            for dat in pdata3:
+                shipto.append(dat)
+            if shipto == []:
+                for i in range(5):
+                    shipto.append('')
+            top = scroll_write(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto, 175 - bump * 5)
+
+    elif lh1 == 4:
+        # Leftmost Block
+        xwidth = 134.75
+        c.rect(ltm, m1 + dl, xwidth, 5 * dl, stroke=1, fill=0)
+        c.line(ltm, level1, ltm + 150, level1)
+        c.drawString(ltm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[0]}')
+        billto = list(range(5))
+        if pdata1 is not None:
+            billto[0] = comporname(pdata1.Company, fullname(pdata1.First, pdata1.Middle, pdata1.Last))
+            billto[1] = nononestr(pdata1.Addr1)
+            billto[2] = nononestr(pdata1.Addr2)
+            billto[3] = nononestr(pdata1.Telephone)
+            # billto[4]=nononestr(pdata1.Email)
+            billto[4] = ' '
+        else:
+            for i in range(5):
+                billto[i] = ' '
+        top = scroll_write(c, 'Helvetica', 9, level1 - dh, ltm + bump * 3, 13, billto, xwidth - bump * 5)
+
+        # 2nd block
+        xctm = ltm + xwidth
+        c.rect(xctm, m1 + dl, xwidth, 5 * dl, stroke=1, fill=0)
+        c.line(xctm, level1, xctm + xwidth, level1)
+        c.drawString(xctm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[1]}')
+        pdata2 = odata.Dropblock1
+        try:
+            pdata2 = pdata2.splitlines()
+        except:
+            pdata2 = []
+        loadat = []
+        for dat in pdata2:
+            loadat.append(dat)
+        if loadat == []:
+            for i in range(5):
+                loadat.append('')
+        top = scroll_write(c, 'Helvetica', 9, level1 - dh, xctm + bump * 3, 13, loadat, xwidth - bump * 5)
+
+        # 3rd Block
+        xctm = xctm + xwidth
+        c.rect(xctm, m1 + dl, xwidth, 5 * dl, stroke=1, fill=0)
+        c.line(xctm, level1, xctm + xwidth, level1)
+        c.drawString(xctm + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[2]}')
+        pdata3 = odata.Dropblock2
+        try:
+            pdata3 = pdata3.splitlines()
+        except:
+            pdata3 = []
+        shipto = []
+        for dat in pdata3:
+            shipto.append(dat)
+        if shipto == []:
+            for i in range(5):
+                shipto.append('')
+        top = scroll_write(c, 'Helvetica', 9, level1 - dh, xctm + bump * 3, 13, shipto, xwidth - bump * 5)
+
+        # 4th block
+        xctm = xctm + xwidth
+        c.rect(xctm, m1 + dl, xwidth, 5 * dl, stroke=1, fill=0)
+        c.line(xctm, level1, xctm + xwidth, level1)
+        c.drawString(xctm + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[3]}')
+        pdata4 = odata.Dropblock3
+        if pdata4 is None: pdata4 = pdata2
+        try:
+            pdata4 = pdata4.splitlines()
+        except:
+            pdata4 = []
+        delto = []
+        for dat in pdata4:
+            delto.append(dat)
+        if delto == []:
+            for i in range(5):
+                delto.append('')
+        top = scroll_write(c, 'Helvetica', 9, level1 - dh, xctm + bump * 3, 13, delto, xwidth - bump * 5)
+
 
 def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, invostyle):
 
@@ -279,59 +410,8 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
     c.setFont('Helvetica', 11, leading=None)
     ctm = 218
     level1 = m1+5*dl
-    header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
-    lh1 = len(header1)
 
-    if lh1 > 0:
-        c.rect(ltm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
-        c.line(ltm, level1, ltm + 175, level1)
-        c.drawString(ltm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[0]}')
-        billto = list(range(5))
-        if pdata1 is not None:
-            billto[0] = comporname(pdata1.Company, fullname(pdata1.First, pdata1.Middle, pdata1.Last))
-            billto[1] = nononestr(pdata1.Addr1)
-            billto[2] = nononestr(pdata1.Addr2)
-            billto[3] = nononestr(pdata1.Telephone)
-            # billto[4]=nononestr(pdata1.Email)
-            billto[4] = ' '
-        else:
-            for i in range(5):
-                billto[i] = ' '
-        top = scroll_write(c,'Helvetica',10,level1-dh,ltm+bump*3,13,billto, 175-bump*5)
-
-    if lh1 > 1:
-        c.rect(ctm, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
-        c.line(ctm, level1, ctm + 175, level1)
-        c.drawString(ctm + bump * 3, m1 + 5 * dl + bump * 2, f'{header1[1]}')
-        pdata2 = odata.Dropblock1
-        try:
-            pdata2 = pdata2.splitlines()
-        except:
-            pdata2 = []
-        loadat = []
-        for dat in pdata2:
-            loadat.append(dat)
-        if loadat == []:
-            for i in range(5):
-                loadat.append('')
-        top = scroll_write(c, 'Helvetica', 10, level1 - dh, ctm + bump * 3, 13, loadat, 175-bump*5)
-
-    if lh1 > 2:
-        c.rect(rtm - 175, m1 + dl, 175, 5 * dl, stroke=1, fill=0)
-        c.line(rtm - 175, level1, rtm, level1)
-        c.drawString(rtm - 170 + bump * 2, m1 + 5 * dl + bump * 2, f'{header1[2]}')
-        pdata3 = odata.Dropblock2
-        try:
-            pdata3 = pdata3.splitlines()
-        except:
-            pdata3 = []
-        shipto = []
-        for dat in pdata3:
-            shipto.append(dat)
-        if shipto == []:
-            for i in range(5):
-                shipto.append('')
-        top = scroll_write(c, 'Helvetica', 10, level1 - dh, rtm - 175 + bump * 3, 13, shipto, 175-bump*5)
+    make_topline_headers(c, tablesetup, pdata1, odata, invostyle, ltm, m1, dl, bump, ctm, rtm, level1, dh)
 
 
     #Create the middle row headers and auto fit the width for the items
