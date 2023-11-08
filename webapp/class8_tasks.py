@@ -553,7 +553,10 @@ def addtopins(thisdate, opair):
                     outchas = ochassis
             else:
                 if 'Export' in ht:
-                    inbook = odat.Booking
+                    if hasinput(odat.BOL):
+                        inbook = odat.BOL
+                    else:
+                        inbook = odat.Booking
                     inbook = inbook.split('-', 1)[0]
                     incon = odat.Container
                     inchas = ochassis
