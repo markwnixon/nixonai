@@ -9,7 +9,7 @@ from webapp.class8_dicts import *
 #Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup, Billing_genre, Bills_setup
 from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task, income_record
-from webapp.class8_utils_package import makepackage
+from webapp.class8_utils_package import makepackage, getdocs, blendticks
 from webapp.class8_utils_email import emaildata_update
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
 from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
@@ -338,9 +338,10 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         if nc == 1:
             thistable = tabs[0]
             sid = tids[0][0]
-            #print('made it here with thistable sid taskiter', thistable, sid, task_iter)
+            print('made it here with thistable sid taskiter', thistable, sid, task_iter)
             tablesetup = eval(f'{thistable}_setup')
             rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
+            print(rstring)
             holdvec, entrydata, err, viewport, completed = eval(rstring)
             print('returned with:', viewport, completed)
         elif nc > 1:
@@ -1957,6 +1958,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         odat.Gate = None
                         odat.Invoice = None
                         odat.Package = None
+                        odat.Proof2 = None
                         db.session.commit()
 
 
@@ -2070,6 +2072,10 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                     sname = 'Pcache'
                 elif task_focus == 'TitleDoc':
                     sname = 'Tcache'
+                elif task_focus == 'RateCon':
+                    sname = 'Rcache'
+                elif task_focus == 'Proof2':
+                    sname = 'Pcache2'
 
                 if thistable == 'Orders':
                     sn = getattr(dat, sname)
@@ -2116,6 +2122,64 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 if returnhit is not None: completed = True
 
     return holdvec, entrydata, err, viewport, completed
+
+def BlendGate_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+
+    completed = False
+    err = [f'Running Blend Gate task with iter {task_iter}']
+    today = datetime.date.today()
+    holdvec = []
+    entrydata = []
+
+    table = tablesetup['table']
+    entrydata = tablesetup['entry data']
+    filter = tablesetup['filter']
+    filterval = tablesetup['filterval']
+    colorcol = tablesetup['colorfilter']
+    creators = tablesetup['creators']    # Gather the data for the selected row
+    nextquery = f"{table}.query.get({sid})"
+    odat = eval(nextquery)
+    try:
+        defaults = tablesetup['defaults']
+    except:
+        defaults = False
+
+    from sqlalchemy import inspect
+    inst = eval(f"inspect({table})")
+    attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+    ukey = tablesetup['ukey']
+    documents = tablesetup['documents']
+    viewport = None
+
+    try:
+        con = odat.Container
+        jo = odat.Jo
+    except:
+        err.append('Could not create blended ticket')
+        return holdvec, entrydata, err, viewport, True
+    try:
+        idata = Interchange.query.filter(Interchange.Jo == jo).all()
+        if idata:
+            if len(idata) > 1:
+                # Try to get a blended ticket
+                con = idata[0].Container
+                newdoc = f'static/{scac}/data/vGate/{con}_Blended.pdf'
+                if os.path.isfile(addpath(newdoc)):
+                    print(f'{newdoc} exists already, removing and remaking the file')
+                    err.append(f'{con}_Blended.pdf already exists, deleting and remaking the file')
+                    os.remove(addpath(newdoc))
+                g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
+                g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
+                blendticks(addpath(g1), addpath(g2), addpath(newdoc))
+                odat.Gate = f'{con}_Blended.pdf'
+                db.session.commit()
+                err.append('Gate Blend Created and added Successfully')
+    except:
+        err.append('Could not create blended ticket')
+
+    return holdvec, entrydata, err, viewport, True
+
+
 
 
 
@@ -2454,7 +2518,11 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     else:
 
         if task_iter == 0:
-            eprof = 'Custom'
+            dockind = getdocs(odat)
+            if 'Invoice' in dockind:
+                eprof = 'Custom-Invoice'
+            else:
+                eprof = 'Custom'
             emaildata = get_company(eprof, odat)
             stamplist, stampdata = get_last_used_stamps(odat)
             email_requested = 0
@@ -2477,7 +2545,8 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         holdvec[15] = stamplist
         #holdvec[4] = emaildata
         # Send in the emaildata in case it get modified by the stamps
-        holdvec[4], holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err, emaildata)
+        emaildata, holdvec[5], dockind, docref, err, fexist = makepackage(genre, odat, task_iter, document_profiles, stamplist, stampdata, eprof, err, emaildata)
+        holdvec[4] = emaildata
         holdvec[6] = eprof
         holdvec[8] = dockind
         holdvec[9] = fexist

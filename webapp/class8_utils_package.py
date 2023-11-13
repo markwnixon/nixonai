@@ -177,6 +177,14 @@ def get_doclist(odat, dockind):
                         fexist[jx] = 1
                 except:
                     print('No source file exists')
+            if thisdoc == 'RateCon':
+                try:
+                    fa = addpath(f'static/{scac}/data/vRateCon/{odat.RateCon}')
+                    if os.path.isfile(fa):
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                except:
+                    print('No ratecon file exists')
             if thisdoc == 'Invoice':
                 try:
                     fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
@@ -193,8 +201,17 @@ def get_doclist(odat, dockind):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('Proof file does not exist')
+                    print('Proof file 1 does not exist')
                     fexist[jx] = 0
+                try:
+                    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof2}')
+                    print('Looking for 2nd proof file:', fa)
+                    if os.path.isfile(fa):
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                except:
+                    print('Proof file 2 does not exist')
+
             if thisdoc == 'PaidInvoice':
                 try:
                     fa = addpath(f'static/{scac}/data/vPaidInvoice/{odat.PaidInvoice}')
@@ -232,16 +249,49 @@ def get_doclist(odat, dockind):
                             print('Single gate ticket does not exist')
     return fexist, packitems
 
+def getdocs(odat):
+    dockind = []
+    #Check for Invoice
+    fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
+    if os.path.isfile(fa):
+        dockind.append('Invoice')
+    #Check for Proof
+    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
+    fa2 = addpath(f'static/{scac}/data/vProof/{odat.Proof2}')
+    if os.path.isfile(fa) or os.path.isfile(fa2):
+        dockind.append('Proofs')
+    #Check for Gate
+    fa = addpath(f'static/{scac}/data/vGate/{odat.Gate}')
+    if os.path.isfile(fa):
+        dockind.append('Gate Tickets')
+    #Check for RateCon
+    fa = addpath(f'static/{scac}/data/vRateCon/{odat.RateCon}')
+    if os.path.isfile(fa):
+        dockind.append('RateCon')
+    else:
+        #If no rate con then try to add DO
+        fa = addpath(f'static/{scac}/data/vSource/{odat.Source}')
+        if os.path.isfile(fa):
+            dockind.append('Source')
+    ix = len(dockind)
+    for jx in range(ix,4): dockind.append('0')
+
+    return dockind
+
+
 
 
 def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, eprof, err, emaildata):
     err = []
     dockind = ['']*4
-    if task_iter > 0 and eprof == 'Custom':
+    if task_iter > 0 and (eprof == 'Custom' or eprof == 'Custom-Invoice'):
         sections = ['1st Section', '2nd Section', '3rd Section', '4th Section']
         for jx, section in enumerate(sections): dockind[jx] = request.values.get(section)
     else:
-        dockind = document_types[eprof]
+        #Set the first iteration based on what is available
+        #Gaear towards an invoice package with Invoices, Proof, Gate, RateCon
+        dockind = getdocs(odat)
+        #dockind = document_types[eprof]
     print('dockind=',dockind)
     try:
         cache2 = int(odat.Pkcache) + 1
@@ -277,5 +327,6 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
         print(f'stamped document coming out: {docref}')
 
     emaildata[6] = odat.Package
+    print('dockind at end=', dockind)
 
     return emaildata, stampdata, dockind, docref, err, fexist

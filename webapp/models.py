@@ -624,13 +624,18 @@ class Orders(db.Model):
     BalDue = db.Column('BalDue', db.String(45))
     Payments = db.Column('Payments', db.String(45))
     Quote = db.Column('Quote', db.String(45))
+    RateCon = db.Column('RateCon', db.String(100))
+    Rcache = db.Column('Rcache', db.Integer)
+    Proof2 = db.Column('Proof2', db.String(100))
+    Pcache2 = db.Column('Pcache2', db.Integer)
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
                  Detention, Storage, Release, Company2, Seal, Shipper, Type, Bid, Lid, Did, Label, Dropblock1,
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
-                 Date4, Date5, Date6, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments, Quote):
+                 Date4, Date5, Date6, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
+                 Quote, RateCon, Rcache, Proof2, Pcache2):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -699,6 +704,10 @@ class Orders(db.Model):
         self.BalDue = BalDue
         self.Payments = Payments
         self.Quote = Quote
+        self.RateCon = RateCon
+        self.Rcache = Rcache
+        self.Proof2 = Proof2
+        self.Pcache2 = Pcache2
 
 
 class Drops(db.Model):

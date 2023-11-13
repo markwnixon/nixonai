@@ -11,27 +11,53 @@ today = my_datetime.date()
 now = my_datetime.time()
 cutoff = today - datetime.timedelta(45)
 
-def Gate_Match(con, lbdate, nbk):
-    iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type.contains('Out'))).first()
-    iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type.contains('In'))).first()
-    if iout and iin:
-        iout.Status = 'IO'
-        iin.Status = 'IO'
-        if nbk > 1:
-            iin.Release = iout.Release
-            #Only force them the same if have multiple bookings else could be a different inbooking
-        iin.Jo = iout.Jo
-        iin.Company = iout.Company
-        db.session.commit()
-        return 2
-    elif iout:
-        iout.Status = 'BBBBBB'
-        db.session.commit()
-        return 1
-    elif iin:
-        return 2
-    else:
-        return 0
+def Gate_Match(con, lbdate, nbk, ptype, odat):
+    if ptype == 'Import':
+        iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Load Out')).first()
+        iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty In')).first()
+        company = odat.Shipper
+        jo = odat.Jo
+        if iout and iin:
+            if iout.Jo != jo or iin.Jo != jo or iout.Company != company or iin.Company != company:
+                iout.Status = 'IO'
+                iin.Status = 'IO'
+                iout.Company = company
+                iin.Company = company
+                iout.Jo = jo
+                iin.Jo = jo
+                db.session.commit()
+                return 2
+            return 2
+        elif iout:
+            iout.Status = 'BBBBBB'
+            db.session.commit()
+            return 1
+        elif iin:
+            return 2
+        else:
+            return 0
+
+    elif ptype == 'Export':
+        iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).first()
+        iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Load In')).first()
+        if iout and iin:
+            iout.Status = 'IO'
+            iin.Status = 'IO'
+            if nbk > 1:
+                iin.Release = iout.Release
+                #Only force them the same if have multiple bookings else could be a different inbooking
+            iin.Jo = iout.Jo
+            iin.Company = iout.Company
+            db.session.commit()
+            return 2
+        elif iout:
+            iout.Status = 'BBBBBB'
+            db.session.commit()
+            return 1
+        elif iin:
+            return 2
+        else:
+            return 0
 
 
 def Gate_Update(ider):
@@ -70,7 +96,7 @@ def Gate_Update(ider):
                         idat.Company = shipper
                         odat.Container = con
                         odat.Chassis = chas
-                        odat.Hstat = Gate_Match(con, lbdate, nbk)
+                        odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
                         db.session.commit()
 
 
@@ -91,7 +117,7 @@ def Gate_Update(ider):
             ikat.Company = shipper
             odat.Container = con
             odat.Chassis = chas
-            odat.Hstat = Gate_Match(con, lbdate, nbk)
+            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
             db.session.commit()
     if htype == 'Load Out':
         odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate)).first()
@@ -102,7 +128,7 @@ def Gate_Update(ider):
             ikat.Jo = jo
             ikat.Company = shipper
             odat.Chassis = chas
-            odat.Hstat = Gate_Match(con, lbdate, nbk)
+            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Import', odat)
             db.session.commit()
     if htype == 'Load In':
         #Could be different booking going in so have to look for both, but need to look at the inbook first
@@ -116,16 +142,16 @@ def Gate_Update(ider):
             shipper = odat.Shipper
             ikat.Jo = jo
             ikat.Company = shipper
-            odat.Hstat = Gate_Match(con, lbdate, nbk)
+            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
             db.session.commit()
     if htype == 'Empty In':
-        odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate)).first()
+        odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate) & (Orders.HaulType.contains('Import')) ).first()
         if odat is not None:
             jo = odat.Jo
             shipper = odat.Shipper
             ikat.Jo = jo
             ikat.Company = shipper
-            odat.Hstat = Gate_Match(con, lbdate, nbk)
+            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Import', odat)
             db.session.commit()
 
 
@@ -179,7 +205,7 @@ def Order_Container_Update(oder):
                     con = jdat.Container
                     edat.Container = con
                     edat.Chassis = jdat.Chassis
-                    edat.Hstat = Gate_Match(con, lbdate, nbk)
+                    edat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', edat)
                     db.session.commit()
                 else:
                     edat.Container = ''

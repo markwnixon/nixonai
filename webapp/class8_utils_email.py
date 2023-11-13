@@ -122,6 +122,7 @@ def etemplate_truck(eprof,odat):
     bid = odat.Bid
     shipper = odat.Shipper
     jo = odat.Jo
+
     signature = cdata[2] + '\n' + cdata[5] + '\n' + cdata[6] + '\n' + cdata[7]
 
     od, bol, con, bk = odat.Order, odat.BOL, odat.Container, odat.Booking
@@ -261,9 +262,13 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
-    elif eprof == 'Custom':
-        etitle = f'{scac} Document Package For: {od} | {keyval} | {con}'
-        ebody = f'Dear {odat.Shipper},\n\nThis document package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+    elif eprof == 'Custom' or eprof == 'Custom-Invoice':
+        if eprof == 'Custom-Invoice':
+            etitle = f'{scac} Invoice Package For: {od} | {keyval} | {con}'
+            ebody = f'Dear {odat.Shipper},\n\nThis invoice package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+        else:
+            etitle = f'{scac} Document Package For: {od} | {keyval} | {con}'
+            ebody = f'Dear {odat.Shipper},\n\nThis document package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
