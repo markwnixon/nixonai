@@ -9,7 +9,7 @@ from webapp.class8_dicts import *
 #Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup, Billing_genre, Bills_setup
 from webapp.class8_utils_manifest import makemanifest
 from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task, income_record
-from webapp.class8_utils_package import makepackage, getdocs, blendticks
+from webapp.class8_utils_package import makepackage, getdocs, blendticks, combine_ticks
 from webapp.class8_utils_email import emaildata_update
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
 from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
@@ -2115,6 +2115,9 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
                 setattr(dat, f'{task_focus}', filename1)
                 if thistable == 'Orders': setattr(dat, sname, bn)
+                if thistable == 'Interchange':
+                    setattr(dat, sname, bn)
+                    setattr(dat, 'Other', 'File Upload Manually')
                 db.session.commit()
                 err.append(f'Viewing {filename1}')
                 err.append('Hit Return to End Viewing and Return to Table View')
@@ -2168,12 +2171,23 @@ def BlendGate_task(genre, task_iter, tablesetup, task_focus, checked_data, thist
                     print(f'{newdoc} exists already, removing and remaking the file')
                     err.append(f'{con}_Blended.pdf already exists, deleting and remaking the file')
                     os.remove(addpath(newdoc))
-                g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
-                g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
-                blendticks(addpath(g1), addpath(g2), addpath(newdoc))
-                odat.Gate = f'{con}_Blended.pdf'
-                db.session.commit()
-                err.append('Gate Blend Created and added Successfully')
+                g1 = addpath(f'static/{scac}/data/vGate/{idata[0].Source}')
+                g2 = addpath(f'static/{scac}/data/vGate/{idata[1].Source}')
+                note1 = idata[0].Other
+                note2 = idata[1].Other
+                if os.path.isfile(g1) and os.path.isfile(g2):
+                    if note1 is not None or note2 is not None:
+                        combine_ticks(g1, g2, addpath(newdoc))
+                    else:
+                        blendticks(g1, g2, addpath(newdoc))
+                    odat.Gate = f'{con}_Blended.pdf'
+                    db.session.commit()
+                    err.append('Gate Blend Created and added Successfully')
+                else:
+                    if not os.path.isfile(g1):
+                        err.append(f'Could not find file {g1}')
+                    if not os.path.isfile(g2):
+                        err.append(f'Could not find file {g2}')
     except:
         err.append('Could not create blended ticket')
 

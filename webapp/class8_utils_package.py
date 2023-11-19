@@ -164,6 +164,16 @@ def blendticks(gfile1,gfile2,outfile):
     with open(outfile, "wb") as out_f:
         output.write(out_f)
 
+def combine_ticks(gfile1,gfile2,outfile):
+
+    packitems = []
+    packitems.append(gfile1)
+    packitems.append(gfile2)
+
+    pdflist = ['pdfunite'] + packitems + [outfile]
+    tes = subprocess.check_output(pdflist)
+
+
 def get_doclist(odat, dockind):
     fexist = [0] * 4
     packitems = []
