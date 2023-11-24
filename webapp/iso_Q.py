@@ -162,7 +162,11 @@ def clean(text):
     return "".join(c if c.isalnum() else "_" for c in text)
 
 def extract_for_code(data):
-    text, encoding = decode_header(data)[0]
+    try:
+        text, encoding = decode_header(data)[0]
+    except:
+        text = 'No Decode Available'
+        encoding = None
     if isinstance(text, bytes):
         if encoding is not None: text = text.decode(encoding)
     return text
@@ -192,19 +196,26 @@ def add_quote_emails():
         subject = extract_for_code(email_message["Subject"])
         mid = extract_for_code(email_message["Message-ID"])
         fromp = extract_for_code(email_message["From"])
-
-        # extract the date and time the email was sent
-        date_time_str = email_message["Date"]
-        date_time = parsedate_to_datetime(date_time_str)
-
-        # print the email content
-        thisdate = date_time.date()
-        thistime = date_time.time()
         print(f'Message ID: {mid}')
         print(f'Subject: {subject}')
         print(f'From: {fromp}')
-        print(f'Date: {str(thisdate)}')
-        print(f'Time: {str(thistime)}')
+
+        # extract the date and time the email was sent
+        try:
+            date_time_str = email_message["Date"]
+            date_time = parsedate_to_datetime(date_time_str)
+            thisdate = date_time.date()
+            thistime = date_time.time()
+            print(f'Date: {str(thisdate)}')
+            print(f'Time: {str(thistime)}')
+        except:
+            thisdate = None
+            thistime = None
+            print('Date Time extraction failed')
+
+
+
+
 
         qdat = Quotes.query.filter(Quotes.Mid == mid).first()
         if qdat is None:
