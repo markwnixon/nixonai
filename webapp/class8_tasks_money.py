@@ -608,43 +608,30 @@ def make_default_invoice(odat, tablesetup):
     sid = odat.id
     jo = odat.Jo
     pid = odat.Bid
-    if '40' in odat.Type:
-        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Line Haul',Description='Drayage to Seagirt',Ea=370.00,Qty=1.00,Amount=370.00,Total=445.00,Date=today,Original=None,Status='New')
-        db.session.add(input)
-        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Chassis',Description='Predefined Agreement',Ea=75.00,Qty=1.00,Amount=75.00,Total=445.00,Date=today,Original=None,Status='New')
-        db.session.add(input)
-        odat.Amount = d2s('370.00')
-        odat.InvoTotal = d2s('445.00')
-        db.session.commit()
-    if '45' in odat.Type:
-        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Line Haul',Description='Drayage to Seagirt',Ea=370.00,Qty=1.00,Amount=370.00,Total=470.00,Date=today,Original=None,Status='New')
-        db.session.add(input)
-        input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Chassis',Description='Predefined Agreement',Ea=75.00,Qty=1.00,Amount=75.00,Total=470.00,Date=today,Original=None,Status='New')
-        db.session.add(input)
-        input = Invoices(Jo=jo, SubJo=None, Pid=pid, Service='Added Charge', Description='45FT add-on',Ea=25.00, Qty=1.00, Amount=25.00, Total=470.00, Date=today, Original=None, Status='New')
-        db.session.add(input)
-        odat.Amount = d2s('370.00')
-        odat.InvoTotal = d2s('470.00')
-        db.session.commit()
 
-    if '40' in odat.Type or '45' in odat.Type:
-        odat = Orders.query.get(sid)
-        ldata = Invoices.query.filter(Invoices.Jo == jo).order_by(Invoices.Ea.desc()).all()
-        pdata1 = People.query.filter(People.id == odat.Bid).first()
-        cache = odat.Icache
+    amt = odat.Amount
+    input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Line Haul',Description='Drayage to Seagirt',Ea=f'{amt}',Qty=1.00,Amount=f'{amt}',Total=f'{amt}',Date=today,Original=None,Status='New')
+    db.session.add(input)
+    odat.InvoTotal = amt
+    db.session.commit()
 
-        docref = make_invo_doc(odat, ldata, pdata1, cache, today, 0, tablesetup, 'Dray Export')
-        docref = os.path.basename(docref)
-        odat.Invoice= docref
-        odat.Istat = 1
-        if '40' in odat.Type: odat.BalDue = d2s('$445.00')
-        if '45' in odat.Type: odat.BalDue = d2s('$470.00')
-        odat.Payments = '0.00'
+    odat = Orders.query.get(sid)
+    ldata = Invoices.query.filter(Invoices.Jo == jo).order_by(Invoices.Ea.desc()).all()
+    pdata1 = People.query.filter(People.id == odat.Bid).first()
+    cache = odat.Icache
 
-        for ldat in ldata:
-            ldat.Original = docref
-        db.session.commit()
-        odat = Orders.query.get(sid)
+    docref = make_invo_doc(odat, ldata, pdata1, cache, today, 0, tablesetup, 'Dray Export')
+    docref = os.path.basename(docref)
+    odat.Invoice= docref
+    odat.Istat = 1
+
+    odat.BalDue = d2s('$370.00')
+    odat.Payments = '0.00'
+
+    for ldat in ldata:
+        ldat.Original = docref
+    db.session.commit()
+    odat = Orders.query.get(sid)
     return odat
 
 
@@ -656,9 +643,8 @@ def invoice_for_all(sids, table, err, tablesetup):
         odat = eval(nextquery)
         inv = getattr(odat, 'Invoice')
         if not hasinput(inv):
-            #Check to see if the shipper has a default invoice and make it
-            if odat.Shipper == "Global Business Link":
-                odat = make_default_invoice(odat, tablesetup)
+            #If no invoice create the default invoice
+            odat = make_default_invoice(odat, tablesetup)
             inv = getattr(odat, 'Invoice')
         if not hasinput(inv):
             err.append(f'Order JO {odat.Jo} has no invoice')
@@ -734,6 +720,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         siupdate = request.values.get('siupdate')
         siadd = request.values.get('siadd')
         sinow = request.values.get('sinow')
+        siremake = request.values.get('siremake')
         jovec = []
         datevec = []
         cache_start = 0
@@ -789,7 +776,49 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                         snew.Status = 1
                         db.session.commit()
 
-        print(f'siupdate is {siupdate}')
+        if siremake is not None:
+            sdata = SumInv.query.filter(SumInv.Si == sinow).all()
+            thetotal = 0.00
+            bamt = request.values.get('baseamt')
+            chamt = request.values.get('chasamt')
+            try: fbamt = float(bamt)
+            except: fbamt = 0.00
+            try: fchamt = float(chamt)
+            except: fchamt = 0.00
+            for sdat in sdata:
+                this_amt = d2s(fbamt+fchamt)
+                sdat.Description = f'Line Haul={d2s(bamt)}, Chassis={d2s(chamt)}'
+                famt = float(this_amt)
+                thetotal += famt
+                sdat.Amount = this_amt
+                odat = Orders.query.filter(Orders.Jo == sdat.Jo).first()
+                odat.InvoTotal = this_amt
+                idata = Invoices.query.filter(Invoices.Jo == sdat.Jo).all()
+                if idata != []:
+                    oldrest = 0.00
+                    for idat in idata:
+                        idat.Total = nodollar(famt)
+                        serv = idat.Service
+                        if serv != 'Line Haul': oldrest = oldrest + float(idat.Amount)
+
+                    newlineamt = famt - oldrest
+                    for idat in idata:
+                        serv = idat.Service
+                        if serv == 'Line Haul':
+                            idat.Ea = nodollar(newlineamt)
+                            idat.Qty = 1.00
+                            idat.Amount = nodollar(newlineamt)
+                odat.Amount = d2s(newlineamt)
+                odat.InvoDate = today
+                odat.BalDue = this_amt
+                odat.Payments = '0.00'
+                db.session.commit()
+                err = loginvo_m(odat, 2)
+
+            for sdat in sdata:
+                sdat.Total = d2s(thetotal)
+            db.session.commit()
+
         if siupdate is not None:
             sdata = SumInv.query.filter(SumInv.Si == sinow).all()
             thetotal = 0.00

@@ -27,6 +27,10 @@ cdata = companydata()
 
 date_y4=re.compile(r'([1-9]|0[1-9]|[12][0-9]|3[01]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})')
 
+today_now = datetime.datetime.now()
+today = today_now.date()
+timenow = today_now.time()
+
 def roundup(x):
     return int(math.ceil(x / 10.0)) * 10
 
@@ -209,9 +213,10 @@ def add_quote_emails():
             print(f'Date: {str(thisdate)}')
             print(f'Time: {str(thistime)}')
         except:
-            thisdate = None
-            thistime = None
-            print('Date Time extraction failed')
+            date_time = today_now
+            thisdate = today
+            thistime = timenow
+            print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
 
 
 

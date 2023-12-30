@@ -587,16 +587,13 @@ def get_custlist(table, tfilters):
         daysback = None
         fromdate = None
         todate = None
-        if '30' in dtest:
-            daysback = 30
-        elif '60' in dtest:
-            daysback = 60
-        elif '90' in dtest:
-            daysback = 90
-        elif '120' in dtest:
-            daysback = 120
-        elif '360' in dtest:
-            daysback = 360
+        if '30' in dtest: daysback = 30
+        elif '45' in dtest: daysback = 45
+        elif '90' in dtest: daysback = 90
+        elif '180' in dtest: daysback = 180
+        elif '360' in dtest: daysback = 360
+        elif '60' in dtest: daysback = 60
+        elif '120' in dtest: daysback = 120
         elif dtest == 'Last Year':
             thisyear = today.year
             lastyear = thisyear - 1
@@ -622,8 +619,9 @@ def get_custlist(table, tfilters):
     custlist = []
     for odat in odata:
         shipper = odat.Shipper
-        if len(shipper) > 20: shipper = shipper[0:20]
-        if shipper not in custlist: custlist.append(shipper)
+        if shipper is not None:
+            if len(shipper) > 20: shipper = shipper[0:20]
+            if shipper not in custlist: custlist.append(shipper)
     custlist.sort()
     custlist.append('Show All')
     return custlist
@@ -1032,10 +1030,12 @@ def get_dbdata(table_setup, tfilters):
                 fromdate = None
                 todate = None
                 if '30' in dtest: daysback = 30
-                elif '60' in dtest: daysback = 60
+                elif '45' in dtest: daysback = 45
                 elif '90' in dtest: daysback = 90
-                elif '120' in dtest: daysback = 120
                 elif '180' in dtest: daysback = 180
+                elif '360' in dtest: daysback = 360
+                elif '60' in dtest: daysback = 60
+                elif '120' in dtest: daysback = 120
                 elif dtest == 'Last Year':
                     fromdate = datetime.date(lastyear,1,1)
                     todate = datetime.date(lastyear,12,31)

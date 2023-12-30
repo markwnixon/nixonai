@@ -660,11 +660,13 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     min_w = []
     for header in header3:
         thisw = stringWidth(header, 'Helvetica', 11)
-        #print(f'header {header} {thisw}')
+        print(f'header {header} {thisw}')
         thisw = thisw + spread
         min_w.append(thisw)
     for line in all_lines:
+        print(line)
         for kx, element in enumerate(line):
+            if element is None: element = 'None'
             thisw = stringWidth(element, 'Times-Roman', 9) + 5
             thatw = min_w[kx]
             new_min = max(thisw,thatw)
@@ -727,6 +729,7 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     for line7 in all_lines:
         popdown = top
         for ix, strx in enumerate(line7):
+            if strx is None: strx = 'None'
             if ix == max_block:
                 lines = simpleSplit(strx, 'Times-Roman', 9, mx_len)
                 for line in lines:
