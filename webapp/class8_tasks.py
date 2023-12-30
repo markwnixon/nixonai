@@ -571,7 +571,7 @@ def addtopins(thisdate, opair):
     if intext: print(f'About to add {len(intext)} {intext} {inchas}')
     if outtext: print(f'About to add {len(outtext)} {outtext} {outchas}')
 
-    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Timeslot=0, Intext=intext, Outtext=outtext)
+    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Timeslot=0, Intext=intext, Outtext=outtext, Notes=None)
     db.session.add(input)
     db.session.commit()
 
