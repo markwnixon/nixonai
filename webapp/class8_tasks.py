@@ -502,7 +502,6 @@ def addtopins(thisdate, opair):
     unit = None
     tag = None
     phone = None
-    carrier = None
     intext = None
     outtext = None
     for odat in opair:
@@ -517,8 +516,10 @@ def addtopins(thisdate, opair):
             except:
                 rel4 = odat.Booking
             ctext = ''
+            if '45' in contype and '9' in contype: ctext = '45HC'
             if '40' in contype and '9' in contype: ctext = '40HC'
             if '40' in contype and '8' in contype: ctext = '40STD'
+            if '45' in contype and '8' in contype: ctext = '45STD'
             if '20' in contype: ctext = '20'
             if 'R' in contype: ctext = ctext + ' Reefer'
             if 'U' in contype: ctext = ctext + ' OpenTop'
@@ -570,7 +571,7 @@ def addtopins(thisdate, opair):
     if intext: print(f'About to add {len(intext)} {intext} {inchas}')
     if outtext: print(f'About to add {len(outtext)} {outtext} {outchas}')
 
-    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Carrier=carrier, Intext=intext, Outtext=outtext)
+    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Timeslot=0, Intext=intext, Outtext=outtext)
     db.session.add(input)
     db.session.commit()
 
@@ -849,6 +850,8 @@ def Table_maker(genre):
                 unit = request.values.get(f'unit{idate}{jx}')
                 chas = request.values.get(f'chas{idate}{jx}')
                 box = request.values.get(f'box{idate}{jx}')
+                timeslot = request.values.get(f'slot{idate}{jx}')
+                print(f'this time slot is read as {timeslot}')
                 if box == 'on':
                     boxid.append(pdat.id)
                 print(f'box is {box} {boxid}')
@@ -879,6 +882,10 @@ def Table_maker(genre):
                     print(f'The selected chassis is {chas}')
                     pdat.InChas = chas
                     pdat.OutChas = chas
+
+                if timeslot is not None:
+                    pdat.Timeslot = int(timeslot)
+
                 db.session.commit()
             print(f'Modifying the selection')
 

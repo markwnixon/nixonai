@@ -44,9 +44,7 @@
           <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="PinGet"
                             data-toggle="tooltip" title="Gets pins for the scheduled port trips">Get<br>Pins</button>
           </td>
-          <td class="align-middle">
-              <b>This button executes the script to get pins from Port</b>
-          </td>
+
         </tr>
     </tbody>
   </table>
@@ -81,12 +79,15 @@
                                     data-toggle="tooltip" title="Add dispatch to schedule for today">Add For<br>Date</button>
                                 <button type="submit" class="btn btn-group-small btn-black my-small-btn" name="mod{{ but }}"
                                     data-toggle="tooltip" title="Update schedule for selected driver/truck">Update<br>Driver/Trk</button>
+                                    <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="hold{{ but }}"
+                                    data-toggle="tooltip" title="Place getting pin on hold until released">Hold<br>Toggle</button>
                                     <button type="submit" class="btn btn-group-small btn-red my-small-btn" name="del{{ but }}"
                                     data-toggle="tooltip" title="Delete selected dispatch">Delete<br>Selected</button>
                                     <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="moveup{{ but }}"
                                     data-toggle="tooltip" title="Move date one day previous">Move<br>Date -1</button>
                                     <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="movedn{{ but }}"
                                     data-toggle="tooltip" title="Move date one day later">Move<br>Date +1</button>
+
                                 </td>
                             </tr>
                         </tbody>
@@ -96,6 +97,7 @@
                           {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
                           {% if pdat.OutPin == '0' %}
                                 {% if pdat.Driver %}{% set col1 = 'green-text font-weight-bold' %}{% else %}{% set col1 = 'black-text' %}{% endif %}
+                              {% if pdat.Timeslot == 0 %} {% set col1 = 'amber-text font-weight-bold' %}{% endif %}
                           {% else %}
                                 {% set col1 = 'blue-text font-weight-bold' %}
                           {% endif %}
@@ -122,6 +124,15 @@
                                 <td>
                                     <input class="form-control form-control-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}></td>
                               </td>
+                          <td>
+                                  <select class="mdb-select md-form" name="slot{{ but }}{{ loop.index-1 }}">
+                                    <option {% if pdat.Timeslot == 0 %} selected {% endif %} value="0" >Hold Getting</option>
+                                    <option {% if pdat.Timeslot == 1 %} selected {% endif %} value="1" >Current Time Slot </option>
+                                    <option {% if pdat.Timeslot == 2 %} selected {% endif %} value="2">Next Time Slot  </option>
+                                    <option {% if pdat.Timeslot == 3 %} selected {% endif %} value="3">2x Next Time Slot</option>
+                                    <option {% if pdat.Timeslot == 4 %} selected {% endif %} value="4">Last Time Slot</option>
+                                </select>
+                          </td>
                           </tr>
 
                     {% endfor %}
