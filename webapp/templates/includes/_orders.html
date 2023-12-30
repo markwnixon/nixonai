@@ -104,7 +104,7 @@
                           <tr>
                           <td align="center" ><input class="align-middle" type="checkbox"  name="box{{ but }}{{ loop.index-1 }}"></td>
                               <td><span class="{{ col1 }}">{{ pdat.Intext }}<br> {{ pdat.Outtext }}</span>
-                              {% if pdat.Carrier %}<br><span class="red-text">{{ pdat.Carrier }}</span>{% endif %}
+                              {% if pdat.Notes %}<br><span class="red-text">{{ pdat.Notes }}</span>{% endif %}
                           </td>
                               <td>
                                   <select class="mdb-select md-form" name="drv{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>

@@ -1738,8 +1738,9 @@ class Pins(db.Model):
     Timeslot = db.Column('Timeslot', db.Integer)
     Intext = db.Column('Intext', db.String(200))
     Outtext = db.Column('Outtext', db.String(200))
+    Notes = db.Column('Notes', db.String(200))
 
-    def __init__(self, Date, Driver, InBook, InCon, InChas, InPin, OutBook, OutCon, OutChas, OutPin, Unit, Tag, Phone, Timeslot, Intext, Outtext):
+    def __init__(self, Date, Driver, InBook, InCon, InChas, InPin, OutBook, OutCon, OutChas, OutPin, Unit, Tag, Phone, Timeslot, Intext, Outtext, Notes):
         self.Date = Date
         self.Driver = Driver
         self.InBook = InBook
@@ -1756,3 +1757,4 @@ class Pins(db.Model):
         self.Timeslot = Timeslot
         self.Intext = Intext
         self.Outtext = Outtext
+        self.Notes = Notes
