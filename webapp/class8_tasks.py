@@ -841,7 +841,7 @@ def Table_maker(genre):
         movedate = thisdate + timedelta(idate)
         if modnow is not None or delthis is not None or moveup is not None or movedn is not None or addnow is not None:
             anyamber = 1
-            default_unit is None
+            default_unit = None
             pdata = Pins.query.filter(Pins.Date == movedate).all()
             for jx, pdat in enumerate(pdata):
                 driver = request.values.get(f'drv{idate}{jx}')
