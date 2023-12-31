@@ -12,39 +12,25 @@
   <table class="table table-striped table-bordered table-sm w-auto">
     <tbody>
         <tr>
-          <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="Reset"
-                            data-toggle="tooltip" title="Clears all filters like you first start the session">Reset<br>All</button>
-          </td>
-          <td class="align-middle">
-              <b>This button resets the filters and tasks as if launching table from start</b>
-          </td>
-        </tr>
-            <tr>
-          <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="Paste Buffer"
-                            data-toggle="tooltip" title="Copy pull data to paste buffer">Dispatch<br>Copy</button>
-          </td>
-          <td class="align-middle">
-                {% if holdvec[45] %}
-                    <textarea id="myInput" rows="2" cols="60">{{ holdvec[45] }}</textarea>
-                    <body onload="myFunction()">
-                {% else %}
-                    <b>This button will create a standardized dispatch command for the selected job based on its current status.<br>  It will sandwich a pair of port dispatch in-out commands if two jobs are selected.</b>
-                {% endif %}
-          </td>
+              <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="Reset"
+                                data-toggle="tooltip" title="Clears all filters like you first start the session">Reset<br>All</button>
+              </td>
+                      <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="InvoiceSet"
+                                data-toggle="tooltip" title="Creates filters ideal for running invoices">Invoice<br>Setup</button>
+              </td>
         </tr>
         <tr>
-          <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="InvoiceSet"
-                            data-toggle="tooltip" title="Creates filters ideal for running invoices">Invoice<br>Setup</button>
-          </td>
-          <td class="align-middle">
-              <b>This button sets up the filters most ideal for invoicing/sending completed jobs</b>
-          </td>
-        </tr>
-        <tr>
-          <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="PinGet"
-                            data-toggle="tooltip" title="Gets pins for the scheduled port trips">Get<br>Pins</button>
-          </td>
-
+              <td class="align-middle"> <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="Paste Buffer"
+                                data-toggle="tooltip" title="Copy pull data to paste buffer">Dispatch<br>Copy</button>
+              </td>
+              <td class="align-middle">
+                    {% if holdvec[45] %}
+                        <textarea id="myInput" rows="2" cols="60">{{ holdvec[45] }}</textarea>
+                        <body onload="myFunction()">
+                    {% else %}
+                        <b>This button will create a standardized dispatch command for the selected job based on its current status.<br>  It will sandwich a pair of port dispatch in-out commands if two jobs are selected.</b>
+                    {% endif %}
+              </td>
         </tr>
     </tbody>
   </table>
@@ -92,7 +78,7 @@
                             </tr>
                         </tbody>
                       </table>
-                     <table>
+
                       {% for pdat in pdata %}
                           {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
                           {% if pdat.OutPin == '0' %}
@@ -101,42 +87,49 @@
                           {% else %}
                                 {% set col1 = 'blue-text font-weight-bold' %}
                           {% endif %}
-                          <tr>
-                          <td align="center" ><input class="align-middle" type="checkbox"  name="box{{ but }}{{ loop.index-1 }}"></td>
-                              <td><span class="{{ col1 }}">{{ pdat.Intext }}<br> {{ pdat.Outtext }}</span>
-                              {% if pdat.Notes %}<br><span class="red-text">{{ pdat.Notes }}</span>{% endif %}
-                          </td>
-                              <td>
-                                  <select class="mdb-select md-form" name="drv{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
-                                    {% for drv in drvdata %}
-                                            <option {% if drv.Name == pdat.Driver %} selected {% endif %} value="{{ drv.Name }}">{{ drv.Name }}</option>
-                                    {% endfor %}
-                                  </select>
-                              </td>
-                              <td>
-                                  <select class="mdb-select md-form" name="unit{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
-                                    {% for truck in trkdata %}
-                                            <option {% if truck.Unit == pdat.Unit %} selected {% endif %} value="{{ truck.Unit }}">{{ truck.Unit }}</option>
-                                    {% endfor %}
-                                  </select>
-                              </td>
+                          <div class="d-sm-flex justify-content-left small">
+                             <div class="p-1 text-left">
+                                <input class="align-middle" type="checkbox"  name="box{{ but }}{{ loop.index-1 }}">
 
-                                <td>
-                                    <input class="form-control form-control-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}></td>
-                              </td>
-                          <td>
-                                  <select class="mdb-select md-form" name="slot{{ but }}{{ loop.index-1 }}">
-                                    <option {% if pdat.Timeslot == 0 %} selected {% endif %} value="0" >Hold Getting</option>
-                                    <option {% if pdat.Timeslot == 1 %} selected {% endif %} value="1" >Current Time Slot </option>
-                                    <option {% if pdat.Timeslot == 2 %} selected {% endif %} value="2">Next Time Slot  </option>
-                                    <option {% if pdat.Timeslot == 3 %} selected {% endif %} value="3">2x Next Time Slot</option>
-                                    <option {% if pdat.Timeslot == 4 %} selected {% endif %} value="4">Last Time Slot</option>
-                                </select>
-                          </td>
-                          </tr>
+                                     <select class="mdb-select md-form" name="drv{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
+                                            {% for drv in drvdata %}
+                                                    <option {% if drv.Name == pdat.Driver %} selected {% endif %} value="{{ drv.Name }}">{{ drv.Name }}</option>
+                                            {% endfor %}
+                                     </select>
+                                      <select class="mdb-select md-form" name="unit{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
+                                            {% for truck in trkdata %}
+                                                    <option {% if truck.Unit == pdat.Unit %} selected {% endif %} value="{{ truck.Unit }}">{{ truck.Unit }}</option>
+                                            {% endfor %}
+                                        </select>
+                                     <select class="mdb-select md-form" name="slot{{ but }}{{ loop.index-1 }}">
+                                            <option {% if pdat.Timeslot == 0 %} selected {% endif %} value="0" >Hold Getting</option>
+                                            <option {% if pdat.Timeslot == 1 %} selected {% endif %} value="1" >Current Time Slot </option>
+                                            <option {% if pdat.Timeslot == 2 %} selected {% endif %} value="2">Next Time Slot  </option>
+                                            <option {% if pdat.Timeslot == 3 %} selected {% endif %} value="3">2x Next Time Slot</option>
+                                            <option {% if pdat.Timeslot == 4 %} selected {% endif %} value="4">Last Time Slot</option>
+                                     </select>
 
-                    {% endfor %}
-                     </table>
+                                     <input class="mdb-select md-form-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
+                                     <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="copy{{ but }}{{ loop.index-1 }}">Copy</button>
+                          <br>
+                             {% if pdat.Intext and pdat.Outtext %}
+                                 <span class="{{ col1 }}">{{ pdat.Intext }}<br>{{ pdat.Outtext }}</span>
+                             {% elif pdat.Intext %}
+                                 <span class="{{ col1 }}">{{ pdat.Intext }}</span>
+                             {% elif pdat.Outtext %}
+                                 <span class="{{ col1 }}">{{ pdat.Outtext }}</span>
+                             {% endif %}
+                                 {% if pdat.Notes %}
+                                     {% set col2 = 'black-text' %}
+                                     {% if '**Warning' in pdat.Notes %}{% set col2 = 'red-text' %}{% endif %}
+                                      <span class="{{ col2 }}">
+                                       <br>{{ pdat.Notes }}
+                                    </span>
+                                  {% endif %}
+                          </div>
+                          </div>
+                     {% endfor %}
+
 
 
                 </div>

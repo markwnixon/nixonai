@@ -575,9 +575,6 @@ def addtopins(thisdate, opair):
     db.session.add(input)
     db.session.commit()
 
-
-
-
     return
 
 def get_custlist(table, tfilters):
@@ -851,6 +848,7 @@ def Table_maker(genre):
                 chas = request.values.get(f'chas{idate}{jx}')
                 box = request.values.get(f'box{idate}{jx}')
                 timeslot = request.values.get(f'slot{idate}{jx}')
+
                 print(f'this time slot is read as {timeslot}')
                 if box == 'on':
                     boxid.append(pdat.id)
@@ -862,8 +860,6 @@ def Table_maker(genre):
                     ddat = Drivers.query.filter(Drivers.Name == driver).first()
                     if ddat is not None:
                         pdat.Phone = ddat.Phone
-                        # Carrier no longer used in pin system, using it to display warnings
-                        pdat.Carrier = None
                         default_unit = ddat.Truck
                         #pdat.Unit = default_unit
 
@@ -886,8 +882,18 @@ def Table_maker(genre):
                 if timeslot is not None:
                     pdat.Timeslot = int(timeslot)
 
+                pdat.Notes = f'Will get pin for {driver} in unit {unit} using chassis {chas}'
+                if unit != default_unit: pdat.Notes = pdat.Notes + f' **Warning this not default truck for driver'
                 db.session.commit()
-            print(f'Modifying the selection')
+        else:
+            pdata = Pins.query.filter(Pins.Date == movedate).all()
+            for jx, pdat in enumerate(pdata):
+                copythis = request.values.get(f'copy{idate}{jx}')
+                if copythis is not None:
+                    itext = pdat.Intext
+                    otext = pdat.Outtext
+                    note = pdat.Notes
+                    holdvec[45] = f'{itext}\n{otext}\n{note}'
 
         #Perform moveup or movedn actions
         for tid in boxid:
