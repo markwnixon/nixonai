@@ -1060,6 +1060,15 @@ def get_dbdata(table_setup, tfilters):
                 if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
                 if todate is not None: query_adds.append(f'{table}.Date <= todate')
                 #print(f'This time filter applied from fromdate = {fromdate} to todate = {todate}')
+            else:
+                daysback = 45
+                if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
+                if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
+        else:
+            daysback = 45
+            if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
+            if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
+
 
         # Determine if pay filter applies to query:
         if 'Pay Filter' in tfilters:
