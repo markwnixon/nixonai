@@ -883,9 +883,10 @@ def Table_maker(genre):
                 if timeslot is not None:
                     pdat.Timeslot = int(timeslot)
 
-                pdat.Notes = f'Will get pin for {driver} in unit {unit} using chassis {chas}'
-                if default_unit is not None:
-                    if unit != default_unit: pdat.Notes = pdat.Notes + f' **Warning this not default truck for driver'
+                if driver is not None and unit is not None and chas is not None:
+                    pdat.Notes = f'Will get pin for {driver} in unit {unit} using chassis {chas}'
+                    if default_unit is not None:
+                        if unit != default_unit: pdat.Notes = pdat.Notes + f' **Warning this not default truck for driver'
                 db.session.commit()
         else:
             pdata = Pins.query.filter(Pins.Date == movedate).all()
