@@ -727,3 +727,83 @@ def info_mimemail(emaildata):
     server.quit()
 
     return err
+
+def html_mimemail(emaildata):
+    err=[]
+    ourserver = websites['mailserver']
+    #emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb]
+    etitle, ebody, emailin, emailcc, username, password, folder, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach = emaildata
+
+    emailfrom = username
+
+    msg = MIMEMultipart()
+
+    msg["From"] = emailfrom
+    tolist, cclist = '', ''
+    emailto = []
+    for em in emailin:
+        tolist = f'{tolist}, {em}'
+        emailto.append(em)
+    for em in emailcc:
+        cclist = f'{cclist}, {em}'
+        emailto.append(em)
+
+    msg["To"] = tolist
+    msg["CC"] = cclist
+    msg["Subject"] = etitle
+
+    msg.add_header("Reply-To", "mnixon@firsteaglelogistics.com")
+
+    # See if there is an attachment
+    for ix, invoice in enumerate(invoices):
+        cfrom = addpath(f'static/{scac}/data/vInvoice/{invoice}')
+        newfile = addpath(f'static/{scac}/data/temp/{ni[ix]}')
+        print(cfrom,newfile)
+        shutil.copy(cfrom,newfile)
+        attachment = open(newfile, "rb")
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload((attachment).read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', "attachment; filename= %s" % ni[ix])
+        msg.attach(part)
+    for ix, package in enumerate(packages):
+        cfrom = addpath(f'static/{scac}/data/vPackage/{package}')
+        newfile = addpath(f'static/{scac}/data/temp/{np[ix]}')
+        print(cfrom,newfile)
+        shutil.copy(cfrom,newfile)
+        attachment = open(newfile, "rb")
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload((attachment).read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', "attachment; filename= %s" % np[ix])
+        msg.attach(part)
+    if wbfile is not None:
+        cfrom = addpath(f'static/{scac}/data/temp/{wbfile}')
+        newfile = addpath(f'static/{scac}/data/temp/{wbattach}')
+        if wbfile != wbattach:  shutil.copy(cfrom, newfile)
+        attachment = open(newfile, "rb")
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload((attachment).read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', "attachment; filename= %s" % wbattach)
+        msg.attach(part)
+
+    attachment.close()
+
+    msg.attach(MIMEText(ebody, 'html'))
+    #msg.attach(MIMEText(signature, 'html'))
+
+    server = smtplib.SMTP(ourserver)
+    server.starttls()
+    print(f'logging in as {username} and {password}')
+    code, check = server.login(username,password)
+    print('check', code, check.decode("utf-8"))
+    err.append(f"Email Login: {check.decode('utf-8')}")
+    err.append(f"Email To: {emailto} sent")
+    err.append(f"Email From: {emailfrom}")
+
+    server.sendmail(emailfrom, emailto, msg.as_string())
+
+    server.quit()
+
+    return err

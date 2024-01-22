@@ -1439,6 +1439,43 @@ class Reconciliations(db.Model):
         self.Status = Status
         self.Diff = Diff
 
+class Ardata(db.Model):
+    __tablename__ = 'ardata'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Etitle = db.Column('Etitle', db.String(100))
+    Ebody = db.Column('Ebody', db.String(2000))
+    Emailto = db.Column('Emailto', db.String(200))
+    Emailcc = db.Column('Emailcc', db.String(200))
+    Sendfiles = db.Column('Sendfiles', db.String(200))
+    Sendasfiles = db.Column('Sendasfiles', db.String(200))
+    Jolist= db.Column('Jolist', db.String(200))
+    Emailtype = db.Column('Emailtype', db.String(45))
+    Mid = db.Column('Mid', db.String(100))
+    Customer = db.Column('Customer', db.String(45))
+    Container = db.Column('Container', db.String(45))
+    Date1 = db.Column('Date1', db.DateTime)
+    Datelist = db.Column('Datelist', db.String(200))
+    From = db.Column('From', db.String(45))
+    Box = db.Column('Box', db.String(45))
+
+    def __init__(self, Etitle, Ebody, Emailto, Emailcc, Sendfiles, Sendasfiles, Jolist, Emailtype, Mid, Customer, Container, Date1, Datelist, From, Box):
+        self.Etitle = Etitle
+        self.Ebody = Ebody
+        self.Emailto = Emailto
+        self.Emailcc = Emailcc
+        self.Sendfiles = Sendfiles
+        self.Sendasfiles = Sendasfiles
+        self.Jolist = Jolist
+        self.Emailtype = Emailtype
+        self.Mid = Mid
+        self.Customer = Customer
+        self.Container = Container
+        self.Date1 = Date1
+        self.Datelist = Datelist
+        self.From = From
+        self.Box = Box
+
+
 class Adjusting(db.Model):
     __tablename__ = 'adjusting'
     id = db.Column('id', db.Integer, primary_key=True)

@@ -1,0 +1,746 @@
+from webapp import db
+from flask import render_template, flash, redirect, url_for, session, logging, request
+from requests import get
+from CCC_system_setup import apikeys
+from CCC_system_setup import myoslist, addpath, tpath, companydata, usernames, passwords, scac, imap_url, accessorials, signoff
+from webapp.viewfuncs import d2s, stat_update, hasinput, d1s
+#from viewfuncs import d2s, d1s
+import imaplib, email
+import math
+import re
+from email.header import decode_header
+import webbrowser
+import os
+from email.utils import parsedate_tz, mktime_tz
+from email.utils import parsedate_to_datetime
+from bs4 import BeautifulSoup
+from sqlalchemy.sql import desc
+import ast
+import openpyxl
+from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font, Color
+from openpyxl.utils import get_column_letter
+
+import datetime
+from webapp.models import Quotes, Quoteinput, Orders, People, Ardata
+from send_mimemail import send_mimemail
+from pyzipcode import ZipCodeDatabase
+from webapp.class8_utils_email import html_mimemail
+zcdb = ZipCodeDatabase()
+
+API_KEY_GEO = apikeys['gkey']
+API_KEY_DIS = apikeys['dkey']
+cdata = companydata()
+
+date_y4=re.compile(r'([1-9]|0[1-9]|[12][0-9]|3[01]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})')
+
+today_now = datetime.datetime.now()
+today = today_now.date()
+timenow = today_now.time()
+
+def roundup(x):
+    return int(math.ceil(x / 10.0)) * 10
+
+def get_body(msg):
+    if msg.is_multipart():
+        return get_body(msg.get_payload(0))
+    else:
+        return msg.get_payload(None,True)
+
+def search(key,value,con):
+    result,data=con.search(None,key,'"{}"'.format(value))
+    return data
+
+def search_from_date(key,value,con,datefrom):
+    result,data=con.search( None, '(SENTSINCE {0})'.format(datefrom) , key, '"{}"'.format(value) )
+    return data
+
+def get_emails(result_bytes,con):
+    msgs=[]
+    for num in result_bytes[0].split():
+        typ,data=con.fetch(num,'(RFC822)')
+        msgs.append(data)
+    return msgs
+
+def get_date(data):
+    for response_part in data:
+        if isinstance(response_part, tuple):
+            try:
+                part = response_part[1].decode('utf-8')
+                msg = email.message_from_string(part)
+                date=msg['Date']
+            except:
+                date=None
+    return date
+
+def get_subject(data):
+    subject = 'none'
+    mid = 'none'
+    for response_part in data:
+        if isinstance(response_part, tuple):
+            part = response_part[1].decode('utf-8')
+            msg = email.message_from_string(part)
+            subject=msg['Subject']
+            mid = msg['Message-ID']
+    return subject, mid
+
+def get_from(data):
+    for response_part in data:
+        if isinstance(response_part, tuple):
+            part = response_part[1]
+            try:
+                part = part.decode('utf-8')
+                msg = email.message_from_string(part)
+                thisfrom=msg['From']
+                return thisfrom
+            except:
+                return 'Nonefound'
+
+def get_msgs():
+    username = usernames['quot']
+    password = passwords['quot']
+    dayback = 100
+    #datefrom = (datetime.date.today() - datetime.timedelta(dayback)).strftime("%d-%b-%Y")
+    con = imaplib.IMAP4_SSL(imap_url)
+    con.login(username, password)
+    con.select('INBOX')
+    result, data = con.search(None,'ALL')
+    msgs = get_emails(data, con)
+    return msgs
+
+
+def compact(body):
+    newbody = ''
+    blines = body.splitlines()
+    for line in blines:
+        #Remove non-ascii characters
+        line = re.sub(r'[^\x00-\x7F]+', ' ', line)
+        line = re.sub(r'=[A-Z,0-9][A-Z,0-9]', '', line)
+        if len(line.strip())>1:
+            if 'Forwarded Message' in line or 'Subject:' in line or 'Date:' in line or 'To:' in line or 'CC:' in line or 'From:' in line or 'Content-Type' in line or 'Content-Transfer' in line:
+                print('Line from FWD Preamble')
+            else:
+                newbody = newbody + line +'\n' + '<br>'
+    return newbody
+
+def hard_decode(raw):
+    raw = str(raw)
+    rawl = raw.splitlines()
+    appendit = 0
+    ebody=''
+    efrom=''
+    edate=''
+    mid=''
+    for line in rawl:
+        test = line[0:5]
+        line = re.sub(r'[^\x00-\x7F]+', ' ', line)
+        line = re.sub(r'=[A-Z,0-9][A-Z,0-9]', '', line)
+        line = line.replace('=09','')
+        if 'Subj' in test:
+            subject = line.split('Subject:')[1]
+            subject = subject.replace('Fwd:','')
+            subject = subject.strip()
+            print(f'Subject:{subject}')
+        if 'Message-ID' in line:
+            mid = line.split('Message-ID:')[1]
+            mid = mid.replace('Fwd:', '')
+            mid = mid.strip()
+            print(f'MID:{mid}')
+        if 'From' in test and '@' in line and 'firsteagle' not in line and 'onestop' not in line:
+            print('efrom',line)
+            efrom = line.split('From:')[1]
+            efrom = efrom.strip()
+            print(f'From:{efrom}')
+        if 'Date' in test:
+            edate = line.split('Date:')[1]
+            edate = edate.strip()
+            print(f'Date:{edate}')
+        if 'Content-Type:' in line and 'plain' in line:
+            print(f'BodyStart:{line}')
+            appendit = 1
+        if 'Content-Type:' in line and 'html' in line:
+            print(f'BodyStop:{line}')
+            appendit = 0
+        if appendit == 1:
+            line = line.strip()
+            if len(line)>0:
+                ebody=ebody+line+'\n'
+    #print(f'ebody={ebody}')
+    return subject,efrom,edate,ebody,mid
+
+def clean(text):
+    # clean text for creating a folder
+    return "".join(c if c.isalnum() else "_" for c in text)
+
+def extract_for_code(data):
+    try:
+        text, encoding = decode_header(data)[0]
+    except:
+        text = 'No Decode Available'
+        encoding = None
+    if isinstance(text, bytes):
+        if encoding is not None: text = text.decode(encoding)
+    return text
+
+def get_body_text(qdat):
+
+    mid = qdat.Mid
+    print(f'this mid is {mid}')
+    username = usernames['quot']
+    password = passwords['quot']
+    imap = imaplib.IMAP4_SSL(imap_url)
+    imap.login(username, password)
+    status, messages = imap.select('INBOX')
+    try:
+        result, data = imap.search(None, f'HEADER Message-ID {mid}')
+        msg_id_list = data[0].split()
+        result, data = imap.fetch(msg_id_list[0], '(RFC822)')
+        email_message = email.message_from_bytes(data[0][1])
+
+        # extract the subject of the email
+        subject = extract_for_code(email_message["Subject"])
+        print(f'****Getting the Body Text***** for Subject: {subject}')
+    except:
+        print('Could not locate this email header')
+        return 'Email ID not found', None
+
+    # Set default text particulars
+    plain_text_content = ''
+    html_content = None
+
+    # extract the email content as a string
+    if email_message.is_multipart():
+        for part in email_message.walk():
+            if part.get_content_type() == 'text/plain':
+                try:
+                    plain_text_content = part.get_payload(decode=True).decode('utf-8')
+                except UnicodeDecodeError as e:
+                    plain_text_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
+            if part.get_content_type() == "text/html":
+                try:
+                    html_content = part.get_payload(decode=True).decode("utf-8")
+                except UnicodeDecodeError as e:
+                    html_content = part.get_payload(decode=True).decode("utf-8", errors='replace')
+
+                soup = BeautifulSoup(html_content, "html.parser")
+                plain_text_content = soup.get_text()
+    else:
+        try:
+            plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
+        except:
+            plain_text_content = 'Could not decode payload'
+
+    #print('Returning from get_body_text', plain_text_content)
+    return plain_text_content, html_content
+
+def get_sorted_cust(arorders):
+    ucust = []
+    for aro in arorders:
+        shipper = aro.Shipper
+        if shipper not in ucust: ucust.append(shipper)
+    ucust.sort()
+    return ucust
+
+def get_open_sort_totals(arlist):
+    dat30 = today - datetime.timedelta(30)
+    lb360 = today - datetime.timedelta(360)
+    cdata = []
+    for cust in arlist:
+        odata = Orders.query.filter((Orders.Shipper == cust) & (Orders.Istat>1) & (Orders.Istat<5) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
+        iall, iu30, io30 = 0, 0, 0
+        dolall, dolu30, dolo30 = 0.00, 0.00, 0.00
+        for odat in odata:
+            invodate = odat.Date3
+            #iif has an invoice date then it has been invoiced
+            #print(f'{dat30} and {invodate}')
+            invototal = odat.InvoTotal
+            if invodate is not None and invototal is not None:
+                invototal = float(invototal)
+                iall += 1
+                dolall += invototal
+                if invodate < dat30:
+                    io30 += 1
+                    dolo30 += invototal
+                else:
+                    iu30 += 1
+                    dolu30 += invototal
+
+        cdata.append([cust,io30, d2s(dolo30), iu30, d2s(dolu30), iall, d2s(dolall)])
+    return cdata
+
+def get_open_for_cust(this_shipper):
+    dat30 = today - datetime.timedelta(30)
+    lb360 = today - datetime.timedelta(360)
+    cdata = []
+    odata = Orders.query.filter((Orders.Shipper == this_shipper) & (Orders.Istat>1) & (Orders.Istat<5) & (Orders.Date3>lb360) & (Orders.InvoTotal != None)).order_by(Orders.Date3).all()
+    return odata
+
+def read_tboxes():
+    tboxes = [0]*30
+    for ix in range(30):
+        tboxes[ix] = request.values.get(f'tbox{ix}')
+    print(f'the tboxes here are {tboxes}')
+    return tboxes
+
+def attach_rename_inv(odat, name):
+    newname = odat.Invoice
+    if name == 'Invoice_Container':  newname = f'Invoice_{odat.Container}.pdf'
+    elif name == 'Invoice_Order_xxx': newname = f'Invoice_Order_{odat.Order}.pdf'
+    elif name == 'Invoice_Release_xxx': newname = f'Invoice_Release_{odat.Booking}.pdf'
+    elif name == 'Inv_Booking_Container': newname = f'Inv_{odat.Booking}_{odat.Container}.pdf'
+    elif name == 'Inv_Order_Container': newname = f'Inv_{odat.Order}_{odat.Container}.pdf'
+    return newname
+
+def attach_rename_pack(odat, name):
+    newname = odat.Package
+    if name == 'Inv_Package_Container':  newname = f'Inv_Package_{odat.Container}.pdf'
+    elif name == 'Inv_Package_Order_xxx': newname = f'Inv_Package_Order_{odat.Order}.pdf'
+    elif name == 'Inv_Package_Release_xxx': newname = f'Inv_Package_Release_{odat.Booking}.pdf'
+    elif name == 'Inv_Package_Booking_Container': newname = f'Inv_Package_{odat.Booking}_{odat.Container}.pdf'
+    elif name == 'Inv_Package_Order_Container': newname = f'Inv_Package_{odat.Order}_{odat.Container}.pdf'
+    return newname
+
+def column_wide(headers,ydata):
+    column_widths = []
+    for cell in enumerate(headers):
+        cell = str(cell)
+        column_widths.append(len(cell))
+    for row in ydata:
+        for i, cell in enumerate(row):
+            test = len(str(cell))
+            column_widths[i] = max(test,column_widths[i])
+    return column_widths
+
+def make_workbook(customer, data, tboxes, ftotal):
+    # if this flag on we will also create a new workbook to attach
+    wb = openpyxl.Workbook()
+    shtlist = wb.sheetnames
+    for sht in shtlist:
+        std = wb.get_sheet_by_name(sht)
+        wb.remove_sheet(std)
+    newsheet = f'{customer}_Open_{today}'
+    dfc = wb.create_sheet(newsheet)
+    # formats for writing to excel
+    money = '$#,##0.00'
+    dec2 = '#,##0.00'
+    dec0 = '#,##0'
+    hdrs = ['JO', 'Order', 'Booking In', 'Container', 'Date Invoiced', 'Amount']
+    keephdrs = []
+    for jx in range(6):
+        if tboxes[jx] == 'on':
+            keephdrs.append(hdrs[jx])
+    for col, hdr in enumerate(keephdrs):
+        d = dfc.cell(row=1, column=col + 1, value=hdr)
+        d.alignment = Alignment(horizontal='center')
+        d.font = Font(name='Calibri', size=10, bold=True)
+
+    for ix, dat in enumerate(data):
+        print(f'dat is {dat} keephdrs is {keephdrs}')
+        for jx, each in enumerate(dat):
+            d = dfc.cell(row=ix+2, column=jx + 1, value=each)
+            d.alignment = Alignment(horizontal='center')
+            d.font = Font(name='Calibri', size=10, bold=False)
+            if keephdrs[jx] == 'Amount':
+                d.number_format = money
+                amtcol = jx+1
+                rowtot = ix+4
+
+    d = dfc.cell(row=rowtot, column=amtcol-1, value='Total:')
+    d.alignment = Alignment(horizontal='right')
+    d.font = Font(name='Calibri', size=10, bold=True)
+
+    d = dfc.cell(row=rowtot, column=amtcol, value=ftotal)
+    d.alignment = Alignment(horizontal='center')
+    d.font = Font(name='Calibri', size=10, bold=True)
+    d.number_format = money
+
+    column_widths = column_wide(keephdrs, [])
+    for i, column_width in enumerate(column_widths):
+        dfc.column_dimensions[get_column_letter(i + 1)].width = column_width + 4
+
+
+    wbpath = addpath(f'static/{scac}/data/temp/{customer}_open_{today}')
+    wbpath = wbpath.replace(' ','_')
+    wbpath = wbpath.replace('.','')
+    wbpath = wbpath.replace('-','')
+    wbpath = wbpath + '.xlsx'
+    wbfile = os.path.basename(wbpath)
+
+
+    print(f'the wbfile is {wbfile} and the wbpath is: {wbpath}')
+    wb.save(wbpath)
+
+    return wbfile
+
+
+def get_table_formatted(odata, etype, tboxes, boxes, make_wb, customer):
+    intable='<table><tr>'
+    labels = ['JO', 'Order', 'Release', 'Container', 'Date', 'Amount']
+    align = ["center", "center", "center", "center", "center", "right"]
+    ftotal = 0.00
+    invoices = []
+    packages = []
+    new_invoices = []
+    new_packages = []
+    invoname = request.values.get('invoname')
+    packname = request.values.get('packname')
+    ydata = []
+    wbfile = None
+
+    for jx in range(6):
+        if tboxes[jx]=='on':
+            intable = f'{intable}<td align={align[jx]}><b>{labels[jx]}</b></td>'
+    intable = f'{intable}</tr><tr>'
+    for ix, odat in enumerate(odata):
+        if boxes[ix]=='on':
+            ftotal = ftotal + float(odat.InvoTotal)
+            data = [odat.Jo, odat.Order, odat.Booking, odat.Container, f'{odat.Date3}', f'${odat.InvoTotal}']
+            datline=[]
+            intable = f'{intable}<tr>'
+            for jx in range(6):
+                if tboxes[jx]=='on':
+                    datline.append(data[jx])
+                    intable = f'{intable}<td align={align[jx]}>{data[jx]}</td>'
+            intable = f'{intable}</tr>'
+            ydata.append(datline)
+            if tboxes[7] == 'on':
+                invoices.append(odat.Invoice)
+                new_invoices.append(attach_rename_inv(odat,invoname))
+            if tboxes[8] == 'on':
+                packages.append(odat.Package)
+                new_packages.append(attach_rename_pack(odat, packname))
+    intable = f'{intable}</table>'
+
+    if make_wb: wbfile = make_workbook(customer, ydata, tboxes, ftotal)
+
+    return intable, ftotal, invoices, packages, new_invoices, new_packages, wbfile
+
+def final_update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
+    cdata = companydata()
+    dat30 = today - datetime.timedelta(30)
+    etitle = request.values.get('etitle')
+    ebody = request.values.get('ebody')
+    salutation = request.values.get('salutation')
+    efrom = usernames['invo']
+    epass = passwords['invo']
+    eto = request.values.get('etolist')
+    ecc = request.values.get('ecclist')
+    eto = ast.literal_eval(eto)
+    ecc = ast.literal_eval(ecc)
+    invoices = []
+    packages = []
+    new_invoices = []
+    new_packages = []
+    intnexti = 0
+    intnextp = 0
+
+    for ix, odat in enumerate(odata):
+        if boxes[ix] == 'on':
+            if tboxes[7] == 'on':
+                invoices.append(odat.Invoice)
+                nextinvo = request.values.get(f'edati{intnexti}')
+                intnexti += 1
+                new_invoices.append(nextinvo)
+            if tboxes[8] == 'on':
+                packages.append(odat.Package)
+                nextpack = request.values.get(f'edatp{intnextp}')
+                intnextp += 1
+                new_packages.append(nextpack)
+
+    wba = request.values.get('wbattach')
+    wbf = request.values.get('wbcreated')
+
+    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, wbf, wba]
+
+    return emaildata
+
+def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
+    cdata = companydata()
+    dat30 = today - datetime.timedelta(30)
+    etitle = f'Open Balance Report for {this_shipper} as of {today}'
+    salutation = request.values.get('salutation')
+    if not hasinput(salutation) or salutation == 'Sir':
+        email_to_selected = emailsend[1]
+        print(email_to_selected)
+        if email_to_selected is not None and email_to_selected != []:
+            ets = email_to_selected[0]
+            etslist = ets.split('@')
+            salutation = etslist[0]
+        else:
+            salutation = 'Sir'
+
+    company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
+    closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Payable Team<br>{company_info}'
+    ebody = f'Hello {salutation},<br><br>'
+    etype = 'o30'
+    efrom = usernames['invo']
+    epass = passwords['invo']
+    eto = emailsend[1]
+    ecc = emailsend[3]
+    invoices = []
+    packages = []
+    #ecc1 = usernames['expo']
+    #ecc2 = usernames['info']
+    if tboxes[9] == 'on': make_wb = 1
+    else: make_wb = 0
+    newwb = None
+
+    if email_update is not None:
+        #ebody = request.values.get('ebody')
+        #table_in, ftotal, invoices, packages, new_invoices, new_packages, newwb = get_table_formatted(odata, etype, tboxes, boxes, make_wb, this_shipper)
+        print('Will get rid of this block')
+
+    elif etype == 'o30':
+        table_in, ftotal, invoices, packages, new_invoices, new_packages, newwb = get_table_formatted(odata,etype,tboxes,boxes, make_wb, this_shipper)
+        ebody = f'{ebody} We are showing a total balance due of ${d2s(ftotal)} as listed in the following table:'
+        ebody = f'{ebody}<br><br>{table_in}'
+        ebody = f'{ebody}<br>Please review this information and let us know when we can expect payment, or if you have sent payment already please indicate what has been paid so that we may review on our side. {closing}'
+        #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
+        ebody = ebody.replace('<br><br>', '<br><br>\n\n')
+
+
+    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb]
+    #etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, efrom, folder, dat30date, sourcenamelist, sendnamellist = emaildata
+    return emaildata
+
+def get_email_customer(pdat, ar_emails):
+    emailto_selected = request.values.getlist('emailtolist')
+    emailcc_selected = request.values.getlist('emailcclist')
+    print(f'{emailto_selected}')
+    print(f'{emailcc_selected}')
+    emailtos, emailccs = [], []
+    if hasinput(pdat.Email):
+        emailtos.append(pdat.Email)
+        emailccs.append(pdat.Email)
+    if hasinput(pdat.Associate1):
+        emailtos.append(pdat.Associate1)
+        emailccs.append(pdat.Associate1)
+    if hasinput(pdat.Associate2):
+        emailtos.append(pdat.Associate2)
+        emailccs.append(pdat.Associate2)
+
+    # Add in email addresses from related emails
+    for ar in ar_emails:
+        eto = ar.Emailto
+        ecc = ar.Emailcc
+        efrom = ar.From
+        eto = ast.literal_eval(eto)
+        ecc = ast.literal_eval(ecc)
+        for et in eto:
+            emailtos.append(et)
+        for ec in ecc:
+            emailccs.append(ec)
+        if efrom is not None:
+            emailtos.append(efrom)
+            emailccs.append(efrom)
+
+    #Add these for testing purposes:
+    emailtos.append('markwnixon@gmail.com')
+    emailtos.append('mark@draytrucking.com')
+    emailccs.append('markwnixon@gmail.com')
+    emailccs.append('mark@draytrucking.com')
+
+    unique_emailtolist = set(emailtos)
+    unique_emailcclist = set(emailccs)
+    emailtos = list(unique_emailtolist)
+    emailccs = list(unique_emailcclist)
+    emailsend = [emailtos, emailto_selected, emailccs, emailcc_selected]
+    return emailsend
+
+def get_ardata(containerlist, tboxes, customer):
+    ardata_all = []
+    for container in containerlist:
+        if tboxes[22]=='on':
+            ardata = Ardata.query.filter((Ardata.Container == container) & (Ardata.Emailtype == 'Invoice')).all()
+            if ardata: ardata_all = ardata_all + ardata
+        if tboxes[23]=='on':
+            ardata = Ardata.query.filter((Ardata.Container == container) & (Ardata.Emailtype == 'Invoice Response')).all()
+            if ardata: ardata_all = ardata_all + ardata
+
+    if tboxes[24]=='on':
+        ardata = Ardata.query.filter((Ardata.Customer == customer) & (Ardata.Emailtype == 'Report')).all()
+        if ardata: ardata_all = ardata_all + ardata
+    if tboxes[25]=='on':
+        ardata = Ardata.query.filter((Ardata.Customer == customer) & (Ardata.Emailtype == 'Report Response')).all()
+        if ardata: ardata_all = ardata_all + ardata
+    return ardata_all
+
+def rselect(nemail):
+    rview = [0]*nemail
+    rtest = request.values.get('email_radio')
+    if rtest is not None:
+        try:
+            rtest = int(rtest)
+            rview[rtest] = 'on'
+        except:
+            rtest = 0
+    print(f'rtest = {rtest}')
+    return rview
+
+
+
+
+def isoAR():
+    username = session['username'].capitalize()
+    #define User variables
+    # Qote being worked
+    uquot = f'{username}_quot'
+    uiter = f'{username}_iter'
+    umid= f'{username}_mid'
+    utext= f'{username}_text'
+    uhtml= f'{username}_html'
+    quot=0
+    tbox = [0]*28
+    bidthis = [0]*5
+    expdata=[]
+    costdata=[]
+    multibid=['off', 1, 0, 0]
+    locs = []
+    ebodytxt=''
+    qdat = None
+    mid = ''
+    htmltext = None
+    plaintext = None
+    boxes = []
+    tboxes = [0]*30
+    analysis = request.values.get('analysis')
+    emailgo = request.values.get('sendemail')
+    exitnow = request.values.get('exitAR')
+    active_task = request.values.get('active_task')
+    redirect = request.values.get('exitAR2')
+    update = request.values.get('updateall')
+    update_e = request.values.get('updateemail')
+    invoname = request.values.get('invoname')
+    packname = request.values.get('packname')
+
+
+    if request.method == 'POST':
+        try:
+            iter = int(os.environ[uiter])
+        except:
+            iter = 1
+        try:
+            oldmid = os.environ[umid]
+        except:
+            oldmid = 'Not Defined'
+        try:
+            plaintext = os.environ[utext]
+        except:
+            plaintext = ''
+        try:
+            htmltext = os.environ[uhtml]
+        except:
+            htmltext = ''
+        print(f'This is a POST with iter {iter} and last mid {oldmid}')
+
+
+
+        print(f'Values are {exitnow} {analysis} {emailgo} {exitnow}')
+
+        if exitnow is not None:
+            print('Exiting quotes')
+            return 'exitnow', None, None, None, None, None, None, None, None, None, None, None, None, None
+
+        elif redirect is not None:
+            this_shipper = request.values.get('this_shipper')
+            task = 'artable review'
+
+
+        elif analysis is not None or active_task == 'analysis':
+            if analysis is not None:
+                this_shipper = request.values.get('optradio')
+                tboxes = ['on'] * 7 + ['off'] * 23
+            else:
+                this_shipper = request.values.get('this_shipper')
+                tboxes = read_tboxes()
+
+            print(f'The shipper of interest is {this_shipper}')
+            task = 'analysis'
+
+
+
+        # Not exiting after a Post
+        else:
+            this_shipper = request.values.get('optradio')
+            print(f'The shipper of interest is {this_shipper}')
+            task = 'artable review'
+
+    #If not a POST
+    else:
+        iter = 1
+        os.environ['MID'] = 'None Selected'
+        print('This is NOT a Post')
+        ebodytxt = ''
+        #print('Entering Quotes1',flush=True)
+        username = session['username'].capitalize()
+        this_shipper = None
+        task = 'artable review'
+
+    lb360 = today - datetime.timedelta(360)
+    arorders = Orders.query.filter((Orders.Istat<5) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
+    arlist = get_sorted_cust(arorders)
+    arbycust = get_open_sort_totals(arlist)
+    if this_shipper is None: this_shipper = arlist[0]
+    odata = get_open_for_cust(this_shipper)
+
+    boxes = [0] * len(odata)
+
+    if task == 'analysis':
+        dat30 = today - datetime.timedelta(30)
+        if tboxes[20] == 'on':
+            for ix, odat in enumerate(odata):
+                if odat.Date3 < dat30: boxes[ix] = 'on'
+        else:
+            for ix, odat in enumerate(odata):
+                boxes[ix] = request.values.get(f'box{ix}')
+
+    for ar in arbycust:
+        print(f'{ar[0]} {ar[1]} {ar[2]} {ar[3]} {ar[4]} {ar[5]} {ar[6]}')
+
+    if htmltext is None:
+        showtext = plaintext
+    else:
+        showtext = htmltext
+
+    containerlist = []
+    for ix, odat in enumerate(odata):
+        if boxes[ix] == 'on': containerlist.append(odat.Container)
+    ar_emails = get_ardata(containerlist, tboxes, this_shipper)
+    nemail = len(ar_emails)
+    rview = rselect(nemail)
+
+    pdat = People.query.filter(People.Company == this_shipper).first()
+    emailsend = get_email_customer(pdat, ar_emails)
+    print(f'Emailsend = {emailsend}')
+
+    if emailgo is not None:
+        #Need to get some emaildata from the website in case and changes made....
+        emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
+        print(f'The final emaildata for send is {emaildata}')
+        err = html_mimemail(emaildata)
+        print(err)
+    elif update_e is not None:
+        #Get the emaildata setup from the website in case changes made....
+        emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
+        print(f'The final emaildata for send is {emaildata}')
+    else:
+        emaildata = update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
+
+
+
+
+
+    #Save all the session variables that may have been updated...
+    iter = iter + 1
+    os.environ[uiter] = str(iter)
+    if plaintext is None: plaintext = ''
+    if htmltext is None: htmltext = ''
+    os.environ[utext] = plaintext
+    os.environ[uhtml] = htmltext
+    os.environ[umid] = mid
+    print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
+    print(f'email create tboxes={tboxes}')
+    print(f'data selection boxes={boxes}')
+    print(f'invoname:{invoname}, packname"{packname}')
+    print(f'emaildata is {emaildata}')
+    print(f'rview is {rview}')
+    return 'keepgoing', arbycust, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails, rview

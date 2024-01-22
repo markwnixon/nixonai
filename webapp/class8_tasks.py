@@ -3145,6 +3145,7 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
     form_show = tablesetup['form show'][thisform]
     form_checks = tablesetup['form checks'][thisform]
+    task_iter = 1
     if thisform != 'MultiChecks': form_show.append('Always')
     failed = 0
     warned = 0

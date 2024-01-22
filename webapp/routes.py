@@ -488,6 +488,14 @@ def QuoteMaker():
         return render_template('Aquotemaker.html', cmpdata=cmpdata, scac=scac, costdata = costdata, biddata=biddata, expdata = expdata, timedata = timedata,
                            distdata=distdata, locto=locto, locfrom=locfrom, emaildata = emaildata, dirdata=dirdata, qdata = qdata, bidthis=bidthis, taskbox=taskbox, thismuch=thismuch, quot=quot, qdat=qdat, bidname=bidname, tbox=tbox, ebodytxt=ebodytxt, multibid=multibid)
 
+@app.route('/ARMaker', methods=['GET', 'POST'])
+def ARMaker():
+    from iso_AR import isoAR
+    status, ardata, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails, rview= isoAR()
+    if status == 'exitnow': return redirect(url_for('Class8Main',genre='Trucking'))
+    else:
+        return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, this_shipper=this_shipper, odata=odata, task=task, emaildata=emaildata, boxes=boxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails=ar_emails, rview=rview)
+
 
 @app.route('/Reports', methods=['GET', 'POST'])
 @login_required

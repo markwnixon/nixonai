@@ -1,0 +1,346 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<form action="{{ url_for ('ARMaker') }}" method="post">
+<div class="table-responsive">
+<div class="row">
+
+{% set etype = 'AR' %}
+
+{% if task == 'analysis'%}
+    {% set linkpath = emaildata[6] %}
+    {% set atlink = "font-weight-bold text-center text-primary bg-white" %}
+        <div class="col-sm-3" align="left">
+                {% include 'includes/emailprep2.html' %}
+
+
+                {% for ar in ar_emails %}
+                    {% if rview[loop.index-1] == 'on' %}
+                            <div class="card" align=left">
+                                    <div class = "card-header">
+                                        Subject: {{ ar.Etitle }}
+                                    </div>
+                                    <div class="card-body">
+                                        {{ ar.Ebody|safe }}
+                                    </div>
+                            </div>
+                    {% endif %}
+                {% endfor %}
+        </div>
+
+        <div class="col-sm-6" align="left">
+            <br>
+                    <div class="card" align=""left">
+                                <div class = "card-header">
+                                    List of Outstanding Invoices for {{ this_shipper }} &nbsp; &nbsp;
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box20" {% if tboxes[20]=='on' %} checked {% endif %} name="tbox20" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box20">Select Over 30 Days</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box21" {% if tboxes[21]=='on' %} checked {% endif %} name="tbox21" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box21">Show Email Composition</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box22" {% if tboxes[22]=='on' %} checked {% endif %} name="tbox22" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box22">Show Past Emails Associated</label>
+                                    </div>
+                                </div>
+
+                                <div class="card-body">
+                                                <table id="AR2" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+                                                    <thead>
+                                                    <tr class="amber lighten-4 text-center" >
+                                                        <th style="font-weight:bold">Select</th>
+                                                        <th style="font-weight:bold">Customer</th>
+                                                        <th style="font-weight:bold">JO</th>
+                                                        <th style="font-weight:bold">HaulType</th>
+                                                        <th style="font-weight:bold">Order</th>
+                                                        <th style="font-weight:bold">Container</th>
+                                                        <th style="font-weight:bold">Release</th>
+                                                        <th style="font-weight:bold">InvoDate</th>
+                                                        <th style="font-weight:bold">InvoTotal</th>
+                                                        <th style="font-weight:bold">IN</th>
+                                                        <th style="font-weight:bold">PK</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    {% set d30 = emaildata[7] %}
+                                                    {% for odat in odata %}
+                                                        {% if odat.Date3 > d30 %}
+                                                            {% set atc1="font-weight-bold" %}
+                                                        {% else %}
+                                                            {% set atc1="red-text font-weight-bold" %}
+                                                        {% endif %}
+                                                    <tr>
+                                                        <td align="center" class="{{atc1}}">
+                                                              <input class="align-middle" type="checkbox"  {% if boxes[loop.index-1] == 'on'%} checked {% endif %} name="box{{ loop.index-1 }}">
+                                                        </td>
+                                                        <td align="center" class="{{atc1}}">{{ odat.Shipper }}</td>
+                                                        <td align="center" class="{{atc1}}">{{ odat.Jo }}</td>
+                                                        <td align="right" class="{{atc1}}">{{ odat.HaulType }}</td>
+                                                        <td align="center" class="{{atc1}}">{{ odat.Order }}</td>
+                                                        <td align="right" class="{{atc1}}">{{ odat.Container }}</td>
+                                                        <td align="center" class="{{atc1}}">{{ odat.Booking }}</td>
+                                                        <td align="right" class="{{atc1}}">{{ odat.Date3 }}</td>
+                                                        <td align="right" class="{{atc1}}">{{ odat.InvoTotal }}</td>
+                                                        {% if odat.Invoice is not none %}
+                                                            <td class="{{ atlink }}">  <a href="{{ linkpath }}{{ odat.Invoice }}" class="{{ atlink }}" target="_blank">[O]</a></td>
+                                                        {% else %}
+                                                            <td class="{{ atlink }}">-</td>
+                                                        {% endif %}
+                                                        {% if odat.Package is not none %}
+                                                            <td class="{{ atlink }}">  <a href="{{ linkpath }}{{ odat.Package }}" class="{{ atlink }}" target="_blank">[O]</a></td>
+                                                        {% else %}
+                                                            <td class="{{ atlink }}">-</td>
+                                                        {% endif %}
+                                                    </tr>
+                                                    {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                                <input type = "hidden" name ="active_task" value= "{{task}}">
+                                                <input type = "hidden" name ="this_shipper" value= "{{this_shipper}}">
+
+                                </div>
+                    </div>
+                            {% if tboxes[21] == 'on' %}
+                                <div class="card" align=left">
+                                        <div class="input-group-text">E-Body:</div>
+                                         <textarea class="form-control" type="text" name="ebody" rows="5">{{emaildata[1] | safe}}</textarea>
+
+                                        <div class = "card-header">
+                                            Email Preview: {{ emaildata[0] }}
+                                        </div>
+                                        <div class="card-body">
+                                            {{ emaildata[1]|safe }}
+                                        </div>
+                                </div>
+                            {% endif %}
+                            {% if tboxes[26] == 'on' %}
+                                <div class="card" align=left">
+                                    <div class = "card-header">
+                                        Emails Associated with Selected Open Invoices
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box26" {% if tboxes[26]=='on' %} checked {% endif %} name="tbox26" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box26">Invoice Sent</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box23" {% if tboxes[23]=='on' %} checked {% endif %} name="tbox23" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box23">Invoice Response</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box24" {% if tboxes[24]=='on' %} checked {% endif %} name="tbox24" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box24">Open Reports</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box25" {% if tboxes[25]=='on' %} checked {% endif %} name="tbox25" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box25">Open Report Responses</label>
+                                    </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <table id="AR3" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+                                                    <thead>
+                                                    <tr class="amber lighten-4 text-center" >
+                                                        <th style="font-weight:bold">Select</th>
+                                                        <th style="font-weight:bold">Date</th>
+                                                        <th style="font-weight:bold">Customer</th>
+                                                        <th style="font-weight:bold">Container</th>
+                                                        <th style="font-weight:bold">From</th>
+                                                        <th style="font-weight:bold">Mailbox</th>
+                                                        <th style="font-weight:bold">Subject</th>
+                                                        <th style="font-weight:bold">Email To</th>
+                                                        <th style="font-weight:bold">Email CC</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    {% for ar in ar_emails %}
+                                                        <tr>
+                                                            <td align="center" >
+                                                                <div class="form-check">
+                                                                    <label class="form-check-label">
+                                                                        <input type="radio" {% if rview[loop.index-1] == 'on' %} checked {% endif %} class="form-check-input"  name="email_radio" id="Ropt{{loop.index-1}}" value="{{ loop.index-1 }}" onchange="this.form.submit()">{{ '>>' }}
+                                                                    </label>
+                                                                </div>
+
+                                                            </td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Date1 }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Customer }}</td>
+                                                            <td align="right" class="{{atc1}}">{{ ar.Container }}</td>
+                                                                <td align="center" class="{{atc1}}">{{ ar.From }}</td>
+                                                                <td align="center" class="{{atc1}}">{{ ar.Box }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Etitle }}</td>
+                                                            <td align="right" class="{{atc1}}">{{ ar.Emailto }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Emailcc }}</td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                    </tbody>
+                                        </table>
+
+                                    </div>
+                                </div>
+
+                            {% endif %}
+            </div>
+
+            <div class="col-sm-3" align="left">
+            <br>
+                    <div class="card" align=""left">
+
+
+                            <div class = "card-header">
+                                Create Email Selections
+                            </div>
+                            <div class="card-body">
+                                 <div class="d-sm-flex justify-content-center small">
+                                    <div class="p-0">
+                                        <button type="submit" class="btn btn-blue btn-sm" name="updateall">Update</button>
+                                        <button type="submit" class="btn btn-blue btn-sm" name="updateemail">Email Mod</button>
+                                        <button type="submit" class="btn btn-green btn-sm" name="sendemail">Send Email</button>
+                                        <button type="submit" class="btn btn-amber btn-sm" name="exitAR2">Exit</button>
+                                    </div>
+                                 </div>
+
+            Include these headers in email table:
+            <br>
+             <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box0" {% if tboxes[0]=='on' %} checked {% endif %} name="tbox0">
+              <label class="custom-control-label" for="box0">JO</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box1" {% if tboxes[1]=='on' %} checked {% endif %} name="tbox1">
+              <label class="custom-control-label" for="box1">Order</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box2" {% if tboxes[2]=='on' %} checked {% endif %} name="tbox2">
+              <label class="custom-control-label" for="box2">Release</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box3" {% if tboxes[3]=='on' %} checked {% endif %} name="tbox3">
+              <label class="custom-control-label" for="box3">Container</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box4" {% if tboxes[4]=='on' %} checked {% endif %} name="tbox4">
+              <label class="custom-control-label" for="box4">Invoice Date</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box5" {% if tboxes[5]=='on' %} checked {% endif %} name="tbox5">
+              <label class="custom-control-label" for="box5">Total Each</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box6" {% if tboxes[6]=='on' %} checked {% endif %} name="tbox6">
+              <label class="custom-control-label" for="box6">Total All</label>
+            </div>
+            <br><br>Attach these files to email:<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box7" {% if tboxes[7]=='on' %} checked {% endif %} name="tbox7">
+              <label class="custom-control-label" for="box7">Invoices</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box8" {% if tboxes[8]=='on' %} checked {% endif %} name="tbox8">
+              <label class="custom-control-label" for="box8">Invoice Packages</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box9" {% if tboxes[9]=='on' %} checked {% endif %} name="tbox9">
+              <label class="custom-control-label" for="box9">Excel Summary</label>
+            </div>
+
+                <div class="p-0">
+                Name Invoices:
+                        <select class="mdb-select md-form small" name="invoname">
+                              <option {% if invoname == 'No Change' %} selected {% endif %}>No Change</option>
+                              <option {% if invoname == 'Invoice_Container' %} selected {% endif %} value='Invoice_Container'>Invoice_Container</option>
+                              <option {% if invoname == 'Invoice_Order_xxx' %} selected {% endif %} value= 'Invoice_Order_xxx'>Invoice_Order_xxx</option>
+                              <option {% if invoname == 'Invoice_Release_xxx'%} selected {% endif %} value= 'Invoice_Release_xxx'>Invoice_Release_xxx</option>
+                              <option {% if invoname == 'Inv_Booking_Container' %} selected {% endif %} value= 'Inv_Booking_Container'>Inv_Booking_Container</option>
+                              <option {% if invoname == 'Inv_Order_Container' %} selected {% endif %} value= 'Inv_Order_Container'>Inv_Order_Container</option>
+                        </select>
+                <br>Name Packages:
+                        <select class="mdb-select md-form small" name="packname">
+                              <option {% if packname == 'No Change' %} selected {% endif %}>No Change</option>
+                              <option {% if packname == 'Inv_Package_Container' %} selected {% endif %} value='Inv_Package_Container'>Inv_Package_Container</option>
+                              <option {% if packname == 'Inv_Package_Order_xxx' %} selected {% endif %} value= 'Inv_Package_Order_xxx'>Inv_Package_Order_xxx</option>
+                              <option {% if packname == 'Inv_Package_Release_xxx'%} selected {% endif %} value= 'Inv_Package_Release_xxx'>Inv_Package_Release_xxx</option>
+                              <option {% if packname == 'Inv_Package_Booking_Container' %} selected {% endif %} value= 'Inv_Package_Booking_Container'>Inv_Package_Booking_Container</option>
+                              <option {% if packname == 'Inv_Package_Order_Container' %} selected {% endif %} value= 'Inv_Package_Order_Container'>Inv_Package_Order_Container</option>
+                        </select>
+                </div>
+
+                {% set involist = emaildata[8] %}
+                {% set packlist = emaildata[9] %}
+                {% set newinvolist = emaildata[10] %}
+                {% set newpacklist = emaildata[11] %}
+                {% if involist %}
+                    Will name/rename invoice attachments as:<br>
+                    <table>
+                        {% for  invo in involist %}
+                            <tr><td>{{ invo }}</td><td>sent as</td><td>{{ newinvolist[loop.index-1] }}</td></tr>
+                        {% endfor %}
+                    </table>
+                {% endif %}
+                {% if packlist %}
+                    Will name/rename invoice package attachments as:<br>
+                    <table>
+                        {% for  pack in packlist %}
+                            <tr><td>{{ pack }}</td><td>sent as</td><td>{{ newpacklist[loop.index-1] }}</td></tr>
+                        {% endfor %}
+                    </table>
+                {% endif %}
+                {% set wbf = emaildata[13] %}
+                {% if wbf is not none %}
+                    An excel workbook has been created as:<br>
+                    <table>
+                        <tr><td>{{ wbf }}</td></tr>
+                    </table>
+                    <input class="form-control" type="hidden" value="{{ wbf }}" name="wbcreated">
+                {% endif %}
+
+
+             Include these recipients of the email:
+            <br>
+                <div class="p-0">
+                        <div class="form-group">
+                                {% set etolist = emailsend[0] %}
+                                {% set etosel = emailsend[1] %}
+                                <label for="mySelect1">Select the Email To: (multiple allowed)</label>
+                                <select select id="mySelect1" class="form-control" multiple name="emailtolist">
+                                    {% for el in etolist %}
+                                        <option{% if el in etosel %} selected {% endif %}>{{ el }}</option>
+                                    {% endfor %}
+                                </select>
+                        </div>
+                        <div class="form-group">
+                                {% set salutation = emaildata[12] %}
+                                <div class="input-group-text">Salutation:</div>
+                                <input class="form-control" type="text" value="{{salutation}}" name="salutation">
+                        </div>
+                        <div class="form-group">
+                                {% set ecclist = emailsend[2] %}
+                                {% set eccsel = emailsend[3] %}
+                                <label for="mySelect2">Select the Email CC: (multiple allowed)</label>
+                                <select select id="mySelect2" class="form-control" multiple name="emailcclist">
+                                    {% for el in ecclist %}
+                                        <option{% if el in eccsel %} selected {% endif %}>{{ el }}</option>
+                                    {% endfor %}
+                                </select>
+                        </div>
+
+                </div>
+
+
+
+        </div>
+
+    </div>
+</div>
+
+{{ task }}{{ this_shipper }}
+
+{% else %}
+
+    {% include 'AR_Table.html' %}
+
+{% endif %}
+
+
+</form>
+{% endblock %}

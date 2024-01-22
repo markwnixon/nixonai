@@ -1,0 +1,64 @@
+{% set etitle = emaildata[0] %}
+{% set ebody = emaildata[1] %}
+{% set emailin=emaildata[2] %}
+{% set emailcc=emaildata[3] %}
+{% set emailfrom=emaildata[4] %}
+
+{% set invoices = emaildata[10] %}
+{% set packages = emaildata[11] %}
+{% if holdvec %}
+    {% set eprof = holdvec[0] %}
+{% else %}
+    {% set eprof = 0 %}
+{% endif %}
+<br>
+
+<div class="card">
+  <div class="card-header" align = "center">
+    Enter Email Associated with this {{ etype }}<br>
+      {% if stamp %}
+      {% if stamp > 0 %}
+            <div class="d-sm-flex justify-content-center small">
+                <div class="p-0">
+                    <select class="mdb-select md-form" name="emlprofile" onchange="this.form.submit()">
+                        <option value="" disabled selected>Choose Email Profile</option>
+                        <option {% if eprof == '1' %} selected {% endif %} value='1'>Update No Attachments</option>
+                        <option {% if eprof == '2' %} selected {% endif %} value='2'>Update with Interchange</option>
+                        <option {% if eprof == '3' %} selected {% endif %} value='3'>Completion with Invoice</option>
+                        <option {% if eprof == '4' %} selected {% endif %} value='4'>Completion with POD</option>
+                        <option {% if eprof == '5' %} selected {% endif %} value='5'>Completion Package</option>
+                        <option {% if eprof == '6' %} selected {% endif %} value='6'>Custom Completed Package</option>
+                    </select>
+                </div>
+            </div>
+    {% endif %}
+  {% endif %}
+  </div>
+<div class="card-body">
+<div class="input-group-text">E-Title:</div>
+<input class="form-control" type="text" value="{{etitle}}" name="etitle">
+
+<div class="input-group-text">Email To:</div>
+<input class="form-control" type="text" value="{{emailin}}" name="etolist">
+
+<div class="input-group-text">Email CC:</div>
+<input class="form-control" type="text" value="{{emailcc}}" name="ecclist">
+
+<div class="input-group-text">Email From:</div>
+<input class="form-control" type="text" value="{{emailfrom}}" name="efrom">
+
+
+<div class="input-group-text">Attachments List:</div>
+    {% for invoice in invoices %}
+        <input class="form-control" type="text" value="{{invoice}}" name="edati{{ loop.index - 1 }}">
+    {% endfor %}
+    {% for package in packages %}
+        <input class="form-control" type="text" value="{{package}}" name="edatp{{ loop.index - 1 }}">
+    {% endfor %}
+    {% set wba = emaildata[14] %}
+    {% if wba is not none %}
+        <input class="form-control" type="text" value="{{ wba }}" name="wbattach">
+    {% endif %}
+
+</div>
+</div>

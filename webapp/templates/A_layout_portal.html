@@ -14,6 +14,7 @@
       <!-- Your custom styles (optional) -->
       <link href="/static/css/style.css" rel="stylesheet">
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+      <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet">
 
         <!-- MDBootstrap Datatables  -->
         <link href="/static/css/addons/datatables.min.css" rel="stylesheet">
@@ -92,6 +93,7 @@
   <script type="text/javascript" src="/static/js/bootstrap.min.js"></script>
   <!-- MDB core JavaScript -->
   <script type="text/javascript" src="/static/js/mdb.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 
 <!-- MDBootstrap Datatables  -->
  <script type="text/javascript" src="/static/js/addons/datatables.min.js"></script>
@@ -149,6 +151,14 @@ $(document).ready(function() {
 });
 
 
+
+$(document).ready(function(){
+    $('#mySelect1').select2();
+});
+
+$(document).ready(function(){
+    $('#mySelect2').select2();
+});
 
 
 
@@ -490,6 +500,39 @@ $('#dtHorizontalVerticalExample8').DataTable({
 "scrollY": 500,
 "stateSave": true,
 "paging": false // false to disable pagination (or any other option)
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#AR1').DataTable({
+"order": [[ 7, "desc" ]],
+"scrollX": true,
+"scrollY": 250,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option),
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#AR2').DataTable({
+"order": [[ 7, "asc" ]],
+"scrollX": true,
+"scrollY": 250,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option),
+});
+$('.dataTables_length').addClass('bs-select');
+});
+
+$(document).ready(function () {
+$('#AR3').DataTable({
+"order": [[ 2, "asc" ]],
+"scrollX": true,
+"scrollY": 250,
+"stateSave": true,
+"paging": false // false to disable pagination (or any other option),
 });
 $('.dataTables_length').addClass('bs-select');
 });
