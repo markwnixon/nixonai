@@ -752,7 +752,7 @@ def html_mimemail(emaildata):
     msg["CC"] = cclist
     msg["Subject"] = etitle
 
-    msg.add_header("Reply-To", "mnixon@firsteaglelogistics.com")
+    #msg.add_header("Reply-To", "mnixon@firsteaglelogistics.com")
 
     # See if there is an attachment
     for ix, invoice in enumerate(invoices):
