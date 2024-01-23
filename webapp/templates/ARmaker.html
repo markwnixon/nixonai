@@ -116,7 +116,7 @@
                                         </div>
                                 </div>
                             {% endif %}
-                            {% if tboxes[26] == 'on' %}
+                            {% if tboxes[22] == 'on' %}
                                 <div class="card" align=left">
                                     <div class = "card-header">
                                         Emails Associated with Selected Open Invoices
@@ -199,7 +199,16 @@
                                         <button type="submit" class="btn btn-amber btn-sm" name="exitAR2">Exit</button>
                                     </div>
                                  </div>
+                        {% set etone = tboxes[27] %}
+                           Tone of Email:
+                        <select class="mdb-select md-form small" name="tbox27" onchange="this.form.submit()">
+                              <option {% if etone == 'Light Reminder' %} selected {% endif %} value="Light Reminder">Light Reminder</option>
+                              <option {% if etone == 'Standard Request' %} selected {% endif %} value='Standard Request'>Standard Request</option>
+                              <option {% if etone == 'Strong Request' %} selected {% endif %} value= 'Strong Request'>Strong Request</option>
+                              <option {% if etone == 'Strongest Request'%} selected {% endif %} value= 'Strongest Request'>Strongest Request</option>
+                        </select>
 
+            <br>
             Include these headers in email table:
             <br>
              <div class="custom-control custom-checkbox custom-control-inline">
@@ -228,7 +237,7 @@
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box6" {% if tboxes[6]=='on' %} checked {% endif %} name="tbox6">
-              <label class="custom-control-label" for="box6">Total All</label>
+              <label class="custom-control-label" for="box6">Due Date</label>
             </div>
             <br><br>Attach these files to email:<br>
             <div class="custom-control custom-checkbox custom-control-inline">

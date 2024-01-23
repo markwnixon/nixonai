@@ -374,8 +374,8 @@ def make_workbook(customer, data, tboxes, ftotal):
 
 def get_table_formatted(odata, etype, tboxes, boxes, make_wb, customer):
     intable='<table><tr>'
-    labels = ['JO', 'Order', 'Release', 'Container', 'Date', 'Amount']
-    align = ["center", "center", "center", "center", "center", "right"]
+    labels = ['JO', 'Order', 'Release', 'Container', 'Invoice Date', 'Amount', 'Due Date']
+    align = ["center", "center", "center", "center", "center", "right", "center"]
     ftotal = 0.00
     invoices = []
     packages = []
@@ -386,17 +386,18 @@ def get_table_formatted(odata, etype, tboxes, boxes, make_wb, customer):
     ydata = []
     wbfile = None
 
-    for jx in range(6):
+    for jx in range(7):
         if tboxes[jx]=='on':
             intable = f'{intable}<td align={align[jx]}><b>{labels[jx]}</b></td>'
     intable = f'{intable}</tr><tr>'
     for ix, odat in enumerate(odata):
         if boxes[ix]=='on':
             ftotal = ftotal + float(odat.InvoTotal)
-            data = [odat.Jo, odat.Order, odat.Booking, odat.Container, f'{odat.Date3}', f'${odat.InvoTotal}']
+            duedate = odat.Date3 + datetime.timedelta(30)
+            data = [odat.Jo, odat.Order, odat.Booking, odat.Container, f'{odat.Date3}', f'${odat.InvoTotal}', f'{duedate}']
             datline=[]
             intable = f'{intable}<tr>'
-            for jx in range(6):
+            for jx in range(7):
                 if tboxes[jx]=='on':
                     datline.append(data[jx])
                     intable = f'{intable}<td align={align[jx]}>{data[jx]}</td>'
@@ -412,7 +413,9 @@ def get_table_formatted(odata, etype, tboxes, boxes, make_wb, customer):
 
     if make_wb: wbfile = make_workbook(customer, ydata, tboxes, ftotal)
 
-    return intable, ftotal, invoices, packages, new_invoices, new_packages, wbfile
+    num_invoices = len(ydata)
+
+    return intable, ftotal, invoices, packages, new_invoices, new_packages, wbfile, num_invoices
 
 def final_update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     cdata = companydata()
@@ -456,7 +459,8 @@ def final_update_email(this_shipper, odata, tboxes, boxes, emailsend, email_upda
 def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     cdata = companydata()
     dat30 = today - datetime.timedelta(30)
-    etitle = f'Open Balance Report for {this_shipper} as of {today}'
+
+    #Items same regarless of email tone
     salutation = request.values.get('salutation')
     if not hasinput(salutation) or salutation == 'Sir':
         email_to_selected = emailsend[1]
@@ -467,10 +471,10 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
             salutation = etslist[0]
         else:
             salutation = 'Sir'
-
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
-    closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Payable Team<br>{company_info}'
-    ebody = f'Hello {salutation},<br><br>'
+
+
+
     etype = 'o30'
     efrom = usernames['invo']
     epass = passwords['invo']
@@ -484,18 +488,76 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     else: make_wb = 0
     newwb = None
 
-    if email_update is not None:
-        #ebody = request.values.get('ebody')
-        #table_in, ftotal, invoices, packages, new_invoices, new_packages, newwb = get_table_formatted(odata, etype, tboxes, boxes, make_wb, this_shipper)
-        print('Will get rid of this block')
+    table_in, ftotal, invoices, packages, new_invoices, new_packages, newwb, ndue = get_table_formatted(odata, etype, tboxes, boxes, make_wb, this_shipper)
 
-    elif etype == 'o30':
-        table_in, ftotal, invoices, packages, new_invoices, new_packages, newwb = get_table_formatted(odata,etype,tboxes,boxes, make_wb, this_shipper)
+    # Tone specific items:
+    tone = tboxes[27]
+    if tone == 'Light Reminder':
+        etitle = 'Friendly Reminder:  Invoice Payments Due'
+        closing = f'  Thank you for your cooperation.<br><br>Kind Regards,<br>Accounts Payable Team<br>{company_info}'
+        ebody = f'Hi {salutation},<br><br>'
+        if ndue == 1:
+            ebody = f'{ebody} I hope this message finds you well. We appreciate your business and would like to remind you the invoice shown below has become due:'
+        else:
+            ebody = f'{ebody} I hope this message finds you well. We appreciate your business and would like to remind you the invoices shown below have become due:'
+        ebody = f'{ebody}<br><br>{table_in}'
+        ebody = f'{ebody}<br>Please make the necessary arrangements to ensure timely payment. If you have already processed the payment, we sincerely thank you for your prompt attention to this matter.'
+        ebody = f'{ebody}<br><br>If there are any concerns or if you require any additional information, feel free to reach out to us. We value our partnership and are here to assist you.. {closing}'
+
+        #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
+        ebody = ebody.replace('<br><br>', '<br><br>\n\n')
+
+    elif tone == 'Standard Request':
+        etitle = f'Open Balance Report for {this_shipper} as of {today}'
+        closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Payable Team<br>{company_info}'
+        ebody = f'Hello {salutation},<br><br>'
         ebody = f'{ebody} We are showing a total balance due of ${d2s(ftotal)} as listed in the following table:'
         ebody = f'{ebody}<br><br>{table_in}'
         ebody = f'{ebody}<br>Please review this information and let us know when we can expect payment, or if you have sent payment already please indicate what has been paid so that we may review on our side. {closing}'
         #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
         ebody = ebody.replace('<br><br>', '<br><br>\n\n')
+
+    elif tone == 'Strong Request':
+        etitle = f'Open Balance Report - Overdue Notice - Urgent Attention Required'
+        closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Payable Team<br>{company_info}'
+        ebody = f'Dear {salutation},<br><br>'
+        ebody = f'{ebody} We are showing a total balance due of ${d2s(ftotal)} as listed in the following table:'
+        ebody = f'{ebody}<br><br>{table_in}'
+        ebody = f'{ebody}<br>We have communicated about this matter previously, but have not yet received a payment.  Please review this information and let us know when we may expect resoluton of this matter.'
+        ebody = f'{ebody}<br><br>If there are reasons for the delay please contact us immediately. {closing}'
+        #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
+        ebody = ebody.replace('<br><br>', '<br><br>\n\n')
+
+    elif tone == 'Strongest Request':
+        if ndue == 1:
+            etitle = f'Outstanding Invoice - Urgent Attention Required'
+            invtense = 'invoice remains'
+            phrase2 = 'This is'
+            phrase3 = 'date'
+        else:
+            etitle = f'Outstanding Invoices - Urgent Attention Required'
+            invtense = 'invoices remain'
+            phrase2 = 'These are all'
+            phrase3 = 'dates'
+
+        closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Payable Team<br>{company_info}'
+
+        ebody = f'Dear {salutation},<br><br>'
+        ebody = f'{ebody} I trust this note finds you well.  We appreciate your business and the opportunity to serve your needs.  \
+                 However, it has come to our attention that the following {invtense} unpaid, despite our previous communications.'
+        ebody = f'{ebody}<br><br>{table_in}'
+        ebody = f'{ebody}<br>{phrase2} well past the due {phrase3}, and the outstanding amount of ${d2s(ftotal)} is causing a significant impact on our cash flow.  We understand\
+        that unforeseen circumstances may arise, but we kindly request your immediate attention to this matter.'
+        ebody = f'{ebody}<br><br>Previous attempts to collect this balance have failed.  We urge you to address this matter promply and sumit the payment by {today + datetime.timedelta(12)}.'
+        ebody = f'{ebody}<br><br>If payment is not received by this specified deadline, we may have no alternative but to escalate this matter for collection.  This action could result in\
+                 additional fees, damage to your credit rating, and potential legal proceedings.'
+        ebody = f'{ebody}<br><br>We value our business relationship and would prefer to resolve this matter amicably.  Should you encounter any challenges or require assistance, please contact our accounts team as soon as possible. {closing}'
+
+        #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
+        ebody = ebody.replace('<br><br>', '<br><br>\n\n')
+
+    else:
+        etitle = 'No Specifice Title'
 
 
     emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb]
@@ -533,11 +595,9 @@ def get_email_customer(pdat, ar_emails):
             emailtos.append(efrom)
             emailccs.append(efrom)
 
-    #Add these for testing purposes:
-    emailtos.append('markwnixon@gmail.com')
-    emailtos.append('mark@draytrucking.com')
-    emailccs.append('markwnixon@gmail.com')
-    emailccs.append('mark@draytrucking.com')
+    #Add these emails for information purposes
+    emailtos.append(usernames['info'])
+    emailccs.append(usernames['info'])
 
     unique_emailtolist = set(emailtos)
     unique_emailcclist = set(emailccs)
