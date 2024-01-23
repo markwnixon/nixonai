@@ -558,6 +558,7 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
 
     else:
         etitle = 'No Specifice Title'
+        ebody = f'Dear {salutation},<br><br>'
 
 
     emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb]
