@@ -788,7 +788,7 @@ def html_mimemail(emaildata):
         part.add_header('Content-Disposition', "attachment; filename= %s" % wbattach)
         msg.attach(part)
 
-    attachment.close()
+    #attachment.close()
 
     msg.attach(MIMEText(ebody, 'html'))
     #msg.attach(MIMEText(signature, 'html'))

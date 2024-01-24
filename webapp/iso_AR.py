@@ -323,9 +323,9 @@ def make_workbook(customer, data, tboxes, ftotal):
     money = '$#,##0.00'
     dec2 = '#,##0.00'
     dec0 = '#,##0'
-    hdrs = ['JO', 'Order', 'Booking In', 'Container', 'Date Invoiced', 'Amount']
+    hdrs = ['JO', 'Order', 'Booking In', 'Container', 'Date Invoiced', 'Amount', 'Date Due']
     keephdrs = []
-    for jx in range(6):
+    for jx in range(7):
         if tboxes[jx] == 'on':
             keephdrs.append(hdrs[jx])
     for col, hdr in enumerate(keephdrs):
