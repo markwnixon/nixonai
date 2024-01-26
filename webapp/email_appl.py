@@ -7,6 +7,8 @@ from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
+from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 import ntpath
 import shutil
 import os
@@ -220,6 +222,12 @@ def email_app_exporter(pdata):
     msg["Cc"] = emailcc2
     msg["Subject"] = f'{cdat[0]} Application Received'
 
+    from_dom = emailfrom.split('@')[1]
+    print(f'from email_app_exporter in email_appl.py: the domain is: {from_dom}')
+
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
+
     body = 'Dear '+exporter+':\n\nThis email confirms receipt of your international shipping application with confirmation code Fapp'+str(idn)
     body = body+', and the following summarizes the information we received from you:\n\n'
     for pdat in pdata:
@@ -295,6 +303,12 @@ def email_app(pdat):
     msg["Cc"] = emailcc1
     msg["Cc"] = emailcc2
     msg["Subject"] = 'First Eagle Logistics Application Received'
+
+    from_dom = emailfrom.split('@')[1]
+    print(f'from email_app in email_appl.py: the domain is: {from_dom}')
+
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
 
     body = 'Dear '+pdat.Company+':\n\nThis email confirms receipt of your application with confirmation code Fapp'+str(pdat.id)
     body = body+', and the following summarizes the information we received from you:\n\n'

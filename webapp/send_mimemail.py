@@ -8,6 +8,8 @@ from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
+from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 import ntpath
 import shutil
 import os
@@ -42,7 +44,10 @@ def send_mimemail(emaildata,emailsender):
     else:
         msg["To"] = f'{emailin1}'
 
-
+    from_dom = emailfrom.split('@')[1]
+    print(f'from send_mimemail in send_mimemail.py: the domain is: {from_dom}')
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
 
     emailto=[emailin1]
     if emailin2 is not None:

@@ -8,6 +8,7 @@ from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 import ntpath
 import shutil
 import os
@@ -464,6 +465,11 @@ def email_app_exporter(pdata):
     msg["Cc"] = emailcc2
     msg["Subject"] = f'{cdat[0]} Application Received'
 
+    from_dom = emailfrom.split('@')[1]
+    print(f'from email_app_exporter in class8-utls_email: the domain is: {from_dom}')
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
+
     body = 'Dear '+exporter+':\n\nThis email confirms receipt of your international shipping application with confirmation code Fapp'+str(idn)
     body = body+', and the following summarizes the information we received from you:\n\n'
     for pdat in pdata:
@@ -540,6 +546,11 @@ def email_app(pdat):
     msg["Cc"] = emailcc2
     msg["Subject"] = 'First Eagle Logistics Application Received'
 
+    from_dom = emailfrom.split('@')[1]
+    print(f'from email_app in class8-utls_email: the domain is: {from_dom}')
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
+
     body = 'Dear '+pdat.Company+':\n\nThis email confirms receipt of your application with confirmation code Fapp'+str(pdat.id)
     body = body+', and the following summarizes the information we received from you:\n\n'
     body = body+'Name: '+pdat.Company+'\n'
@@ -574,9 +585,9 @@ def email_app(pdat):
 
 def invoice_mimemail(docref, err, lastpath):
     cdata = companydata()
-    signature_block = cdata[2] + '<br>' + cdata[5] + '<br>' + cdata[6] + '<br>' + cdata[7]
-    signature = f'<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><br><br><table><tr><td><div>'\
-                + f'<img src = "{cdata[11]}" height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
+
+    company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
+    closing = f'  <br><br>Kind Regards,<br>Accounts Payable Team<br>{company_info}'
 
     ourserver = websites['mailserver']
 
@@ -587,6 +598,8 @@ def invoice_mimemail(docref, err, lastpath):
     etitle=request.values.get('edat0')
     ebody=request.values.get('edat1')
     newfile = request.values.get('edat6')
+
+    ebody = f'{ebody} {closing}'
 
     if 'INV' in docref or 'Inv' in docref:
         lastpath = 'vInvoice'
@@ -607,27 +620,31 @@ def invoice_mimemail(docref, err, lastpath):
 
     msg = MIMEMultipart()
 
+    eto = [f'{emailin1}', f'{emailin2}']
+    ecc = [f'{emailcc1}', f'{emailcc2}']
+
+    tolist, cclist = '', ''
+    emailto = []
+    for emt in eto:
+        if hasinput(emt) and emt != '':
+            tolist = f'{tolist}, {emt}'
+            emailto.append(emt)
+    for emt in ecc:
+        if hasinput(emt) and emt != '':
+            cclist = f'{cclist}, {emt}'
+            emailto.append(emt)
+
+    from_dom = emailfrom.split('@')[1]
+    print(f'from invoice_mimemail in class8-utls_email: the domain is: {from_dom}')
+
     msg["From"] = emailfrom
-    if emailcc2:
-        msg["CC"] = f'{emailcc1}, {emailcc2}'
-    elif emailcc1:
-        msg["CC"] = f'{emailcc1}'
-    if emailin2:
-        msg["To"] = f'{emailin1}, {emailin2}'
-    else:
-        msg["To"] = f'{emailin1}'
-
-    emailto=[emailin1]
-    if emailin2 is not None:
-        emailto.append(emailin2)
-    if emailcc1 is not None:
-        emailto.append(emailcc1)
-    if emailcc2 is not None:
-        emailto.append(emailcc2)
-
+    msg["To"] = tolist
+    msg["CC"] = cclist
     msg["Subject"] = etitle
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
 
-    ebody = ebody.replace('\n', '<br>') + signature
+    ebody = ebody.replace('\n', '<br>')
 
     msg.attach(MIMEText(ebody, 'html'))
     #msg.attach(MIMEText(signature, 'html'))
@@ -639,7 +656,7 @@ def invoice_mimemail(docref, err, lastpath):
         encoders.encode_base64(part)
         part.add_header('Content-Disposition', "attachment; filename= %s" % newfile)
         msg.attach(part)
-        attachment.close()
+        #attachment.close()
         os.remove(newfile)
 
     server = smtplib.SMTP(ourserver)
@@ -658,9 +675,8 @@ def invoice_mimemail(docref, err, lastpath):
 def info_mimemail(emaildata):
     err=[]
     cdata = companydata()
-    signature_block = cdata[2] + '<br>' + cdata[5] + '<br>' + cdata[6] + '<br>' + cdata[7]
-    signature = f'<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"></head><body><br><br><table><tr><td><div>'\
-                + f'<img src = "{cdata[11]}"  height="81" alt = "Image Not Shown" ></div></td><td>&nbsp</td><td>' + signature_block + '</td></tr></table>'
+    company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
+    closing = f'<br><br>Accounts Payable Team<br>{company_info}'
 
     ourserver = websites['mailserver']
     etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, sendname, folder = emaildata
@@ -670,30 +686,35 @@ def info_mimemail(emaildata):
     username = em['invo']
     password = passwords['invo']
 
+    ebody = f'{ebody} {closing}'
+
     msg = MIMEMultipart()
 
+    eto = [f'{emailin1}', f'{emailin2}']
+    ecc = [f'{emailcc1}', f'{emailcc2}']
+
+    tolist, cclist = '', ''
+    emailto = []
+    for emt in eto:
+        if hasinput(emt) and emt != '':
+            tolist = f'{tolist}, {emt}'
+            emailto.append(emt)
+    for emt in ecc:
+        if hasinput(emt) and emt != '':
+            cclist = f'{cclist}, {emt}'
+            emailto.append(emt)
+
+    from_dom = emailfrom.split('@')[1]
+    print(f'from info_mimemail in class8-utls_email: the domain is: {from_dom}')
+
     msg["From"] = emailfrom
-    if emailcc2:
-        msg["CC"] = f'{emailcc1}, {emailcc2}'
-    elif emailcc1:
-        msg["CC"] = f'{emailcc1}'
-    if emailin2:
-        msg["To"] = f'{emailin1}, {emailin2}'
-    else:
-        msg["To"] = f'{emailin1}'
-
-    emailto=[emailin1]
-    if emailin2 is not None:
-        emailto.append(emailin2)
-    if emailcc1 is not None:
-        emailto.append(emailcc1)
-    if emailcc2 is not None:
-        emailto.append(emailcc2)
-
-
+    msg["To"] = tolist
+    msg["CC"] = cclist
     msg["Subject"] = etitle
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
 
-    ebody = ebody.replace('\n', '<br>') + signature
+    ebody = ebody.replace('\n', '<br>')
 
     # See if there is an attachment
 
@@ -709,11 +730,10 @@ def info_mimemail(emaildata):
         encoders.encode_base64(part)
         part.add_header('Content-Disposition', "attachment; filename= %s" % sendname)
         msg.attach(part)
-        attachment.close()
+        #attachment.close()
         #os.remove(newfile)
 
     msg.attach(MIMEText(ebody, 'html'))
-    #msg.attach(MIMEText(signature, 'html'))
 
     server = smtplib.SMTP(ourserver)
     server.starttls()
@@ -741,16 +761,21 @@ def html_mimemail(emaildata):
     msg["From"] = emailfrom
     tolist, cclist = '', ''
     emailto = []
-    for em in emailin:
-        tolist = f'{tolist}, {em}'
-        emailto.append(em)
-    for em in emailcc:
-        cclist = f'{cclist}, {em}'
-        emailto.append(em)
+    for emt in emailin:
+        tolist = f'{tolist}, {emt}'
+        emailto.append(emt)
+    for emt in emailcc:
+        cclist = f'{cclist}, {emt}'
+        emailto.append(emt)
+
+    from_dom = emailfrom.split('@')[1]
+    print(f'from html_mimemail in class8-utls_email: the domain is: {from_dom}')
 
     msg["To"] = tolist
     msg["CC"] = cclist
     msg["Subject"] = etitle
+    msg['Date'] = formatdate()
+    msg['Message-ID'] = make_msgid(domain=from_dom)
 
     #msg.add_header("Reply-To", "mnixon@firsteaglelogistics.com")
 
