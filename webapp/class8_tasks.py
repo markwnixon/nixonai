@@ -590,8 +590,6 @@ def get_custlist(table, tfilters):
         elif '90' in dtest: daysback = 90
         elif '180' in dtest: daysback = 180
         elif '360' in dtest: daysback = 360
-        elif '60' in dtest: daysback = 60
-        elif '120' in dtest: daysback = 120
         elif dtest == 'Last Year':
             thisyear = today.year
             lastyear = thisyear - 1
@@ -600,6 +598,8 @@ def get_custlist(table, tfilters):
         elif dtest == 'This Year':
             thisyear = today.year
             fromdate = datetime.date(thisyear, 1, 1)
+        else:
+            daysback = 45
         if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
         if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
         if todate is not None: query_adds.append(f'{table}.Date <= todate')
@@ -990,6 +990,7 @@ def get_dbdata(table_setup, tfilters):
     today = datetime.date.today()
     thisyear = today.year
     lastyear = thisyear - 1
+    yearblast = thisyear - 2
     #print(thisyear,lastyear)
     query_adds = []
     table = table_setup['table']
@@ -1050,13 +1051,16 @@ def get_dbdata(table_setup, tfilters):
                 elif '90' in dtest: daysback = 90
                 elif '180' in dtest: daysback = 180
                 elif '360' in dtest: daysback = 360
-                elif '60' in dtest: daysback = 60
-                elif '120' in dtest: daysback = 120
+                elif dtest == 'Year Before Last':
+                    fromdate = datetime.date(yearblast,1,1)
+                    todate = datetime.date(yearblast,12,31)
                 elif dtest == 'Last Year':
                     fromdate = datetime.date(lastyear,1,1)
                     todate = datetime.date(lastyear,12,31)
                 elif dtest == 'This Year':
                     fromdate = datetime.date(thisyear,1,1)
+                else:
+                    daysback = 45
                 if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
                 if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
                 if todate is not None: query_adds.append(f'{table}.Date <= todate')
@@ -1799,6 +1803,7 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
                 if task_focus == 'Inv-1':
                     if nstat-1 > -1: odat.Istat = nstat-1
                 if task_focus == 'Inv Emailed': odat.Istat = 3
+                if task_focus == 'Inv Paid': odat.Istat = 8
     db.session.commit()
     holdvec, entrydata, err = [], [], []
     viewport = ['0'] * 6

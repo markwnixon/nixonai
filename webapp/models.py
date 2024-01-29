@@ -1351,17 +1351,25 @@ class SumInv(db.Model):
 class Income(db.Model):
     __tablename__ = 'income'
     id = db.Column('id', db.Integer, primary_key=True)
-    Month = db.Column('Month', db.String(99))
+    Month = db.Column('Month', db.String(15))
     Mrev = db.Column('Mrev', db.Integer)
-    Crev = db.Column('Crev', db.Integer)
-    Revcoll = db.Column('Revcoll', db.Integer)
+    Mpaid = db.Column('Mpaid', db.Integer)
+    O120 = db.Column('O120', db.Integer)
+    O90 = db.Column('O90', db.Integer)
+    O60 = db.Column('O60', db.Integer)
+    O30 = db.Column('O30', db.Integer)
+    U30 = db.Column('U30', db.Integer)
     Open = db.Column('Open', db.Integer)
     Description = db.Column('Description', db.String(100))
-    def __init__(self, Month, Mrev, Crev, Revcoll, Open, Description):
+    def __init__(self, Month, Mrev, Mpaid, O120, O90, O60, O30, U30, Open, Description):
         self.Month = Month
         self.Mrev = Mrev
-        self.Crev = Crev
-        self.Revcoll = Revcoll
+        self.Mpaid = Mpaid
+        self.O120 = O120
+        self.O90 = O90
+        self.O60 = O60
+        self.O30 = O30
+        self.U30 = U30
         self.Open = Open
         self.Description = Description
 
@@ -1369,15 +1377,25 @@ class Openi(db.Model):
     __tablename__ = 'openi'
     id = db.Column('id', db.Integer, primary_key=True)
     Company = db.Column('Company', db.String(99))
-    Over30 = db.Column('Over30', db.Integer)
-    Under30 = db.Column('Under30', db.Integer)
-    Total = db.Column('Total', db.Integer)
+    Mrev = db.Column('Mrev', db.Integer)
+    Mpaid = db.Column('Mpaid', db.Integer)
+    O120 = db.Column('O120', db.Integer)
+    O90 = db.Column('O90', db.Integer)
+    O60 = db.Column('O60', db.Integer)
+    O30 = db.Column('O30', db.Integer)
+    U30 = db.Column('U30', db.Integer)
+    Open = db.Column('Open', db.Integer)
     Description = db.Column('Description', db.String(100))
-    def __init__(self, Company, Over30, Under30, Total, Description):
+    def __init__(self, Company, Mrev, Mpaid, O120, O90, O60, O30, U30, Open, Description):
         self.Company = Company
-        self.Over30 = Over30
-        self.Under30 = Under30
-        self.Total = Total
+        self.Mrev = Mrev
+        self.Mpaid = Mpaid
+        self.O120 = O120
+        self.O90 = O90
+        self.O60 = O60
+        self.O30 = O30
+        self.U30 = U30
+        self.Open = Open
         self.Description = Description
 
 

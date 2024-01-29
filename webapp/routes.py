@@ -444,8 +444,8 @@ def Class8Main(genre):
 
 def Revenue():
     print('Made it to the Revenue Data Center')
-    title1,col1,data1,title2,col2,data2 = get_revenues()
-    return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2)
+    title1,col1,data1,title2,col2,data2,title3,col3,data3 = get_revenues()
+    return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2, title3=title3, col3=col3, data3=data3)
 
 
 
