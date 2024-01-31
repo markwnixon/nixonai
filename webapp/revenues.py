@@ -53,6 +53,8 @@ def get_revenues():
     if lastitem is not None:
         data2.append(lastitem)
     for adat in adata:
-        data3.append([adat.Jo, adat.Shipper, adat.Container, adat.InvoDate, d2s(float(adat.InvoTotal))])
+        try: amt = float(adat.InvoTotal)
+        except: amt = 0.00
+        data3.append([adat.Jo, adat.Shipper, adat.Container, adat.InvoDate, d2s(amt)])
 
     return title1, col1, data1, title2, col2, data2, title3, col3, data3

@@ -473,11 +473,11 @@ def EasyStart():
     #       message = {'greeting':'Hello from Flask!'}
 #       return jsonify(message)  # serialize and use JSON headers
 
-@app.route('/CalendarTest', methods=['GET', 'POST'])
-def CalendarTest():
-    print('Working the Calendar route!!')
-    srcpath = statpath('')
-    return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
+#@app.route('/CalendarTest', methods=['GET', 'POST'])
+#def CalendarTest():
+#    print('Working the Calendar route!!')
+#    srcpath = statpath('')
+#    return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
 @app.route('/QuoteMaker', methods=['GET', 'POST'])
 def QuoteMaker():
