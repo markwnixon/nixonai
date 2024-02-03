@@ -439,13 +439,14 @@ def Class8Main(genre):
                            taskon=taskon, task_focus=task_focus, task_iter=task_iter, tasktype=tasktype, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, genre=genre, viewport=viewport, tablesetup=tablesetup)
 
 
+
+
 @app.route('/Revenue', methods=['GET', 'POST'])
 @login_required
-
 def Revenue():
     print('Made it to the Revenue Data Center')
-    title1,col1,data1,title2,col2,data2,title3,col3,data3 = get_revenues()
-    return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2, title3=title3, col3=col3, data3=data3)
+    title1,col1,data1,title2,col2,data2,title3,col3,data3,tabon = get_revenues()
+    return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2, title3=title3, col3=col3, data3=data3, tabon=tabon)
 
 
 

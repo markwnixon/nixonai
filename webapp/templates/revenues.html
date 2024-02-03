@@ -1,14 +1,42 @@
 {% extends 'A_layout_portal.html' %}
 
 {% block body %}
+<form action="{{ url_for ('Revenue') }}" method="post" enctype="multipart/form-data">
+
 {% set atcb = "font-weight-bold text-center" %}
 {% set atrb = "font-weight-bold text-right" %}
 {% set atr = "text-right" %}
 <div class="table-responsive">
+<div class="row"> &nbsp' </div>
+<div class="row">
+    <div class="col-sm-12" align="center">
+        <b>Show:</b>&nbsp
+            <div class="custom-control custom-checkbox custom-control-inline">
+                <input type="checkbox" class="custom-control-input" id="monthlyincome" {% if tabon[0] =='on' %} checked {% endif %} name="mireport" onchange="this.form.submit()">
+                <label class="custom-control-label" for="monthlyincome">Monthly Income Report</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+                <input type="checkbox" class="custom-control-input" id="openbalance" {% if tabon[1] =='on' %} checked {% endif %} name="obreport" onchange="this.form.submit()">
+                <label class="custom-control-label" for="openbalance">Open Balance Report</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+                <input type="checkbox" class="custom-control-input" id="openinvoice" {% if tabon[2] =='on' %} checked {% endif %} name="oireport" onchange="this.form.submit()">
+                <label class="custom-control-label" for="openinvoice">Open Invoices</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+                <input type="checkbox" class="custom-control-input" id="biweekly" {% if tabon[3] =='on' %} checked {% endif %} name="bireport" onchange="this.form.submit()">
+                <label class="custom-control-label" for="biweekly">Bi-Weekly Income</label>
+            </div>
+    </div>
+</div>
+
+
+
 
 <div class="row"> &nbsp' </div>
 <div class="row">
             <div class="col-sm-4" align="center">
+            {% if tabon[0] == 'on' %}
                 <h1>Monthly Income Report</h1>
                 <h5>{{ title1 }}</h5>
                  <table class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
@@ -21,34 +49,40 @@
                        <tr>{% for dat in data %} {% if 'TOTAL' in data[0] %} <td class="{{atrb}}"> {% else %} <td class="{{atr}}"> {% endif %}{{ dat }}</td> {% endfor %}</tr>
                    {% endfor %}
                  </table>
+            {% endif %}
             </div>
 
             <div class="col-sm-4" align="center">
+            {% if tabon[1] == 'on' %}
             <h1>Open Balance Report</h1>
                 <h5>{{ title2 }}</h5>
                  <table class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
                    <tr>
                          {% for col in col2 %}
-                            <td align="right" ><b>{{ col }}</b></td>
+                            <td class="{{atcb}}">{{ col }}</td>
                          {% endfor %}
                    </tr>
                    {% for data in data2 %}
-                       <tr>{% for dat in data %} <td align="right" ><b>{{ dat }}</b></td> {% endfor %}</tr>
+                       <tr>{% for dat in data %} {% if 'TOTAL' in data[0] %} <td class="{{atrb}}"> {% else %} <td class="{{atr}}"> {% endif %}{{ dat }}</td> {% endfor %}</tr>
                    {% endfor %}
                  </table>
+            {% endif %}
             </div>
             <div class="col-sm-4" align="center">
-                 <h5>{{ title3 }}</h5>
-                 <table class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
-                   <tr>
-                         {% for col in col3 %}
-                            <td align="right" ><b>{{ col }}</b></td>
-                         {% endfor %}
-                   </tr>
-                   {% for data in data3 %}
-                       <tr>{% for dat in data %} <td align="right" ><b>{{ dat }}</b></td> {% endfor %}</tr>
-                   {% endfor %}
-                 </table>
+            {% if tabon[2] == 'on' or tabon[3] == 'on' %}
+                    {% if tabon[3] == 'on' %} <h1>Bi-Weekly Income Report</h1> {% else %} <h1>Open Invoices Report</h1> {% endif %}
+                        <h5>{{ title2 }}</h5>
+                         <table class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+                           <tr>
+                                 {% for col in col3 %}
+                                    <td class="{{atcb}}">{{ col }}</td>
+                                 {% endfor %}
+                           </tr>
+                           {% for data in data3 %}
+                               <tr>{% for dat in data %} <td align="right" ><b>{{ dat }}</b></td> {% endfor %}</tr>
+                           {% endfor %}
+                         </table>
+             {% endif %}
             </div>
 
 
@@ -56,4 +90,5 @@
 
 </div>
 
+</form>
 {% endblock %}

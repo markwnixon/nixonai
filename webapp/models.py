@@ -1351,7 +1351,7 @@ class SumInv(db.Model):
 class Income(db.Model):
     __tablename__ = 'income'
     id = db.Column('id', db.Integer, primary_key=True)
-    Month = db.Column('Month', db.String(15))
+    Period = db.Column('Period', db.String(45))
     Mrev = db.Column('Mrev', db.Integer)
     Mpaid = db.Column('Mpaid', db.Integer)
     O120 = db.Column('O120', db.Integer)
@@ -1361,8 +1361,9 @@ class Income(db.Model):
     U30 = db.Column('U30', db.Integer)
     Open = db.Column('Open', db.Integer)
     Description = db.Column('Description', db.String(100))
-    def __init__(self, Month, Mrev, Mpaid, O120, O90, O60, O30, U30, Open, Description):
-        self.Month = Month
+    Type = db.Column('Type', db.String(5))
+    def __init__(self, Period, Mrev, Mpaid, O120, O90, O60, O30, U30, Open, Description, Type):
+        self.Period = Period
         self.Mrev = Mrev
         self.Mpaid = Mpaid
         self.O120 = O120
@@ -1372,6 +1373,7 @@ class Income(db.Model):
         self.U30 = U30
         self.Open = Open
         self.Description = Description
+        self.Type = Type
 
 class Openi(db.Model):
     __tablename__ = 'openi'
