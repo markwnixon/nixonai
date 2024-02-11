@@ -1,6 +1,7 @@
 from webapp.CCC_system_setup import purpose
 from datetime import datetime
-from webapp import db, login_manager
+from webapp.extensions import db, login_manager
+#from webapp import login_manager
 from flask_login import UserMixin
 
 @login_manager.user_loader

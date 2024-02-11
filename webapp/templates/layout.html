@@ -31,8 +31,7 @@ display: none;
     <title>{{cmpdata[0]}}</title>
   </head>
     <body>
-    {% set navbar = 'companysite/' + scac + '/navbar7.html' %}
-    {% include navbar %}
+    {% include 'navbar7.html' %}
     <br>
     <div class="container-fluid">
       {% block body %}{% endblock %}

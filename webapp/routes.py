@@ -1,6 +1,7 @@
 from flask import render_template, flash, redirect, url_for, session, logging, request, jsonify
+from flask import Blueprint
 
-from webapp import app, db
+from webapp.extensions import db
 from webapp.models import Orders, People
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
@@ -40,7 +41,11 @@ today_str = today.strftime('%Y-%m-%d')
 from webapp.CCC_system_setup import companydata, statpath, addpath, scac, tpath
 cmpdata = companydata()
 
-@app.route('/FileUpload', methods=['GET', 'POST'])
+
+main = Blueprint('main',__name__)
+
+
+@main.route('/FileUpload', methods=['GET', 'POST'])
 def FileUpload():
     err=[]
     uptype = request.values['uptype']
@@ -91,7 +96,7 @@ def FileUpload():
 
     return "successful_upload"
 
-@app.route('/chartdata', methods=['GET', 'POST'])
+@main.route('/chartdata', methods=['GET', 'POST'])
 def chartdata():
     acct = request.values['thisacct']
     timestyle = request.values['thesemonths']
@@ -155,7 +160,7 @@ def chartdata():
                         })
 
 
-@app.route('/', methods=['GET', 'POST'])
+@main.route('/', methods=['GET', 'POST'])
 def index():
     info = [''] * 9
     if request.method == 'POST':
@@ -187,13 +192,13 @@ def index():
     srcpath = statpath('')
     return render_template(f'companysite/{scac}/index.html',srcpath=srcpath, cmpdata=cmpdata, scac=scac,info=info)
 
-@app.route('/About')
+@main.route('/About')
 def About():
     lang = 'English'
     srcpath = statpath('')
     return render_template(f'companysite/{scac}/about.html',srcpath=srcpath,cmpdata=cmpdata, scac=scac, lang=lang)
 
-@app.route('/Whatapp', methods=['GET', 'POST'])
+@main.route('/Whatapp', methods=['GET', 'POST'])
 def Whatapp():
     token = os.environ['TWILIO_AUTH_TOKEN']
     print('token=',token)
@@ -236,7 +241,7 @@ def Whatapp():
     return str(resp)
 
 
-@app.route('/AboutClass8', methods=['GET', 'POST'])
+@main.route('/AboutClass8', methods=['GET', 'POST'])
 def AboutClass8():
     info = ['']*7
     thisnow = now + timedelta(1)
@@ -265,7 +270,7 @@ def AboutClass8():
     srcpath = statpath('')
     return render_template('AboutClass8.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, info = info)
 
-@app.route('/People_Forms', methods=['GET', 'POST'])
+@main.route('/People_Forms', methods=['GET', 'POST'])
 def People_Forms():
     if request.method == 'POST':
         today = datetime.datetime.today().strftime('%Y-%m-%d')
@@ -328,13 +333,13 @@ def People_Forms():
     srcpath = statpath('')
     return render_template(f'companysite/{scac}/pforms.html', cmpdata=cmpdata, scac=scac, ptype=ptype, srcpath=srcpath)
 
-@app.route('/Employment')
+@main.route('/Employment')
 def Employment():
     ptype = 'driver'
     srcpath = statpath('')
     return render_template('employment.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, ptype=ptype, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
 
-@app.route('/Calculator', methods=['GET', 'POST'])
+@main.route('/Calculator', methods=['GET', 'POST'])
 def Calculator():
     import ast
     from viewfuncs import d2s
@@ -423,7 +428,7 @@ def Calculator():
     return render_template('calculator.html', srcpath=srcpath,cmpdata=cmpdata, scac=scac, finalcost=finalcost, a1=a1, a2=a2, a3=a3, a4=a4, a5=a5, a6=a6, a7=a7, b1=b1, b2=b2, wtkg=wtkgstr, wtlb=wtlbstr, alldata=newalldata, finalwt=finalwt)
 
 
-@app.route('/Class8Main/<genre>', methods=['GET', 'POST'])
+@main.route('/Class8Main/<genre>', methods=['GET', 'POST'])
 @login_required
 
 def Class8Main(genre):
@@ -441,7 +446,7 @@ def Class8Main(genre):
 
 
 
-@app.route('/Revenue', methods=['GET', 'POST'])
+@main.route('/Revenue', methods=['GET', 'POST'])
 @login_required
 def Revenue():
     print('Made it to the Revenue Data Center')
@@ -450,11 +455,11 @@ def Revenue():
 
 
 
-@app.route('/EasyStart', methods=['GET', 'POST'])
+@main.route('/EasyStart', methods=['GET', 'POST'])
 def EasyStart():
     calbut=request.values.get('calbut')
     if calbut is not None:
-        return redirect(url_for('CalendarBig'))
+        return redirect(url_for('main.CalendarBig'))
     print('Working the EasyStart route!!')
     srcpath = statpath('')
     return render_template('easystart.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
@@ -480,25 +485,25 @@ def EasyStart():
 #    srcpath = statpath('')
 #    return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
-@app.route('/QuoteMaker', methods=['GET', 'POST'])
+@main.route('/QuoteMaker', methods=['GET', 'POST'])
 def QuoteMaker():
     from iso_Q import isoQuote
     bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, dirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt, multibid = isoQuote()
-    if bidname == 'exitnow': return redirect(url_for('Class8Main',genre='Trucking'))
+    if bidname == 'exitnow': return redirect(url_for('main.Class8Main',genre='Trucking'))
     else:
         return render_template('Aquotemaker.html', cmpdata=cmpdata, scac=scac, costdata = costdata, biddata=biddata, expdata = expdata, timedata = timedata,
                            distdata=distdata, locto=locto, locfrom=locfrom, emaildata = emaildata, dirdata=dirdata, qdata = qdata, bidthis=bidthis, taskbox=taskbox, thismuch=thismuch, quot=quot, qdat=qdat, bidname=bidname, tbox=tbox, ebodytxt=ebodytxt, multibid=multibid)
 
-@app.route('/ARMaker', methods=['GET', 'POST'])
+@main.route('/ARMaker', methods=['GET', 'POST'])
 def ARMaker():
     from iso_AR import isoAR
     status, ardata, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails, rview= isoAR()
-    if status == 'exitnow': return redirect(url_for('Class8Main',genre='Trucking'))
+    if status == 'exitnow': return redirect(url_for('main.Class8Main',genre='Trucking'))
     else:
         return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, this_shipper=this_shipper, odata=odata, task=task, emaildata=emaildata, boxes=boxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails=ar_emails, rview=rview)
 
 
-@app.route('/Reports', methods=['GET', 'POST'])
+@main.route('/Reports', methods=['GET', 'POST'])
 @login_required
 def Reports():
 

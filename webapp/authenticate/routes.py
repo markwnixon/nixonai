@@ -1,5 +1,9 @@
 from flask import render_template, flash, redirect, url_for, session, Blueprint
-from webapp import db, bcrypt
+#from webapp import db, bcrypt
+
+from webapp.extensions import db, bcrypt
+#from webapp import app, bcrypt
+
 from webapp.models import users
 from webapp.authenticate.forms import RegistrationForm, LoginForm
 from flask_login import login_user, current_user, logout_user, login_required
@@ -26,7 +30,7 @@ def login():
                 session['username'] = thisuser.username
                 session['authority'] = thisuser.authority
                 login_user(thisuser, remember=form.remember.data)
-                return redirect(url_for('EasyStart'))
+                return redirect(url_for('main.EasyStart'))
             else:
                 flash('Passwords do not match', 'danger')
                 return render_template('authenticate/login.html', cmpdata=cmpdata, scac=scac, form=form)
@@ -60,4 +64,4 @@ def register():
         return render_template('authenticate/register.html', title='Register', form=form, cmpdata=cmpdata, scac=scac)
     else:
         flash(f'Do not have authority to register new users', 'danger')
-        return redirect(url_for('EasyStart'))
+        return redirect(url_for('main.EasyStart'))
