@@ -1,5 +1,5 @@
 {% set contypes = genre_data['container_types'] %}
-{% set checkcol = holdvec[48] %}
+{% set checkcol = holdvec[98] %}
 
         <div class="row">
             <div class="col-sm-12" align="center">
@@ -11,7 +11,7 @@
         {% set atl = "font-weight-bold text-left" %}
         {% set atr = "font-weight-bold text-right" %}
         {% set atlink = "font-weight-bold text-center text-primary bg-white" %}
-        {% set linkpath = holdvec[47] %}
+        {% set linkpath = holdvec[97] %}
 
                 {% for db_data in table_data %}
                     {% set most_outer_loop = loop %}
@@ -27,7 +27,7 @@
                             <div class="row">
                                   <div class="col-sm-12" align="center" style="font-weight:bold"> {{ thistable }} </div>
                             </div>
-                            {% set buttonlabels = holdvec[49] %}
+                            {% set buttonlabels = holdvec[99] %}
                             {% set thisbutton = buttonlabels[most_outer_loop.index-1] %}
                                 {% if thisbutton != none %}
                                     {% set aname = thistable+thisbutton%}{{ aname }}

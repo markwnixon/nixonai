@@ -25,6 +25,8 @@ from webapp.models import Quotes, Quoteinput, Orders, People, Ardata
 from send_mimemail import send_mimemail
 from pyzipcode import ZipCodeDatabase
 from webapp.class8_utils_email import html_mimemail
+import json
+
 zcdb = ZipCodeDatabase()
 
 API_KEY_GEO = apikeys['gkey']
@@ -435,6 +437,7 @@ def final_update_email(this_shipper, odata, tboxes, boxes, emailsend, email_upda
     new_packages = []
     intnexti = 0
     intnextp = 0
+    tone = tboxes[27]
 
     for ix, odat in enumerate(odata):
         if boxes[ix] == 'on':
@@ -452,7 +455,7 @@ def final_update_email(this_shipper, odata, tboxes, boxes, emailsend, email_upda
     wba = request.values.get('wbattach')
     wbf = request.values.get('wbcreated')
 
-    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, wbf, wba]
+    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, wbf, wba, tone]
 
     return emaildata
 
@@ -561,7 +564,7 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
         ebody = f'Dear {salutation},<br><br>'
 
 
-    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb]
+    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb, tone]
     #etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, efrom, folder, dat30date, sourcenamelist, sendnamellist = emaildata
     return emaildata
 
@@ -637,7 +640,32 @@ def rselect(nemail):
     print(f'rtest = {rtest}')
     return rview
 
+def ardata_email_update(emaildata, shipper, jolist, containerlist):
 
+    etitle, ebody, emailin, emailcc, username, password, folder, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach, tone = emaildata
+    sentfiles = []
+    sentasfiles = []
+    for inv in invoices:
+        sentfiles.append(inv)
+    for pac in packages:
+        sentfiles.append(pac)
+    for inv in ni:
+        sentasfiles.append(inv)
+    for pac in np:
+        sentasfiles.append(pac)
+
+    itype = 'Direct'
+    print(jolist)
+    print(containerlist)
+    print(today)
+    print(emailin)
+    print(emailcc)
+
+    input = Ardata(Etitle=etitle, Ebody=ebody, Emailto=f'{emailin}', Emailcc=f'{emailcc}', Sendfiles=f'{sentfiles}',
+                   Sendasfiles=f'{sentasfiles}', Jolist=f'{jolist}', Emailtype=itype, Mid=None,
+                   Customer=shipper, Container=f'{containerlist}', Date1=today, Datelist=None, From=username, Box='SENT')
+    db.session.add(input)
+    db.session.commit()
 
 
 def isoAR():
@@ -763,8 +791,11 @@ def isoAR():
         showtext = htmltext
 
     containerlist = []
+    jolist = []
     for ix, odat in enumerate(odata):
-        if boxes[ix] == 'on': containerlist.append(odat.Container)
+        if boxes[ix] == 'on':
+            containerlist.append(odat.Container)
+            jolist.append(odat.Jo)
     ar_emails = get_ardata(containerlist, tboxes, this_shipper)
     nemail = len(ar_emails)
     rview = rselect(nemail)
@@ -778,7 +809,9 @@ def isoAR():
         emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
         print(f'The final emaildata for send is {emaildata}')
         err = html_mimemail(emaildata)
-        print(err)
+        print(f'err is {err[0]}')
+        if err[0] == 'Email Login: Authentication succeeded':
+            ardata_email_update(emaildata, this_shipper, jolist, containerlist)
     elif update_e is not None:
         #Get the emaildata setup from the website in case changes made....
         emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)

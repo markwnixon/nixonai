@@ -96,6 +96,32 @@
 
                 </tr>
 
+        {% elif entry[3] == 'choose-select' %}
+
+            {% if entry[4] == 'emaildata1' %}{% set klist = keydata.emaildata1 %}
+            {% elif entry[4] == 'emaildata2' %} {% set klist = keydata.emaildata2 %}
+            {% elif entry[4] == 'emaildata3' %} {% set klist = keydata.emaildata3 %}
+            {% endif %}
+
+
+            {% if klist %}
+                <tr>
+                    <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
+                    <td>
+                        <select class="form-control" type="text" name="{{ entry[4] }}" onchange="this.form.submit()">
+                        <option value="">Optional Choose from Previous</option>
+                        {% for du in klist %}
+                            <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                        {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+            {%  endif  %}
+                <tr>
+                    <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
+                    <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
+                </tr>
+
         {% endif %}
     {% endif %}
 

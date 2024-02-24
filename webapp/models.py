@@ -629,6 +629,12 @@ class Orders(db.Model):
     Rcache = db.Column('Rcache', db.Integer)
     Proof2 = db.Column('Proof2', db.String(100))
     Pcache2 = db.Column('Pcache2', db.Integer)
+    Emailjp = db.Column('Emailjp', db.String(45))
+    Emailoa = db.Column('Emailoa', db.String(45))
+    Emailap = db.Column('Emailap', db.String(45))
+    Saljp = db.Column('Saljp', db.String(45))
+    Saloa = db.Column('Saloa', db.String(45))
+    Salap = db.Column('Salap', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
@@ -636,7 +642,7 @@ class Orders(db.Model):
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
                  Date4, Date5, Date6, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
-                 Quote, RateCon, Rcache, Proof2, Pcache2):
+                 Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -709,6 +715,12 @@ class Orders(db.Model):
         self.Rcache = Rcache
         self.Proof2 = Proof2
         self.Pcache2 = Pcache2
+        self.Emailjp = Emailjp
+        self.Saljp = Saljp
+        self.Emailoa = Emailoa
+        self.Saloa = Saloa
+        self.Emailap = Emailap
+        self.Salap = Salap
 
 
 class Drops(db.Model):
@@ -1473,7 +1485,7 @@ class Ardata(db.Model):
     Emailtype = db.Column('Emailtype', db.String(45))
     Mid = db.Column('Mid', db.String(100))
     Customer = db.Column('Customer', db.String(45))
-    Container = db.Column('Container', db.String(45))
+    Container = db.Column('Container', db.String(200))
     Date1 = db.Column('Date1', db.DateTime)
     Datelist = db.Column('Datelist', db.String(200))
     From = db.Column('From', db.String(45))

@@ -26,8 +26,10 @@ def create_app():
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_POOL_RECYCLE"] = 280
+    app.config['SQLALCHEMY_POOL_TIMEOUT'] = 10
+    app.config['SQLALCHEMY_POOL_PRE_PING'] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["DEBUG"] = True
+    app.config["DEBUG"] = False
     app.config["SECRET_KEY"] = dbp[5]
     app.secret_key = dbp[5]
 

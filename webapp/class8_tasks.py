@@ -140,6 +140,7 @@ def get_drop(loadname):
 
         return ''
 
+
 def get_checked(thistable, data1id):
     numchecked = 0
     avec = []
@@ -153,6 +154,100 @@ def get_checked(thistable, data1id):
 
     #print(numchecked, avec)
     return numchecked, avec
+
+def get_default_list(item, col):
+    if item == 'emaildata1' or item == 'emaildata2' or item == 'emaildata3':
+        emaildata = []
+        #print(f'The shipper is {col}')
+        sdata = People.query.filter(People.Company == col).all()
+        for sdat in sdata:
+            if sdat is not None:
+                if hasinput(sdat.Email):
+                    if sdat.Email not in emaildata: emaildata.append(sdat.Email)
+                if hasinput(sdat.Associate1):
+                    if sdat.Associate1 not in emaildata: emaildata.append(sdat.Associate1)
+                if hasinput(sdat.Associate2):
+                    if sdat.Associate2 not in emaildata: emaildata.append(sdat.Associate2)
+
+        return emaildata
+
+def get_Orders_keydata(keydata, checked_data):
+    sid = None
+    em1, em2, em3 = None, None, None
+    nc = sum(cks[1] for cks in checked_data)
+    tids = [cks[2] for cks in checked_data if cks[2] != []]
+    tabs = [cks[0] for cks in checked_data if cks[1] != 0]
+    # print('nc=', nc)
+    # print(tids)
+    # print(tabs)
+    if nc == 1:
+        thistable = tabs[0]
+        sid = tids[0][0]
+    if sid is not None:
+        odat = Orders.query.get(sid)
+        if odat is not None:
+            shipper = odat.Shipper
+            em1 = odat.Emailjp
+            em2 = odat.Emailoa
+            em3 = odat.Emailap
+            kdata = Orders.query.filter(Orders.Shipper == shipper).all()
+            pdat = People.query.filter(People.Company == shipper).first()
+        else:
+            kdata = []
+            pdat = None
+        print(f'The sid is {sid}')
+        if hasvalue(em1):
+            keydata['emaildata1'] = []
+        elif keydata['emaildata1'] == []:
+            elist = []
+            for kdat in kdata:
+                new = kdat.Emailjp
+                if hasinput(new):
+                    if new not in elist: elist.append(new)
+
+            #If no history for this customer it will still be blank to use the base values form cusotmer
+            if elist == [] and pdat is not None:
+                keydata['emaildata1'] = [pdat.Email]
+            else:
+                keydata['emaildata1'] = elist
+
+        if hasvalue(em2):
+            keydata['emaildata2'] = []
+        elif keydata['emaildata2'] == []:
+            elist = []
+            for kdat in kdata:
+                new = kdat.Emailoa
+                if hasinput(new):
+                    if new not in elist: elist.append(new)
+            # If no history for this customer it will still be blank to use the base values form cusotmer
+            if elist == [] and pdat is not None:
+                keydata['emaildata2'] = [pdat.Associate1]
+            else:
+                keydata['emaildata2'] = elist
+
+
+        if hasvalue(em3):
+            keydata['emaildata3'] = []
+        elif keydata['emaildata3'] == []:
+            elist = []
+            for kdat in kdata:
+                new = kdat.Emailap
+                if hasinput(new):
+                    if new not in elist: elist.append(new)
+
+            #If no history for this customer it will still be blank to use the base values form cusotmer
+            if elist == []:
+                if pdat is not None: keydata['emaildata3'] = [pdat.Associate2]
+            else:
+                keydata['emaildata3'] = elist
+
+    else:
+        keydata['emaildata1'] == []
+        keydata['emaildata2'] == []
+        keydata['emaildata3'] == []
+
+
+    return keydata
 
 def populate(tables_on,tabletitle,tfilters,jscripts):
     # print(int(filter(check.isdigit, check)))
@@ -211,16 +306,16 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
         for side in side_data:
             #print(f'side is: {side}')
             for key, values in side.items():
-                #print('')
-                #print('****************************')
-                #print(f'key:{key}, values:{values}')
+                print('')
+                print('****************************')
+                print(f'key:{key}, values:{values}')
                 ktable = values[0]
                 pairs = values[1]
                 keyon = values[2]
                 for ix, pair in enumerate(pairs):
                     col = pair[0]
                     select_value = pair[1]
-                    #print(f'col,select_value is: {col} {select_value}')
+                    print(f'col,select_value is: {col} {select_value}')
                     if ix == 0:
                         if isinstance(select_value, str):
                             # Output of the get_ could be string or integer, but have to start with string to test get_
@@ -228,7 +323,9 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                                 default_val = defaults[f'{select_value}']
                                 find = select_value.replace('get_', '')
                                 select_value = request.values.get(find)
-                                if select_value is None: select_value = default_val
+                                if select_value is None:
+                                    print(f'On first iteration have no data to read so use the sid')
+                                    select_value = default_val
 
                         if isinstance(select_value, str):
                             if select_value == 'All':
@@ -253,16 +350,24 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
             if 'all()' not in filters: filters = filters+f').order_by({ktable}.{keyon}).all()'
             dbstats = eval(filters)
 
+            print(f'filters is {filters}')
+            print(f'dbstats is {dbstats}')
+
             if dbstats is not None:
                 dblist = []
                 for dbstat in dbstats:
                     nextvalue = eval(f'dbstat.{keyon}')
-                    #print(f'nextvalue:{nextvalue}')
+                    print(f'nextvalue:{nextvalue}')
                     if nextvalue is not None:  nextvalue = nextvalue.strip()
                     if nextvalue not in dblist:
-                        dblist.append(nextvalue)
+                        if hasinput(nextvalue): dblist.append(nextvalue)
                 keydata.update({key: dblist})
-                #print(f'keydata is {keydata[key]}')
+                print(f'For the key {key} in keydata[key] is {keydata[key]} and select_value is {select_value}')
+                if keydata[key] == []:
+                    def_list = get_default_list(key, select_value)
+                    print(def_list)
+                    keydata.update({key: def_list})
+            print(f'Final for the key {key} in keydata[key] is {keydata[key]}')
     return tabletitle, table_data, checked_data, jscripts, keydata, labpassvec
 
 def reset_state_soft(task_boxes):
@@ -785,7 +890,12 @@ def Table_maker(genre):
                 #print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
                 jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
-        else: task_iter = int(task_iter) + 1
+        else:
+            print(f'On task_iter {task_iter} keydata is {keydata}')
+            task_iter = int(task_iter) + 1
+            # Need to pick up some of the keydata after table build
+            keydata = get_Orders_keydata(keydata, checked_data)
+
 
         #for e in err:
             #if 'Created' in e:
@@ -804,7 +914,7 @@ def Table_maker(genre):
         taskon = None
         task_iter = 0
         tasktype = ''
-        holdvec = [''] * 50
+        holdvec = [''] * 99
         print(f'labpassvec is {labpassvec}')
         entrydata = []
         #err = ['All is well']
@@ -815,11 +925,11 @@ def Table_maker(genre):
     if returnhit is not None:
         checked_data = [0,'0',['0']]
 
-    if len(holdvec)<50: holdvec = holdvec + ['']*(50-len(holdvec))
+    if len(holdvec)<100: holdvec = holdvec + ['']*(100-len(holdvec))
     checkcol = [eval(f"{ix}_setup['checklocation']") for ix in tables_on]
-    holdvec[48] = checkcol
-    holdvec[49] = labpassvec
-    holdvec[47] = f'/static/{scac}/data/v'
+    holdvec[98] = checkcol
+    holdvec[99] = labpassvec
+    holdvec[97] = f'/static/{scac}/data/v'
     #print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
     #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
@@ -828,8 +938,8 @@ def Table_maker(genre):
     thisdate = thisdate.date()
     movedate = thisdate
     print(thisdate, thisdate.weekday())
-    holdvec[46] = []
-    holdvec[44] = [Drivers.query.filter(Drivers.Active == 1).all(),Vehicles.query.filter(Vehicles.Active == 1).all()]
+    holdvec[96] = []
+    holdvec[94] = [Drivers.query.filter(Drivers.Active == 1).all(),Vehicles.query.filter(Vehicles.Active == 1).all()]
     anyamber = 0
     for idate in range(4):
         boxid = []
@@ -896,7 +1006,7 @@ def Table_maker(genre):
                     itext = pdat.Intext
                     otext = pdat.Outtext
                     note = pdat.Notes
-                    holdvec[45] = f'{itext}\n{otext}\n{note}'
+                    holdvec[95] = f'{itext}\n{otext}\n{note}'
 
         #Perform moveup or movedn actions
         for tid in boxid:
@@ -913,10 +1023,10 @@ def Table_maker(genre):
                 pdat.Date = pdat.Date + timedelta(1)
                 db.session.commit()
 
-        holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
+        holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
 
     if (putbuff is not None or anyamber) and 'Orders' in tables_on:
-        holdvec[46] = []
+        holdvec[96] = []
         print(f'Doing the paste buffer for {checked_data} {tables_on}')
         sids = checked_data[0][2]
         if sids != []:
@@ -943,11 +1053,11 @@ def Table_maker(genre):
                         if addnow is not None:
                             print(f'Adding the dispatch selection to date {movedate}')
                             addtopins(movedate, [indat,outdat])
-                    holdvec[45] = f'{get_dispatch(indat)}\n{get_dispatch(outdat)}'
+                    holdvec[95] = f'{get_dispatch(indat)}\n{get_dispatch(outdat)}'
                 else:
                     sid = sids[0]
                     odat = Orders.query.get(sid)
-                    holdvec[45] = get_dispatch(odat)
+                    holdvec[95] = get_dispatch(odat)
                     for idate in range(4):
                         addnow = request.values.get(f'add{idate}')
                         movedate = thisdate + timedelta(idate)
@@ -958,7 +1068,7 @@ def Table_maker(genre):
                 err.append('Too many selections for paste buffer task')
         for idate in range(4):
             movedate = thisdate + timedelta(idate)
-            holdvec[46].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
+            holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
         else:
             err.append('No selection made for paste buffer task')
     leftcheck = tfilters['Viewer']
@@ -1553,7 +1663,7 @@ def New_task(tablesetup, task_iter):
                         holdvec[jx] = request.values.get(f'{entry[0]}')
                         if entry[0] in form_checks: required = True
                         else: required = False
-                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold)
+                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold,0)
                         if entry[5] > 1: failed = failed + 1
                         if entry[5] == 1: warned = warned + 1
 
@@ -1606,7 +1716,8 @@ def New_task(tablesetup, task_iter):
             for jx, entry in enumerate(entrydata):
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold, 0)
+                #print(f'Entry loop: jx"{jx}, entry:{entry[0]} {entry[5]} {entry[6]} {required}')
 
 
     return holdvec, entrydata, err, completed
@@ -1665,7 +1776,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 holdvec[jx] = request.values.get(f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid)
                 if entry[5] > 1: failed = failed + 1
                 if entry[5] == 1: warned = warned + 1
 
@@ -1756,9 +1867,11 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         for jx, entry in enumerate(entrydata):
             if entry[3] == 'appears_if': entrydata[jx][3], entrydata[jx][4] = check_appears(tablesetup, entry, htold)
             holdvec[jx] = getattr(olddat, f'{entry[0]}')
+
             if entry[0] in form_checks: required = True
             else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold)
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid)
+            print(f'Entry[0] is {entry[0]} and value is {holdvec[jx]}')
 
 
     try:
@@ -2360,7 +2473,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                     holdvec[jx] = request.values.get(f'{entry[0]}')
                     if entry[0] in form_checks: required = True
                     else: required = False
-                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold)
+                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid)
                     if entry[5] > 1: failed = failed + 1
                     if entry[5] == 1: warned = warned + 1
 
@@ -2420,7 +2533,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 holdvec[jx] = getattr(modata, f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid)
 
         docref = makemanifest(modata, tablesetup)
         try:
@@ -3160,7 +3273,7 @@ def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
             holdvec[jx] = request.values.get(f'{entry[0]}')
             if entry[0] in form_checks: required = True
             else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required, task_iter, 'unknown')
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required, task_iter, 'unknown', 0)
             if entry[5] > 1: failed = failed + 1
             if entry[5] == 1: warned = warned + 1
 

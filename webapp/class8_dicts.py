@@ -215,12 +215,21 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Seal', 'Seal', 'Seal', 'text', 'text', 0, 'ok', 'cc', None, 'Dispatch'],
                                ['Pickup', 'Pickup', 'Pickup No.', 'text', 'text', 0, 'ok', 'cc', None, 'Dispatch'],
                                ['Description', 'Description', 'Special Instructions', 'multitext', 'text', 0, 'ok', '00', None, 'Dispatch'],
-                               ['Label', 'Label', 'InvoSummary', 'text', 'text', 0, 'ok', 'cc', None, 'Hidden']
+                               ['Label', 'Label', 'InvoSummary', 'text', 'text', 0, 'ok', 'cc', None, 'Hidden'],
+                               ['Emailjp', 'Email Job Provider', 'Job Provider Email', 'choose-select', 'emaildata1', 0, 'Shipper', 'll', None, 'Job Detail'],
+                                ['Emailoa', 'Email Opp Assist', 'Email Opp Assist', 'choose-select', 'emaildata2', 0, 'Shipper', 'll', None, 'Job Detail'],
+                                ['Emailap', 'Email Acct Payable', 'Email Acct Payable', 'choose-select', 'emaildata3', 0, 'Shipper', 'll', None, 'Job Detail'],
+['Saljp', 'Job Provider Name', 'Job Provider Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail'],
+['Saloa', 'Ops Assist Name', 'Ops Assist Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail'],
+['Salap', 'Acct Payable Name', 'Acct Payable Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail']
                                ],
                 'hidden data' : [
                                 ['Company', 'hidden', 'Dropblock1'],
                                 ['Company2','hidden', 'Dropblock2'],
-                                ['Location3', 'hidden', 'Dropblock3']
+                                ['Location3', 'hidden', 'Dropblock3'],
+                                ['Emailjp', 'hidden', 'Emailjp'],
+['Emailoa', 'hidden', 'Emailoa'],
+['Emailap', 'hidden', 'Emailap']
                                 ],
                 'defaults': [
                                 ['Hstat', -1],
@@ -238,6 +247,9 @@ Orders_setup = {'name' : 'Trucking Job',
                 'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
                               {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
                               {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                              {'emaildata1': ['Orders', [['Shipper', 'get_Shipper']], 'Emailjp']},
+{'emaildata2': ['Orders', [['Shipper', 'get_Shipper']], 'Emailoa']},
+{'emaildata3': ['Orders', [['Shipper', 'get_Shipper']], 'Emailap']},
                               {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
                               {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
                               {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
@@ -250,8 +262,8 @@ Orders_setup = {'name' : 'Trucking Job',
                     'Manifest': ['Job', 'Job Detail', 'Dispatch']
                 },
                 'form checks': {
-                    'New': ['Shipper', 'Booking', 'Container', 'Type', 'HaulType','Date3'],
-                    'Edit': ['Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3','Dropblock1', 'Dropblock2', 'Dropblock3'],
+                    'New': ['Shipper', 'Booking', 'Container', 'Type', 'HaulType', 'Date3', 'Emailjp', 'Emailoa', 'Emailap'],
+                    'Edit': ['Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3','Dropblock1', 'Dropblock2', 'Dropblock3', 'Emailjp', 'Emailoa', 'Emailap'],
                     'Manifest': ['Driver','Shipper', 'Booking', 'Container', 'Date', 'Date2', 'Type', 'HaulType','Date3', 'Dropblock1', 'Dropblock2', 'Dropblock3']
                 },
                 'appears_if': {

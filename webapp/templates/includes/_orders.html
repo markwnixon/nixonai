@@ -24,8 +24,8 @@
                                 data-toggle="tooltip" title="Copy pull data to paste buffer">Dispatch<br>Copy</button>
               </td>
               <td class="align-middle">
-                    {% if holdvec[45] %}
-                        <textarea id="myInput" rows="2" cols="60">{{ holdvec[45] }}</textarea>
+                    {% if holdvec[95] %}
+                        <textarea id="myInput" rows="2" cols="60">{{ holdvec[95] }}</textarea>
                         <body onload="myFunction()">
                     {% else %}
                         <b>This button will create a standardized dispatch command for the selected job based on its current status.<br>  It will sandwich a pair of port dispatch in-out commands if two jobs are selected.</b>
@@ -38,13 +38,13 @@
 
 </div>
 
-{% if holdvec[46] %}
-    {% for setdata in holdvec[46] %}
+{% if holdvec[96] %}
+    {% for setdata in holdvec[96] %}
         {% set thisdate = setdata[0] %}
         {% set but = setdata[1] %}
         {% set pdata = setdata[2] %}
-        {% set drvdata = holdvec[44][0] %}
-        {% set trkdata = holdvec[44][1] %}
+        {% set drvdata = holdvec[94][0] %}
+        {% set trkdata = holdvec[94][1] %}
                 <br>
                     <div class="card">
                       <div class="card-header">

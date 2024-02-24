@@ -48,7 +48,7 @@
                             {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
                             {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                             {% elif entry[4] == 'shipdata' %}{% set klist = keydata.shipdata %}
-
+                            {% elif entry[4] == 'emaildata' %}{% set klist = keydata.emaildata %}
                             {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
@@ -65,6 +65,33 @@
                 {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% endif %}
                 {% if entry[4] == 'dropblock3' %}{% set klist = keydata.dropblock3 %}{% endif %}
                 {% if klist %}
+                            <tr>
+                                <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
+                                <td>
+                                    <select class="form-control" type="text" name="{{ entry[4] }}" onchange="this.form.submit()">
+                                    <option value="">Optional Choose from Previous</option>
+                                    {% for du in klist %}
+                                        <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                    {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                {%  endif  %}
+            {% endif %}
+                <tr>
+                    <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
+                    <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
+                </tr>
+
+        {% elif entry[3] == 'choose-select' %}
+
+            {% if entry[4] == 'emaildata1' %}{% set klist = keydata.emaildata1 %}
+            {% elif entry[4] == 'emaildata2' %} {% set klist = keydata.emaildata2 %}
+            {% elif entry[4] == 'emaildata3' %} {% set klist = keydata.emaildata3 %}
+            {% endif %}
+
+
+            {% if klist %}
                 <tr>
                     <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
                     <td>
@@ -77,10 +104,9 @@
                     </td>
                 </tr>
             {%  endif  %}
-            {% endif %}
                 <tr>
-                    <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
-                    <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
+                    <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
+                    <td><input class="form-control {{ valdat }}" type="{{ entry[3] }}" name="{{ entry[0] }}" value="{{ holdvec[loop.index-1] }}"  data-toggle="tooltip" title="{{ message }}"></td>
                 </tr>
 
         {% elif entry[3] == 'disabled' %}

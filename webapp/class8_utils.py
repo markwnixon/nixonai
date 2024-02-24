@@ -41,7 +41,7 @@ def container_check(num):
         return 2, message
 
 
-def form_check(input,text,type,task,req, task_iter, haultype):
+def form_check(input,text,type,task,req, task_iter, haultype, sid):
     #print(' ')
     #print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req}')
     status = 0
@@ -306,6 +306,25 @@ def form_check(input,text,type,task,req, task_iter, haultype):
         if hasinput(text):
             text = Review_Drop(text)
 
+    elif type == 'emaildata1' or type == 'emaildata2' or type == 'emaildata3':
+        #from webapp.class8_tasks import get_emailset
+        #print(f'*********************starting this test for type {type} with text: {text}')
+        if hasinput(text):
+            text = text.strip()
+            if text == '':
+                text = request.values.get(type)
+        if not hasinput(text):
+            text = request.values.get(type)
+            if text is not None:
+                text = text.strip()
+            else:
+                text = ''
+        if not hasinput(text) and task_iter > 0:
+            status = 1
+            message = 'Should include this email information'
+        if hasinput(text):
+            print(f'the email is {text}')
+
     elif type == 'quotehistory':
         sh = request.values.get('Shipper')
         ld = request.values.get('Dropblock2')
@@ -313,7 +332,7 @@ def form_check(input,text,type,task,req, task_iter, haultype):
         if not hasinput(text) or 'History' in text:
             if hasinput(sh) and not hasinput(ld):
                 #initiate the values from previous history
-                text = f'History for {sh} coming with delivery location'
+                text = f'No history {sh}'
             if hasinput(sh) and hasinput(ld):
                 coz = ld.splitlines()
                 co = coz[0].strip()
