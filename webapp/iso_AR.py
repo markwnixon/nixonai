@@ -118,9 +118,7 @@ def compact(body):
         line = re.sub(r'[^\x00-\x7F]+', ' ', line)
         line = re.sub(r'=[A-Z,0-9][A-Z,0-9]', '', line)
         if len(line.strip())>1:
-            if 'Forwarded Message' in line or 'Subject:' in line or 'Date:' in line or 'To:' in line or 'CC:' in line or 'From:' in line or 'Content-Type' in line or 'Content-Transfer' in line:
-                print('Line from FWD Preamble')
-            else:
+            if not 'Forwarded Message' in line or 'Subject:' in line or 'Date:' in line or 'To:' in line or 'CC:' in line or 'From:' in line or 'Content-Type' in line or 'Content-Transfer' in line:
                 newbody = newbody + line +'\n' + '<br>'
     return newbody
 
@@ -141,26 +139,26 @@ def hard_decode(raw):
             subject = line.split('Subject:')[1]
             subject = subject.replace('Fwd:','')
             subject = subject.strip()
-            print(f'Subject:{subject}')
+            #print(f'Subject:{subject}')
         if 'Message-ID' in line:
             mid = line.split('Message-ID:')[1]
             mid = mid.replace('Fwd:', '')
             mid = mid.strip()
-            print(f'MID:{mid}')
+            #print(f'MID:{mid}')
         if 'From' in test and '@' in line and 'firsteagle' not in line and 'onestop' not in line:
-            print('efrom',line)
+            #print('efrom',line)
             efrom = line.split('From:')[1]
             efrom = efrom.strip()
-            print(f'From:{efrom}')
+            #print(f'From:{efrom}')
         if 'Date' in test:
             edate = line.split('Date:')[1]
             edate = edate.strip()
-            print(f'Date:{edate}')
+            #print(f'Date:{edate}')
         if 'Content-Type:' in line and 'plain' in line:
-            print(f'BodyStart:{line}')
+            #print(f'BodyStart:{line}')
             appendit = 1
         if 'Content-Type:' in line and 'html' in line:
-            print(f'BodyStop:{line}')
+            #print(f'BodyStop:{line}')
             appendit = 0
         if appendit == 1:
             line = line.strip()
@@ -186,7 +184,7 @@ def extract_for_code(data):
 def get_body_text(qdat):
 
     mid = qdat.Mid
-    print(f'this mid is {mid}')
+    #print(f'this mid is {mid}')
     username = usernames['quot']
     password = passwords['quot']
     imap = imaplib.IMAP4_SSL(imap_url)
@@ -200,9 +198,9 @@ def get_body_text(qdat):
 
         # extract the subject of the email
         subject = extract_for_code(email_message["Subject"])
-        print(f'****Getting the Body Text***** for Subject: {subject}')
+        #print(f'****Getting the Body Text***** for Subject: {subject}')
     except:
-        print('Could not locate this email header')
+        #print('Could not locate this email header')
         return 'Email ID not found', None
 
     # Set default text particulars
@@ -280,7 +278,7 @@ def read_tboxes():
     tboxes = [0]*30
     for ix in range(30):
         tboxes[ix] = request.values.get(f'tbox{ix}')
-    print(f'the tboxes here are {tboxes}')
+    #print(f'the tboxes here are {tboxes}')
     return tboxes
 
 def attach_rename_inv(odat, name):
@@ -336,7 +334,7 @@ def make_workbook(customer, data, tboxes, ftotal):
         d.font = Font(name='Calibri', size=10, bold=True)
 
     for ix, dat in enumerate(data):
-        print(f'dat is {dat} keephdrs is {keephdrs}')
+        #print(f'dat is {dat} keephdrs is {keephdrs}')
         for jx, each in enumerate(dat):
             d = dfc.cell(row=ix+2, column=jx + 1, value=each)
             d.alignment = Alignment(horizontal='center')
@@ -368,7 +366,7 @@ def make_workbook(customer, data, tboxes, ftotal):
     wbfile = os.path.basename(wbpath)
 
 
-    print(f'the wbfile is {wbfile} and the wbpath is: {wbpath}')
+    #print(f'the wbfile is {wbfile} and the wbpath is: {wbpath}')
     wb.save(wbpath)
 
     return wbfile
@@ -467,7 +465,7 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     salutation = request.values.get('salutation')
     if not hasinput(salutation) or salutation == 'Sir':
         email_to_selected = emailsend[1]
-        print(email_to_selected)
+        #print(email_to_selected)
         if email_to_selected is not None and email_to_selected != []:
             ets = email_to_selected[0]
             etslist = ets.split('@')
@@ -571,8 +569,8 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
 def get_email_customer(pdat, ar_emails):
     emailto_selected = request.values.getlist('emailtolist')
     emailcc_selected = request.values.getlist('emailcclist')
-    print(f'{emailto_selected}')
-    print(f'{emailcc_selected}')
+    #print(f'{emailto_selected}')
+    #print(f'{emailcc_selected}')
     emailtos, emailccs = [], []
     if hasinput(pdat.Email):
         emailtos.append(pdat.Email)
@@ -637,7 +635,7 @@ def rselect(nemail):
             rview[rtest] = 'on'
         except:
             rtest = 0
-    print(f'rtest = {rtest}')
+    #print(f'rtest = {rtest}')
     return rview
 
 def ardata_email_update(emaildata, shipper, jolist, containerlist):
@@ -655,11 +653,11 @@ def ardata_email_update(emaildata, shipper, jolist, containerlist):
         sentasfiles.append(pac)
 
     itype = 'Direct'
-    print(jolist)
-    print(containerlist)
-    print(today)
-    print(emailin)
-    print(emailcc)
+    #print(jolist)
+    #print(containerlist)
+    #print(today)
+    #print(emailin)
+    #print(emailcc)
 
     input = Ardata(Etitle=etitle, Ebody=ebody, Emailto=f'{emailin}', Emailcc=f'{emailcc}', Sendfiles=f'{sentfiles}',
                    Sendasfiles=f'{sentasfiles}', Jolist=f'{jolist}', Emailtype=itype, Mid=None,
@@ -719,14 +717,14 @@ def isoAR():
             htmltext = os.environ[uhtml]
         except:
             htmltext = ''
-        print(f'This is a POST with iter {iter} and last mid {oldmid}')
+        #print(f'This is a POST with iter {iter} and last mid {oldmid}')
 
 
 
-        print(f'Values are {exitnow} {analysis} {emailgo} {exitnow}')
+        #print(f'Values are {exitnow} {analysis} {emailgo} {exitnow}')
 
         if exitnow is not None:
-            print('Exiting quotes')
+            #print('Exiting quotes')
             return 'exitnow', None, None, None, None, None, None, None, None, None, None, None, None, None
 
         elif redirect is not None:
@@ -742,7 +740,7 @@ def isoAR():
                 this_shipper = request.values.get('this_shipper')
                 tboxes = read_tboxes()
 
-            print(f'The shipper of interest is {this_shipper}')
+            #print(f'The shipper of interest is {this_shipper}')
             task = 'analysis'
 
 
@@ -750,14 +748,14 @@ def isoAR():
         # Not exiting after a Post
         else:
             this_shipper = request.values.get('optradio')
-            print(f'The shipper of interest is {this_shipper}')
+            #print(f'The shipper of interest is {this_shipper}')
             task = 'artable review'
 
     #If not a POST
     else:
         iter = 1
         os.environ['MID'] = 'None Selected'
-        print('This is NOT a Post')
+        #print('This is NOT a Post')
         ebodytxt = ''
         #print('Entering Quotes1',flush=True)
         username = session['username'].capitalize()
@@ -782,8 +780,7 @@ def isoAR():
             for ix, odat in enumerate(odata):
                 boxes[ix] = request.values.get(f'box{ix}')
 
-    for ar in arbycust:
-        print(f'{ar[0]} {ar[1]} {ar[2]} {ar[3]} {ar[4]} {ar[5]} {ar[6]}')
+    #for ar in arbycust: print(f'{ar[0]} {ar[1]} {ar[2]} {ar[3]} {ar[4]} {ar[5]} {ar[6]}')
 
     if htmltext is None:
         showtext = plaintext
@@ -802,20 +799,20 @@ def isoAR():
 
     pdat = People.query.filter(People.Company == this_shipper).first()
     emailsend = get_email_customer(pdat, ar_emails)
-    print(f'Emailsend = {emailsend}')
+    #print(f'Emailsend = {emailsend}')
 
     if emailgo is not None:
         #Need to get some emaildata from the website in case and changes made....
         emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
-        print(f'The final emaildata for send is {emaildata}')
+        #print(f'The final emaildata for send is {emaildata}')
         err = html_mimemail(emaildata)
-        print(f'err is {err[0]}')
+        #print(f'err is {err[0]}')
         if err[0] == 'Email Login: Authentication succeeded':
             ardata_email_update(emaildata, this_shipper, jolist, containerlist)
     elif update_e is not None:
         #Get the emaildata setup from the website in case changes made....
         emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
-        print(f'The final emaildata for send is {emaildata}')
+        #print(f'The final emaildata for send is {emaildata}')
     else:
         emaildata = update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
 
@@ -831,10 +828,10 @@ def isoAR():
     os.environ[utext] = plaintext
     os.environ[uhtml] = htmltext
     os.environ[umid] = mid
-    print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
-    print(f'email create tboxes={tboxes}')
-    print(f'data selection boxes={boxes}')
-    print(f'invoname:{invoname}, packname"{packname}')
-    print(f'emaildata is {emaildata}')
-    print(f'rview is {rview}')
+    #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
+    #print(f'email create tboxes={tboxes}')
+    #print(f'data selection boxes={boxes}')
+    #print(f'invoname:{invoname}, packname"{packname}')
+    #print(f'emaildata is {emaildata}')
+    #print(f'rview is {rview}')
     return 'keepgoing', arbycust, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails, rview

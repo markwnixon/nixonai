@@ -110,9 +110,7 @@ def compact(body):
         line = re.sub(r'[^\x00-\x7F]+', ' ', line)
         line = re.sub(r'=[A-Z,0-9][A-Z,0-9]', '', line)
         if len(line.strip())>1:
-            if 'Forwarded Message' in line or 'Subject:' in line or 'Date:' in line or 'To:' in line or 'CC:' in line or 'From:' in line or 'Content-Type' in line or 'Content-Transfer' in line:
-                print('Line from FWD Preamble')
-            else:
+            if not 'Forwarded Message' in line or 'Subject:' in line or 'Date:' in line or 'To:' in line or 'CC:' in line or 'From:' in line or 'Content-Type' in line or 'Content-Transfer' in line:
                 newbody = newbody + line +'\n' + '<br>'
     return newbody
 
@@ -133,26 +131,26 @@ def hard_decode(raw):
             subject = line.split('Subject:')[1]
             subject = subject.replace('Fwd:','')
             subject = subject.strip()
-            print(f'Subject:{subject}')
+            #print(f'Subject:{subject}')
         if 'Message-ID' in line:
             mid = line.split('Message-ID:')[1]
             mid = mid.replace('Fwd:', '')
             mid = mid.strip()
-            print(f'MID:{mid}')
+            #print(f'MID:{mid}')
         if 'From' in test and '@' in line and 'firsteagle' not in line and 'onestop' not in line:
-            print('efrom',line)
+            #print('efrom',line)
             efrom = line.split('From:')[1]
             efrom = efrom.strip()
-            print(f'From:{efrom}')
+            #print(f'From:{efrom}')
         if 'Date' in test:
             edate = line.split('Date:')[1]
             edate = edate.strip()
-            print(f'Date:{edate}')
+            #print(f'Date:{edate}')
         if 'Content-Type:' in line and 'plain' in line:
-            print(f'BodyStart:{line}')
+            #print(f'BodyStart:{line}')
             appendit = 1
         if 'Content-Type:' in line and 'html' in line:
-            print(f'BodyStop:{line}')
+            #print(f'BodyStop:{line}')
             appendit = 0
         if appendit == 1:
             line = line.strip()
@@ -184,7 +182,7 @@ def add_quote_emails():
     status, messages = imap.select('INBOX')
     # total number of emails
     messages = int(messages[0])
-    print(f'Total number of messages in inbox is {messages}')
+    #print(f'Total number of messages in inbox is {messages}')
 
     N = 50
     #for i in range(messages, messages - N, -1):
@@ -200,9 +198,9 @@ def add_quote_emails():
         subject = extract_for_code(email_message["Subject"])
         mid = extract_for_code(email_message["Message-ID"])
         fromp = extract_for_code(email_message["From"])
-        print(f'Message ID: {mid}')
-        print(f'Subject: {subject}')
-        print(f'From: {fromp}')
+        #print(f'Message ID: {mid}')
+        #print(f'Subject: {subject}')
+        #print(f'From: {fromp}')
 
         # extract the date and time the email was sent
         try:
@@ -210,13 +208,13 @@ def add_quote_emails():
             date_time = parsedate_to_datetime(date_time_str)
             thisdate = date_time.date()
             thistime = date_time.time()
-            print(f'Date: {str(thisdate)}')
-            print(f'Time: {str(thistime)}')
+            #print(f'Date: {str(thisdate)}')
+            #print(f'Time: {str(thistime)}')
         except:
             date_time = today_now
             thisdate = today
             thistime = timenow
-            print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
+            #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
 
 
 
@@ -261,7 +259,7 @@ def extract_values(obj, key):
 
 def direct_resolver(json):
     di, du, ht, la, lo = [],[],[],[],[]
-    print(json['routes'])
+    #print(json['routes'])
     t1 = json['routes'][0]['legs'][0]['steps']
     for t2 in t1:
         di.append(t2['distance']['text'])
@@ -380,7 +378,7 @@ def get_directions(start,end):
     end = end.replace(" ", "+")
     url = f'https://maps.googleapis.com/maps/api/directions/json?origin={start}&destination={end}'
     url = url + f'&key={API_KEY_DIS}'
-    print(url)
+    #print(url)
     response = get(url)
     dis, dus, hts, las, los  = direct_resolver(response.json())
 
@@ -430,14 +428,14 @@ def get_place(subject, body, multibid):
     testq2 = zip_c.findall(body)
     testp3 = nozip.match(subject)
     testq3 = nozip.match(body)
-    print(f'the subject has these zipcodes {testp}')
-    print(f'the body has these zipcodes {testq}')
-    print(f'the subject has these city-zips {testp2}')
-    print(f'the body has these city-zips {testq2}')
-    print(f'the subject has these city-states {testp3}')
-    print(f'the body has these city-states {testq3}')
-    print('The body is:',body)
-    print(f'the address is {testp}, {testq}, {testq2}, {testq3}')
+    #print(f'the subject has these zipcodes {testp}')
+    #print(f'the body has these zipcodes {testq}')
+    #print(f'the subject has these city-zips {testp2}')
+    #print(f'the body has these city-zips {testq2}')
+    #print(f'the subject has these city-states {testp3}')
+    #print(f'the body has these city-states {testq3}')
+    #print('The body is:',body)
+    #print(f'the address is {testp}, {testq}, {testq2}, {testq3}')
     for test in testp:
         ziptest = test.strip()
         try:
@@ -445,9 +443,9 @@ def get_place(subject, body, multibid):
             location = f'{zb.city}, {zb.state}  {ziptest}'
             # print(zcdb[location])
             # print(f'zb is {zb} {zb.city}')
-            print(f'In subject: test is {test} and location is **{location}**')
+            #print(f'In subject: test is {test} and location is **{location}**')
         except:
-            print(f'{ziptest} does not work')
+            #print(f'{ziptest} does not work')
             location = 'nogood'
 
         if location != 'nogood' and multibid[0]=='off': loci.append(location)
@@ -457,9 +455,9 @@ def get_place(subject, body, multibid):
         try:
             zb = zcdb[ziptest]
             location = f'{zb.city}, {zb.state}  {ziptest}'
-            print(f'In body: test is {test} and location is **{location}**')
+            #print(f'In body: test is {test} and location is **{location}**')
         except:
-            print(f'{ziptest} does not work')
+            #print(f'{ziptest} does not work')
             location = 'nogood'
 
         if location != 'nogood': loci.append(location)
@@ -467,10 +465,10 @@ def get_place(subject, body, multibid):
 
     if (len(testp)==0 and len(testq)==0) or len(loci)==0:
         location = 'Upper Marlboro, MD  20743'
-        print(f'Both subject and body failed to find a location')
+        #print(f'Both subject and body failed to find a location')
     else:
         #Find best and most likely loci
-        print('loci is:', loci)
+        #print('loci is:', loci)
         location = loci[0]
 
     if len(location) > 199: location = location[0:199]
@@ -620,7 +618,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
     if not takedef:
         for ix in range(len(tbox)):
             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-            print(ix,tbox[ix])
+            #print(ix,tbox[ix])
 
     if 'all-in' not in btype:
         if tbox[0]:
@@ -826,7 +824,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 def get_body_text(qdat):
 
     mid = qdat.Mid
-    print(f'this mid is {mid}')
+    #print(f'this mid is {mid}')
     username = usernames['quot']
     password = passwords['quot']
     imap = imaplib.IMAP4_SSL(imap_url)
@@ -840,9 +838,9 @@ def get_body_text(qdat):
 
         # extract the subject of the email
         subject = extract_for_code(email_message["Subject"])
-        print(f'****Getting the Body Text***** for Subject: {subject}')
+        #print(f'****Getting the Body Text***** for Subject: {subject}')
     except:
-        print('Could not locate this email header')
+        #print('Could not locate this email header')
         return 'Email ID not found', None
 
     # Set default text particulars
@@ -918,7 +916,7 @@ def isoQuote():
             htmltext = os.environ[uhtml]
         except:
             htmltext = ''
-        print(f'This is a POST with iter {iter} and last mid {oldmid}')
+        #print(f'This is a POST with iter {iter} and last mid {oldmid}')
         emailgo = request.values.get('Email')
         updatego = request.values.get('GetQuote')
         updatebid = request.values.get('Update')
@@ -929,7 +927,7 @@ def isoQuote():
         ware = request.values.get('Ware')
         exitnow = request.values.get('exitquotes')
         if exitnow is not None:
-            print('Exiting quotes')
+            #print('Exiting quotes')
             return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None
 
         for jx in range(5):
@@ -962,7 +960,7 @@ def isoQuote():
         else:
             multibid[0] = 'off'
             multibid[1] = 1
-        print(f'mutlibid is {multibid[0]} and {multibid[1]} locs are {locs}')
+        #print(f'mutlibid is {multibid[0]} and {multibid[1]} locs are {locs}')
 
 
         if qbid is not None: taskbox = 1
@@ -980,7 +978,7 @@ def isoQuote():
                      request.values.get('fsc'), request.values.get('chassis2'), request.values.get('chassis3'), request.values.get('prepull'), request.values.get('store'), request.values.get('detention'),
                      request.values.get('extrastop'),request.values.get('overweight'), request.values.get('reefer'), request.values.get('scale'), request.values.get('residential'),
                      request.values.get('congestion'), request.values.get('chassplit'), request.values.get('owmile'), request.values.get('permits')]
-            for a in alist: print(a)
+            #for a in alist: print(a)
             blist = [int(float(a)*100) for a in alist]
             pmf=int(100*float(alist[1])/float(alist[2]))
             phi=int(100*float(alist[3])/1992)
@@ -1055,13 +1053,10 @@ def isoQuote():
             quot = nonone(quot)
 
         qdat = Quotes.query.get(quot)
-        print(f'quot:{quot} quotbut:{quotbut} username:{username} taskbox:{taskbox}')
+        #print(f'quot:{quot} quotbut:{quotbut} username:{username} taskbox:{taskbox}')
         if qdat is not None:
             mid = qdat.Mid
-            if mid == oldmid:
-                print(f'No need grab email from inbox, this is the same mid {mid}')
-            else:
-                print(f'Getting body_text 1011 because mid is {mid} and oldmid is {oldmid}')
+            if mid != oldmid:
                 plaintext, htmltext = get_body_text(qdat)
 
         if returnhit is not None:
@@ -1088,9 +1083,9 @@ def isoQuote():
                     except:
                         datethis = '0'
                         datelast = '1'
-                    print(f'comparing {datethis} to {datelast}')
+                    #print(f'comparing {datethis} to {datelast}')
                     if datethis == datelast:
-                        print(f'Getting body_text because it is a successful remove and go')
+                        #print(f'Getting body_text because it is a successful remove and go')
                         plaintext, htmltext = get_body_text(qdat)
                         mid = qdat.Mid
                         oldmid = qdat.Mid
@@ -1104,7 +1099,7 @@ def isoQuote():
 
         if taskbox == 2:
             if qdat is not None:
-                print(f'quot is {quot}')
+                #print(f'quot is {quot}')
                 qdat.Status = -1
                 db.session.commit()
                 taskbox = 0
@@ -1135,7 +1130,7 @@ def isoQuote():
                 quot = qdat.id
                 quotbut = qdat.id
                 mid = qdat.Mid
-                print(f'Getting body_text because we just refreshed the emails')
+                #print(f'Getting body_text because we just refreshed the emails')
                 plaintext, htmltext = get_body_text(qdat)
 
         if taskbox == 1 or taskbox == 5:
@@ -1147,10 +1142,10 @@ def isoQuote():
                     locto = qdat.Location
             if quot>0 and qdat is not None:
                 if mid != oldmid:
-                    print(f'Getting body_text because this is a new mid: {mid} not oldmid {oldmid}')
+                    #print(f'Getting body_text because this is a new mid: {mid} not oldmid {oldmid}')
                     plaintext, htmltext = get_body_text(qdat)
                 if multibid[0] == 'off' and locto is None:
-                    print('Getting new locations because multibid is off and locto is None ')
+                    #print('Getting new locations because multibid is off and locto is None ')
                     locto, loci = get_place(qdat.Subject, plaintext, multibid)
                     qdat.Location = locto
                     multibid[2] = loci
@@ -1159,8 +1154,8 @@ def isoQuote():
                     # Test if all locs are None then try to extract from email:
                     testloc, testloci = get_place(qdat.Subject, plaintext, multibid)
                     locs = multibid[2]
-                    print(f'Here is multibid[1]:{multibid[1]} and here is multibid[2]: {multibid[2]}')
-                    print(f'Here is locs:{locs} and here is testloci:{testloci}')
+                    #print(f'Here is multibid[1]:{multibid[1]} and here is multibid[2]: {multibid[2]}')
+                    #print(f'Here is locs:{locs} and here is testloci:{testloci}')
                     for ix in range(multibid[1]):
                         if not hasinput(locs[ix]): locs[ix] = testloci[ix]
 
@@ -1170,7 +1165,7 @@ def isoQuote():
                     qdat.From = emailto
                     db.session.commit()
             else:
-                print('No radio button selected, default is top of the current list')
+                #print('No radio button selected, default is top of the current list')
                 comdata = companydata()
                 locto = comdata[6]
                 emailto = usernames['serv']
@@ -1189,11 +1184,11 @@ def isoQuote():
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
                         for locto in locs:
-                            print(f'Getting data for going to location {locto}')
+                            #print(f'Getting data for going to location {locto}')
                             if hasinput(locto):
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
                                 biddata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
-                                print(biddata)
+                                #print(biddata)
                                 if tbox[15]: mbids.append(biddata[4])
                                 elif tbox[12]: mbids.append(biddata[0])
                                 elif tbox[13]: mbids.append(biddata[1])
@@ -1201,7 +1196,7 @@ def isoQuote():
                                 elif tbox[16]: mbids.append(biddata[3])
                             else:
                                 mbids.append('0.00')
-                        print(mbids)
+                        #print(mbids)
                         multibid[3] = mbids
 
 
@@ -1227,7 +1222,7 @@ def isoQuote():
                         db.session.commit()
 
                 if emailgo is not None:
-                    print(f'The task box is {taskbox}')
+                    #print(f'The task box is {taskbox}')
                     emaildata = sendquote()
                     if taskbox == 1 or taskbox == 5:
                         qdat.Status = 2
@@ -1256,7 +1251,7 @@ def isoQuote():
                             except:
                                 datethis = '0'
                                 datelast = '1'
-                            print(f'comparing {datethis} to {datelast}')
+                            #print(f'comparing {datethis} to {datelast}')
                             if datethis == datelast:
                                 multibid = ['off', 1, 0, 0]
                                 taskbox = 5
@@ -1280,7 +1275,7 @@ def isoQuote():
 
 
 
-                print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
+                #print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
                 try:
                     ####################################  Directions Section  ######################################
                     miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
@@ -1484,7 +1479,7 @@ def isoQuote():
             quot = request.values.get('optradio')
             if quot is not None:
                 qdat = Quotes.query.get(quot)
-                print(f'Getting body_text because this is not a post so we are getting new values')
+                #print(f'Getting body_text because this is not a post so we are getting new values')
                 plaintext, htmltext = get_body_text(qdat)
                 if htmltext is None:
                     showtext = plaintext
@@ -1516,7 +1511,7 @@ def isoQuote():
     else:
         iter = 1
         os.environ['MID'] = 'None Selected'
-        print('This is NOT a Post')
+        #print('This is NOT a Post')
         ebodytxt = ''
         #print('Entering Quotes1',flush=True)
         username = session['username'].capitalize()
@@ -1547,7 +1542,7 @@ def isoQuote():
         if qdat is not None:
             quot = qdat.id
             quotbut = qdat.id
-            print(f'Getting body_text because this is not a post and we set pointer to top of table')
+            #print(f'Getting body_text because this is not a post and we set pointer to top of table')
             plaintext, htmltext = get_body_text(qdat)
         else:
             add_quote_emails()
@@ -1560,8 +1555,8 @@ def isoQuote():
         showtext = plaintext
     else:
         showtext = htmltext
-    print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
-    print(f'mutlibid on exit is {multibid[0]} and {multibid[1]}')
+    #print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
+    #print(f'mutlibid on exit is {multibid[0]} and {multibid[1]}')
     #Save all the session variables that may have been updated...
     iter = iter + 1
     os.environ[uiter] = str(iter)
@@ -1570,5 +1565,5 @@ def isoQuote():
     os.environ[utext] = plaintext
     os.environ[uhtml] = htmltext
     os.environ[umid] = mid
-    print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
+    #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
     return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid
