@@ -161,7 +161,7 @@ def Gate_Update(ider):
 
 
 def Order_Container_Update(oder):
-    print('**********Update Function***********')
+    #print('**********Update Function***********')
     okat = Orders.query.get(oder)
     bkout = okat.Booking
     con = okat.Container
@@ -230,7 +230,7 @@ def Order_Container_Update(oder):
         if hasinput(bkout):
             kdat = Interchange.query.filter((Interchange.Release == bkout) & (Interchange.Type == 'Empty Out') & (Interchange.Date > lbdate)).first()
 
-        print(f'There are {ntick} interchange tickets based on container search')
+        #print(f'There are {ntick} interchange tickets based on container search')
         if ntick == 2:
             test = 1
             if 'Out' in idata[0].Type:
@@ -243,8 +243,8 @@ def Order_Container_Update(oder):
                 test = 0
                 print('Failed test of proper pairing')
             if test:
-                print(f'{idat0.Type}: {idat0.Release} {idat0.Container}')
-                print(f'{idat1.Type}: {idat1.Release} {idat1.Container}')
+                #print(f'{idat0.Type}: {idat0.Release} {idat0.Container}')
+                #print(f'{idat1.Type}: {idat1.Release} {idat1.Container}')
                 # Check to see if pairing completed and this is only Order for that container (in case duplicated)
                 if 'Out' in idat0.Type and 'In' in idat1.Type:
                     allorders = idata = Orders.query.filter((Orders.Container == con) & (Orders.Date3 > lbdate)).all()
@@ -330,8 +330,6 @@ def Order_Container_Update(oder):
                     ingate.Status = 'IO'
                     kdat.Status = 'IO'
                 db.session.commit()
-        else:
-            print(f'nick is {ntick} and kdat is None')
 
 
 

@@ -433,7 +433,7 @@ def Calculator():
 
 def Class8Main(genre):
 
-    print('routes.py 237: The genre is',genre)
+    #print('routes.py 237: The genre is',genre)
     genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup = Table_maker(genre)
     if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)

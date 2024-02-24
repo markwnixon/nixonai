@@ -322,8 +322,6 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid):
         if not hasinput(text) and task_iter > 0:
             status = 1
             message = 'Should include this email information'
-        if hasinput(text):
-            print(f'the email is {text}')
 
     elif type == 'quotehistory':
         sh = request.values.get('Shipper')
