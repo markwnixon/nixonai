@@ -24,7 +24,7 @@ def addr2break(adv):
         ai = f'{ai} {ad}'
     testpart = usaddress.parse(ai)
     ecity, estate, ezip = '', '', ''
-    print(testpart)
+    #print(testpart)
     for te in testpart:
         #print(te[0],te[1])
         if te[1] == 'PlaceName':
@@ -40,7 +40,7 @@ def addr2break(adv):
 
 def loginvo_m(odat,ix):
     alink = odat.Links
-    print(f'ix is {ix} and alink is {alink}')
+    #print(f'ix is {ix} and alink is {alink}')
     if hasinput(alink):
         if 1 == 1:
             alist = json.loads(alink)
@@ -84,7 +84,7 @@ def getservice(myo, service, serviceqty, serviceamt, servicestr):
 
     sdat = Services.query.filter(Services.Code == service).first()
     if sdat is not None:
-        print(f'Evaluating {service}, {serviceqty}, {serviceamt}, {servicestr}')
+        #print(f'Evaluating {service}, {serviceqty}, {serviceamt}, {servicestr}')
         nextservice = sdat.Service
         if str(serviceamt) == 'default':
             each = float(sdat.Price)
@@ -204,7 +204,7 @@ def get_invo_data(qblines, myo):
                 brstrings = qbl.split('*')
                 timedata = brstrings[1]
                 time1, time2, time3, qty, status = gettimes(timedata)
-                print(time1, time2, time2, qty)
+                #print(time1, time2, time2, qty)
                 if status == 1:
                     desc = f'Free time {time1}-{time2}, detention {time2}-{time3}'
                 else:
@@ -268,7 +268,7 @@ def initialize_invoice(myo, err):
                     lineamount = float(qblines[0])
                 except:
                     lineamount = 0.00
-                print(f'The base amount is {lineamount}')
+                #print(f'The base amount is {lineamount}')
                 input = Invoices(Jo=myo.Jo, SubJo=None, Pid=0, Service='Line Haul', Description=descript,
                                  Ea=d2s(lineamount), Qty=qty, Amount=d2s(lineamount*qty), Total=0.00, Date=today,
                                  Original=None, Status='New')
@@ -277,13 +277,13 @@ def initialize_invoice(myo, err):
 
                 if len(qblines) > 1:
                     qblines = qblines[1:]
-                    print(qblines)
+                    #print(qblines)
                     codes, labels, descs, qtys, prices = get_invo_data(qblines, myo)
-                    print(codes)
-                    print(labels)
-                    print(descs)
-                    print(qtys)
-                    print(prices)
+                    #print(codes)
+                    #print(labels)
+                    #print(descs)
+                    #print(qtys)
+                    #print(prices)
                     #nextservice, descript, each, serviceqty, amount = getservice(myo, service, serviceqty, serviceamt, servicestr)
                     if len(codes)>0:
                         for jx,code in enumerate(codes):
@@ -312,10 +312,10 @@ def add_service(myo):
     invoserv = request.values.get('invoserv')
     if invoserv is not None:
         servid = nonone(invoserv)
-        print('servid=',servid)
+        #print('servid=',servid)
         if servid > 0:
             mys = Services.query.get(servid)
-            print('service is',mys.Service)
+            #print('service is',mys.Service)
             if mys is not None:
                 qty = 1
                 descript = ' '
@@ -442,11 +442,12 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         #invostyle = request.values.get('invoicestyle')
         invostyle = getattr(odata1, 'HaulType')
         holdvec[16] = invostyle
-        print(f'The invoice style is {invostyle}')
+        #print(f'The invoice style is {invostyle}')
         headers = tablesetup['invoicetypes'][invostyle]
 
         #Need to jump over to invoice database
         jo = getattr(odata1, 'Jo')
+        sids = [getattr(odata1, 'id')]
         holdvec[0] = jo
 
         if task_iter > 0:
@@ -477,9 +478,9 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
             db.session.commit()
 
-            print('entrydata=', entrydata)
+            #print('entrydata=', entrydata)
             holdvec[4] = emaildata_update()
-            print('emaildata is:', holdvec[4])
+            #print('emaildata is:', holdvec[4])
 
         else:
             invodate = today
@@ -491,16 +492,16 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             entrydata, docref, err, itotal = update_invoice(odata1, err, tablesetup, invostyle)
 
             holdvec[4] = etemplate_truck('invoice', odata1)
-            print('emaildata is:', holdvec[4])
+            #print('emaildata is:', holdvec[4])
 
         odata1.Invoice = os.path.basename(docref)
         db.session.commit()
-        print('docref=',docref)
+        #print('docref=',docref)
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'
         viewport[2] = 'show_doc_left'
         viewport[3] = '/' + tpath('invoice',odata1.Invoice)
-        print('viewport=', viewport)
+        #print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
@@ -519,7 +520,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             odat = eval(nextquery)
             err = loginvo_m(odat, 2)
             docref = odat.Invoice
-            err = invoice_mimemail(docref, err, 'invoice')
+            err = invoice_mimemail(docref, err, 'vInvoice', sids)
             if 'Error' not in err:
                 odat.Istat = 3
                 db.session.commit()
@@ -530,17 +531,17 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 def find_zip_line(address):
     address = address.strip()
     address = address.replace('\r','')
-    print(f'*****************The address is: {address}')
+    #print(f'*****************The address is: {address}')
     alines = address.split('\n')
     alen = len(alines)
-    print(f'The address lines are: {alines}')
+    #print(f'The address lines are: {alines}')
     pline = re.search(r'.*(\d{5}(\-\d{4})?)$', address)
-    print(f'pline is {pline}')
+    #print(f'pline is {pline}')
     if pline:
-        print(f'Retrning the line with postal code: {pline[0]}')
+        #print(f'Retrning the line with postal code: {pline[0]}')
         return pline[0]
     else:
-        print(f'Did not find zip, returning: {alines[alen-1]}')
+        #print(f'Did not find zip, returning: {alines[alen-1]}')
         return alines[alen-1]
 
 
@@ -549,7 +550,7 @@ def set_desc(odat):
     haultype = odat.HaulType
     delivery = find_zip_line(odat.Dropblock1)
     returnto = find_zip_line(odat.Dropblock2)
-    print(f'found {delivery} {returnto}')
+    #print(f'found {delivery} {returnto}')
     desc = ''
     #desc = f'{haultype} {delivery} to {returnto}'
     idata = Invoices.query.filter(Invoices.Jo == jo).all()
@@ -679,7 +680,7 @@ def convert_sids(sid):
 def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sids):
 
     err = [f"Running Summary task with task_iter {task_iter} using {tablesetup['table']}"]
-    print(f'Executing over {sids} selections')
+    #print(f'Executing over {sids} selections')
     entrydata, holdvec, viewport = [], [0]*30, ['0'] * 6
 
     headers = {
@@ -698,7 +699,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         table = 'Orders'
 
     testchecks = same_company_all(sids, table)
-    print(f'testchecks={testchecks}')
+    #print(f'testchecks={testchecks}')
     testinv, err = invoice_for_all(sids, table, err, tablesetup)
 
     if testchecks is False:
@@ -734,7 +735,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             if sdat is not None:
                 #Even if start over the SI number will be same so dont want to restart the cache
                 cache_start = sdat.Cache
-                print(f'Deleting {sinow} from database')
+                #print(f'Deleting {sinow} from database')
                 SumInv.query.filter(SumInv.Si == sinow).delete()
                 db.session.commit()
 
@@ -748,7 +749,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                         sikill = sdat.id
                         jo = sdat.Jo
                         ck = request.values.get(f'box{sdat.id}')
-                        print(f'for sdat with id {sdat.id} ck is {ck}')
+                        #print(f'for sdat with id {sdat.id} ck is {ck}')
                         if ck == 'on':
                             #Reset the order data
                             odat = Orders.query.filter(Orders.Jo == jo).first()
@@ -757,9 +758,9 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                                 odat.Label = 'None'
                                 odat.Istat = 2
                             SumInv.query.filter(SumInv.id == sikill).delete()
-                            print(f'{sids} {oid}')
+                            #print(f'{sids} {oid}')
                             sids.remove(oid)
-                            print(f'new sids is: {sids}')
+                            #print(f'new sids is: {sids}')
                         else:
                             sdat.Cache = cache
                     db.session.commit()
@@ -767,7 +768,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 #Also must create a new lead element
                 sdata = SumInv.query.filter(SumInv.Si == sinow).all()
                 slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status == 1)).first()
-                print(f'sdata is {sdata}')
+                #print(f'sdata is {sdata}')
                 if sdata == []:
                     completed = True
                 else:
@@ -884,7 +885,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
         if completed == False:
 
-            print(f'Looping over these sids: {sids}')
+            #print(f'Looping over these sids: {sids}')
             #loop over each job and rebuild
             #get a new SI if one does not exist already
             total = 0.00
@@ -917,8 +918,8 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     desc = set_desc(odat)
                     docref = f'{si}.pdf'
                     amt = d2s(odat.InvoTotal)
-                    print(f'amt input to suminv for jo {jo} is {amt} for {odat.InvoTotal}')
-                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.BOL, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, InvoDate = invodate)
+                    #print(f'amt input to suminv for jo {jo} is {amt} for {odat.InvoTotal}')
+                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.BOL, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, Date = invodate)
                     db.session.add(input)
                     odat.Label = si
                     odat.Istat = 6
@@ -929,7 +930,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             db.session.commit()
             sdata = SumInv.query.filter(SumInv.Si == si).all()
             sdat = SumInv.query.filter( (SumInv.Si == si) & (SumInv.Status >= 1) ).first()
-            print(f'{sdata} sdat.id is {sdat}')
+            #print(f'{sdata} sdat.id is {sdat}')
             pdat = People.query.filter(People.id == sdat.Pid).first()
             cache = sdat.Cache
             docref, newbase = make_summary_doc(sdata, sdat, pdat, cache, invodate, 0, tablesetup, invostyle)
@@ -940,7 +941,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
             sendemail = request.values.get('siemail')
             if sendemail is not None:
-                err = invoice_mimemail(newbase, err, 'vInvoice')
+                err = invoice_mimemail(newbase, err, 'vPackage', sids)
                 if 'Error' not in err:
                     sdat.Status = 2
                     for sid in sids:
@@ -957,12 +958,12 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             holdvec[0] = jovec
             holdvec[1] = datevec
             holdvec[2] = sdata
-            print('docref=',docref)
+            #print('docref=',docref)
             viewport[0] = 'split panel left'
             viewport[1] = 'email setup'
             viewport[2] = 'show_doc_left'
-            viewport[3] = '/' + tpath('invoice',newbase)
-            print('viewport=', viewport)
+            viewport[3] = '/' + tpath('package',newbase)
+            #print('viewport=', viewport)
 
             err.append(f'Viewing {docref}')
             err.append('Hit Finished to End Viewing and Return to Table View')
@@ -973,9 +974,9 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 def income_record(jopaylist, err):
     success = False
     for jopay in jopaylist:
-        print(jopay)
+        #print(jopay)
         jo, amtpaid, paidon, payref, paymethod, depoacct = [jopay[i] for i in range(6)]
-        print(jo, amtpaid, paidon, payref, paymethod, depoacct)
+        #print(jo, amtpaid, paidon, payref, paymethod, depoacct)
         adderr = gledger_write(['income', amtpaid, paidon,  payref, paymethod], jo, depoacct, 0 )
         if adderr == []:
             odat = Orders.query.filter(Orders.Jo == jo).first()
@@ -994,7 +995,7 @@ def income_record(jopaylist, err):
                 try:
                     famt = float(odat.InvoTotal)
                 except:
-                    print(f'Cannot process InvoTotal for Jo {jo}')
+                    #print(f'Cannot process InvoTotal for Jo {jo}')
                     famt = 0.00
                     success = False
                 totpaid = paysofar + float(amtpaid)

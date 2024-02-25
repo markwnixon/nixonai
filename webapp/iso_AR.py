@@ -245,11 +245,11 @@ def get_open_sort_totals(arlist):
     lb360 = today - datetime.timedelta(360)
     cdata = []
     for cust in arlist:
-        odata = Orders.query.filter((Orders.Shipper == cust) & (Orders.Istat>1) & (Orders.Istat<5) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
+        odata = Orders.query.filter((Orders.Shipper == cust) & ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==7))) & (Orders.InvoDate>lb360)).order_by(Orders.InvoDate).all()
         iall, iu30, io30 = 0, 0, 0
         dolall, dolu30, dolo30 = 0.00, 0.00, 0.00
         for odat in odata:
-            invodate = odat.Date3
+            invodate = odat.InvoDate
             #iif has an invoice date then it has been invoiced
             #print(f'{dat30} and {invodate}')
             invototal = odat.InvoTotal
@@ -270,9 +270,27 @@ def get_open_sort_totals(arlist):
 def get_open_for_cust(this_shipper):
     dat30 = today - datetime.timedelta(30)
     lb360 = today - datetime.timedelta(360)
-    cdata = []
-    odata = Orders.query.filter((Orders.Shipper == this_shipper) & (Orders.Istat>1) & (Orders.Istat<5) & (Orders.Date3>lb360) & (Orders.InvoTotal != None)).order_by(Orders.Date3).all()
-    return odata
+    odata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==7))) & (Orders.Date3>lb360) & (Orders.InvoTotal != None)).order_by(Orders.Date3).all()
+    adata = Ardata.query.filter((Ardata.Customer == this_shipper) & (Ardata.Date1 > lb360) & (Ardata.Emailtype == 'Direct')).all()
+    tdata = []
+    for adat in adata:
+        jol= adat.Jolist
+        if jol is not None and isinstance(jol, str):
+            try:
+                jolist = ast.literal_eval(jol)
+            except:
+                #print(f'Could not form ast for adat {adat.id}')
+                jolist = []
+        else:
+            jolist = []
+        for jo in jolist:
+            jo = str(jo)
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                tdata.append([f'{adat.Date1}', adat.Emailtype, adat.Mid, adat.Emailto, adat.Etitle])
+                break
+
+    return odata, tdata
 
 def read_tboxes():
     tboxes = [0]*30
@@ -292,11 +310,15 @@ def attach_rename_inv(odat, name):
 
 def attach_rename_pack(odat, name):
     newname = odat.Package
-    if name == 'Inv_Package_Container':  newname = f'Inv_Package_{odat.Container}.pdf'
-    elif name == 'Inv_Package_Order_xxx': newname = f'Inv_Package_Order_{odat.Order}.pdf'
-    elif name == 'Inv_Package_Release_xxx': newname = f'Inv_Package_Release_{odat.Booking}.pdf'
-    elif name == 'Inv_Package_Booking_Container': newname = f'Inv_Package_{odat.Booking}_{odat.Container}.pdf'
-    elif name == 'Inv_Package_Order_Container': newname = f'Inv_Package_{odat.Order}_{odat.Container}.pdf'
+    if newname is not None:
+        if 'SI' in newname:
+            pass
+        else:
+            if name == 'Inv_Package_Container':  newname = f'Inv_Package_{odat.Container}.pdf'
+            elif name == 'Inv_Package_Order_xxx': newname = f'Inv_Package_Order_{odat.Order}.pdf'
+            elif name == 'Inv_Package_Release_xxx': newname = f'Inv_Package_Release_{odat.Booking}.pdf'
+            elif name == 'Inv_Package_Booking_Container': newname = f'Inv_Package_{odat.Booking}_{odat.Container}.pdf'
+            elif name == 'Inv_Package_Order_Container': newname = f'Inv_Package_{odat.Order}_{odat.Container}.pdf'
     return newname
 
 def column_wide(headers,ydata):
@@ -323,7 +345,7 @@ def make_workbook(customer, data, tboxes, ftotal):
     money = '$#,##0.00'
     dec2 = '#,##0.00'
     dec0 = '#,##0'
-    hdrs = ['JO', 'Order', 'Booking In', 'Container', 'Date Invoiced', 'Amount', 'Date Due']
+    hdrs = ['JO', 'Order/Summary', 'Booking In', 'Container', 'Date Invoiced', 'Amount', 'Date Due']
     keephdrs = []
     for jx in range(7):
         if tboxes[jx] == 'on':
@@ -392,9 +414,14 @@ def get_table_formatted(odata, etype, tboxes, boxes, make_wb, customer):
     intable = f'{intable}</tr><tr>'
     for ix, odat in enumerate(odata):
         if boxes[ix]=='on':
+            datei = odat.InvoDate
+            if datei is None: datei = odat.Date3
+
             ftotal = ftotal + float(odat.InvoTotal)
-            duedate = odat.Date3 + datetime.timedelta(30)
-            data = [odat.Jo, odat.Order, odat.Booking, odat.Container, f'{odat.Date3}', f'${odat.InvoTotal}', f'{duedate}']
+            duedate = datei + datetime.timedelta(30)
+            odr = odat.Label
+            if odr is None: odr = odat.Order
+            data = [odat.Jo, odr, odat.Booking, odat.Container, f'{datei}', f'${odat.InvoTotal}', f'{duedate}']
             datline=[]
             intable = f'{intable}<tr>'
             for jx in range(7):
@@ -404,11 +431,17 @@ def get_table_formatted(odata, etype, tboxes, boxes, make_wb, customer):
             intable = f'{intable}</tr>'
             ydata.append(datline)
             if tboxes[7] == 'on':
-                invoices.append(odat.Invoice)
-                new_invoices.append(attach_rename_inv(odat,invoname))
+                newinvo = odat.Invoice
+                if newinvo is not None:
+                    if newinvo not in invoices:
+                        invoices.append(odat.Invoice)
+                        new_invoices.append(attach_rename_inv(odat,invoname))
             if tboxes[8] == 'on':
-                packages.append(odat.Package)
-                new_packages.append(attach_rename_pack(odat, packname))
+                newpack = odat.Package
+                if newpack is not None:
+                    if newpack not in packages:
+                        packages.append(newpack)
+                        new_packages.append(attach_rename_pack(odat, packname))
     intable = f'{intable}</table>'
 
     if make_wb: wbfile = make_workbook(customer, ydata, tboxes, ftotal)
@@ -440,20 +473,26 @@ def final_update_email(this_shipper, odata, tboxes, boxes, emailsend, email_upda
     for ix, odat in enumerate(odata):
         if boxes[ix] == 'on':
             if tboxes[7] == 'on':
-                invoices.append(odat.Invoice)
-                nextinvo = request.values.get(f'edati{intnexti}')
-                intnexti += 1
-                new_invoices.append(nextinvo)
+                next_invoice = odat.Invoice
+                if next_invoice is not None:
+                    if next_invoice not in invoices:
+                        invoices.append(odat.Invoice)
+                        nextinvo = request.values.get(f'edati{intnexti}')
+                        intnexti += 1
+                        new_invoices.append(nextinvo)
             if tboxes[8] == 'on':
-                packages.append(odat.Package)
-                nextpack = request.values.get(f'edatp{intnextp}')
-                intnextp += 1
-                new_packages.append(nextpack)
+                next_package = odat.Package
+                if next_package is not None:
+                    if next_package not in packages:
+                        packages.append(next_package)
+                        nextpack = request.values.get(f'edatp{intnextp}')
+                        intnextp += 1
+                        new_packages.append(nextpack)
 
     wba = request.values.get('wbattach')
     wbf = request.values.get('wbcreated')
 
-    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, wbf, wba, tone]
+    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, wbf, wba, tone, f'/static/{scac}/data/vPackage/']
 
     return emaildata
 
@@ -463,15 +502,17 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
 
     #Items same regarless of email tone
     salutation = request.values.get('salutation')
-    if not hasinput(salutation) or salutation == 'Sir':
+    if not hasinput(salutation) or salutation == f'{this_shipper} Accounting':
         email_to_selected = emailsend[1]
         #print(email_to_selected)
         if email_to_selected is not None and email_to_selected != []:
-            ets = email_to_selected[0]
-            etslist = ets.split('@')
-            salutation = etslist[0]
+            salutation = emailsend[4]
+            if not hasinput(salutation):
+                ets = email_to_selected[0]
+                etslist = ets.split('@')
+                salutation = etslist[0].title()
         else:
-            salutation = 'Sir'
+            salutation = f'{this_shipper} Accounting'
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
 
 
@@ -562,14 +603,19 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
         ebody = f'Dear {salutation},<br><br>'
 
 
-    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb, tone]
+    emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb, newwb, tone, f'/static/{scac}/data/vPackage/']
     #etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, efrom, folder, dat30date, sourcenamelist, sendnamellist = emaildata
     return emaildata
 
-def get_email_customer(pdat, ar_emails):
+def get_email_customer(pdat, ar_emails_cust):
+    sal_default = None
     emailto_selected = request.values.getlist('emailtolist')
     emailcc_selected = request.values.getlist('emailcclist')
     #print(f'{emailto_selected}')
+    if emailto_selected == []:
+        #set a default value...
+        emailto_selected = [pdat.Associate2]
+        sal_default = pdat.Salap
     #print(f'{emailcc_selected}')
     emailtos, emailccs = [], []
     if hasinput(pdat.Email):
@@ -583,7 +629,7 @@ def get_email_customer(pdat, ar_emails):
         emailccs.append(pdat.Associate2)
 
     # Add in email addresses from related emails
-    for ar in ar_emails:
+    for ar in ar_emails_cust:
         eto = ar.Emailto
         ecc = ar.Emailcc
         efrom = ar.From
@@ -605,7 +651,7 @@ def get_email_customer(pdat, ar_emails):
     unique_emailcclist = set(emailccs)
     emailtos = list(unique_emailtolist)
     emailccs = list(unique_emailcclist)
-    emailsend = [emailtos, emailto_selected, emailccs, emailcc_selected]
+    emailsend = [emailtos, emailto_selected, emailccs, emailcc_selected, sal_default]
     return emailsend
 
 def get_ardata(containerlist, tboxes, customer):
@@ -619,7 +665,7 @@ def get_ardata(containerlist, tboxes, customer):
             if ardata: ardata_all = ardata_all + ardata
 
     if tboxes[24]=='on':
-        ardata = Ardata.query.filter((Ardata.Customer == customer) & (Ardata.Emailtype == 'Report')).all()
+        ardata = Ardata.query.filter((Ardata.Customer == customer) & ((Ardata.Emailtype == 'Report') | (Ardata.Emailtype == 'Direct'))).all()
         if ardata: ardata_all = ardata_all + ardata
     if tboxes[25]=='on':
         ardata = Ardata.query.filter((Ardata.Customer == customer) & (Ardata.Emailtype == 'Report Response')).all()
@@ -638,9 +684,17 @@ def rselect(nemail):
     #print(f'rtest = {rtest}')
     return rview
 
+def shortbody(jolist, containerlist):
+    text = 'The original email body is too long to store here, but the following jo and containers were referenced:'
+    jolist = ast.literal_eval(jolist)
+    for ix, jo in enumerate(jolist):
+        #print(jo, containerlist[ix])
+        text = f'{text}<br>{jo}  {containerlist[ix]}'
+    return text
+
 def ardata_email_update(emaildata, shipper, jolist, containerlist):
 
-    etitle, ebody, emailin, emailcc, username, password, folder, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach, tone = emaildata
+    etitle, ebody, emailin, emailcc, username, password, folder1, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach, tone, folder2 = emaildata
     sentfiles = []
     sentasfiles = []
     for inv in invoices:
@@ -658,10 +712,24 @@ def ardata_email_update(emaildata, shipper, jolist, containerlist):
     #print(today)
     #print(emailin)
     #print(emailcc)
+    ncl = f'{containerlist}'
+    jl = f'{jolist}'
+    sf = f'{sentfiles}'
+    saf = f'{sentasfiles}'
+    if len(ebody) > 5998:
+        try:
+            ebody = shortbody(jl, containerlist)
+        except:
+            ebody = 'Email too long to store'
+    if len(jl) > 499: jl = None
+    if len(ncl) > 499: ncl = None
+    if len(sf) > 999: sf = None
+    if len(saf) > 999: saf = None
 
-    input = Ardata(Etitle=etitle, Ebody=ebody, Emailto=f'{emailin}', Emailcc=f'{emailcc}', Sendfiles=f'{sentfiles}',
-                   Sendasfiles=f'{sentasfiles}', Jolist=f'{jolist}', Emailtype=itype, Mid=None,
-                   Customer=shipper, Container=f'{containerlist}', Date1=today, Datelist=None, From=username, Box='SENT')
+
+    input = Ardata(Etitle=etitle, Ebody=ebody, Emailto=f'{emailin}', Emailcc=f'{emailcc}', Sendfiles=sf,
+                   Sendasfiles=saf, Jolist=jl, Emailtype=itype, Mid=tone,
+                   Customer=shipper, Container=ncl, Date1=today, Datelist=None, From=username, Box='SENT')
     db.session.add(input)
     db.session.commit()
 
@@ -725,7 +793,7 @@ def isoAR():
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', None, None, None, None, None, None, None, None, None, None, None, None, None
+            return 'exitnow', None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
         elif redirect is not None:
             this_shipper = request.values.get('this_shipper')
@@ -763,11 +831,12 @@ def isoAR():
         task = 'artable review'
 
     lb360 = today - datetime.timedelta(360)
-    arorders = Orders.query.filter((Orders.Istat<5) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
+    arorders = Orders.query.filter( ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==7))) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
     arlist = get_sorted_cust(arorders)
     arbycust = get_open_sort_totals(arlist)
-    if this_shipper is None: this_shipper = arlist[0]
-    odata = get_open_for_cust(this_shipper)
+    if this_shipper is None:
+        this_shipper = arlist[0]
+    odata, arsent = get_open_for_cust(this_shipper)
 
     boxes = [0] * len(odata)
 
@@ -793,12 +862,12 @@ def isoAR():
         if boxes[ix] == 'on':
             containerlist.append(odat.Container)
             jolist.append(odat.Jo)
-    ar_emails = get_ardata(containerlist, tboxes, this_shipper)
-    nemail = len(ar_emails)
+    ar_emails_cust = get_ardata(containerlist, tboxes, this_shipper)
+    nemail = len(ar_emails_cust)
     rview = rselect(nemail)
 
     pdat = People.query.filter(People.Company == this_shipper).first()
-    emailsend = get_email_customer(pdat, ar_emails)
+    emailsend = get_email_customer(pdat, ar_emails_cust)
     #print(f'Emailsend = {emailsend}')
 
     if emailgo is not None:
@@ -806,8 +875,8 @@ def isoAR():
         emaildata = final_update_email(this_shipper, odata, tboxes, boxes, emailsend, update_e)
         #print(f'The final emaildata for send is {emaildata}')
         err = html_mimemail(emaildata)
-        #print(f'err is {err[0]}')
-        if err[0] == 'Email Login: Authentication succeeded':
+        #print(f'err[0] is {err[0]}')
+        if 'fail' not in err[0].lower():
             ardata_email_update(emaildata, this_shipper, jolist, containerlist)
     elif update_e is not None:
         #Get the emaildata setup from the website in case changes made....
@@ -834,4 +903,4 @@ def isoAR():
     #print(f'invoname:{invoname}, packname"{packname}')
     #print(f'emaildata is {emaildata}')
     #print(f'rview is {rview}')
-    return 'keepgoing', arbycust, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails, rview
+    return 'keepgoing', arbycust, arsent, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview

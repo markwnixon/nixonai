@@ -23,7 +23,8 @@ def manfile(joborder, cache):
     try:
         os.remove(file4)
     except:
-        print(f'No file {file4} found')
+        pass
+        #print(f'No file {file4} found')
     return file1, file2, file3
 
 def minbox_write(header, lineitems, fs1, fs2):
@@ -51,7 +52,7 @@ def get_padding(sectors, sectorlines, fs1, fs2, margin, ltm, rtm):
     space_available = total_width - total_need
     lt = len(sectors) - 1
     padding = space_available/lt
-    print(f'The calculated dimensions for sector padding are: total_width: {total_width}, total_need: {total_need}, space_available: {space_available}, padding: {padding}')
+    #print(f'The calculated dimensions for sector padding are: total_width: {total_width}, total_need: {total_need}, space_available: {space_available}, padding: {padding}')
     return padding
 
 def get_shipper(odat):
@@ -60,13 +61,13 @@ def get_shipper(odat):
     if bid != 0:
         try:
             bid = int(odat.Bid)
-            print(shipper,bid)
+            #print(shipper,bid)
             pdat = People.query.get(bid)
             return [pdat.Company, pdat.Addr1, pdat.Addr2, pdat.Telephone, '']
         except:
-            print(shipper)
+            #print(shipper)
             pdat = People.query.filter(People.Company == shipper).first()
-            print(pdat.Company)
+            #print(pdat.Company)
     else:
         pdat = People.query.filter(People.Company == shipper).first()
     if pdat is not None:
@@ -112,7 +113,7 @@ def get_sectors(ht, odat):
     middle2data = [order, pickup, loaddatetime, deliverdatetime]
 
     if hasvalue(ht):
-        print(f'ht here is {ht}')
+        #print(f'ht here is {ht}')
 
         if 'Import' in ht:
             sectors = ['Pickup Load at Port', 'Deliver To', 'Return to Port']
@@ -154,12 +155,12 @@ def center_write_items(headers, headeritems, fs1, fs2, ltm, rtm):
     maxw = []
     # headeritems are the header data
     # headers are the labels for the column data to be shown on the invoice
-    print(headeritems)
+    #print(headeritems)
     for ix, item in enumerate(headeritems):
         header_width = stringWidth(headers[ix], 'Helvetica', fs1)
         #if item is None: item = ''
         if not isinstance(item, str): item = ''
-        print(f'The item is {item}')
+        #print(f'The item is {item}')
         headerval_width = stringWidth(item, 'Helvetica', fs2)
         maxval = max(header_width, headerval_width)
         # Store the max lengths in a list
@@ -342,7 +343,7 @@ def makemanifest(odat, tablesetup):
             c.line(leftstart, level1, leftstart+boxwidth , level1)
 
             c.drawString(leftstart + bump * 3, m1 + 5 * dl + bump * 2, sector)
-            print('lineitems', lineitems)
+            #print('lineitems', lineitems)
             top = scroll_write(c, 'Helvetica', fs2, level1 - dh, leftstart + bump * 3, 13, lineitems, 175)
             leftstart = leftstart + boxwidth + padding
 
@@ -468,5 +469,9 @@ def makemanifest(odat, tablesetup):
     #
     #Now make a cache copy
     shutil.copy(file1,file2)
-    print('returning file',file3)
+    try:
+        os.remove(file1)
+    except:
+        pass
+    #print('returning file',file3)
     return file3

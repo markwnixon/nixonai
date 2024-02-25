@@ -9,12 +9,13 @@
 
 {% if task == 'analysis'%}
     {% set linkpath = emaildata[6] %}
+    {% set linkpath2 = emaildata[16] %}
     {% set atlink = "font-weight-bold text-center text-primary bg-white" %}
         <div class="col-sm-3" align="left">
                 {% include 'includes/emailprep2.html' %}
 
 
-                {% for ar in ar_emails %}
+                {% for ar in ar_emails_cust %}
                     {% if rview[loop.index-1] == 'on' %}
                             <div class="card" align=left">
                                     <div class = "card-header">
@@ -55,7 +56,7 @@
                                                         <th style="font-weight:bold">Customer</th>
                                                         <th style="font-weight:bold">JO</th>
                                                         <th style="font-weight:bold">HaulType</th>
-                                                        <th style="font-weight:bold">Order</th>
+                                                        <th style="font-weight:bold">Order/Summary</th>
                                                         <th style="font-weight:bold">Container</th>
                                                         <th style="font-weight:bold">Release</th>
                                                         <th style="font-weight:bold">InvoDate</th>
@@ -67,7 +68,9 @@
                                                     <tbody>
                                                     {% set d30 = emaildata[7] %}
                                                     {% for odat in odata %}
-                                                        {% if odat.Date3 > d30 %}
+                                                        {% if odat.Label is not none %}{% set odr = odat.Label %}{% else %}{% set odr = odat.Order %}{% endif %}
+                                                        {% if odat.InvoDate is not none %}{% set idate = odat.InvoDate %}{% else %}{% set idate = odat.Date3 %}{% endif %}
+                                                        {% if idate > d30 %}
                                                             {% set atc1="font-weight-bold" %}
                                                         {% else %}
                                                             {% set atc1="red-text font-weight-bold" %}
@@ -79,10 +82,10 @@
                                                         <td align="center" class="{{atc1}}">{{ odat.Shipper }}</td>
                                                         <td align="center" class="{{atc1}}">{{ odat.Jo }}</td>
                                                         <td align="right" class="{{atc1}}">{{ odat.HaulType }}</td>
-                                                        <td align="center" class="{{atc1}}">{{ odat.Order }}</td>
+                                                        <td align="center" class="{{atc1}}">{{ odr }}</td>
                                                         <td align="right" class="{{atc1}}">{{ odat.Container }}</td>
                                                         <td align="center" class="{{atc1}}">{{ odat.Booking }}</td>
-                                                        <td align="right" class="{{atc1}}">{{ odat.Date3 }}</td>
+                                                        <td align="right" class="{{atc1}}">{{ idate }}</td>
                                                         <td align="right" class="{{atc1}}">{{ odat.InvoTotal }}</td>
                                                         {% if odat.Invoice is not none %}
                                                             <td class="{{ atlink }}">  <a href="{{ linkpath }}{{ odat.Invoice }}" class="{{ atlink }}" target="_blank">[O]</a></td>
@@ -90,7 +93,7 @@
                                                             <td class="{{ atlink }}">-</td>
                                                         {% endif %}
                                                         {% if odat.Package is not none %}
-                                                            <td class="{{ atlink }}">  <a href="{{ linkpath }}{{ odat.Package }}" class="{{ atlink }}" target="_blank">[O]</a></td>
+                                                            <td class="{{ atlink }}">  <a href="{{ linkpath2 }}{{ odat.Package }}" class="{{ atlink }}" target="_blank">[O]</a></td>
                                                         {% else %}
                                                             <td class="{{ atlink }}">-</td>
                                                         {% endif %}
@@ -138,22 +141,21 @@
                                     </div>
                                     </div>
                                     <div class="card-body">
-                                        <table id="AR3" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
+                                        <table id="AR5" class="table  table-striped table-bordered  table-hover w-auto"  width="100%">
                                                     <thead>
                                                     <tr class="amber lighten-4 text-center" >
                                                         <th style="font-weight:bold">Select</th>
                                                         <th style="font-weight:bold">Date</th>
                                                         <th style="font-weight:bold">Customer</th>
-                                                        <th style="font-weight:bold">Container</th>
-                                                        <th style="font-weight:bold">From</th>
-                                                        <th style="font-weight:bold">Mailbox</th>
+                                                        <th style="font-weight:bold">Type</th>
+                                                        <th style="font-weight:bold">Tone</th>
                                                         <th style="font-weight:bold">Subject</th>
                                                         <th style="font-weight:bold">Email To</th>
                                                         <th style="font-weight:bold">Email CC</th>
                                                     </tr>
                                                     </thead>
                                                     <tbody>
-                                                    {% for ar in ar_emails %}
+                                                    {% for ar in ar_emails_cust %}
                                                         <tr>
                                                             <td align="center" >
                                                                 <div class="form-check">
@@ -165,12 +167,11 @@
                                                             </td>
                                                             <td align="center" class="{{atc1}}">{{ ar.Date1 }}</td>
                                                             <td align="center" class="{{atc1}}">{{ ar.Customer }}</td>
-                                                            <td align="right" class="{{atc1}}">{{ ar.Container }}</td>
-                                                                <td align="center" class="{{atc1}}">{{ ar.From }}</td>
-                                                                <td align="center" class="{{atc1}}">{{ ar.Box }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Emailtype }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Mid }}</td>
                                                             <td align="center" class="{{atc1}}">{{ ar.Etitle }}</td>
                                                             <td align="right" class="{{atc1}}">{{ ar.Emailto }}</td>
-                                                            <td align="center" class="{{atc1}}">{{ ar.Emailcc }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ ar.Emailcc}}</td>
                                                         </tr>
                                                     {% endfor %}
                                                     </tbody>

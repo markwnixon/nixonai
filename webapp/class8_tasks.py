@@ -892,7 +892,8 @@ def Table_maker(genre):
             #print(f'On task_iter {task_iter} keydata is {keydata}')
             task_iter = int(task_iter) + 1
             # Need to pick up some of the keydata after table build
-            keydata = get_Orders_keydata(keydata, checked_data)
+            if checked_data is not None:
+                if checked_data[0] == 'Orders': keydata = get_Orders_keydata(keydata, checked_data)
 
 
         #for e in err:
@@ -2628,6 +2629,7 @@ def get_last_used_stamps(odat):
             for ix in range(vlen):
                 if isinstance(stampdata[7 * ix + 6], str): stamplist.append(stampdata[7 * ix + 6])
         except:
+            pass
             print(f'String for stamp in this location is {stampstring} and not in json format')
     return stamplist, stampdata
 
@@ -2693,7 +2695,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             else:
                 emaildata = get_company(eprof, odat)
             if email_requested:
-                info_mimemail(emaildata)
+                info_mimemail(emaildata, [sid])
 
         holdvec[15] = stamplist
         #holdvec[4] = emaildata
@@ -3005,7 +3007,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                 jopaylist = [[jo, amtpaid, paidon,  payref, paymethod, depoacct]]
                 err, success = income_record(jopaylist, err)
                 if success:
-                    if email_requested: info_mimemail(emaildata)
+                    if email_requested: info_mimemail(emaildata, [sid])
                     completed = True
 
             else:
@@ -3024,7 +3026,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                         jopaylist.append([jo, amtpaid, paidon,  payref, paymethod, depoacct])
                     err, success = income_record(jopaylist, err)
                     if success:
-                        if email_requested: info_mimemail(emaildata)
+                        if email_requested: info_mimemail(emaildata, [sid])
                         completed = True
                 else: err.append('Could not process paid invoice')
 
@@ -3514,6 +3516,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 lastfile = file1.replace(f'_c{cache}', f'_c{lastcache}')
                 try: os.remove(lastfile)
                 except:
+                    pass
                     print(f'{lastfile} does not exist')
 
             if record_item is not None:

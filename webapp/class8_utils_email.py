@@ -15,7 +15,7 @@ import os
 from webapp.CCC_system_setup import websites, passwords, companydata, scac, addpath
 from webapp.CCC_system_setup import usernames as em
 from webapp import db
-from webapp.models import People, Orders
+from webapp.models import People, Orders, Ardata
 from webapp.viewfuncs import stripper, hasinput
 
 import datetime
@@ -43,7 +43,7 @@ def add_person(info):
     db.session.commit()
 
 def emaildata_update():
-    print('running email update')
+    #print('running email update')
     etitle = request.values.get('edat0')
     ebody = request.values.get('edat1')
     outfile = request.values.get('edat7')
@@ -334,7 +334,7 @@ def etemplate_truck(eprof,odat):
         #aname = odat.Invoice
         #aname = aname.replace('INV', 'Paid_Invoice_')
         aname = odat.PaidInvoice
-        print(f'aname here is {aname} {odat.PaidInvoice} {odat.Jo} {odat.Source}')
+        #print(f'aname here is {aname} {odat.PaidInvoice} {odat.Jo} {odat.Source}')
         emailin1 = estatus
         emailin2 = eaccts
         emailcc1 = em['invo']
@@ -437,7 +437,7 @@ def email_app_exporter(pdata):
         ptype=pdat.Ptype
         if ptype=='exporter':
             emailin=pdat.Email
-            print('Eporter email=',emailin)
+            #print('Eporter email=',emailin)
             exporter=pdat.First+' '+pdat.Middle+' '+pdat.Last
             exporter=exporter.replace('  ',' ')
             idn=pdat.id
@@ -466,7 +466,7 @@ def email_app_exporter(pdata):
     msg["Subject"] = f'{cdat[0]} Application Received'
 
     from_dom = emailfrom.split('@')[1]
-    print(f'from email_app_exporter in class8-utls_email: the domain is: {from_dom}')
+    #print(f'from email_app_exporter in class8-utls_email: the domain is: {from_dom}')
     msg['Date'] = formatdate()
     msg['Message-ID'] = make_msgid(domain=from_dom)
 
@@ -547,7 +547,7 @@ def email_app(pdat):
     msg["Subject"] = 'First Eagle Logistics Application Received'
 
     from_dom = emailfrom.split('@')[1]
-    print(f'from email_app in class8-utls_email: the domain is: {from_dom}')
+    #print(f'from email_app in class8-utls_email: the domain is: {from_dom}')
     msg['Date'] = formatdate()
     msg['Message-ID'] = make_msgid(domain=from_dom)
 
@@ -583,7 +583,39 @@ def email_app(pdat):
     
     #os.remove(newfile)
 
-def invoice_mimemail(docref, err, lastpath):
+def update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids):
+    jolist = []
+    conlist = []
+    shipper = None
+    for sid in sids:
+        odat = Orders.query.get(sid)
+        if odat is not None:
+            shipper = odat.Shipper
+            jo = odat.Jo
+            con = odat.Container
+            jolist.append(jo)
+            conlist.append(con)
+            odat.InvoDate = today
+            #Important this updates the orders for the final summary invoice sent out
+            if 'SI' in docref:
+                odat.Package = docref
+    db.session.commit()
+
+    ncl = f'{conlist}'
+    jl = f'{jolist}'
+    filtered_eto = [item for item in eto if item.strip()]
+    filtered_ecc = [item for item in ecc if item.strip()]
+    etf = f'{filtered_eto}'
+    ecf = f'{filtered_ecc}'
+    #print((f'the eto is {etf}')
+
+    input = Ardata(Etitle=etitle, Ebody=ebody, Emailto=etf, Emailcc=ecf, Sendfiles=f'[{docref}]',
+                   Sendasfiles=f'[{newfile}]', Jolist=jl, Emailtype='Invoice', Mid=None,
+                   Customer=shipper, Container=ncl, Date1=today, Datelist=None, From=emailfrom, Box='SENT')
+    db.session.add(input)
+    db.session.commit()
+
+def invoice_mimemail(docref, err, lastpath, sids):
     cdata = companydata()
 
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
@@ -601,16 +633,14 @@ def invoice_mimemail(docref, err, lastpath):
 
     ebody = f'{ebody} {closing}'
 
-    if 'INV' in docref or 'Inv' in docref:
-        lastpath = 'vInvoice'
-    elif 'Proof' in docref:
+    if 'Proof' in docref:
         lastpath = 'vProofs'
     elif 'Manifest' in docref:
         lastpath = 'vManifest'
 
     if newfile != 'none':
         cfrom = addpath(f'static/{scac}/data/{lastpath}/{docref}')
-        print(cfrom,newfile)
+        #print(cfrom,newfile)
         shutil.copy(cfrom,newfile)
 
     #emailto = "export@firsteaglelogistics.com"
@@ -635,7 +665,7 @@ def invoice_mimemail(docref, err, lastpath):
             emailto.append(emt)
 
     from_dom = emailfrom.split('@')[1]
-    print(f'from invoice_mimemail in class8-utls_email: the domain is: {from_dom}')
+    #print(f'from invoice_mimemail in class8-utls_email: the domain is: {from_dom}')
 
     msg["From"] = emailfrom
     msg["To"] = tolist
@@ -662,7 +692,7 @@ def invoice_mimemail(docref, err, lastpath):
     server = smtplib.SMTP(ourserver)
     server.starttls()
     code, check = server.login(username,password)
-    print('check', code, check.decode("utf-8"))
+    #print('check', code, check.decode("utf-8"))
     err.append(f"Email Login: {check.decode('utf-8')}")
     err.append(f"Email To: {emailin1} sent")
     err.append(f"Email From: {emailfrom}")
@@ -670,13 +700,17 @@ def invoice_mimemail(docref, err, lastpath):
 
     server.quit()
 
+    update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids)
+
     return err
 
-def info_mimemail(emaildata):
+def info_mimemail(emaildata, sids):
     err=[]
     cdata = companydata()
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
     closing = f'<br><br>Accounts Payable Team<br>{company_info}'
+
+    #print((f'for info mimemail sids is {sids}')
 
     ourserver = websites['mailserver']
     etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, sendname, folder = emaildata
@@ -705,7 +739,7 @@ def info_mimemail(emaildata):
             emailto.append(emt)
 
     from_dom = emailfrom.split('@')[1]
-    print(f'from info_mimemail in class8-utls_email: the domain is: {from_dom}')
+    #print(f'from info_mimemail in class8-utls_email: the domain is: {from_dom}')
 
     msg["From"] = emailfrom
     msg["To"] = tolist
@@ -721,7 +755,7 @@ def info_mimemail(emaildata):
     if sourcename != 'No Attachment':
         cfrom = addpath(f'static/{scac}/data/{folder}/{sourcename}')
         newfile = addpath(f'static/{scac}/data/temp/{sendname}')
-        print(cfrom,newfile)
+        #print(cfrom,newfile)
         shutil.copy(cfrom,newfile)
 
         attachment = open(newfile, "rb")
@@ -738,7 +772,7 @@ def info_mimemail(emaildata):
     server = smtplib.SMTP(ourserver)
     server.starttls()
     code, check = server.login(username,password)
-    print('check', code, check.decode("utf-8"))
+    #print('check', code, check.decode("utf-8"))
     err.append(f"Email Login: {check.decode('utf-8')}")
     err.append(f"Email To: {emailin1} sent")
     err.append(f"Email From: {emailfrom}")
@@ -746,13 +780,15 @@ def info_mimemail(emaildata):
 
     server.quit()
 
+    update_ardata(etitle, ebody, eto, ecc, sourcename, sendname, emailfrom, 'vPackage', sids)
+
     return err
 
 def html_mimemail(emaildata):
     err=[]
     ourserver = websites['mailserver']
     #emaildata = [etitle, ebody, eto, ecc, efrom, epass, f'/static/{scac}/data/vInvoice/', dat30, invoices, packages, new_invoices, new_packages, salutation, newwb]
-    etitle, ebody, emailin, emailcc, username, password, folder, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach, tone = emaildata
+    etitle, ebody, emailin, emailcc, username, password, folder, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach, tone, folder2 = emaildata
 
     emailfrom = username
 
@@ -769,7 +805,7 @@ def html_mimemail(emaildata):
         emailto.append(emt)
 
     from_dom = emailfrom.split('@')[1]
-    print(f'from html_mimemail in class8-utls_email: the domain is: {from_dom}')
+    #print(f'from html_mimemail in class8-utls_email: the domain is: {from_dom}')
 
     msg["To"] = tolist
     msg["CC"] = cclist
@@ -781,27 +817,29 @@ def html_mimemail(emaildata):
 
     # See if there is an attachment
     for ix, invoice in enumerate(invoices):
-        cfrom = addpath(f'static/{scac}/data/vInvoice/{invoice}')
-        newfile = addpath(f'static/{scac}/data/temp/{ni[ix]}')
-        print(cfrom,newfile)
-        shutil.copy(cfrom,newfile)
-        attachment = open(newfile, "rb")
-        part = MIMEBase('application', 'octet-stream')
-        part.set_payload((attachment).read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', "attachment; filename= %s" % ni[ix])
-        msg.attach(part)
+        if invoice is not None:
+            cfrom = addpath(f'static/{scac}/data/vInvoice/{invoice}')
+            newfile = addpath(f'static/{scac}/data/temp/{ni[ix]}')
+            #print(cfrom,newfile)
+            shutil.copy(cfrom,newfile)
+            attachment = open(newfile, "rb")
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload((attachment).read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', "attachment; filename= %s" % ni[ix])
+            msg.attach(part)
     for ix, package in enumerate(packages):
-        cfrom = addpath(f'static/{scac}/data/vPackage/{package}')
-        newfile = addpath(f'static/{scac}/data/temp/{np[ix]}')
-        print(cfrom,newfile)
-        shutil.copy(cfrom,newfile)
-        attachment = open(newfile, "rb")
-        part = MIMEBase('application', 'octet-stream')
-        part.set_payload((attachment).read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', "attachment; filename= %s" % np[ix])
-        msg.attach(part)
+        if package is not None:
+            cfrom = addpath(f'static/{scac}/data/vPackage/{package}')
+            newfile = addpath(f'static/{scac}/data/temp/{np[ix]}')
+            #print(cfrom,newfile)
+            shutil.copy(cfrom,newfile)
+            attachment = open(newfile, "rb")
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload((attachment).read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', "attachment; filename= %s" % np[ix])
+            msg.attach(part)
     if wbfile is not None:
         cfrom = addpath(f'static/{scac}/data/temp/{wbfile}')
         newfile = addpath(f'static/{scac}/data/temp/{wbattach}')
@@ -820,9 +858,9 @@ def html_mimemail(emaildata):
 
     server = smtplib.SMTP(ourserver)
     server.starttls()
-    print(f'logging in as {username} and {password}')
+    #print(f'logging in as {username} and {password}')
     code, check = server.login(username,password)
-    print('check', code, check.decode("utf-8"))
+    #print('check', code, check.decode("utf-8"))
     err.append(f"Email Login: {check.decode('utf-8')}")
     err.append(f"Email To: {emailto} sent")
     err.append(f"Email From: {emailfrom}")

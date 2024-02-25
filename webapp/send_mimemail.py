@@ -45,7 +45,7 @@ def send_mimemail(emaildata,emailsender):
         msg["To"] = f'{emailin1}'
 
     from_dom = emailfrom.split('@')[1]
-    print(f'from send_mimemail in send_mimemail.py: the domain is: {from_dom}')
+    #print(f'from send_mimemail in send_mimemail.py: the domain is: {from_dom}')
     msg['Date'] = formatdate()
     msg['Message-ID'] = make_msgid(domain=from_dom)
 
@@ -68,7 +68,7 @@ def send_mimemail(emaildata,emailsender):
         part.add_header('Content-Disposition', "attachment; filename= %s" % newfile)
         msg.attach(part)
 
-    print('username=',username,password)
+    #print('username=',username,password)
     server = smtplib.SMTP(ourserver)
     server.starttls()
     server.login(username,password)

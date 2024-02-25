@@ -77,7 +77,7 @@ def reportmaker(type,thiscomp):
     if type=='customer':
         custbackground(file2)
         custheaders(file3,thiscomp)
-        print('thiscompany=',thiscomp)
+        #print('thiscompany=',thiscomp)
         itemlist,headerlist,pstops=custcalcs(thiscomp)
         pages,multioutput=custcontents(file4,itemlist,headerlist,pstops,cache)
         if len(pages)>1:
@@ -103,12 +103,12 @@ def reportmaker(type,thiscomp):
         else:
             stamp=0
         file2=addpath(f'tmp/{scac}/data/vreport/depositslip.pdf')
-        print('thiscomp=',thiscomp)
+        #print('thiscomp=',thiscomp)
         itemlist=depositcalcs(thiscomp)
         # We are creating a deposit for review so get the account to deposit into
         depojo = request.values.get('depojo')
         acdeposit = request.values.get('acdeposit')
-        print(itemlist,depojo)
+        #print(itemlist,depojo)
         pages,multioutput=depositcontents(file4,itemlist,cache,depojo,acdeposit,stamp)
         cache,docref=pagemerger([file4,file2,file1],cache)
 

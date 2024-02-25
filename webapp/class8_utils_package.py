@@ -31,10 +31,10 @@ def call_stamp(odat, task_iter):
     else:
         stampstring = odat.Status
         if isinstance(stampstring, str):
-            print('stampstring is:', stampstring)
+            #print('stampstring is:', stampstring)
             stampdata = json.loads(stampstring)
             if isinstance(stampdata, list):
-                print('json loads stampdata is', stampdata)
+                #print('json loads stampdata is', stampdata)
                 if None in stampdata: stampdata = [0]*12
             else: stampdata = [3, 35, 35, 1,5, 120, 100, 1, 5, 477, 350, 12]
     return stampdata
@@ -79,12 +79,12 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
         doc_stamps.append(key)
     for key in document_signatures:
         doc_signatures.append(key)
-    print('the stamplist is:', stamplist)
-    print('the stampdata is:', stampdata)
+    #print('the stamplist is:', stamplist)
+    #print('the stampdata is:', stampdata)
 
     for jx, stamp in enumerate(stamplist):
         stampname = stampdata[7*jx + 5]
-        print('stampname is:',stampname)
+        #print('stampname is:',stampname)
         if stampname in doc_stamps:
             listdata = document_stamps[stampname]
         if stampname in doc_signatures:
@@ -108,10 +108,10 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
         scalesize[0] = int(stamp_scale * imsize_list[0])
         scalesize[1] = int(stamp_scale * imsize_list[1])
         newsize = tuple(scalesize)
-        print(newsize)
+        #print(newsize)
         new_image = image.resize(newsize)
         new_filepath = addpath(f'static/{scac}/data/{stampfolder}/{stampfile}_{scalesize[0]}_{scalesize[1]}.png')
-        print(new_filepath)
+        #print(new_filepath)
         new_image.save(new_filepath)
         c.drawImage(new_filepath, stamp_right, stamp_up, mask='auto')
         c.showPage()
@@ -186,7 +186,8 @@ def get_doclist(odat, dockind):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('No source file exists')
+                    pass
+                    #print('No source file exists')
             if thisdoc == 'RateCon':
                 try:
                     fa = addpath(f'static/{scac}/data/vRateCon/{odat.RateCon}')
@@ -194,7 +195,8 @@ def get_doclist(odat, dockind):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('No ratecon file exists')
+                    pass
+                    #print('No ratecon file exists')
             if thisdoc == 'Invoice':
                 try:
                     fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
@@ -202,25 +204,27 @@ def get_doclist(odat, dockind):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('No invoice exists')
+                    pass
+                    #print('No invoice exists')
             if thisdoc == 'Proofs':
                 try:
                     fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
-                    print('Looking for proof file:', fa)
+                    #print('Looking for proof file:', fa)
                     if os.path.isfile(fa):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('Proof file 1 does not exist')
+                    #print('Proof file 1 does not exist')
                     fexist[jx] = 0
                 try:
                     fa = addpath(f'static/{scac}/data/vProof/{odat.Proof2}')
-                    print('Looking for 2nd proof file:', fa)
+                    #print('Looking for 2nd proof file:', fa)
                     if os.path.isfile(fa):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('Proof file 2 does not exist')
+                    pass
+                    #print('Proof file 2 does not exist')
 
             if thisdoc == 'PaidInvoice':
                 try:
@@ -230,7 +234,8 @@ def get_doclist(odat, dockind):
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
-                    print('Paid Invoice does not exist')
+                    pass
+                    #print('Paid Invoice does not exist')
             if thisdoc == 'Gate Tickets':
                 idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
                 if idata:
@@ -239,7 +244,7 @@ def get_doclist(odat, dockind):
                         con = idata[0].Container
                         newdoc = f'static/{scac}/data/vGate/{con}_Blended.pdf'
                         if os.path.isfile(addpath(newdoc)):
-                            print(f'{newdoc} exists already')
+                            #print(f'{newdoc} exists already')
                             packitems.append(addpath(newdoc))
                             fexist[jx] = 1
                         else:
@@ -256,7 +261,8 @@ def get_doclist(odat, dockind):
                             packitems.append(addpath(f'static/{scac}/data/vGate/{idata[0].Source}'))
                             fexist[jx] = 1
                         else:
-                            print('Single gate ticket does not exist')
+                            pass
+                            #print('Single gate ticket does not exist')
     return fexist, packitems
 
 def getdocs(odat):
@@ -302,11 +308,12 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
         #Gaear towards an invoice package with Invoices, Proof, Gate, RateCon
         dockind = getdocs(odat)
         #dockind = document_types[eprof]
-    print('dockind=',dockind)
+    #print('dockind=',dockind)
     try:
         cache2 = int(odat.Pkcache) + 1
     except:
         cache2 = 1
+    oldfile = f'static/{scac}/data/vPackage/{odat.Package}'
     basefile = f'P_c{cache2}_{odat.Jo}.pdf'
     odat.Package = basefile
     odat.Pkcache = cache2
@@ -321,8 +328,8 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
     #stampdata = call_stamp(odat, task_iter)
     fexist, packitems = get_doclist(odat, dockind)
 
-    print('packitems final:', packitems)
-    print('stampdata final:', stampdata)
+    #print('packitems final:', packitems)
+    #print('stampdata final:', stampdata)
 
     if len(packitems) >= 1:
         pdflist = ['pdfunite'] + packitems + [addpath(docref)]
@@ -332,11 +339,16 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
 
     stampnow = request.values.get('stampnow')
     if stampnow is not None or eprof == 'Paid Invoice':
-        print(f'stamping document going in: {docref}')
+        #print(f'stamping document going in: {docref}')
         docref = stamp_document(genre, odat, stamplist, stampdata, err, docref)
-        print(f'stamped document coming out: {docref}')
+        #print(f'stamped document coming out: {docref}')
 
     emaildata[6] = odat.Package
-    print('dockind at end=', dockind)
+    #print('dockind at end=', dockind)
+
+    try:
+        os.remove(oldfile)
+    except:
+        pass
 
     return emaildata, stampdata, dockind, docref, err, fexist

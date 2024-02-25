@@ -449,7 +449,7 @@ def Class8Main(genre):
 @main.route('/Revenue', methods=['GET', 'POST'])
 @login_required
 def Revenue():
-    print('Made it to the Revenue Data Center')
+    #print('Made it to the Revenue Data Center')
     title1,col1,data1,title2,col2,data2,title3,col3,data3,tabon = get_revenues()
     return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2, title3=title3, col3=col3, data3=data3, tabon=tabon)
 
@@ -460,7 +460,7 @@ def EasyStart():
     calbut=request.values.get('calbut')
     if calbut is not None:
         return redirect(url_for('main.CalendarBig'))
-    print('Working the EasyStart route!!')
+    #print('Working the EasyStart route!!')
     srcpath = statpath('')
     return render_template('easystart.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
@@ -486,6 +486,7 @@ def EasyStart():
 #    return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
 @main.route('/QuoteMaker', methods=['GET', 'POST'])
+@login_required
 def QuoteMaker():
     from iso_Q import isoQuote
     bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, dirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt, multibid = isoQuote()
@@ -495,12 +496,13 @@ def QuoteMaker():
                            distdata=distdata, locto=locto, locfrom=locfrom, emaildata = emaildata, dirdata=dirdata, qdata = qdata, bidthis=bidthis, taskbox=taskbox, thismuch=thismuch, quot=quot, qdat=qdat, bidname=bidname, tbox=tbox, ebodytxt=ebodytxt, multibid=multibid)
 
 @main.route('/ARMaker', methods=['GET', 'POST'])
+@login_required
 def ARMaker():
     from iso_AR import isoAR
-    status, ardata, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails, rview= isoAR()
+    status, ardata, arsent, this_shipper, odata, task, emaildata, boxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview= isoAR()
     if status == 'exitnow': return redirect(url_for('main.Class8Main',genre='Trucking'))
     else:
-        return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, this_shipper=this_shipper, odata=odata, task=task, emaildata=emaildata, boxes=boxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails=ar_emails, rview=rview)
+        return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, arsent=arsent, this_shipper=this_shipper, odata=odata, task=task, emaildata=emaildata, boxes=boxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails_cust=ar_emails_cust, rview=rview)
 
 
 @main.route('/Reports', methods=['GET', 'POST'])

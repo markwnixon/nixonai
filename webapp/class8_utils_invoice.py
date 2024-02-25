@@ -156,7 +156,8 @@ def addpayment(file1, cache, amtowed, payment, paidon, payref, paymethod):
     try:
         paidon = paidon.strftime('%m/%d/%Y')
     except:
-        print('Already a string')
+        pass
+        #print('Already a string')
     file2 = file1.replace('.pdf', f'_Paid{cache}.pdf')
     file2 = file2.replace('/vInvoice','/vPaidInvoice')
     c = canvas.Canvas(file2, pagesize=letter)
@@ -190,7 +191,7 @@ def addpayment(file1, cache, amtowed, payment, paidon, payref, paymethod):
 def make_topline_headers(c, tablesetup, pdata1, odata, invostyle, ltm, m1, dl, bump, ctm, rtm, level1, dh):
     header1 = tablesetup['invoicetypes'][invostyle]['Top Blocks']
     lh1 = len(header1)
-    print(f'Making invoice for lh1: {lh1}')
+    #print(f'Making invoice for lh1: {lh1}')
 
     if lh1 < 4:
         if lh1 > 0:
@@ -527,6 +528,10 @@ def make_invo_doc(odata, ldata, pdata1, cache, invodate, payment, tablesetup, in
     #
     # Now make a cache copy
     shutil.copy(file1, file2)
+    try:
+        os.remove(file1)
+    except:
+        pass
 
     return file2
 
@@ -537,8 +542,8 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     si = sdat.Si
     docref = sdat.Source
     newbase = f'{si}_c{cache}.pdf'
-    file1 = addpath(f'static/{scac}/data/vInvoice/{docref}')
-    file2 = addpath(f'static/{scac}/data/vInvoice/{si}_c{cache}.pdf')
+    file1 = addpath(f'static/{scac}/data/vPackage/{docref}')
+    file2 = addpath(f'static/{scac}/data/vPackage/{si}_c{cache}.pdf')
     today = datetime.datetime.today().strftime('%m/%d/%Y')
 
     if invodate is None or invodate == 0:
@@ -660,11 +665,11 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     min_w = []
     for header in header3:
         thisw = stringWidth(header, 'Helvetica', 11)
-        print(f'header {header} {thisw}')
+        #print(f'header {header} {thisw}')
         thisw = thisw + spread
         min_w.append(thisw)
     for line in all_lines:
-        print(line)
+        #print(line)
         for kx, element in enumerate(line):
             if element is None: element = 'None'
             thisw = stringWidth(element, 'Times-Roman', 9) + 5
@@ -775,6 +780,10 @@ def make_summary_doc(sdata, sdat, pdat, cache, invodate, payment, tablesetup, in
     #
     # Now make a cache copy
     shutil.copy(file1, file2)
+    try:
+        os.remove(file1)
+    except:
+        pass
 
     return file2, newbase
 
@@ -820,7 +829,7 @@ def writechecks(sids,pmeth):
     file1 = addpath(f'static/{scac}/data/vCheck/{docref}')
     bdat.Ccache = cache + 1
     db.session.commit()
-    print(f'The check docref is {docref} and ckstyle is {ckstyle}')
+    #print(f'The check docref is {docref} and ckstyle is {ckstyle}')
 
     try:
         if multi: amt = bdat.pAmount2
@@ -851,7 +860,7 @@ def writechecks(sids,pmeth):
     amount_num = d2s(amount)
     bank = bdat.pAccount
     amount_text = get_check_words(amount_num)
-    # print(amount_text)
+    # #print(amount_text)
 
     # We need to add '*******' to back of this enough to fill up the rest of the block
     atlen = len(amount_text)
@@ -947,7 +956,7 @@ def writechecks(sids,pmeth):
             c.drawString(374, 587, '***Void Until Recorded***')
             c.setFont('Helvetica', 12, leading=None)
 
-# Middle 1/3 section ********** only print this section if making a payment record that is not a check
+# Middle 1/3 section ********** only #print this section if making a payment record that is not a check
 
         memoline2 = m6 - dl * 2
         if ckstyle == 1:
