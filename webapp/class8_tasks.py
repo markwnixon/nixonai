@@ -177,9 +177,9 @@ def get_Orders_keydata(keydata, checked_data):
     nc = sum(cks[1] for cks in checked_data)
     tids = [cks[2] for cks in checked_data if cks[2] != []]
     tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-    # print('nc=', nc)
-    # print(tids)
-    # print(tabs)
+    print('nc=', nc)
+    print(tids)
+    print(tabs)
     if nc == 1:
         thistable = tabs[0]
         sid = tids[0][0]
@@ -892,7 +892,8 @@ def Table_maker(genre):
             #print(f'On task_iter {task_iter} keydata is {keydata}')
             task_iter = int(task_iter) + 1
             # Need to pick up some of the keydata after table build
-            if checked_data is not None:
+            if checked_data != [] and checked_data is not None:
+                print(checked_data)
                 if checked_data[0] == 'Orders': keydata = get_Orders_keydata(keydata, checked_data)
 
 
