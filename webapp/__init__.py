@@ -31,7 +31,7 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["DEBUG"] = False
     app.config["SECRET_KEY"] = dbp[5]
-    app.secret_key = dbp[5]
+    #app.secret_key = dbp[5]
 
     db.init_app(app)
     bcrypt.init_app(app)
