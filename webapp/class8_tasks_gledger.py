@@ -14,7 +14,7 @@ def get_company(pid):
             co = adat.Name
         else:
             co = 'Not There'
-            print('Problem finding vendor')
+           #print('Problem finding vendor')
     return co
 
 def check_revenue_acct(fd):
@@ -150,7 +150,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             acctdb='Accounts Receivable'
             acctcr = check_revenue_acct(fd)
             #acctcr='Revenues'
-            print('Gledger Write:',jo, acctdb, acctcr)
+           #print('Gledger Write:',jo, acctdb, acctcr)
             idat=Invoices.query.filter(Invoices.Jo==jo).first()
             pid=idat.Pid
             date = idat.Date
@@ -197,7 +197,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             pid=odat.Bid
             #date = odat.PaidDate
             co = get_company(pid)
-            print(f'Attempting to adb {acctdb} and {cc}')
+           #print(f'Attempting to adb {acctdb} and {cc}')
 
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first()
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first()
@@ -247,7 +247,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             else:
                 pid=0
                 comp = acctcr
-            print('cc=',cc)
+           #print('cc=',cc)
             acr=Accounts.query.filter((Accounts.Name=='Cash') & (Accounts.Co ==cc)).first()
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first()
             # In this case jo is the deposit ticket code
@@ -286,7 +286,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             co = get_company(pid)
 
             acctcr = 'Accounts Payable'
-            print(acctdb,cc)
+           #print(acctdb,cc)
 
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first() #the expense account
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first() #the asset account
@@ -337,7 +337,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             co = get_company(pid)
 
             acctdb = 'Accounts Payable'
-            print(acctcr,cc)
+           #print(acctcr,cc)
 
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first() #the expense account
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first() #the asset account
@@ -348,7 +348,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
                 if acr is not None:
                     acrco = acr.Co
                     if acrco != cc:
-                        print('Mismatched Bills')
+                       #print('Mismatched Bills')
                         newcc = acr.Co
 
                 adat1 = Accounts.query.filter( (Accounts.Name.contains('Due to')) & (Accounts.Name.contains(cc)) & (Accounts.Co == newcc)).first()
@@ -485,7 +485,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
             co = get_company(pid)
 
             acctcr = 'Accounts Payable'
-            print(acctdb,cc)
+           #print(acctdb,cc)
 
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first() #the expense account
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first() #the asset account

@@ -25,8 +25,8 @@ SQLALCHEMY_DATABASE_URI = dbp[0] +"{username}:{password}@{hostname}/{databasenam
 def create_app():
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
-    app.config["SQLALCHEMY_POOL_RECYCLE"] = 280
-    app.config['SQLALCHEMY_POOL_TIMEOUT'] = 10
+    app.config["SQLALCHEMY_POOL_RECYCLE"] = 600
+    app.config['SQLALCHEMY_POOL_TIMEOUT'] = 60
     app.config['SQLALCHEMY_POOL_PRE_PING'] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["DEBUG"] = False

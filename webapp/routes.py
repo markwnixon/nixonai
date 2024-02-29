@@ -486,7 +486,6 @@ def EasyStart():
 #    return render_template('CalendarTest.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac)
 
 @main.route('/QuoteMaker', methods=['GET', 'POST'])
-@login_required
 def QuoteMaker():
     from iso_Q import isoQuote
     bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, dirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt, multibid = isoQuote()

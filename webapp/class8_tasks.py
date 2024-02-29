@@ -177,9 +177,9 @@ def get_Orders_keydata(keydata, checked_data):
     nc = sum(cks[1] for cks in checked_data)
     tids = [cks[2] for cks in checked_data if cks[2] != []]
     tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-    print('nc=', nc)
-    print(tids)
-    print(tabs)
+    #print('nc=', nc)
+    #print(tids)
+    #print(tabs)
     if nc == 1:
         thistable = tabs[0]
         sid = tids[0][0]
@@ -250,7 +250,7 @@ def get_Orders_keydata(keydata, checked_data):
     return keydata
 
 def populate(tables_on,tabletitle,tfilters,jscripts):
-    # print(int(filter(check.isdigit, check)))
+    #print(int(filter(check.isdigit, check)))
     checked_data = []
     table_data = []
     labpassvec = []
@@ -893,7 +893,7 @@ def Table_maker(genre):
             task_iter = int(task_iter) + 1
             # Need to pick up some of the keydata after table build
             if checked_data != [] and checked_data is not None:
-                print(checked_data)
+                #print(checked_data)
                 if checked_data[0] == 'Orders': keydata = get_Orders_keydata(keydata, checked_data)
 
 
@@ -1401,7 +1401,8 @@ def make_new_entry(tablesetup,holdvec):
                     shutil.move(oldpath, newpath)
                     #print(f'Moved file {oldpath} to {newpath}')
                 except:
-                    print('File already moved')
+                    pass
+                    #print('File already moved')
                 # Test to see if file exists
                 if not os.path.isfile(newpath): newfile = None
 
@@ -2489,7 +2490,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                             for ix, entry in enumerate(entrydata):
                                 if entry[0] == colist2[jx]:
                                     holdvec[ix] = thisval
-                                    # print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+                                    #print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
 
             err.append(f'There are {failed} input errors and {warned} input warnings')
 
@@ -2515,7 +2516,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                             thissubvalue = thisvalue[0]
                         except:
                             thissubvalue = ''
-                        # print('Updating Entry with', entry[0], thissubvalue)
+                        #print('Updating Entry with', entry[0], thissubvalue)
                         setattr(modata, f'{entry[0]}', thissubvalue)
                     db.session.commit()
                 else:
@@ -2631,7 +2632,7 @@ def get_last_used_stamps(odat):
                 if isinstance(stampdata[7 * ix + 6], str): stamplist.append(stampdata[7 * ix + 6])
         except:
             pass
-            print(f'String for stamp in this location is {stampstring} and not in json format')
+            #print(f'String for stamp in this location is {stampstring} and not in json format')
     return stamplist, stampdata
 
 def make_bool(input):
@@ -3291,7 +3292,7 @@ def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
                     for ix, entry in enumerate(entrydata):
                         if entry[0] == colist2[jx]:
                             holdvec[ix] = thisval
-                            # print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
+                            #print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
 
     err.append(f'There are {failed} input errors and {warned} input warnings')
     return holdvec, err, failed
@@ -3431,7 +3432,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                                         thissubvalue = thisvalue[0]
                                     except:
                                         thissubvalue = ''
-                                    # print('Updating Entry with', entry[0], thissubvalue)
+                                    #print('Updating Entry with', entry[0], thissubvalue)
                                     setattr(each_bdat, f'{entry[0]}', thissubvalue)
                                 db.session.commit()
                             # err.append(f"Updated entry in {tablesetup['table']}")
@@ -3518,7 +3519,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 try: os.remove(lastfile)
                 except:
                     pass
-                    print(f'{lastfile} does not exist')
+                    #print(f'{lastfile} does not exist')
 
             if record_item is not None:
                 for sid in sids:
