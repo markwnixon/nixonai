@@ -837,8 +837,9 @@ class Quotes(db.Model):
     Start = db.Column('Start', db.String(45))
     Emailto = db.Column('Emailto', db.String(45))
     Subjectsend = db.Column('Subjectsend', db.String(100))
+    Markup = db.Column('Markup', db.String(10))
 
-    def __init__(self, Date, From, Subject, Response, Amount, Location, Status, Responder, RespDate, Start, Mid, Person, Emailto, Subjectsend):
+    def __init__(self, Date, From, Subject, Response, Amount, Location, Status, Responder, RespDate, Start, Mid, Person, Emailto, Subjectsend, Markup):
         self.Date = Date
         self.From = From
         self.Subject = Subject
@@ -853,6 +854,7 @@ class Quotes(db.Model):
         self.Person = Person
         self.Emailto = Emailto
         self.Subjectsend = Subjectsend
+        self.Markup = Markup
 
 
 class DriverAssign(db.Model):

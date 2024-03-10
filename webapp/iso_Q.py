@@ -197,6 +197,7 @@ def add_quote_emails():
         # extract the subject of the email
         subject = extract_for_code(email_message["Subject"])
         mid = extract_for_code(email_message["Message-ID"])
+        mid = mid.strip()
         fromp = extract_for_code(email_message["From"])
         #print(f'Message ID: {mid}')
         #print(f'Subject: {subject}')
@@ -224,7 +225,7 @@ def add_quote_emails():
         if qdat is None:
             try:
                 input = Quotes(Date=date_time, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
-                               Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD')
+                               Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD', Markup=None)
                 db.session.add(input)
                 db.session.commit()
             except:
@@ -682,7 +683,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
 
     return sen, tbox, btype, stype, mixtype
 
-def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
+def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newmarkup):
     # Get the base inputs costs:
     ph_driver = float(qidat.ph_driver) / 100
     fuel = float(qidat.fuelpergal) / 100
@@ -690,7 +691,6 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     pm_fuel = fuel / mpg
     ins = float(qidat.insurance_annual_truck) / 100
     ph_insurance = ins / 1992  # based on 249 work days 8 hrs per day
-    markup = float(qidat.markup) / 100
     toll = float(qidat.toll) / 100
     gapct = float(qidat.ga) / 100
     pm_repairs = float(qidat.pm_repairs) / 100
@@ -709,6 +709,14 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     reefer = float(qidat.reefer) / 100
     scale = float(qidat.scale) / 100
     resid = float(qidat.residential) / 100
+    markup = float(qidat.markup) / 100
+
+    if newmarkup is not None:
+        markupx = float(newmarkup)
+    else:
+        markupx = float(qidat.markup) / 100
+
+
 
     # Calculate road tolls
     tollroadlist = ['I-76', 'NJ Tpke']
@@ -808,13 +816,13 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     costdata = [d2s(cost_drv), d2s(cost_fuel), d2s(cost_tolls), d2s(cost_insur), d2s(cost_rm), d2s(cost_misc),
                 d2s(cost_ga), d2s(cost_direct), d2s(cost_total)]
 
-    bid = cost_total * markup
+    bid = cost_total * markupx
     dpcost = (dptime * (ph_driver + ph_insurance) + totmiles * (
                 pm_fuel + pm_repairs + pm_fees + pm_other) + cost_tolls) * (1 + gapct / 100)
-    dpbid = dpcost * markup
+    dpbid = dpcost * markupx
     bobtailcost = ((dptime - .25) * (ph_driver + ph_insurance) + (totmiles - 8) * (
                 pm_fuel + pm_repairs + pm_fees + pm_other)) * (1 + gapct / 100)
-    drbid = dpbid + bobtailcost * markup
+    drbid = dpbid + bobtailcost * markupx
     fuelbid = bid / (1 + fsc / 100)
     allbid = bid + 2 * 40
 
@@ -824,24 +832,26 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 def get_body_text(qdat):
 
     mid = qdat.Mid
+    mid = mid.strip()
     #print(f'this mid is {mid}')
     username = usernames['quot']
     password = passwords['quot']
     imap = imaplib.IMAP4_SSL(imap_url)
     imap.login(username, password)
     status, messages = imap.select('INBOX')
+    search_criteria = f'HEADER Message-ID {mid}'
     try:
-        result, data = imap.search(None, f'HEADER Message-ID {mid}')
-        msg_id_list = data[0].split()
-        result, data = imap.fetch(msg_id_list[0], '(RFC822)')
-        email_message = email.message_from_bytes(data[0][1])
-
-        # extract the subject of the email
-        subject = extract_for_code(email_message["Subject"])
-        #print(f'****Getting the Body Text***** for Subject: {subject}')
+        result, data = imap.search(None, search_criteria)
     except:
         #print('Could not locate this email header')
         return 'Email ID not found', None
+
+    msg_id_list = data[0].split()
+    result, data = imap.fetch(msg_id_list[0], '(RFC822)')
+    email_message = email.message_from_bytes(data[0][1])
+
+    # extract the subject of the email
+    #subject = extract_for_code(email_message["Subject"])
 
     # Set default text particulars
     plain_text_content = ''
@@ -869,7 +879,8 @@ def get_body_text(qdat):
         except:
             plain_text_content = 'Could not decode payload'
 
-    #print('Returning from get_body_text', plain_text_content)
+    #print('Returning from get_body_text with plain text', plain_text_content)
+    #print('Returning from get_body_text with html', html_content)
     return plain_text_content, html_content
 
 
@@ -926,6 +937,7 @@ def isoQuote():
         bidname = request.values.get('bidname')
         ware = request.values.get('Ware')
         exitnow = request.values.get('exitquotes')
+
         if exitnow is not None:
             #print('Exiting quotes')
             return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None
@@ -972,6 +984,8 @@ def isoQuote():
         def_costs = request.values.get('oldcosts')
         updatefees = request.values.get('newfees')
 
+
+
         if updatecosts is not None or updatefees is not None:
             alist = [request.values.get('driver'), request.values.get('fuel'), request.values.get('mpg'), request.values.get('insurance'), request.values.get('markup'),
                      request.values.get('toll'), request.values.get('gapct'), request.values.get('rm'), request.values.get('fees'), request.values.get('other'),
@@ -1012,7 +1026,19 @@ def isoQuote():
         pm_fuel = fuel / mpg
         ins = float(qidat.insurance_annual_truck) / 100
         ph_insurance = ins / 1992  # based on 249 work days 8 hrs per day
-        markup = float(qidat.markup)/100
+        markup = float(qidat.markup) / 100
+
+        newmarkup = request.values.get('optmarkup')
+        if newmarkup is not None:
+            try:
+                markupx = float(newmarkup)
+            except:
+                #print(f'Could not float convert {newmarkup}')
+                markupx = float(qidat.markup) / 100
+        else:
+            markupx = float(qidat.markup)/100
+            newmarkup = str(markupx)
+        #print(f'The markup and newmarkup are {markup} and {newmarkup}')
         toll = float(qidat.toll) / 100
         gapct = float(qidat.ga)/100
         pm_repairs = float(qidat.pm_repairs) / 100
@@ -1187,7 +1213,7 @@ def isoQuote():
                             #print(f'Getting data for going to location {locto}')
                             if hasinput(locto):
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
-                                biddata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
+                                biddata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newmarkup)
                                 #print(biddata)
                                 if tbox[15]: mbids.append(biddata[4])
                                 elif tbox[12]: mbids.append(biddata[0])
@@ -1199,7 +1225,6 @@ def isoQuote():
                         #print(mbids)
                         multibid[3] = mbids
 
-
                     locto = request.values.get('locto')
                     if locto is None:
                         locto = 'Capitol Heights, MD  20743'
@@ -1210,8 +1235,9 @@ def isoQuote():
                         qdat.Start = locfrom
                         qdat.Location = locto
                         qdat.From = emailto
+                        qdat.Markkup = newmarkup
                         try:
-                            bidshort = [float(bid) for bid in bidthis if hasinput(bid)]
+                            bidshort = [float(bid) for bid in biddata if hasinput(bid)]
                             qdat.Amount = d2s(max(bidshort))
                         except:
                             qdat.Amount = '0.00'
@@ -1229,6 +1255,7 @@ def isoQuote():
                         qdat.Subjectsend = emaildata[0]
                         qdat.Response = emaildata[1]
                         qdat.Emailto = emaildata[2]
+                        qdat.Markup = newmarkup
                         db.session.commit()
 
 
@@ -1389,11 +1416,11 @@ def isoQuote():
                     cost_total = cost_direct + cost_ga
                     costdata = [d2s(cost_drv),d2s(cost_fuel),d2s(cost_tolls),d2s(cost_insur), d2s(cost_rm), d2s(cost_misc), d2s(cost_ga), d2s(cost_direct), d2s(cost_total)]
 
-                    bid = cost_total * markup
+                    bid = cost_total * markupx
                     dpcost = (dptime*(ph_driver+ph_insurance) + totmiles*(pm_fuel+pm_repairs+pm_fees+pm_other) + cost_tolls)*(1+gapct/100)
-                    dpbid = dpcost*markup
+                    dpbid = dpcost*markupx
                     bobtailcost = ((dptime-.25)*(ph_driver+ph_insurance) + (totmiles-8)*(pm_fuel+pm_repairs+pm_fees+pm_other))*(1+gapct/100)
-                    drbid = dpbid+bobtailcost*markup
+                    drbid = dpbid+bobtailcost*markupx
                     fuelbid = bid/(1+fsc/100)
                     allbid = bid + 2*40
 
@@ -1548,6 +1575,7 @@ def isoQuote():
             add_quote_emails()
         thismuch = '6'
         taskbox = 0
+        newmarkup = None
 
 
     qdata = dataget_Q(thismuch)
@@ -1566,4 +1594,4 @@ def isoQuote():
     os.environ[uhtml] = htmltext
     os.environ[umid] = mid
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
-    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid
+    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup
