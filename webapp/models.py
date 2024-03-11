@@ -835,8 +835,8 @@ class Quotes(db.Model):
     Responder = db.Column('Responder', db.String(45))
     RespDate = db.Column('RespDate', db.DateTime)
     Start = db.Column('Start', db.String(45))
-    Emailto = db.Column('Emailto', db.String(45))
-    Subjectsend = db.Column('Subjectsend', db.String(100))
+    Emailto = db.Column('Emailto', db.String(100))
+    Subjectsend = db.Column('Subjectsend', db.String(200))
     Markup = db.Column('Markup', db.String(10))
 
     def __init__(self, Date, From, Subject, Response, Amount, Location, Status, Responder, RespDate, Start, Mid, Person, Emailto, Subjectsend, Markup):
