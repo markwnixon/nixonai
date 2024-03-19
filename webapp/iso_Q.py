@@ -21,6 +21,8 @@ from send_mimemail import send_mimemail
 from pyzipcode import ZipCodeDatabase
 zcdb = ZipCodeDatabase()
 
+from viewfuncs import dataget_Q, nonone, numcheck
+
 API_KEY_GEO = apikeys['gkey']
 API_KEY_DIS = apikeys['dkey']
 cdata = companydata()
@@ -192,44 +194,42 @@ def add_quote_emails():
         # Insert the GPTChat solution
         result, email_data = imap.fetch(str(i), "(RFC822)")
         # convert the email message data into an email object
-        email_message = email.message_from_bytes(email_data[0][1])
+        #print(f'Result for email {i} is {result}')
+        if result == 'OK':
+            email_message = email.message_from_bytes(email_data[0][1])
 
-        # extract the subject of the email
-        subject = extract_for_code(email_message["Subject"])
-        mid = extract_for_code(email_message["Message-ID"])
-        mid = mid.strip()
-        fromp = extract_for_code(email_message["From"])
-        #print(f'Message ID: {mid}')
-        #print(f'Subject: {subject}')
-        #print(f'From: {fromp}')
+            # extract the subject of the email
+            subject = extract_for_code(email_message["Subject"])
+            mid = extract_for_code(email_message["Message-ID"])
+            mid = mid.strip()
+            fromp = extract_for_code(email_message["From"])
+            #print(f'Message ID: {mid}')
+            #print(f'Subject: {subject}')
+            #print(f'From: {fromp}')
 
-        # extract the date and time the email was sent
-        try:
-            date_time_str = email_message["Date"]
-            date_time = parsedate_to_datetime(date_time_str)
-            thisdate = date_time.date()
-            thistime = date_time.time()
-            #print(f'Date: {str(thisdate)}')
-            #print(f'Time: {str(thistime)}')
-        except:
-            date_time = today_now
-            thisdate = today
-            thistime = timenow
-            #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
-
-
-
-
-
-        qdat = Quotes.query.filter(Quotes.Mid == mid).first()
-        if qdat is None:
+            # extract the date and time the email was sent
             try:
-                input = Quotes(Date=date_time, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
-                               Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD', Markup=None)
-                db.session.add(input)
-                db.session.commit()
+                date_time_str = email_message["Date"]
+                date_time = parsedate_to_datetime(date_time_str)
+                thisdate = date_time.date()
+                thistime = date_time.time()
+                #print(f'Date: {str(thisdate)}')
+                #print(f'Time: {str(thistime)}')
             except:
-                print(f'Could not input the body of the email with subject {subject}')
+                date_time = today_now
+                thisdate = today
+                thistime = timenow
+                #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
+
+            qdat = Quotes.query.filter(Quotes.Mid == mid).first()
+            if qdat is None:
+                try:
+                    input = Quotes(Date=date_time, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
+                                   Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD', Markup=None)
+                    db.session.add(input)
+                    db.session.commit()
+                except:
+                    print(f'Could not input the body of the email with subject {subject}')
 
     # close the connection and logout
     imap.close()
@@ -703,7 +703,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
 
     return sen, tbox, btype, stype, mixtype
 
-def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newmarkup):
+def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     # Get the base inputs costs:
     ph_driver = float(qidat.ph_driver) / 100
     fuel = float(qidat.fuelpergal) / 100
@@ -711,7 +711,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
     pm_fuel = fuel / mpg
     ins = float(qidat.insurance_annual_truck) / 100
     ph_insurance = ins / 1992  # based on 249 work days 8 hrs per day
-    toll = float(qidat.toll) / 100
+    md_toll = float(qidat.toll) / 100
     gapct = float(qidat.ga) / 100
     pm_repairs = float(qidat.pm_repairs) / 100
     pm_fees = float(qidat.pm_fees) / 100
@@ -719,6 +719,8 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
     pmc = pm_fuel + pm_repairs + pm_fees + pm_other
     phc = ph_driver + ph_insurance
     fsc = float(qidat.FSC) / 100
+
+
     chassis2 = float(qidat.chassis2) / 100
     chassis3 = float(qidat.chassis3) / 100
     prepull = float(qidat.prepull) / 100
@@ -731,16 +733,20 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
     resid = float(qidat.residential) / 100
     markup = float(qidat.markup) / 100
 
+    newmarkup = request.values.get('optmarkup')
     if newmarkup is not None:
-        markupx = float(newmarkup)
+        try:
+            markupx = float(newmarkup)
+        except:
+            # print(f'Could not float convert {newmarkup}')
+            markupx = float(qidat.markup) / 100
     else:
         markupx = float(qidat.markup) / 100
-
-
+        newmarkup = str(markupx)
 
     # Calculate road tolls
-    tollroadlist = ['I-76', 'NJ Tpke']
-    tollroadcpm = [.784, .275]
+    tollroadlist = ['I-76', 'NJ Tpke', 'MD-200']
+    tollroadcpm = [.784, .275, .35]
     legtolls = len(dirdata) * [0.0]
     legcodes = len(dirdata) * ['None']
     for lx, mi in enumerate(miles):
@@ -754,11 +760,15 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
     bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
     fsk_tollbox = [39.232770, -76.502453, 39.202279, -76.569906]
     bay_tollbox = [39.026893, -76.417512, 38.964938, -76.290104]
-    sus_tollbox = [39.585193, -76.142883, 39.552328, -76.033975]
+    sus_tollbox = [39.585193, -76.142883, 39.572328, -76.033975]
     new_tollbox = [39.647121, -75.774523, 39.642613, -75.757187]  # Newark Delaware Toll Center
     dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
-    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB']
-    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox]
+    thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055]  # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
+    dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659]  # Dulles Toll Rd Plaza
+    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
+    onceonly = []
+    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox,
+                 dtr_tollbox]
 
     for jx, lat in enumerate(lats):
         stat1 = 'ok'
@@ -778,8 +788,13 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
                 if lo > lol and lo < loh:
                     stat2 = 'toll'
                     tollcode = tollcodes[kx]
-                    legtolls[jx] = 24.00
-                    legcodes[jx] = tollcode
+                    if tollcode not in onceonly:
+                        if tollcode == 'DTR':
+                            legtolls[jx] = 10.50
+                        else:
+                            legtolls[jx] = 24.00
+                        legcodes[jx] = tollcode
+                        onceonly.append(tollcode)
             if jx > 0:
                 lam = (lah + lal) / 2.0
                 lom = (loh + lol) / 2.0
@@ -788,7 +803,10 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
                 stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
                 if stat3 == 1 and stat4 == 1:
                     tollcode = tollcodes[kx]
-                    legtolls[jx] = 24.00
+                    if tollcode == 'DTR':
+                        legtolls[jx] = 10.50
+                    else:
+                        legtolls[jx] = md_toll
                     legcodes[jx] = tollcode
         ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
 
@@ -847,7 +865,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newm
     allbid = bid + 2 * 40
 
     biddata = [d2s(roundup(bid)), d2s(roundup(drbid)), d2s(roundup(dpbid)), d2s(roundup(fuelbid)), d2s(roundup(allbid))]
-    return biddata
+    return timedata, distdata, costdata, biddata, newdirdata
 
 def get_body_text(qdat):
 
@@ -906,6 +924,217 @@ def get_body_text(qdat):
     #print('Returning from get_body_text with html', html_content)
     return plain_text_content, html_content
 
+def go_to_next(mid, oldmid, taskbox):
+    #Loads in the next email off of a remove and go....
+    qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
+    if qdat is not None:
+        quot = qdat.id
+        quotbut = qdat.id
+        # Check to see if we have rolled into a new date, if so then go back to the table
+        datethis = f'{qdat.Date}'
+        datelast = request.values.get('datelast')
+
+        if datelast is not None:
+            try:
+                datethis = datethis[0:10]
+                datelast = datelast[0:10]
+            except:
+                datethis = '0'
+                datelast = '1'
+            # print(f'comparing {datethis} to {datelast}')
+            if datethis == datelast:
+                # print(f'Getting body_text because it is a successful remove and go')
+                # Change from lower section### gets the email data since below where we get email data
+                taskbox = 5
+                plaintext, htmltext = get_body_text(qdat)
+                mid = qdat.Mid
+                oldmid = qdat.Mid
+                emailto = qdat.From
+                #if emailto is None:
+                    #emailto = qdat.From
+                    #qdat.From = emailto
+                    #db.session.commit()
+                multibid = ['off', 1, 0, 0]
+                locto, loci = get_place(qdat.Subject, plaintext, multibid)
+                qdat.Location = locto
+                db.session.commit()
+                qdat = Quotes.query.get(quot)
+                #####################################
+
+            else:
+                multibid = ['off', 1, 0, 0]
+                plaintext, htmltext = None, None
+                taskbox = 0
+                quot = 0
+                emailto = None
+                locto = None
+                loci = None
+        else:
+            multibid = ['off', 1, 0, 0]
+            taskbox = 0
+            quot = 0
+            return None, quot, None, None, None, None, None, None, None, taskbox, None, None, None, None
+
+        return qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci
+
+    else:
+        taskbox = 0
+        quot = 0
+        return None, quot, None, None, None, None, None, None, None, taskbox, None, None, None, None
+
+def get_costs_old(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
+
+    # Get the currently used cost per mile and cost per hour data used in the base bids
+    ph_driver = float(qidat.ph_driver) / 100
+    fuel = float(qidat.fuelpergal) / 100
+    mpg = float(qidat.mpg) / 100
+    pm_fuel = fuel / mpg
+    ins = float(qidat.insurance_annual_truck) / 100
+    ph_insurance = ins / 1992  # based on 249 work days 8 hrs per day
+
+    newmarkup = request.values.get('optmarkup')
+    if newmarkup is not None:
+        try:
+            markupx = float(newmarkup)
+        except:
+            # print(f'Could not float convert {newmarkup}')
+            markupx = float(qidat.markup) / 100
+    else:
+        markupx = float(qidat.markup) / 100
+        newmarkup = str(markupx)
+    # print(f'The markup and newmarkup are {markup} and {newmarkup}')
+    md_toll = float(qidat.toll) / 100
+    gapct = float(qidat.ga) / 100
+    pm_repairs = float(qidat.pm_repairs) / 100
+    pm_fees = float(qidat.pm_fees) / 100
+    pm_other = float(qidat.pm_other) / 100
+    pmc = pm_fuel + pm_repairs + pm_fees + pm_other
+    phc = ph_driver + ph_insurance
+    fsc = float(qidat.FSC) / 100
+
+    # Calculate road tolls
+    tollroadlist = ['I-76', 'NJ Tpke', 'MD-200']
+    tollroadcpm = [.784, .275, .35]
+    legtolls = len(dirdata) * [0.0]
+    legcodes = len(dirdata) * ['None']
+    for lx, mi in enumerate(miles):
+        for nx, tollrd in enumerate(tollroadlist):
+            if tollrd in dirdata[lx]:
+                legtolls[lx] = tollroadcpm[nx] * mi
+                legcodes[lx] = tollrd
+
+    # Calculate plaza tolls
+    fm_tollbox = [39.267757, -76.610192, 39.261248, -76.563158]
+    bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
+    fsk_tollbox = [39.232770, -76.502453, 39.202279, -76.569906]
+    bay_tollbox = [39.026893, -76.417512, 38.964938, -76.290104]
+    sus_tollbox = [39.585193, -76.142883, 39.572328, -76.033975]
+    new_tollbox = [39.647121, -75.774523, 39.642613, -75.757187]  # Newark Delaware Toll Center
+    dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
+    thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055]  # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
+    dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659]  # Dulles Toll Rd Plaza
+    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
+    onceonly = []
+    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox,
+                 dtr_tollbox]
+
+    for jx, lat in enumerate(lats):
+        stat1 = 'ok'
+        stat2 = 'ok'
+        stat3 = 0
+        stat4 = 0
+        tollcode = 'None'
+        la = float(lat)
+        lo = float(lons[jx])
+        for kx, tollbox in enumerate(tollboxes):
+            lah = max([tollbox[0], tollbox[2]])
+            lal = min([tollbox[0], tollbox[2]])
+            loh = max([tollbox[1], tollbox[3]])
+            lol = min([tollbox[1], tollbox[3]])
+            if la > lal and la < lah:
+                stat1 = 'toll'
+                if lo > lol and lo < loh:
+                    stat2 = 'toll'
+                    tollcode = tollcodes[kx]
+                    if tollcode not in onceonly:
+                        if tollcode == 'DTR':
+                            legtolls[jx] = 10.50
+                        else:
+                            legtolls[jx] = 24.00
+                        legcodes[jx] = tollcode
+                        onceonly.append(tollcode)
+            if jx > 0:
+                lam = (lah + lal) / 2.0
+                lom = (loh + lol) / 2.0
+                la_last = float(lats[jx - 1])
+                lo_last = float(lons[jx - 1])
+                stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
+                if stat3 == 1 and stat4 == 1:
+                    tollcode = tollcodes[kx]
+                    if tollcode == 'DTR':
+                        legtolls[jx] = 10.50
+                    else:
+                        legtolls[jx] = md_toll
+                    legcodes[jx] = tollcode
+        ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
+
+    tot_tolls = 0.00
+    porttime = 1.4
+    loadtime = 2.0
+    triptime = tot_dura * 2.0
+    handling = .5 + triptime * .01
+    dphandling = .75 + triptime * .05
+    tottime = porttime + loadtime + triptime + handling
+    dptime = porttime + triptime + dphandling
+    timedata = [d1s(triptime), d1s(porttime), d1s(loadtime), d1s(handling), d1s(tottime)]
+
+    tripmiles = tot_dist * 2.0
+    portmiles = .4
+    glidemiles = 10 + .005 * tripmiles
+    totmiles = tripmiles + portmiles + glidemiles
+    distdata = [d1s(tripmiles), d1s(portmiles), '0.0', d1s(glidemiles), d1s(totmiles)]
+
+    newdirdata = []
+    for lx, aline in enumerate(dirdata):
+        tot_tolls += legtolls[lx]
+        aline = aline.replace('<div style="font-size:0.9em">Toll road</div>', '')
+        aline = aline.strip()
+        # print(aline)
+        # print(f'Dist:{d1s(miles[lx])}, Time:{d1s(hours[lx])}, ')
+        if legtolls[lx] < .000001:
+            newdirdata.append(f'{d1s(miles[lx])} MI {d2s(hours[lx])} HRS {aline}')
+        else:
+            newdirdata.append(
+                f'{d1s(miles[lx])} MI {d2s(hours[lx])} HRS {aline} Tolls:${d2s(legtolls[lx])}, TollCode:{legcodes[lx]}')
+
+    # Cost Analysis:
+    cost_drv = tottime * ph_driver
+    cost_fuel = totmiles * pm_fuel
+    cost_tolls = 2.0 * tot_tolls
+
+    cost_insur = tottime * ph_insurance
+    cost_rm = totmiles * pm_repairs
+    cost_misc = totmiles * (pm_fees + pm_other)
+
+    cost_direct = cost_drv + cost_fuel + cost_tolls + cost_insur + cost_rm + cost_misc
+    cost_ga = cost_direct * gapct / 100.0
+    cost_total = cost_direct + cost_ga
+    costdata = [d2s(cost_drv), d2s(cost_fuel), d2s(cost_tolls), d2s(cost_insur), d2s(cost_rm), d2s(cost_misc),
+                d2s(cost_ga), d2s(cost_direct), d2s(cost_total)]
+
+    bid = cost_total * markupx
+    dpcost = (dptime * (ph_driver + ph_insurance) + totmiles * (
+                pm_fuel + pm_repairs + pm_fees + pm_other) + cost_tolls) * (1 + gapct / 100)
+    dpbid = dpcost * markupx
+    bobtailcost = ((dptime - .25) * (ph_driver + ph_insurance) + (totmiles - 8) * (
+                pm_fuel + pm_repairs + pm_fees + pm_other)) * (1 + gapct / 100)
+    drbid = dpbid + bobtailcost * markupx
+    fuelbid = bid / (1 + fsc / 100)
+    allbid = bid + 2 * 40
+
+    biddata = [d2s(roundup(bid)), d2s(roundup(drbid)), d2s(roundup(dpbid)), d2s(roundup(fuelbid)), d2s(roundup(allbid))]
+
+    return timedata, distdata, costdata, biddata, newdirdata
 
 def isoQuote():
     username = session['username'].capitalize()
@@ -930,8 +1159,6 @@ def isoQuote():
     mid = ''
     locto = None
 
-
-    from viewfuncs import dataget_Q, nonone, numcheck
 
     if request.method == 'POST':
         try:
@@ -963,7 +1190,7 @@ def isoQuote():
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None
+            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None
 
         for jx in range(5):
             bidthis[jx] = request.values.get(f'bidthis{jx}')
@@ -1006,7 +1233,6 @@ def isoQuote():
         updatecosts = request.values.get('newcosts')
         def_costs = request.values.get('oldcosts')
         updatefees = request.values.get('newfees')
-
 
 
         if updatecosts is not None or updatefees is not None:
@@ -1092,8 +1318,6 @@ def isoQuote():
                    d1s(fsc), d2s(chassis2), d2s(chassis3), d2s(prepull), d2s(store), d2s(detention), d2s(extrastop),
                    d2s(overweight), d2s(owmile), d2s(reefer), d2s(scale), d2s(resid), d2s(congest), d2s(chassplit), d2s(permits)]
 
-        qdata = dataget_Q(thismuch)
-        #quot, numchecked = numcheck(1, qdata, 0, 0, 0, 0, ['quot'])
 
         if quotbut is not None:
             quot=nonone(quotbut)
@@ -1112,36 +1336,14 @@ def isoQuote():
             taskbox = 0
             quot = 0
 
+        #If choose exit or assign as a warehouse job (status 7)...
         if removego is not None or ware is not None:
             if removego is not None:  qdat.Status = -1
             else: qdat.Status = 7
             db.session.commit()
-            #New get the new item not removed from the list
-            qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
-            if qdat is not None:
-                quot = qdat.id
-                quotbut = qdat.id
-                # Check to see if we have rolled into a new date, if so then go back to the table
-                datethis = f'{qdat.Date}'
-                datelast = request.values.get('datelast')
+            #Now moving to the next email on the list.....
+            qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
 
-                if datelast is not None:
-                    try:
-                        datethis = datethis[0:10]
-                        datelast = datelast[0:10]
-                    except:
-                        datethis = '0'
-                        datelast = '1'
-                    #print(f'comparing {datethis} to {datelast}')
-                    if datethis == datelast:
-                        #print(f'Getting body_text because it is a successful remove and go')
-                        plaintext, htmltext = get_body_text(qdat)
-                        mid = qdat.Mid
-                        oldmid = qdat.Mid
-                    else:
-                        taskbox = 0
-                        quot = 0
-            multibid = ['off', 1, 0, 0]
 
         #If no radio button selected then go with generic
         if taskbox == 1 and quot == 0: taskbox = 5
@@ -1231,6 +1433,7 @@ def isoQuote():
 
                 if updatego is not None or updatebid is not None or emailgo is not None or updateE is not None:
                     if multibid[0] == 'on':
+                        # Get the bids for each location....
                         mbids = []
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
@@ -1238,7 +1441,7 @@ def isoQuote():
                             #print(f'Getting data for going to location {locto}')
                             if hasinput(locto):
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
-                                biddata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, newmarkup)
+                                timedata, distdata, costdata, biddata, newdirdata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
                                 #print(biddata)
                                 if tbox[15]: mbids.append(biddata[4])
                                 elif tbox[12]: mbids.append(biddata[0])
@@ -1250,6 +1453,7 @@ def isoQuote():
                         #print(mbids)
                         multibid[3] = mbids
 
+                    # Get the email parameters and box information
                     locto = request.values.get('locto')
                     if locto is None:
                         locto = 'Capitol Heights, MD  20743'
@@ -1270,6 +1474,7 @@ def isoQuote():
 
                 if emailgo is not None:
                     #print(f'The task box is {taskbox}')
+                    #Email the quote based on the currently loaded email parameters from the html
                     emaildata = sendquote()
                     if taskbox == 1 or taskbox == 5:
                         qdat.Status = 2
@@ -1278,185 +1483,33 @@ def isoQuote():
                         qdat.Emailto = emaildata[2]
                         qdat.Markup = newmarkup
                         db.session.commit()
-
-
-
-                    # Now get the new item not removed from the list
-                    qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
-                    if qdat is not None:
-                        quot = qdat.id
-                        quotbut = qdat.id
-                        mid = qdat.Mid
-                        plaintext, htmltext = get_body_text(qdat)
-
-                        # Check to see if we have tolled into a new date, if so then go back to the table
-                        datethis = f'{qdat.Date}'
-                        datelast = request.values.get('datelast')
-
-                        if datelast is not None:
-                            try:
-                                datethis = datethis[0:10]
-                                datelast = datelast[0:10]
-                            except:
-                                datethis = '0'
-                                datelast = '1'
-                            #print(f'comparing {datethis} to {datelast}')
-                            if datethis == datelast:
-                                multibid = ['off', 1, 0, 0]
-                                taskbox = 5
-                                emailto = qdat.From
-                                if emailto is None:
-                                    emailto = qdat.From
-                                    qdat.From = emailto
-                                    db.session.commit()
-                                locto, loci = get_place(qdat.Subject, plaintext, multibid)
-                                qdat.Location = locto
-                                db.session.commit()
-                                qdat = Quotes.query.get(quot)
-                            else:
-                                taskbox = 0
-                                quot = 0
-                        else:
-                            taskbox = 0
-                            quot = 0
-                    else:
-                        taskbox = 0
-                        quot = 0
-
+                    # Now moving to the next email on the list.....
+                    qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
 
 
                 #print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
                 try:
-                    ####################################  Directions Section  ######################################
-                    miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
+                    if locfrom is not None and locto is not None:
+                        ####################################  Directions Section  ######################################
+                        miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
 
-                    #Calculate road tolls
-                    tollroadlist = ['I-76','NJ Tpke','MD-200']
-                    tollroadcpm = [.784, .275, .35]
-                    legtolls = len(dirdata)*[0.0]
-                    legcodes = len(dirdata)*['None']
-                    for lx,mi in enumerate(miles):
-                        for nx,tollrd in enumerate(tollroadlist):
-                            if tollrd in dirdata[lx]:
-                                legtolls[lx] = tollroadcpm[nx]*mi
-                                legcodes[lx] = tollrd
+                        ####################################  Cost & Bid Section  ######################################
+                        timedata, distdata, costdata, biddata, newdirdata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
 
-                    #Calculate plaza tolls
-                    fm_tollbox =  [39.267757, -76.610192, 39.261248, -76.563158]
-                    bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
-                    fsk_tollbox = [39.232770, -76.502453, 39.202279, -76.569906]
-                    bay_tollbox = [39.026893, -76.417512, 38.964938, -76.290104]
-                    sus_tollbox = [39.585193, -76.142883, 39.572328, -76.033975]
-                    new_tollbox = [39.647121, -75.774523, 39.642613, -75.757187] #Newark Delaware Toll Center
-                    dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
-                    thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055] # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
-                    dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659] # Dulles Toll Rd Plaza
-                    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
-                    onceonly = []
-                    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox, dtr_tollbox]
-
-                    for jx,lat in enumerate(lats):
-                        stat1 = 'ok'
-                        stat2 = 'ok'
-                        stat3 = 0
-                        stat4 = 0
-                        tollcode = 'None'
-                        la = float(lat)
-                        lo = float(lons[jx])
-                        for kx, tollbox in enumerate(tollboxes):
-                            lah = max([tollbox[0],tollbox[2]])
-                            lal = min([tollbox[0], tollbox[2]])
-                            loh = max([tollbox[1],tollbox[3]])
-                            lol = min([tollbox[1], tollbox[3]])
-                            if la > lal and la < lah:
-                                stat1 = 'toll'
-                                if lo > lol and lo < loh:
-                                    stat2 = 'toll'
-                                    tollcode = tollcodes[kx]
-                                    if tollcode not in onceonly:
-                                        if tollcode == 'DTR':
-                                            legtolls[jx] = 10.50
-                                        else:
-                                            legtolls[jx] = 24.00
-                                        legcodes[jx] = tollcode
-                                        onceonly.append(tollcode)
-                            if jx > 0:
-                                lam = (lah + lal)/2.0
-                                lom = (loh + lol)/2.0
-                                la_last = float(lats[jx-1])
-                                lo_last= float(lons[jx-1])
-                                stat3, stat4 = checkcross(lam,la_last,la,lom,lo_last,lo)
-                                if stat3 == 1 and stat4 ==1:
-                                    tollcode = tollcodes[kx]
-                                    if tollcode == 'DTR':
-                                        legtolls[jx] = 10.50
-                                    else:
-                                        legtolls[jx] = 24.00
-                                    legcodes[jx] = tollcode
-                        ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
-
-
-
-                    tot_tolls = 0.00
-                    porttime = 1.4
-                    loadtime = 2.0
-                    triptime = tot_dura * 2.0
-                    handling = .5 + triptime*.01
-                    dphandling = .75 + triptime*.05
-                    tottime = porttime + loadtime + triptime + handling
-                    dptime = porttime + triptime + dphandling
-                    timedata = [d1s(triptime), d1s(porttime), d1s(loadtime), d1s(handling), d1s(tottime)]
-
-                    tripmiles = tot_dist * 2.0
-                    portmiles = .4
-                    glidemiles = 10 + .005*tripmiles
-                    totmiles = tripmiles + portmiles + glidemiles
-                    distdata = [d1s(tripmiles), d1s(portmiles), '0.0', d1s(glidemiles), d1s(totmiles)]
-
-                    newdirdata=[]
-                    for lx, aline in enumerate(dirdata):
-                        tot_tolls += legtolls[lx]
-                        aline = aline.replace('<div style="font-size:0.9em">Toll road</div>','')
-                        aline = aline.strip()
-                        #print(aline)
-                        #print(f'Dist:{d1s(miles[lx])}, Time:{d1s(hours[lx])}, ')
-                        if legtolls[lx] < .000001:
-                            newdirdata.append(f'{d1s(miles[lx])} MI {d2s(hours[lx])} HRS {aline}')
-                        else:
-                            newdirdata.append(f'{d1s(miles[lx])} MI {d2s(hours[lx])} HRS {aline} Tolls:${d2s(legtolls[lx])}, TollCode:{legcodes[lx]}')
-
-                    # Cost Analysis:
-                    cost_drv = tottime * ph_driver
-                    cost_fuel = totmiles * pm_fuel
-                    cost_tolls = 2.0 * tot_tolls
-
-                    cost_insur = tottime * ph_insurance
-                    cost_rm = totmiles * pm_repairs
-                    cost_misc = totmiles * (pm_fees + pm_other)
-
-                    cost_direct = cost_drv + cost_fuel + cost_tolls + cost_insur + cost_rm + cost_misc
-                    cost_ga = cost_direct * gapct/100.0
-                    cost_total = cost_direct + cost_ga
-                    costdata = [d2s(cost_drv),d2s(cost_fuel),d2s(cost_tolls),d2s(cost_insur), d2s(cost_rm), d2s(cost_misc), d2s(cost_ga), d2s(cost_direct), d2s(cost_total)]
-
-                    bid = cost_total * markupx
-                    dpcost = (dptime*(ph_driver+ph_insurance) + totmiles*(pm_fuel+pm_repairs+pm_fees+pm_other) + cost_tolls)*(1+gapct/100)
-                    dpbid = dpcost*markupx
-                    bobtailcost = ((dptime-.25)*(ph_driver+ph_insurance) + (totmiles-8)*(pm_fuel+pm_repairs+pm_fees+pm_other))*(1+gapct/100)
-                    drbid = dpbid+bobtailcost*markupx
-                    fuelbid = bid/(1+fsc/100)
-                    allbid = bid + 2*40
-
-                    biddata = [d2s(roundup(bid)),d2s(roundup(drbid)),d2s(roundup(dpbid)), d2s(roundup(fuelbid)), d2s(roundup(allbid))]
-
-                    if updatego is not None or quotbut is not None or (taskbox == 5 and updatebid is None):
-                        for ix in range(len(tbox)):
-                            tbox[ix] = request.values.get(f'tbox{str(ix)}')
-                        if tbox[12]: bidthis[0] = d2s(roundup(bid))
-                        if tbox[13]: bidthis[1] = d2s(roundup(drbid))
-                        if tbox[14]: bidthis[2] = d2s(roundup(dpbid))
-                        if tbox[16]: bidthis[3] = d2s(roundup(fuelbid))
-                        if tbox[15]: bidthis[4] = d2s(roundup(allbid))
+                        if updatego is not None or quotbut is not None or (taskbox == 5 and updatebid is None):
+                            for ix in range(len(tbox)):
+                                tbox[ix] = request.values.get(f'tbox{str(ix)}')
+                            if tbox[12]: bidthis[0] = biddata[0]
+                            if tbox[13]: bidthis[1] = biddata[1]
+                            if tbox[14]: bidthis[2] = biddata[2]
+                            if tbox[16]: bidthis[3] = biddata[3]
+                            if tbox[15]: bidthis[4] = biddata[4]
+                    else:
+                        timedata = []
+                        distdata = []
+                        costdata = []
+                        biddata = []
+                        newdirdata = []
                 except:
                     timedata = []
                     distdata = []
@@ -1495,7 +1548,7 @@ def isoQuote():
                     except:
                         bidname = ''
                     ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle)
-                    print(f'The bidtypeamount here after call is {bidtypeamount} and amount in database is {qdat.Amount} for {quot}')
+                    #print(f'The bidtypeamount here after call is {bidtypeamount} and amount in database is {qdat.Amount} for {quot}')
                     ebody = ebody + maketable(expdata)
                     emailin1 = request.values.get('edat2')
                     if updatego is None:
@@ -1515,7 +1568,7 @@ def isoQuote():
                         etitle = f'{cdata[0]} Quote to {locto} from {locfrom}'
                         ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle)
                         ebody = ebody + maketable(expdata)
-                        print(f'The bidtypeamount here after 2nd lower call is {bidtypeamount} and amount in database is {qdat.Amount}')
+                        #print(f'The bidtypeamount here after 2nd lower call is {bidtypeamount} and amount in database is {qdat.Amount}')
                         qdat.Amount = bidtypeamount[1]
                     else:
                         etitle = request.values.get('edat0')
