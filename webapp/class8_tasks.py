@@ -747,6 +747,7 @@ def Table_maker(genre):
     resethit = request.values.get('Reset')
     invoicehit = request.values.get('InvoiceSet')
 
+
     if request.method == 'POST' and resethit is None:
         #print('Method is POST')
         # See if a task is active and ongoing
@@ -1079,6 +1080,9 @@ def Table_maker(genre):
     if leftcheck == 'Top-Bot': leftsize = 12
     #print(f'Leftsize on exit is {leftsize}')
     err = erud(err)
+
+    holdvec[80] = request.values.get('showcolorstable')
+
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
 

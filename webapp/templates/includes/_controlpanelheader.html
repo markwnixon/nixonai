@@ -1,6 +1,10 @@
 <div class="card">
   <div class="card-body bg-info text-white">
-      Control Panel Messages:<br>
+      Control Panel Messages:
+      <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="showcolorstable" {% if holdvec[80] == 'on'%} checked {% endif %}>
+              <label class="form-check-label" for="showcolorstable">Show Color Code Legend
+      </div>
         <textarea class = "form-control" type = "text" rows="2">{{err}}</textarea>
     </div>
 </div>

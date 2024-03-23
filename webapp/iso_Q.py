@@ -419,7 +419,7 @@ def get_directions(start,end):
 
 def get_place(subject, body, multibid):
     loci = []
-    location = 'Upper Marlboro, MD  20743'
+    location = 'No Location Found'
     zip_c = re.compile(r'\w+[,.]?\s+\w+[,.]?\s+[0-9]{5}')
     zip_p = re.compile(r'[\s,]\d{5}(?:[-\s]\d{4})?')
     nozip = re.compile(r'\w+[,.]?\s+(MD|PA|VA|DE|NJ|OH|NC)')
@@ -439,6 +439,7 @@ def get_place(subject, body, multibid):
     #print(f'the address is {testp}, {testq}, {testq2}, {testq3}')
     for test in testp:
         ziptest = test.strip()
+        print(f'this zip is: {ziptest}')
         try:
             zb = zcdb[ziptest]
             location = f'{zb.city}, {zb.state}  {ziptest}'
@@ -453,19 +454,23 @@ def get_place(subject, body, multibid):
 
     for test in testq:
         ziptest = test.strip()
-        try:
-            zb = zcdb[ziptest]
-            location = f'{zb.city}, {zb.state}  {ziptest}'
-            #print(f'In body: test is {test} and location is **{location}**')
-        except:
-            #print(f'{ziptest} does not work')
+        print(f'this zip is: {ziptest}')
+        if zip != '21224':
+            try:
+                zb = zcdb[ziptest]
+                location = f'{zb.city}, {zb.state}  {ziptest}'
+                #print(f'In body: test is {test} and location is **{location}**')
+            except:
+                #print(f'{ziptest} does not work')
+                location = 'nogood'
+        else:
             location = 'nogood'
 
         if location != 'nogood': loci.append(location)
 
 
     if (len(testp)==0 and len(testq)==0) or len(loci)==0:
-        location = 'Upper Marlboro, MD  20743'
+        location = 'No Location Found'
         #print(f'Both subject and body failed to find a location')
     else:
         #Find best and most likely loci
@@ -478,10 +483,10 @@ def get_place(subject, body, multibid):
     requested = multibid[1]
     if len(loci) < requested:
         while len(loci) < requested:
-            loci.append('Upper Marlboro, MD  20743')
+            loci.append('No Location Found')
     if len(loci) > requested:
         loci = loci[0:requested]
-
+    print(f'returning location {location} loci {loci}')
     return location, loci
 
 def friendly(emailin):
@@ -558,62 +563,67 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
             bidtypeamount[1] = bids[0]
 
     else:
-        if 'all-in' in btype:
-            ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto}.' \
-                    f'\nThe quote is inclusive of tolls, 2-days chassis, pre-pull, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-            ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
-            bidtypeamount[0] = 'all-in'
-            bidtypeamount[1] = bidthis[4]
-        elif len(btype) == 1:
+        if locto is None or locto == 'No Location Found':
+            ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> has no quote due to location not found.'
+            bidtypeamount[0] = 'live'
+            bidtypeamount[1] = 0.00
+        else:
+            if 'all-in' in btype:
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto}.' \
+                        f'\nThe quote is inclusive of tolls, 2-days chassis, pre-pull, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
+                ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+                bidtypeamount[0] = 'all-in'
+                bidtypeamount[1] = bidthis[4]
+            elif len(btype) == 1:
 
-            if 'live' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[0]}</b> for this live load to {locto}.' \
-                        f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-                bidtypeamount[0] = 'live'
-                bidtypeamount[1] = bidthis[0]
+                if 'live' in btype:
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[0]}</b> for this live load to {locto}.' \
+                            f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
+                    bidtypeamount[0] = 'live'
+                    bidtypeamount[1] = bidthis[0]
 
-            if 'dr' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[1]}</b> for this drop-pick load at {locto}.' \
-                        f'\nThe quote is inclusive of tolls and fuel and two bobtails to load site.'
-                bidtypeamount[0] = 'dr'
-                bidtypeamount[1] = bidthis[1]
+                if 'dr' in btype:
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[1]}</b> for this drop-pick load at {locto}.' \
+                            f'\nThe quote is inclusive of tolls and fuel and two bobtails to load site.'
+                    bidtypeamount[0] = 'dr'
+                    bidtypeamount[1] = bidthis[1]
 
-            if 'dp' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[2]}</b> for this drop-hook load to {locto}.' \
-                        f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).  No bobtailing included for drop-hook.'
-                bidtypeamount[0] = 'dp'
-                bidtypeamount[1] = bidthis[2]
+                if 'dp' in btype:
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[2]}</b> for this drop-hook load to {locto}.' \
+                            f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).  No bobtailing included for drop-hook.'
+                    bidtypeamount[0] = 'dp'
+                    bidtypeamount[1] = bidthis[2]
 
-            if 'fsc' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for this load to {locto}.' \
-                        f'\nThe quote is inclusive of tolls and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-                bidtypeamount[0] = 'fsc'
-                bidtypeamount[1] = bidthis[3]
+                if 'fsc' in btype:
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for this load to {locto}.' \
+                            f'\nThe quote is inclusive of tolls and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
+                    bidtypeamount[0] = 'fsc'
+                    bidtypeamount[1] = bidthis[3]
 
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
-
-
-        elif len(btype) > 1:
-            if mixtype == 'mix':
-                ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}, which apply to both 20ft and 40ft containers.<br><br>'
-            else:
-                ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}.<br><br>'
-
-            if 'live' in btype:
-                ebody =  ebody + f'<b>${bidthis[0]}</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
-
-            if 'dr' in btype:
-                ebody = ebody + f'<b>${bidthis[1]}</b> for a drop-pick (two bobtails included).<br>'
-
-            if 'dp' in btype:
-                ebody = ebody + f'<b>${bidthis[2]}</b> for a drop-hook (no bobtailing).<br>'
-
-            if 'fsc' in btype:
-                ebody = ebody + f'<b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
+                ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
 
 
-            ebody = ebody + f'<br>The quotes are inclusive of all tolls and fuel costs.'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+            elif len(btype) > 1:
+                if mixtype == 'mix':
+                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}, which apply to both 20ft and 40ft containers.<br><br>'
+                else:
+                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}.<br><br>'
+
+                if 'live' in btype:
+                    ebody =  ebody + f'<b>${bidthis[0]}</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
+
+                if 'dr' in btype:
+                    ebody = ebody + f'<b>${bidthis[1]}</b> for a drop-pick (two bobtails included).<br>'
+
+                if 'dp' in btype:
+                    ebody = ebody + f'<b>${bidthis[2]}</b> for a drop-hook (no bobtailing).<br>'
+
+                if 'fsc' in btype:
+                    ebody = ebody + f'<b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
+
+
+                ebody = ebody + f'<br>The quotes are inclusive of all tolls and fuel costs.'
+                ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
 
     if len(btype) == 1 and stype == 'ml':
         ebody = ebody.replace('this','these').replace('load', 'loads')
@@ -1439,7 +1449,7 @@ def isoQuote():
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
                         for locto in locs:
                             #print(f'Getting data for going to location {locto}')
-                            if hasinput(locto):
+                            if hasinput(locto) and locto != 'No Location Found':
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
                                 timedata, distdata, costdata, biddata, newdirdata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
                                 #print(biddata)
@@ -1456,7 +1466,7 @@ def isoQuote():
                     # Get the email parameters and box information
                     locto = request.values.get('locto')
                     if locto is None:
-                        locto = 'Capitol Heights, MD  20743'
+                        locto = 'No Location Found'
                     locfrom = request.values.get('locfrom')
                     emailto = request.values.get('edat2')
                     respondnow = datetime.datetime.now()
@@ -1489,7 +1499,7 @@ def isoQuote():
 
                 #print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
                 try:
-                    if locfrom is not None and locto is not None:
+                    if locfrom is not None and locto is not None and locto != 'No Location Found':
                         ####################################  Directions Section  ######################################
                         miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
 
@@ -1628,7 +1638,7 @@ def isoQuote():
         tbox[0] = 'on'
         tbox[12] = 'on'
         qdat=None
-        locto = 'Upper Marlboro, MD  20772'
+        locto = 'No Location Found'
         locfrom = 'Baltimore Seagirt'
         etitle = f'{cdata[0]} Quote for Drayage to {locto} from {locfrom}'
         ebody = f'Regirgitation from the input'
