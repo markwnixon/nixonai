@@ -1685,5 +1685,12 @@ def isoQuote():
     os.environ[utext] = plaintext
     os.environ[uhtml] = htmltext
     os.environ[umid] = mid
+
+    if multibid[0] == 'on':
+        loci = multibid[2]
+        locto = 'OK'
+        for loctest in loci:
+            if loctest == 'No Location Found': locto = 'No Location Found'
+
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
     return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup
