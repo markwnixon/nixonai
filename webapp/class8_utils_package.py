@@ -4,7 +4,7 @@ from webapp.models import People, Drops, Drivers, Vehicles, Interchange
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
-from PyPDF2 import PdfFileReader, PdfFileWriter, PdfFileMerger
+from PyPDF2 import PdfReader, PdfWriter
 #from PyPDF2.pdf import PageObject
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import datetime
@@ -19,7 +19,7 @@ from webapp.utils import *
 import subprocess
 import os
 import datetime
-from PyPDF2 import PdfFileReader
+from PyPDF2 import PdfReader
 from webapp.page_merger import pagemergerx
 from PIL import Image
 
@@ -67,8 +67,8 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
     # print(month,day,year)
     datestr = month + '/' + day + '/' + year
     file1 = addpath(docin)
-    reader = PdfFileReader(open(file1, 'rb'))
-    npages = reader.getNumPages()
+    reader = PdfReader(open(file1, 'rb'))
+    npages = len(reader.pages)
     ck = subprocess.check_output(['pdfseparate', file1, addpath(f'static/{scac}/data/vreport/%d.pdf')])
     file6 = addpath(f'static/{scac}/data/vreport/report6.pdf')
 
@@ -133,15 +133,15 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
 
 def blendticks(gfile1,gfile2,outfile):
 
-    reader1 = PdfFileReader(open(gfile1, 'rb'))
-    p1 = reader1.getPage(0)
+    reader1 = PdfReader(open(gfile1, 'rb'))
+    p1 = reader1.ages[0]
 
-    reader2 = PdfFileReader(open(gfile2, 'rb'))
-    p2 = reader2.getPage(0)
+    reader2 = PdfReader(open(gfile2, 'rb'))
+    p2 = reader2.pages[0]
 
     g3 = addpath(f'static/{scac}/data/vGate/blank.pdf')
-    reader3 = PdfFileReader(open(g3, 'rb'))
-    p3 = reader3.getPage(0)
+    reader3 = PdfReader(open(g3, 'rb'))
+    p3 = reader3.pages[0]
     #p2.cropBox.lowerLeft = (50,400)
     #p2.cropBox.upperRight = (600,700)
     #translate first page
@@ -158,8 +158,8 @@ def blendticks(gfile1,gfile2,outfile):
     p3.cropBox.lowerLeft = (50,250)
     p3.cropBox.upperRight = (550,800)
 
-    output = PdfFileWriter()
-    output.addPage(p3)
+    output = PdfWriter()
+    output.add_page(p3)
 
     with open(outfile, "wb") as out_f:
         output.write(out_f)

@@ -1,4 +1,4 @@
-from PyPDF2 import PdfFileReader, PdfFileWriter
+from PyPDF2 import PdfReader, PdfWriter
 #from PyPDF2 import PageObject
 from webapp.CCC_system_setup import myoslist, addpath, addpath2, addtxt, scac
 import os
@@ -18,19 +18,19 @@ def pagemerger(filelist, cache):
         else:
             firstfile = addpath(f'static/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
 
-        reader = PdfFileReader(open(firstfile, 'rb'))
-        first_page = reader.getPage(0)
+        reader = PdfReader(open(firstfile, 'rb'))
+        first_page = reader.pages[0]
 
-        sup_reader = PdfFileReader(open(filelist[j+1], 'rb'))
-        sup_page = sup_reader.getPage(0)  # This is the first page, can pick any page of document
+        sup_reader = PdfReader(open(filelist[j+1], 'rb'))
+        sup_page = sup_reader.pages[0]  # This is the first page, can pick any page of document
 
     #translated_page = PageObject.createBlankPage(None, sup_page.mediaBox.getWidth(), sup_page.mediaBox.getHeight())
     # translated_page.mergeScaledTranslatedPage(sup_page, 1, 0, 0)  # -400 is approximate mid-page
-    # translated_page.mergePage(invoice_page)
-        sup_page.mergePage(first_page)
-        writer = PdfFileWriter()
-    # writer.addPage(translated_page)
-        writer.addPage(sup_page)
+    # translated_page.merge_page(invoice_page)
+        sup_page.merge_page(first_page)
+        writer = PdfWriter()
+    # writer.add_page(translated_page)
+        writer.add_page(sup_page)
 
         if j == lfs-1:
             outfile = addpath(f'static/{scac}/data/vreport/report'+str(cache)+'.pdf')
@@ -72,19 +72,19 @@ def pagemergerx(filelist, page, cache):
         else:
             firstfile = addpath(f'static/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
 
-        reader = PdfFileReader(open(firstfile, 'rb'))
-        first_page = reader.getPage(page)
+        reader = PdfReader(open(firstfile, 'rb'))
+        first_page = reader.pages[page]
 
-        sup_reader = PdfFileReader(open(filelist[j+1], 'rb'))
-        sup_page = sup_reader.getPage(0)  # This is the selected page, can pick any page of document
+        sup_reader = PdfReader(open(filelist[j+1], 'rb'))
+        sup_page = sup_reader.pages[0] # This is the selected page, can pick any page of document
 
     #translated_page = PageObject.createBlankPage(None, sup_page.mediaBox.getWidth(), sup_page.mediaBox.getHeight())
     # translated_page.mergeScaledTranslatedPage(sup_page, 1, 0, 0)  # -400 is approximate mid-page
-    # translated_page.mergePage(invoice_page)
-        sup_page.mergePage(first_page)
-        writer = PdfFileWriter()
-    # writer.addPage(translated_page)
-        writer.addPage(sup_page)
+    # translated_page.merge_page(invoice_page)
+        sup_page.merge_page(first_page)
+        writer = PdfWriter()
+    # writer.add_page(translated_page)
+        writer.add_page(sup_page)
 
         if j == lfs-1:
             outfile = addpath(f'static/{scac}/data/vreport/report'+str(cache)+'.pdf')
@@ -126,19 +126,19 @@ def pagemergermp(filelist, cache, pages, multioutput):
         else:
             firstfile = addpath(f'static/{scac}/data/vreport/temp'+str(j-1)+'.pdf')
 
-        reader = PdfFileReader(open(firstfile, 'rb'))
-        first_page = reader.getPage(0)
+        reader = PdfReader(open(firstfile, 'rb'))
+        first_page = reader.pages[0]
 
-        sup_reader = PdfFileReader(open(filelist[j+1], 'rb'))
-        sup_page = sup_reader.getPage(0)  # This is the first page, can pick any page of document
+        sup_reader = PdfReader(open(filelist[j+1], 'rb'))
+        sup_page = sup_reader.pages[0] # This is the first page, can pick any page of document
 
     #translated_page = PageObject.createBlankPage(None, sup_page.mediaBox.getWidth(), sup_page.mediaBox.getHeight())
     # translated_page.mergeScaledTranslatedPage(sup_page, 1, 0, 0)  # -400 is approximate mid-page
-    # translated_page.mergePage(invoice_page)
-        sup_page.mergePage(first_page)
-        writer = PdfFileWriter()
-    # writer.addPage(translated_page)
-        writer.addPage(sup_page)
+    # translated_page.merge_page(invoice_page)
+        sup_page.merge_page(first_page)
+        writer = PdfWriter()
+    # writer.add_page(translated_page)
+        writer.add_page(sup_page)
 
         if j == lfs-1:
             outfile = addpath(f'static/{scac}/data/vreport/report'+str(cache)+'.pdf')
@@ -159,15 +159,15 @@ def pagemergermp(filelist, cache, pages, multioutput):
     # Now place the mulitpage content on this file for each page and assemble
     newpages = []
     for j, page in enumerate(pages):
-        reader = PdfFileReader(open(outfile, 'rb'))
-        first_page = reader.getPage(0)
+        reader = PdfReader(open(outfile, 'rb'))
+        first_page = reader.pages[0]
 
-        sup_reader = PdfFileReader(open(multioutput, 'rb'))
-        sup_page = sup_reader.getPage(j)
+        sup_reader = PdfReader(open(multioutput, 'rb'))
+        sup_page = sup_reader.pages[j]
 
-        sup_page.mergePage(first_page)
-        writer = PdfFileWriter()
-        writer.addPage(sup_page)
+        sup_page.merge_page(first_page)
+        writer = PdfWriter()
+        writer.add_page(sup_page)
 
         newoutfile = addpath2('multipage'+str(j)+'.pdf')
         with open(newoutfile, 'wb') as f:
