@@ -505,7 +505,7 @@ def emailonly(emailin):
     except:
         return emailin
 
-def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle):
+def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port):
     sen, tbox, btype, stype, mixtype = insert_adds(tbox,expdata,takedef,distdata,multibid)
     #print(f'btype is {btype}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
@@ -569,7 +569,7 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
             bidtypeamount[1] = 0.00
         else:
             if 'all-in' in btype:
-                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto}.' \
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto} from {port}.' \
                         f'\nThe quote is inclusive of tolls, 2-days chassis, pre-pull, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
                 ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
                 bidtypeamount[0] = 'all-in'
@@ -577,25 +577,25 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
             elif len(btype) == 1:
 
                 if 'live' in btype:
-                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[0]}</b> for this live load to {locto}.' \
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[0]}</b> for this live load to {locto} from {port}.' \
                             f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
                     bidtypeamount[0] = 'live'
                     bidtypeamount[1] = bidthis[0]
 
                 if 'dr' in btype:
-                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[1]}</b> for this drop-pick load at {locto}.' \
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[1]}</b> for this drop-pick load at {locto} from {port}.' \
                             f'\nThe quote is inclusive of tolls and fuel and two bobtails to load site.'
                     bidtypeamount[0] = 'dr'
                     bidtypeamount[1] = bidthis[1]
 
                 if 'dp' in btype:
-                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[2]}</b> for this drop-hook load to {locto}.' \
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[2]}</b> for this drop-hook load to {locto} from {port}.' \
                             f'\nThe quote is inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).  No bobtailing included for drop-hook.'
                     bidtypeamount[0] = 'dp'
                     bidtypeamount[1] = bidthis[2]
 
                 if 'fsc' in btype:
-                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for this load to {locto}.' \
+                    ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[3]} plus {d1s(expdata[5])}% FSC</b> for this load to {locto} from {port}.' \
                             f'\nThe quote is inclusive of tolls and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
                     bidtypeamount[0] = 'fsc'
                     bidtypeamount[1] = bidthis[3]
@@ -605,9 +605,9 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
 
             elif len(btype) > 1:
                 if mixtype == 'mix':
-                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}, which apply to both 20ft and 40ft containers.<br><br>'
+                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto} from {port}, which apply to both 20ft and 40ft containers.<br><br>'
                 else:
-                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto}.<br><br>'
+                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto} from {port}.<br><br>'
 
                 if 'live' in btype:
                     ebody =  ebody + f'<b>${bidthis[0]}</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
@@ -1146,6 +1146,42 @@ def get_costs_old(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 
     return timedata, distdata, costdata, biddata, newdirdata
 
+def get_terminal(locto):
+    term = request.values.get('terminal')
+    if locto is None:
+        locto_update = request.values.get('locto')
+        print(f'locto update is {locto_update}')
+        if locto_update is not None and locto_update != 'None': locto = locto_update
+
+    if term is None:
+        locfrom = '2600 Broening Hwy, Baltimore, MD 21224'
+        thisterm = 'BAL'
+        port = 'Baltimore Seagirt'
+    else:
+        if term == 'BAL':
+            locfrom = '2600 Broening Hwy, Baltimore, MD 21224'
+            thisterm = 'BAL'
+            port = 'Baltimore Seagirt'
+        elif term == 'NIT':
+            locfrom = '1431 Terminal Blvd, Norfolk, VA 23505'
+            thisterm = 'NIT'
+            port = 'Virginia Ports-NIT'
+        elif term == 'VIG':
+            locfrom = '1000 Virginia International Gateway Blvd, Portsmouth, VA 23703'
+            thisterm = 'VIG'
+            port = 'Virginia Ports-VIG'
+        elif term == 'PAC':
+            locfrom = '3301 S Columbus Boulevard, Philadelphia, PA 19148'
+            thisterm = 'PAC'
+            port = 'Packard Ave Marine Terminal'
+        elif term == 'PNCT':
+            locfrom = '1210 Corbin St Elizabeth, NJ 07201'
+            thisterm = 'PNCT'
+            port = 'PNCT-Maher'
+    return thisterm, locfrom, locto, port
+
+
+
 def isoQuote():
     username = session['username'].capitalize()
     #define User variables
@@ -1198,6 +1234,7 @@ def isoQuote():
         ware = request.values.get('Ware')
         exitnow = request.values.get('exitquotes')
 
+
         if exitnow is not None:
             #print('Exiting quotes')
             return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None
@@ -1207,13 +1244,14 @@ def isoQuote():
             bidthis[jx] = d2s(bidthis[jx])
 
         #locto = request.values.get('locto')
-        locfrom = request.values.get('locfrom')
+        term, locfrom, locto, port = get_terminal(locto)
         thismuch = request.values.get('thismuch')
         taskbox = request.values.get('taskbox')
         taskbox = nonone(taskbox)
         qbid = request.values.get('quickbid')
         qdel = request.values.get('quickdel')
         getnumq = request.values.get('numcit')
+        print(f'Here, locfrom is: {locfrom}')
         if getnumq is not None:
             if 1 == 1:
                 try: multibid[1] = int(getnumq)
@@ -1353,6 +1391,7 @@ def isoQuote():
             db.session.commit()
             #Now moving to the next email on the list.....
             qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
+            print(f'locto from email is {locto}')
 
 
         #If no radio button selected then go with generic
@@ -1434,12 +1473,23 @@ def isoQuote():
                 emailto = usernames['serv']
 
             if quot > 0 or taskbox == 5:
+                print(f'Here2a, locfrom is: {locfrom} and locto is {locto}')
                 if qdat is not None:
-                    locfrom = qdat.Start
+                    locfrom1 = qdat.Start
+                    term, locfrom2, locto, port = get_terminal(locto)
+                    if locfrom2 is not None:
+                        if locfrom1 == locfrom2:
+                            locfrom = locfrom1
+                        else:
+                            #update qdat
+                            qdat.Start = locfrom2
+                            locfrom = locfrom2
+                    print(f'Here, locfrom is: {locfrom} and locto is {locto}')
                     if locfrom is None:
-                        locfrom = 'Seagirt Marine Terminal, Baltimore, MD 21224'
+                        term, locfrom, locto, port = get_terminal(locto)
                 else:
-                    locfrom = 'Seagirt Marine Terminal, Baltimore, MD 21224'
+                    term, locfrom, locto, port = get_terminal(locto)
+                print(f'Here2b, locfrom is: {locfrom} and locto is {locto}')
 
                 if updatego is not None or updatebid is not None or emailgo is not None or updateE is not None:
                     if multibid[0] == 'on':
@@ -1469,8 +1519,10 @@ def isoQuote():
                         locto = 'No Location Found'
                     locfrom = request.values.get('locfrom')
                     emailto = request.values.get('edat2')
+                    print(f'Here3, locfrom is: {locfrom}')
                     respondnow = datetime.datetime.now()
                     if taskbox == 1 or taskbox == 5:
+                        print(f'Here setting qdat.start with, locfrom is: {locfrom}')
                         qdat.Start = locfrom
                         qdat.Location = locto
                         qdat.From = emailto
@@ -1542,7 +1594,7 @@ def isoQuote():
 
                 if quotbut is not None:
                     #Set the email data:
-                    etitle = f'{cdata[0]} Quote to {locto} from {locfrom}'
+                    etitle = f'{cdata[0]} Quote to {locto} from {port}'
                     if qdat is not None:
                         customer = qdat.Person
                         if customer is None:
@@ -1557,7 +1609,7 @@ def isoQuote():
                         bidname = bidnamelist[0]
                     except:
                         bidname = ''
-                    ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle)
+                    ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port)
                     #print(f'The bidtypeamount here after call is {bidtypeamount} and amount in database is {qdat.Amount} for {quot}')
                     ebody = ebody + maketable(expdata)
                     emailin1 = request.values.get('edat2')
@@ -1575,8 +1627,8 @@ def isoQuote():
                     if updatebid is not None or updatego is not None:
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-                        etitle = f'{cdata[0]} Quote to {locto} from {locfrom}'
-                        ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle)
+                        etitle = f'{cdata[0]} Quote to {locto} from {port}'
+                        ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle, port)
                         ebody = ebody + maketable(expdata)
                         #print(f'The bidtypeamount here after 2nd lower call is {bidtypeamount} and amount in database is {qdat.Amount}')
                         qdat.Amount = bidtypeamount[1]
@@ -1606,9 +1658,9 @@ def isoQuote():
                     showtext = htmltext
             else:
                 showtext = ''
-            locto = 'Capitol Heights, MD  20743'
-            locfrom = 'Baltimore Seagirt'
-            etitle = f'{cdata[0]} Quote for Drayage to {locto} from {locfrom}'
+            term, locfrom, locto, port = get_terminal(locto)
+            if locto is None: locto = 'Capitol Heights, MD  20743'
+            etitle = f'{cdata[0]} Quote for Drayage to {locto} from {port}'
             efrom = usernames['quot']
             eto1 = 'unknown'
             eto2 = ''
@@ -1638,9 +1690,9 @@ def isoQuote():
         tbox[0] = 'on'
         tbox[12] = 'on'
         qdat=None
+        term, locfrom, locto, port = get_terminal(locto)
         locto = 'No Location Found'
-        locfrom = 'Baltimore Seagirt'
-        etitle = f'{cdata[0]} Quote for Drayage to {locto} from {locfrom}'
+        etitle = f'{cdata[0]} Quote for Drayage to {locto} from {port}'
         ebody = f'Regirgitation from the input'
         efrom = usernames['quot']
         eto1 = 'unknown'
@@ -1692,5 +1744,8 @@ def isoQuote():
         for loctest in loci:
             if loctest == 'No Location Found': locto = 'No Location Found'
 
+    print(f'Here at end, locfrom is: {locfrom}')
+    multibid.append(term)
+    print(multibid)
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
     return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup

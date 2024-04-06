@@ -223,6 +223,7 @@
     </div>
 {% else %}
     {% set ncit = multibid[1]|int %}
+    {% set term = multibid[4] %}
     <div class="col-sm-4" align="left">
     <br>
         <div class="card">
@@ -241,7 +242,16 @@
                       <option {% if ncit == 5 %} selected {% endif %} value=5>Five</option>
                       <option {% if ncit == 6 %} selected {% endif %} value=6>Six</option>
                 </select>
-
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+                Change Terminal To:&nbsp;&nbsp;
+                <select class="form-select" aria-label="Default select example" name="terminal" onchange="this.form.submit()">
+                      <option {% if term == 'BAL' %} selected {% endif %} value='BAL'>Baltimore Seagirt</option>
+                      <option {% if term == 'NIT' %} selected {% endif %} value='NIT'>Norfolk Int Terminal</option>
+                      <option {% if term == 'VIG' %} selected {% endif %} value='VIG'>Virginia Int Gateway</option>
+                      <option {% if term == 'PAC' %} selected {% endif %} value='PAC'>Packer Ave Marine Term</option>
+                      <option {% if term == 'PNCT' %} selected {% endif %} value='PNCT'>PNCT-Maher Terminals</option>
+                </select>
             </div>
         {% if multibid[0] == 'on' %}
             {% set loci = multibid[2] %}

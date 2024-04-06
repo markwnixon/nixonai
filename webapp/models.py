@@ -834,7 +834,7 @@ class Quotes(db.Model):
     Status = db.Column('Status', db.Integer)
     Responder = db.Column('Responder', db.String(45))
     RespDate = db.Column('RespDate', db.DateTime)
-    Start = db.Column('Start', db.String(45))
+    Start = db.Column('Start', db.String(200))
     Emailto = db.Column('Emailto', db.String(100))
     Subjectsend = db.Column('Subjectsend', db.String(200))
     Markup = db.Column('Markup', db.String(10))
