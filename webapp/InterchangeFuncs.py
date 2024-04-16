@@ -59,12 +59,60 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
         else:
             return 0
 
+    elif ptype == 'Dray In':
+        iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray Out')).first()
+        iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray In')).first()
+        if iout and iin:
+            iout.Status = 'IO'
+            iin.Status = 'IO'
+            if nbk > 1:
+                iin.Release = iout.Release
+                # Only force them the same if have multiple bookings else could be a different inbooking
+            iin.Jo = iout.Jo
+            iin.Company = iout.Company
+            db.session.commit()
+            return 2
+        elif iout:
+            iout.Status = 'BBBBBB'
+            db.session.commit()
+            return 1
+        elif iin:
+            return 2
+        else:
+            return 0
+
+    elif ptype == 'Dray Out':
+        iout = Interchange.query.filter(
+            (Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray Out')).first()
+        iin = Interchange.query.filter(
+            (Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray In')).first()
+        if iout and iin:
+            iout.Status = 'IO'
+            iin.Status = 'IO'
+            if nbk > 1:
+                iin.Release = iout.Release
+                # Only force them the same if have multiple bookings else could be a different inbooking
+            iin.Jo = iout.Jo
+            iin.Company = iout.Company
+            db.session.commit()
+            return 2
+        elif iout:
+            iout.Status = 'BBBBBB'
+            db.session.commit()
+            return 1
+        elif iin:
+            return 2
+        else:
+            return 0
+
 
 def Gate_Update(ider):
     ikat = Interchange.query.get(ider)
     bk = ikat.Release
     con = ikat.Container
     htype = ikat.Type
+    if hasinput(con) and hasinput(htype): pass
+    else: return err
     lbdate = ikat.Date - timedelta(120)
     nbk = 1
     if hasinput(bk) and len(bk)>5 and htype == 'Empty Out':
@@ -89,7 +137,7 @@ def Gate_Update(ider):
                     chas = idat.Chassis
                     odat = Orders.query.filter((Orders.Booking == bk) & (Orders.Date > lbdate)).first()
                     if odat is not None:
-                        print(f'UPdate order with booking {bk} to match the interchange release with container {con}')
+                        ###print(f'UPdate order with booking {bk} to match the interchange release with container {con}')
                         jo = odat.Jo
                         shipper = odat.Shipper
                         idat.Jo = jo
@@ -107,6 +155,7 @@ def Gate_Update(ider):
     htype = ikat.Type
     lbdate = ikat.Date - timedelta(120)
     if htype == 'Empty Out':
+        gate_name = f'{con}_EMPTY_OUT.pdf'
         odat = Orders.query.filter((Orders.Booking == bk) & (Orders.Date > lbdate)).first()
         if odat is not None:
             jo = odat.Jo
@@ -120,6 +169,7 @@ def Gate_Update(ider):
             odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
             db.session.commit()
     if htype == 'Load Out':
+        gate_name = f'{con}_LOAD_OUT.pdf'
         odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate)).first()
         if odat is not None:
             jo = odat.Jo
@@ -130,7 +180,32 @@ def Gate_Update(ider):
             odat.Chassis = chas
             odat.Hstat = Gate_Match(con, lbdate, nbk, 'Import', odat)
             db.session.commit()
+    if htype == 'Dray Out':
+        gate_name = f'{con}_LOAD_OUT.pdf'
+        odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate)).first()
+        if odat is not None:
+            jo = odat.Jo
+            shipper = odat.Shipper
+            chas = ikat.Chassis
+            ikat.Jo = jo
+            ikat.Company = shipper
+            odat.Chassis = chas
+            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Dray Out', odat)
+            db.session.commit()
+    if htype == 'Dray In':
+        gate_name = f'{con}_LOAD_OUT.pdf'
+        odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate)).first()
+        if odat is not None:
+            jo = odat.Jo
+            shipper = odat.Shipper
+            chas = ikat.Chassis
+            ikat.Jo = jo
+            ikat.Company = shipper
+            odat.Chassis = chas
+            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Dray In', odat)
+            db.session.commit()
     if htype == 'Load In':
+        gate_name = f'{con}_LOAD_IN.pdf'
         #Could be different booking going in so have to look for both, but need to look at the inbook first
         odat = Orders.query.filter((Orders.BOL == bk) & (Orders.Date > lbdate)).first()
         if odat is None:
@@ -145,6 +220,7 @@ def Gate_Update(ider):
             odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
             db.session.commit()
     if htype == 'Empty In':
+        gate_name = f'{con}_EMPTY_IN.pdf'
         odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate) & (Orders.HaulType.contains('Import')) ).first()
         if odat is not None:
             jo = odat.Jo
@@ -153,6 +229,11 @@ def Gate_Update(ider):
             ikat.Company = shipper
             odat.Hstat = Gate_Match(con, lbdate, nbk, 'Import', odat)
             db.session.commit()
+
+    ikat = Interchange.query.get(ider)
+    ###print(f'The interchange source doe is {ikat.Source}')
+    ###print(f'The gate name should be {gate_name}')
+
 
 
 
@@ -241,7 +322,7 @@ def Order_Container_Update(oder):
                 idat0 = idata[1]
             else:
                 test = 0
-                print('Failed test of proper pairing')
+                ###print('Failed test of proper pairing')
             if test:
                 #print(f'{idat0.Type}: {idat0.Release} {idat0.Container}')
                 #print(f'{idat1.Type}: {idat1.Release} {idat1.Container}')
@@ -305,11 +386,11 @@ def Order_Container_Update(oder):
                 db.session.commit()
 
         if ntick == 0 and kdat is not None:
-            print('Doing the most dangerous update')
+            ###print('Doing the most dangerous update')
             #If only have no tickets based on container and have an empty out based on booking do that update
             con = kdat.Container
             movetyp = kdat.Type
-            print(f'Performing update based on interchange empty out give con {con} and movetyp {movetyp}')
+            ###print(f'Performing update based on interchange empty out give con {con} and movetyp {movetyp}')
             if movetyp == 'Empty Out':
                 okat.Container = con
                 okat.Chassis = kdat.Chassis

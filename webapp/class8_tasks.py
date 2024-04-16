@@ -1622,7 +1622,8 @@ def UpdatePlanner_task(tablesetup, task_iter):
 
 def New_task(tablesetup, task_iter):
     completed = False
-    err = [f"Running New task with task_iter {task_iter} using {tablesetup['table']}"]
+    itable = tablesetup['table']
+    err = [f"Running New task with task_iter {task_iter} using {itable}"]
     form_show = tablesetup['form show']['New']
     form_checks = tablesetup['form checks']['New']
     #print(f'Entering New Task with task iter {task_iter}')
@@ -1639,7 +1640,12 @@ def New_task(tablesetup, task_iter):
     else:
 
         if task_iter > 0:
-            htold = request.values.get('haultype')
+            if itable == 'Orders':
+                htold = request.values.get('haultype')
+            elif itable == 'Interchange':
+                htold = request.values.get('Type')
+                ###print(f'htold is {htold}')
+
             if htold is None: htold = ''
             entrydata = tablesetup['entry data']
             masks = tablesetup['haulmask']
@@ -1660,7 +1666,9 @@ def New_task(tablesetup, task_iter):
                         holdvec[jx] = request.values.get(f'{entry[0]}')
                         if entry[0] in form_checks: required = True
                         else: required = False
-                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold,0)
+                        ###print(entry[0], form_checks, required)
+                        holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold,0, itable)
+                        ###print(entry[5])
                         if entry[5] > 1: failed = failed + 1
                         if entry[5] == 1: warned = warned + 1
 
@@ -1713,7 +1721,7 @@ def New_task(tablesetup, task_iter):
             for jx, entry in enumerate(entrydata):
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold, 0)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold, 0, itable)
                 #print(f'Entry loop: jx"{jx}, entry:{entry[0]} {entry[5]} {entry[6]} {required}')
 
 
@@ -1721,7 +1729,8 @@ def New_task(tablesetup, task_iter):
 
 
 def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
-    err = [f"Running Edit task with task_iter {task_iter} using {tablesetup['table']}"]
+    itable = tablesetup['table']
+    err = [f"Running Edit task with task_iter {task_iter} using {itable}"]
     completed = False
     viewport = ['0'] * 6
 
@@ -1773,7 +1782,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 holdvec[jx] = request.values.get(f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid, itable)
                 if entry[5] > 1: failed = failed + 1
                 if entry[5] == 1: warned = warned + 1
 
@@ -1867,7 +1876,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
             if entry[0] in form_checks: required = True
             else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid)
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid, itable)
             #print(f'Entry[0] is {entry[0]} and value is {holdvec[jx]}')
 
 
@@ -2238,7 +2247,11 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
                 if thistable == 'Interchange':
                     bn = 0
-                    filename1 = f'{task_focus}_{fileout}{ext}'
+                    con = dat.Container
+                    type = dat.Type
+                    type = type.upper()
+                    type = type.replace(' ','_')
+                    filename1 = f'{con}_{type}{ext}'
                     output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
                     #print(f'output1 for thistable {thistable}-{task_focus} = {output1}')
 
@@ -2428,7 +2441,7 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
 
 
 def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
-
+    itable = tablesetup['table']
     err = [f"Running Manifest task with task_iter {task_iter} using {tablesetup['table']}"]
     completed = False
     viewport = ['0'] * 6
@@ -2476,7 +2489,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                     holdvec[jx] = request.values.get(f'{entry[0]}')
                     if entry[0] in form_checks: required = True
                     else: required = False
-                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid)
+                    holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid, itable)
                     if entry[5] > 1: failed = failed + 1
                     if entry[5] == 1: warned = warned + 1
 
@@ -2536,7 +2549,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 holdvec[jx] = getattr(modata, f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
-                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid)
+                holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid, itable)
 
         docref = makemanifest(modata, tablesetup)
         try:
@@ -3278,7 +3291,7 @@ def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
             holdvec[jx] = request.values.get(f'{entry[0]}')
             if entry[0] in form_checks: required = True
             else: required = False
-            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required, task_iter, 'unknown', 0)
+            holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required, task_iter, 'unknown', 0, itable)
             if entry[5] > 1: failed = failed + 1
             if entry[5] == 1: warned = warned + 1
 

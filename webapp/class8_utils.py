@@ -41,9 +41,9 @@ def container_check(num):
         return 2, message
 
 
-def form_check(input,text,type,task,req, task_iter, haultype, sid):
+def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
     #print(' ')
-    #print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req}')
+    ###print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req} task_iter: {task_iter}')
     status = 0
     message = ''
     if type == 'disabled':
@@ -130,89 +130,108 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid):
     elif type == 'concheck':
         #Complex checker.  We want to assess ligitimate containers for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
-        if text is None: text = 'Missing'
-        text = text.strip()
-        #print(f'****************************Entering concheck with text {text}')
-        if hasinput(text): char1 = text[0]
-        else: char1 = ''
-        if char1 == '*':
-            status = 0
-            message = 'Forced bypass number'
+        if not hasinput(text) and not hasinput(haultype) and req:
+            status = 2
+            message = f'Valid container number input required'
+            return text, status, message
         else:
-            if haultype is None:
-                if not hasinput(text) or task_iter == 0:
-                    status = 0
-                    message = 'Not a required input yet'
-                else:
-                    lenck = len(text)
-                    if lenck == 11:
-                        status, message = container_check(text)
-
-                    else:
-                        if lenck > 3:
-                            status = 2
-                            message = f'Container must have length of 11 characters not {lenck}'
-                        else:
-                            status = 2
-                            message = f'Valid container number input required'
-
+            #if not hasinput(text) and req: text = 'Missing'
+            text = text.strip()
+            ###print(f'****************************Entering concheck with text {text}')
+            if hasinput(text): char1 = text[0]
+            else: char1 = ''
+            if char1 == '*':
+                status = 0
+                message = 'Forced bypass number'
             else:
-                if 'Dray' in haultype or 'Export' in haultype or 'Import' in haultype:
-                    if hasinput(text):
+                if haultype is None:
+                    if not hasinput(text) or task_iter == 0:
+                        status = 0
+                        message = 'Not a required input yet'
+                    else:
                         lenck = len(text)
                         if lenck == 11:
                             status, message = container_check(text)
-                            #print(f'Container status check: {status} {message}')
+
                         else:
-                            if lenck > 0:
+                            if lenck > 3:
                                 status = 2
                                 message = f'Container must have length of 11 characters not {lenck}'
                             else:
                                 status = 2
                                 message = f'Valid container number input required'
-                    else:
-                        if 'Import' in haultype:
-                            status = 2
-                            message = 'Must enter a valid container number'
-                        else:
-                            status = 1
-                            message = 'Container number required after pull'
+
                 else:
-                    status = 0
-                    message = 'Not a required input for haul type'
+                    if 'Dray' in haultype or 'Export' in haultype or 'Import' in haultype:
+                        if hasinput(text):
+                            lenck = len(text)
+                            if lenck == 11:
+                                status, message = container_check(text)
+                                #print(f'Container status check: {status} {message}')
+                            else:
+                                if lenck > 0:
+                                    status = 2
+                                    message = f'Container must have length of 11 characters not {lenck}'
+                                else:
+                                    status = 2
+                                    message = f'Valid container number input required'
+                        else:
+                            if 'Import' in haultype:
+                                status = 2
+                                message = 'Must enter a valid container number'
+                            else:
+                                status = 1
+                                message = 'Container number required after pull'
+                    else:
+                        status = 0
+                        message = 'Not a required input for haul type'
 
     elif type == 'release':
         #Complex checker.  We want to assess ligitimate bookings for proper number
         #but allow for exceptions or use of dry vans and other container types...etc
         if haultype is None:
-            status = 0
+            status = 1
             message = 'Not a required input yet'
         else:
-            if 'Dray' in haultype or 'Export' in haultype or 'Import' in haultype:
-                if text is not None:
-                    text = text.strip()
-                    lenck = len(text)
+            if itable == 'Orders':
+                if 'Dray' in haultype or 'Export' in haultype or 'Import' in haultype:
+                    if text is not None:
+                        text = text.strip()
+                        lenck = len(text)
 
-                    if lenck < 4:
-                        status = 2
-                        message = f'Must have at least 4 characters not {lenck}'
+                        if lenck < 4:
+                            status = 2
+                            message = f'Must have at least 4 characters not {lenck}'
+                        else:
+                            status = 0
+                            if 'Export' in haultype: message = 'Booking number entered'
+                            if 'Import' in haultype: message = 'BOL number entered'
                     else:
-                        status = 0
-                        if 'Export' in haultype: message = 'Booking number entered'
-                        if 'Import' in haultype: message = 'BOL number entered'
-                else:
-                    status = 2
-                    if 'Export' in haultype: message = 'Must enter a booking number'
-                    if 'Import' in haultype: message = 'Must enter a BOL number'
+                        status = 2
+                        if 'Export' in haultype: message = 'Must enter a booking number'
+                        if 'Import' in haultype: message = 'Must enter a BOL number'
 
-            else:
-                status = 0
-                message = 'Not a required input for this haul type'
+                else:
+                    status = 0
+                    message = 'Not a required input for this haul type'
+            if itable == 'Interchange':
+                if haultype == 'Empty Out' or haultype == 'Load In':
+                    req = True
+                    if not hasinput(text):
+                        status = 2
+                        message = 'Booking release required for Empty Out'
+
 
     elif type == 'container_types':
         if text == 'Choose Later' or not hasinput(text):
             status = 2
             message = 'Must select a container type'
+
+    elif type == 'load_types':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must select a container type'
+
 
     elif type == 'pickupdata':
         if text == 'Choose Later' or not hasinput(text):
@@ -367,7 +386,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid):
         message = 'Not a Required Input'
         if not hasinput(text): text = ''
 
-    #print(f'At conclusion of input for input:{input} type: {type} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
+    ###print(f'At conclusion of input for input:{input} type: {type} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
 
     return text, status, message
 
@@ -551,7 +570,7 @@ def get_check_words(num):
         num = million(a)
 
     lnum = len(num)
-    # print(num[lnum-1])
+    ##print(num[lnum-1])
     if num[lnum-1] == '-':
         num = num[0:lnum-1]
 

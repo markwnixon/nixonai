@@ -34,7 +34,7 @@ Trucking_genre = {'table': 'Orders',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'haul_types': ['Dray Import', 'Dray Export', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
-                  'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
+                  'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out', 'Dray Out', 'Dray In'],
                   'document_profiles'  : {
                                         'Custom' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
                                         'Custom-Invoice' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
@@ -219,17 +219,17 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Emailjp', 'Email Job Provider', 'Job Provider Email', 'choose-select', 'emaildata1', 0, 'Shipper', 'll', None, 'Job Detail'],
                                 ['Emailoa', 'Email Opp Assist', 'Email Opp Assist', 'choose-select', 'emaildata2', 0, 'Shipper', 'll', None, 'Job Detail'],
                                 ['Emailap', 'Email Acct Payable', 'Email Acct Payable', 'choose-select', 'emaildata3', 0, 'Shipper', 'll', None, 'Job Detail'],
-['Saljp', 'Job Provider Name', 'Job Provider Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail'],
-['Saloa', 'Ops Assist Name', 'Ops Assist Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail'],
-['Salap', 'Acct Payable Name', 'Acct Payable Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail']
+                                ['Saljp', 'Job Provider Name', 'Job Provider Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail'],
+                                ['Saloa', 'Ops Assist Name', 'Ops Assist Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail'],
+                                ['Salap', 'Acct Payable Name', 'Acct Payable Name', 'text', 'text', 0, 'ok', 'cl', None, 'Job Detail']
                                ],
                 'hidden data' : [
                                 ['Company', 'hidden', 'Dropblock1'],
                                 ['Company2','hidden', 'Dropblock2'],
                                 ['Location3', 'hidden', 'Dropblock3'],
                                 ['Emailjp', 'hidden', 'Emailjp'],
-['Emailoa', 'hidden', 'Emailoa'],
-['Emailap', 'hidden', 'Emailap']
+                                ['Emailoa', 'hidden', 'Emailoa'],
+                                ['Emailap', 'hidden', 'Emailap']
                                 ],
                 'defaults': [
                                 ['Hstat', -1],
@@ -248,8 +248,8 @@ Orders_setup = {'name' : 'Trucking Job',
                               {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
                               {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
                               {'emaildata1': ['Orders', [['Shipper', 'get_Shipper']], 'Emailjp']},
-{'emaildata2': ['Orders', [['Shipper', 'get_Shipper']], 'Emailoa']},
-{'emaildata3': ['Orders', [['Shipper', 'get_Shipper']], 'Emailap']},
+                                {'emaildata2': ['Orders', [['Shipper', 'get_Shipper']], 'Emailoa']},
+                                {'emaildata3': ['Orders', [['Shipper', 'get_Shipper']], 'Emailap']},
                               {'dropblock1': ['Orders', [['Shipper', 'get_Shipper']], 'Company']},
                               {'dropblock2': ['Orders', [['Shipper', 'get_Shipper']], 'Company2']},
                               {'dropblock3': ['Orders', [['Shipper', 'get_Shipper']], 'Location3']}
@@ -419,7 +419,7 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                      'entry data': [['Jo', 'JO', '', '', None, 0, 'ok', 'cc', None, 'Always'],
                                     ['Company', 'Company', '', '', None, 0, 'ok', 'cl', 15, 'Always'],
                                     ['Source', 'GT', 'Gate', 'text', None, 0, 'ok', 'cL', None, 'Always'],
-                                    ['Release', 'Release', 'Release', 'text', 'text', 0, 'ok', 'cc', None, 'Ticket'],
+                                    ['Release', 'Release', 'Release', 'text', 'release', 0, 'ok', 'cc', None, 'Ticket'],
                                     ['Container', 'Container', 'Container', 'text', 'concheck', 0, 'ok', 'cc', None, 'Ticket'],
                                     ['ConType', 'Equip Type', 'Equip Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Ticket'],
                                     ['Type', 'Load Type', 'Load Type', 'select', 'load_types', 0, 'ok', 'cc', None, 'Ticket'],
@@ -443,8 +443,8 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                          'Edit': ['Ticket','Extras']
                      },
                      'form checks': {
-                         'New': ['Container'],
-                         'Edit': ['Container']
+                         'New': ['Container', 'Type'],
+                         'Edit': ['Container', 'Type']
                      },
                      'jscript': 'dtInterchange',
                      'documents': ['Source'],
@@ -453,7 +453,9 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                                     'Load In' : 'Empty Out',
                                     'Empty Out' : 'Load In',
                                     'Load Out' : 'Empty In',
-                                    'Empty In' : 'Load Out'
+                                    'Empty In' : 'Load Out',
+                                    'Dray Out' : 'Dray In',
+                                    'Dray In' : 'Dray Out'
                                     },
                      'matchfrom': {
                          'Orders': [['Jo', 'Jo'], ['Company', 'Shipper'] ],
