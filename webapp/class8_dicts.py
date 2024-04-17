@@ -33,7 +33,7 @@ Trucking_genre = {'table': 'Orders',
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
-                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Transfer', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out', 'Dray Out', 'Dray In'],
                   'document_profiles'  : {
                                         'Custom' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
@@ -320,6 +320,14 @@ Orders_setup = {'name' : 'Trucking Job',
                                         'Middle Items' : ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
                                         'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
                                      },
+
+                    'Dray Transfer': {
+                        'Top Blocks': ['Bill To', 'Pickup Location', 'Selever Location'],
+                        'Middle Blocks': ['Order #', 'Job Type', 'Booking #', 'Container #', 'Chassis', 'Pulled',
+                                          'Returned'],
+                        'Middle Items': ['Order', 'HaulType', 'Booking', 'Container', 'Chassis', 'Date', 'Date2'],
+                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                    },
 
                                     'Dray Export 2T': {
                                         'Top Blocks': ['Bill To', 'Pickup From 1st Terminal', 'Deliver To', 'Return To 2nd Terminal'],
@@ -866,6 +874,13 @@ Autos_setup = {'name' : 'Auto Job',
                                         'Middle Items' : ['Order', 'Booking', 'Container', 'Date', 'Date2'],
                                         'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
                                                       },
+                    'Dray Transfer': {
+                        'Top Blocks': ['Bill To', 'Pickup Location', 'Drop Off Location'],
+                        'Middle Blocks': ['Order #', 'Booking #', 'Container #', 'Job Start', 'Job Finished'],
+                        'Middle Items': ['Order', 'Booking', 'Container', 'Date', 'Date2'],
+                        'Lower Blocks': ['Quantity', 'Item Code', 'Description', 'Price Each', 'Amount']
+                    },
+
                                     'Trailer Moves': {
                                         'Top Blocks': ['Bill To', 'Location Start', 'Location Included'],
                                         'Middle Blocks': ['Order #', 'Trailer #', 'Trailer #', 'Job Start', 'Job Finished'],
@@ -915,7 +930,7 @@ Planning_genre =   {'table': 'Newjobs',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'pickupdata': ['Baltimore Seagirt', 'CSX Rail', 'East Coast CES', 'Belts'],
-                  'haul_types': ['Dray Import', 'Dray Export', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Transfer', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
                   'document_profiles'  : {
                                         'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],

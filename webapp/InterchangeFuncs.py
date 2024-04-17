@@ -59,7 +59,7 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
         else:
             return 0
 
-    elif ptype == 'Dray In':
+    elif ptype == 'Dray In' or ptype == 'Import Dray-In':
         iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray Out')).first()
         iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray In')).first()
         if iout and iin:
