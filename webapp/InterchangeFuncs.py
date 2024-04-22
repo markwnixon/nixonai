@@ -44,7 +44,8 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
-                iin.Release = iout.Release
+                test = iout.Release
+                if len(test)>7: iin.Release = iout.Release
                 #Only force them the same if have multiple bookings else could be a different inbooking
             iin.Jo = iout.Jo
             iin.Company = iout.Company
@@ -66,7 +67,8 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
-                iin.Release = iout.Release
+                test = iout.Release
+                if len(test) > 7: iin.Release = iout.Release
                 # Only force them the same if have multiple bookings else could be a different inbooking
             iin.Jo = iout.Jo
             iin.Company = iout.Company
@@ -90,7 +92,8 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
-                iin.Release = iout.Release
+                test = iout.Release
+                if len(test) > 7: iin.Release = iout.Release
                 # Only force them the same if have multiple bookings else could be a different inbooking
             iin.Jo = iout.Jo
             iin.Company = iout.Company
@@ -122,8 +125,8 @@ def Gate_Update(ider):
         # Check to see if there are multiple bookings for this job
         edata = Orders.query.filter((Orders.HaulType == 'Dray Export') & (Orders.Booking.contains(bk)) & (Orders.Date > lbdate)).all()
         nbk = len(edata)
-        if nbk > 1:
-            # there are multiple bookings so we need to modify the interchange tickets to coincide
+        if nbk > 1 and len(bk) > 6:
+            # there are multiple bookings so we need to modify the interchange tickets to coincide, make sure have a valid booking not blankj
             idata = Interchange.query.filter((Interchange.Release.contains(bk)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).all()
             if idata:
                 for ix, idat in enumerate(idata):
@@ -258,6 +261,7 @@ def Order_Container_Update(oder):
         if '-' in bkout:
             bklist = bkout.split('-')
             bkout = bklist[0]
+            if bkout < 7: bkout = 'NoBook'
         edata = Orders.query.filter((Orders.HaulType == 'Dray Export') & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
         nbk = len(edata)
         if nbk > 1:
