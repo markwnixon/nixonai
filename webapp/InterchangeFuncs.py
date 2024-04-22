@@ -261,7 +261,7 @@ def Order_Container_Update(oder):
         if '-' in bkout:
             bklist = bkout.split('-')
             bkout = bklist[0]
-            if bkout < 7: bkout = 'NoBook'
+            if len(bkout) < 7: bkout = 'NoBook'
         edata = Orders.query.filter((Orders.HaulType == 'Dray Export') & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
         nbk = len(edata)
         if nbk > 1:
