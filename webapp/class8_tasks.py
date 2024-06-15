@@ -1699,7 +1699,7 @@ def New_task(tablesetup, task_iter):
                     if tablesetup['table'] == 'Orders':
                         #print(f'Updating Orders with {sid}')
                         Order_Addresses_Update(sid)
-                        Order_Container_Update(sid)
+                        err = Order_Container_Update(sid, err)
                     if tablesetup['table'] == 'Interchange':
                         Gate_Update(sid)
                     if tablesetup['table'] == 'Bills':
@@ -1836,7 +1836,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 if table == 'Orders':
                     #print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
-                    Order_Container_Update(sid)
+                    err = Order_Container_Update(sid, err)
                 if table == 'Interchange':
                     Gate_Update(sid)
                 #err.append(f"Updated entry in {tablesetup['table']}")
