@@ -137,6 +137,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
         else:
             #if not hasinput(text) and req: text = 'Missing'
             if text is not None: text = text.strip()
+            else: text = ''
             ###print(f'****************************Entering concheck with text {text}')
             if hasinput(text): char1 = text[0]
             else: char1 = ''
