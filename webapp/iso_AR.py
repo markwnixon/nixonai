@@ -523,8 +523,12 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     etype = 'o30'
     efrom = usernames['invo']
     epass = passwords['invo']
-    eto = emailsend[1]
-    ecc = emailsend[3]
+    try:
+        eto = emailsend[1]
+        ecc = emailsend[3]
+    except:
+        eto = ''
+        ecc = ''
     invoices = []
     packages = []
     #ecc1 = usernames['expo']
