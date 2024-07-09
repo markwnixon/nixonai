@@ -614,8 +614,11 @@ def get_email_customer(pdat, ar_emails_cust):
     #print(f'{emailto_selected}')
     if emailto_selected == []:
         #set a default value...
-        emailto_selected = [pdat.Associate2]
-        sal_default = pdat.Salap
+        try:
+            emailto_selected = [pdat.Associate2]
+            sal_default = pdat.Salap
+        except:
+            emailto_selected = []
     #print(f'{emailcc_selected}')
     emailtos, emailccs = [], []
     if hasinput(pdat.Email):
