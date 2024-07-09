@@ -503,7 +503,10 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     #Items same regarless of email tone
     salutation = request.values.get('salutation')
     if not hasinput(salutation) or salutation == f'{this_shipper} Accounting':
-        email_to_selected = emailsend[1]
+        try:
+            email_to_selected = emailsend[1]
+        except:
+            email_to_selected = None
         #print(email_to_selected)
         if email_to_selected is not None and email_to_selected != []:
             salutation = emailsend[4]
