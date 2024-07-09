@@ -608,54 +608,55 @@ def update_email(this_shipper, odata, tboxes, boxes, emailsend, email_update):
     return emaildata
 
 def get_email_customer(pdat, ar_emails_cust):
-    sal_default = None
-    emailto_selected = request.values.getlist('emailtolist')
-    emailcc_selected = request.values.getlist('emailcclist')
-    #print(f'{emailto_selected}')
-    if emailto_selected == []:
-        #set a default value...
-        try:
-            emailto_selected = [pdat.Associate2]
-            sal_default = pdat.Salap
-        except:
-            emailto_selected = []
-    #print(f'{emailcc_selected}')
-    emailtos, emailccs = [], []
-    if hasinput(pdat.Email):
-        emailtos.append(pdat.Email)
-        emailccs.append(pdat.Email)
-    if hasinput(pdat.Associate1):
-        emailtos.append(pdat.Associate1)
-        emailccs.append(pdat.Associate1)
-    if hasinput(pdat.Associate2):
-        emailtos.append(pdat.Associate2)
-        emailccs.append(pdat.Associate2)
+    if pdat is not None:
+        sal_default = None
+        emailto_selected = request.values.getlist('emailtolist')
+        emailcc_selected = request.values.getlist('emailcclist')
+        #print(f'{emailto_selected}')
+        if emailto_selected == []:
+            #set a default value...
+            try:
+                emailto_selected = [pdat.Associate2]
+                sal_default = pdat.Salap
+            except:
+                emailto_selected = []
+        #print(f'{emailcc_selected}')
+        emailtos, emailccs = [], []
+        if hasinput(pdat.Email):
+            emailtos.append(pdat.Email)
+            emailccs.append(pdat.Email)
+        if hasinput(pdat.Associate1):
+            emailtos.append(pdat.Associate1)
+            emailccs.append(pdat.Associate1)
+        if hasinput(pdat.Associate2):
+            emailtos.append(pdat.Associate2)
+            emailccs.append(pdat.Associate2)
 
-    # Add in email addresses from related emails
-    for ar in ar_emails_cust:
-        eto = ar.Emailto
-        ecc = ar.Emailcc
-        efrom = ar.From
-        eto = ast.literal_eval(eto)
-        ecc = ast.literal_eval(ecc)
-        for et in eto:
-            emailtos.append(et)
-        for ec in ecc:
-            emailccs.append(ec)
-        if efrom is not None:
-            emailtos.append(efrom)
-            emailccs.append(efrom)
+        # Add in email addresses from related emails
+        for ar in ar_emails_cust:
+            eto = ar.Emailto
+            ecc = ar.Emailcc
+            efrom = ar.From
+            eto = ast.literal_eval(eto)
+            ecc = ast.literal_eval(ecc)
+            for et in eto:
+                emailtos.append(et)
+            for ec in ecc:
+                emailccs.append(ec)
+            if efrom is not None:
+                emailtos.append(efrom)
+                emailccs.append(efrom)
 
-    #Add these emails for information purposes
-    emailtos.append(usernames['info'])
-    emailccs.append(usernames['info'])
+        #Add these emails for information purposes
+        emailtos.append(usernames['info'])
+        emailccs.append(usernames['info'])
 
-    unique_emailtolist = set(emailtos)
-    unique_emailcclist = set(emailccs)
-    emailtos = list(unique_emailtolist)
-    emailccs = list(unique_emailcclist)
-    emailsend = [emailtos, emailto_selected, emailccs, emailcc_selected, sal_default]
-    return emailsend
+        unique_emailtolist = set(emailtos)
+        unique_emailcclist = set(emailccs)
+        emailtos = list(unique_emailtolist)
+        emailccs = list(unique_emailcclist)
+        emailsend = [emailtos, emailto_selected, emailccs, emailcc_selected, sal_default]
+        return emailsend
 
 def get_ardata(containerlist, tboxes, customer):
     ardata_all = []
