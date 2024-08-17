@@ -1746,6 +1746,14 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     except:
         htold = ''
 
+    if task_iter > 0:
+        if itable == 'Orders':
+            htold = request.values.get('HaulType')
+            #print(f'htold edit task for orders is {htold}')
+        elif itable == 'Interchange':
+            htold = request.values.get('Type')
+            #print(f'htold edit task for interchange is {htold}')
+
     masks = tablesetup['haulmask']
     #print(f'masks is {masks}')
     if masks != []:
