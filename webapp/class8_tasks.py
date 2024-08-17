@@ -1626,7 +1626,7 @@ def New_task(tablesetup, task_iter):
     err = [f"Running New task with task_iter {task_iter} using {itable}"]
     form_show = tablesetup['form show']['New']
     form_checks = tablesetup['form checks']['New']
-    #print(f'Entering New Task with task iter {task_iter}')
+    print(f'Entering New Task with task iter {task_iter} and itable {itable}')
     htold = ''
 
     cancelnow = request.values.get('Cancel')
@@ -1641,10 +1641,12 @@ def New_task(tablesetup, task_iter):
 
         if task_iter > 0:
             if itable == 'Orders':
-                htold = request.values.get('haultype')
+                htold = request.values.get('HaulType')
+                #print(f'htold for orders is {htold}')
             elif itable == 'Interchange':
                 htold = request.values.get('Type')
-                ###print(f'htold is {htold}')
+                #print(f'htold for interchange is {htold}')
+
 
             if htold is None: htold = ''
             entrydata = tablesetup['entry data']
@@ -1668,7 +1670,7 @@ def New_task(tablesetup, task_iter):
                         else: required = False
                         ###print(entry[0], form_checks, required)
                         holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold,0, itable)
-                        ###print(entry[5])
+                        #print(entry[0], holdvec[jx], entry[4])
                         if entry[5] > 1: failed = failed + 1
                         if entry[5] == 1: warned = warned + 1
 
