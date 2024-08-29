@@ -12,7 +12,7 @@ from webapp.authenticate.routes import authenticate
 ########## SET DATABASE STRUCTURES #################################
 ####################################################################
 a=statpath('1')
-#print(scac, machine,a)
+print(scac, machine,a)
 
 SQLALCHEMY_DATABASE_URI = dbp[0] +"{username}:{password}@{hostname}/{databasename}".format(
             username=dbp[1],

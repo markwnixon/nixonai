@@ -1943,7 +1943,7 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
 
 def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
     err = []
-    #print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, tids= {tids} tabs= {tabs}')
+    print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, tids= {tids} tabs= {tabs}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
@@ -1953,7 +1953,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
             err.append('Too Many Selections')
         else:
             for sid in tids[jx]:
-                err.append('Working on single item {sid}')
+                err.append(f'Working on single item {sid}')
                 if task_focus == 'Delete':
                     #print('made it here with jx, thistable sid', jx, thistable, sid)
                     rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
@@ -1963,7 +1963,20 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                     # Need to add the undo of the journal entries
                     rstring = f'{table}.query.get({sid})'
                     odat = eval(rstring)
+
+                    invoice = addpath(tpath(f'{thistable}-Invoice',odat.Invoice))
+                    package = addpath(tpath(f'{thistable}-Package',odat.Package))
+                    try:
+                        os.remove(invoice)
+                    except:
+                        err.append(f'File {odat.Invoice} not found')
+                    try:
+                        os.remove(package)
+                    except:
+                        err.append(f'File {odat.Package} not found')
+
                     odat.Invoice = None
+                    odat.Package = None
                     odat.Istat = 0
                     odat.Links = None
                     odat.BalDue = None
@@ -2060,67 +2073,86 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
 
                     db.session.commit()
 
-                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'DocsNotSource' or task_focus == 'xProof'):
+                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'DocsNotSource' or task_focus == 'xProof' or task_focus == 'yProof' or task_focus == 'xRateCon'):
                     rstring = f'{table}.query.get({sid})'
                     odat = eval(rstring)
                     source = addpath(tpath(f'{thistable}-Source',odat.Source))
                     proof = addpath(tpath(f'{thistable}-Proof',odat.Proof))
+                    proof2 = addpath(tpath(f'{thistable}-Proof', odat.Proof2))
+                    ratecon = addpath(tpath(f'{thistable}-RateCon', odat.RateCon))
                     manifest = addpath(tpath(f'{thistable}-Manifest',odat.Manifest))
                     gate = addpath(tpath(f'{thistable}-Gate',odat.Gate))
                     invoice = addpath(tpath(f'{thistable}-Invoice',odat.Invoice))
                     package = addpath(tpath(f'{thistable}-Package',odat.Package))
+                    #print(f'task focus is {task_focus} and proof2 is {proof2}')
 
                     if task_focus == 'xProof':
                         try:
                             os.remove(proof)
                         except:
-                            continue
-                            #print(f'File {proof} not found')
+                            err.append(f'File {odat.Proof} not found')
+                        #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
                         odat.Proof = None
                         db.session.commit()
+                    elif task_focus == 'yProof':
+                        try:
+                            os.remove(proof2)
+                        except:
+                            err.append(f'File {odat.Proof2} not found')
+                        #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
+                        odat.Proof2 = None
+                        db.session.commit()
+                    elif task_focus == 'xRateCon':
+                        try:
+                            os.remove(ratecon)
+                        except:
+                            err.append(f'File {odat.RateCon} not found')
+                        #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
+                        odat.RateCon = None
+                        db.session.commit()
+
                     else:
 
                         if task_focus == 'Docs':
                             try:
                                 os.remove(source)
                             except:
-                                continue
-                                ##print(f'File {source} not found')
+                                err.append(f'File {odat.Source} not found')
 
                         try:
                             os.remove(proof)
                         except:
-                            continue
-                            #print(f'File {proof} not found')
+                            err.append(f'File {odat.Proof} not found')
 
                         try:
                             os.remove(manifest)
                         except:
-                            continue
-                            #print(f'File {manifest} not found')
+                            err.append(f'File {odat.Manifest} not found')
 
                         try:
                             os.remove(gate)
                         except:
-                            continue
-                            #print(f'File {gate} not found')
+                            err.append(f'File {odat.Gate} not found')
+
+                        try:
+                            os.remove(ratecon)
+                        except:
+                            err.append(f'File {odat.RateCon} not found')
 
                         try:
                             os.remove(invoice)
                         except:
-                            continue
-                            #print(f'File {invoice} not found')
-
+                            err.append(f'File {odat.Invoice} not found')
                         try:
                             os.remove(package)
                         except:
-                            continue
-                            #print(f'File {package} not found')
+                            err.append(f'File {odat.Package} not found')
 
                         if task_focus == 'Docs':  odat.Source = None
                         odat.Proof = None
                         odat.Manifest = None
                         odat.Gate = None
+                        odat.RateCon = None
                         odat.Invoice = None
                         odat.Package = None
                         odat.Proof2 = None
