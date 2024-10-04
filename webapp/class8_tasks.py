@@ -1626,7 +1626,7 @@ def New_task(tablesetup, task_iter):
     err = [f"Running New task with task_iter {task_iter} using {itable}"]
     form_show = tablesetup['form show']['New']
     form_checks = tablesetup['form checks']['New']
-    print(f'Entering New Task with task iter {task_iter} and itable {itable}')
+    print(f'Entering New Task with task iter {task_iter} and itable: {itable}')
     htold = ''
 
     cancelnow = request.values.get('Cancel')
@@ -3320,7 +3320,7 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
             if success: completed = True
     return completed, err, holdvec
 
-def get_billform_data(entrydata, tablesetup, holdvec, err, thisform):
+def get_billform_data(entrydata, tablesetup, holdvec, err, thisform, itable):
     form_show = tablesetup['form show'][thisform]
     form_checks = tablesetup['form checks'][thisform]
     task_iter = 1
@@ -3465,7 +3465,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     for jx, entry in enumerate(entrydata):
                         holdvec[jx] = getattr(bdat, f'{entry[0]}')
                 else:
-                    holdvec, err, failed = get_billform_data(entrydata, tablesetup, holdvec, err, 'MultiChecks')
+                    holdvec, err, failed = get_billform_data(entrydata, tablesetup, holdvec, err, 'MultiChecks', table)
                     err.append(f'Failed is {failed}')
 
                     update_item = request.values.get('Update Item')

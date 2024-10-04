@@ -52,9 +52,11 @@
                                 {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
-                            {% for kdata in klist %}
-                                <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>
-                            {% endfor %}
+                            {% if klist %}
+                                {% for kdata in klist %}
+                                    <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
                     </td>
                 </tr>

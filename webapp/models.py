@@ -635,6 +635,7 @@ class Orders(db.Model):
     Saljp = db.Column('Saljp', db.String(45))
     Saloa = db.Column('Saloa', db.String(45))
     Salap = db.Column('Salap', db.String(45))
+    SSCO = db.Column('SSCO', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
@@ -642,7 +643,7 @@ class Orders(db.Model):
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
                  Date4, Date5, Date6, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
-                 Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap):
+                 Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap, SSCO):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -721,6 +722,7 @@ class Orders(db.Model):
         self.Saloa = Saloa
         self.Emailap = Emailap
         self.Salap = Salap
+        self.SSCO = SSCO
 
 
 class Drops(db.Model):
