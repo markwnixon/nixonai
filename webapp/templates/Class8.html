@@ -44,11 +44,13 @@
         {% else %}
 
             <div class="col-sm-{{leftsize}}">
+
                 {% if (viewport[0] == 'show_doc_left') or (viewport[0] == 'upload_doc_left') %}
                     {% include 'the_tables_hidden.html' %}
                 {% else %}
                     {% include 'the_tables.html' %}
                 {% endif %}
+
 
                 {% if viewport[0] == 'upload_doc_left' %}
                     {% include 'uploaddocs.html' %}
@@ -158,9 +160,14 @@
 
 </div>
 </div>
-{{oder}}<br>
-{{modlink}}<br>
-{{ genre }}<br>
+
+{% if genre == 'Planning' %}
+    {% set caldata = holdvec[100] %}
+    {% set jolist = caldata[9] %}
+    {% for jo in jolist %}
+        <input type = "hidden" name ="jo{{ loop.index }}" value= "{{jo}}"> jo{{ loop.index }} is {{ jo }}<br>
+    {% endfor %}
+{% endif %}
 
 <input type = "hidden" name ="genre" value= "{{genre}}"><br>
 <input type = "hidden" name ="oder" value= "{{oder}}"><br>

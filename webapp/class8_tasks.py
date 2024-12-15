@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -65,6 +65,17 @@ def Review_Drop(dropblock):
         db.session.add(input)
         db.session.commit()
         return dropblock
+
+def due_back(date):
+    dw = date.weekday()
+    da = 3
+    if dw > 1: da = 5
+    return date + timedelta(days=da)
+
+def short_date(date):
+    if date is not None:  return date.strftime("%m-%d")
+    else: return ''
+
 
 
 
@@ -268,9 +279,9 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
 
         #Section to determine what items have been checked
         numchecked, avec = get_checked(tableget, db_data[1])
-        #print('returning checks numc, avec=',numchecked, avec)
+        print('returning checks numc, avec=',numchecked, avec)
         checked_data.append([tableget,numchecked,avec])
-        #print('after',checked_data)
+        print('after',checked_data)
 
         boxchecks = db_data[6]
         boxlist = db_data[7]
@@ -402,7 +413,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
     viewport = ['tables'] + ['0'] * 5
     # This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
     # If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-    #print(f'Taskon:{taskon}, task_focus:{task_focus}, tasktype:{tasktype}, task_iter:{task_iter}')
+    print(f'Taskon:{taskon}, task_focus:{task_focus}, tasktype:{tasktype}, task_iter:{task_iter}')
 
     if tasktype == 'Table_Selected':
         tablesetup = eval(f'{task_focus}_setup')
@@ -437,16 +448,16 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         nc = sum(cks[1] for cks in checked_data)
         tids = [cks[2] for cks in checked_data if cks[2] != []]
         tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-        #print('nc=', nc)
-        #print(tids)
-        #print(tabs)
+        print('nc=', nc)
+        print(tids)
+        print(tabs)
         if nc == 1:
             thistable = tabs[0]
             sid = tids[0][0]
-            #print('made it here with thistable sid taskiter', thistable, sid, task_iter)
+            print('made it here with this table sid taskiter', thistable, sid, task_iter)
             tablesetup = eval(f'{thistable}_setup')
             rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
-            #print(rstring)
+            print(f'rstring = {rstring}')
             holdvec, entrydata, err, viewport, completed = eval(rstring)
             #print('returned with:', viewport, completed)
         elif nc > 1:
@@ -535,6 +546,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             completed = True
             tablesetup = None
     #print(f'Returning from runthetask with viewport = {viewport} and completed {completed}')
+    print(f'The genre is {genre}')
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
 def get_address_details(address):
@@ -727,6 +739,284 @@ def get_custlist(table, tfilters):
     custlist.append('Show All')
     return custlist
 
+def next_business_day(date, jx):
+    next_day = date
+    kx = 0
+    for ix in range(15):
+        if jx < 0: next_day = next_day - timedelta(days=1)
+        else: next_day = next_day + timedelta(days=1)
+        pdat = PortClosed.query.filter(PortClosed.Date==next_day).first()
+        if pdat is None:
+            kx += 1
+            if kx == abs(jx): return next_day
+
+def create_cal_data():
+    # Define the dates shown for the selection based on current date
+    todaynow = datetime.datetime.now()
+    todaynow = todaynow.date()
+    # See if todaynow is a business day.  If not get the next business day.
+    pcdat = PortClosed.query.filter(PortClosed.Date == todaynow).first()
+    if pcdat is not None: todaynow = next_business_day(todaynow, 1)
+    busweek = 1
+    if busweek:
+        sw = todaynow - timedelta(days=todaynow.weekday())
+        busdays = [sw, next_business_day(sw, 1), next_business_day(sw, 2), next_business_day(sw, 3),
+                   next_business_day(sw, 4)]
+
+    # busdays = [next_business_day(todaynow, -2), next_business_day(todaynow, -1), todaynow, next_business_day(todaynow, 1), next_business_day(todaynow, 2)]
+
+    lbdate = datetime.datetime.now() - timedelta(90)
+    lbdate = lbdate.date()
+    podata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date3 > lbdate)).all()
+
+    pdio, pdip, pdeo, pdep = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [],
+                                                                                                            [], [], []]
+    for podat in podata:
+        hstat = podat.Hstat
+        container = podat.Container
+        shipper = podat.Shipper
+        jo = podat.Jo
+        on_alldates = 0
+        on_calendar = 0
+
+        gateout = podat.Date
+        gatein = podat.Date2
+        delivery = podat.Date3
+        arrives = podat.Date6
+        dueback = podat.Date7
+        del_s = short_date(delivery)
+        arr_s = short_date(arrives)
+        due_s = short_date(dueback)
+        pulled = short_date(gateout)
+        ret_s = short_date(gatein)
+
+        if 'Import' in podat.HaulType:
+            timport = 1
+        else:
+            timport = 0
+        if 'Export' in podat.HaulType:
+            texport = 1
+        else:
+            texport = 0
+
+        if timport:
+            avail = podat.Date4
+            avail_s = short_date(avail)
+            lfd = podat.Date5
+            lfd_s = short_date(lfd)
+
+            if hstat == 1:
+                if not isinstance(dueback, datetime.datetime): dueback = due_back(gateout)
+                due_s = short_date(dueback)
+
+                firstline = f'{container}'
+                custline = f'{shipper}'
+                dateline = f'GO:{pulled} DV:{del_s} DB:{due_s}'
+                colorline = 'blue-text'
+                comment = 0
+                print(f'Container {container} was pulled on {pulled} and is due back on {dueback}')
+                print(f'This is an import with dateline: {dateline}')
+                pdio[0].append([firstline, custline, dateline, colorline, comment, jo])
+                on_alldates = 1
+                for ix in range(5):
+                    if delivery == busdays[ix]:
+                        if dueback < delivery:
+                            colorline = 'red-text'
+                            comment = f'Container past due back {dueback}'
+                        elif dueback == delivery:
+                            colorline = 'text-warning'
+                            comment = 'Container due back today'
+                        else:
+                            colorline = 'blue-text'
+                            comment = 0
+                        pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
+                        on_calendar = 1
+
+            elif hstat < 1:
+                firstline = f'{container}'
+                custline = f'{shipper}'
+                dateline = f'AP:{avail_s} DV:{del_s} LFD:{lfd_s}'
+                colorline = 'black-text'
+                comment = 0
+                print(f'Container {container} is not pulled yet')
+                print(f'This is an import with dateline: {dateline}')
+                pdip[0].append([firstline, custline, dateline, colorline, comment, jo])
+                on_alldates = 1
+                for ix in range(5):
+                    if delivery == busdays[ix]:
+                        if lfd < delivery:
+                            colorline = 'red-text'
+                            comment = 'Past LFD for pull'
+                        elif lfd == delivery:
+                            colorline = 'orange-text'
+                            comment = 'Today LFD for pull'
+                        else:
+                            colorline = 'black-text'
+                            comment = 0
+                        pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
+                        on_calendar = 1
+        if texport:
+            erd = podat.Date4
+            erd_s = short_date(erd)
+            cut = podat.Date5
+            cut_s = short_date(cut)
+
+            if hstat == 1:
+                firstline = f'{podat.Booking}|{container}'
+                custline = f'{shipper}'
+                dateline = f'GO:{pulled} DV:{del_s} ERD:{erd_s} CUT:{cut_s}'
+                colorline = 'blue-text'
+                comment = 0
+                if delivery < erd:
+                    colorline = 'orange-text'
+                    comment = f'No return before {erd_s}'
+
+                print(f'Container {container} was pulled on {pulled} and is due back on {due_s}')
+                print(f'This is an export out with dateline: {dateline}')
+                pdeo[0].append([firstline, custline, dateline, colorline, comment, jo])
+                on_alldates = 1
+                for ix in range(5):
+                    if delivery == busdays[ix]:
+                        pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
+                        on_calendar = 1
+            elif hstat < 1:
+                firstline = f'{podat.Booking}'
+                custline = f'{shipper}'
+                colorline = 'black-text'
+                comment = 0
+                dateline = f'DV:{del_s} ERD:{erd_s} CUT: {cut_s}'
+                print(f'Booking {podat.Booking} is not pulled yet')
+                print(f'This is an export out with dateline: {dateline}')
+                pdep[0].append([firstline, custline, dateline, colorline, comment, jo])
+                on_alldates = 1
+                for ix in range(5):
+                    if delivery == busdays[ix]:
+                        pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
+                        on_calendar = 1
+
+        print(on_alldates, on_calendar)
+        if on_alldates and not on_calendar:
+            if texport:
+                if hstat == 1:
+                    print(f'Job {pdeo[0][-1]} not on the current calendar')
+                    pdeo[0][-1][3] = 'orange-text'
+                    pdeo[0][-1][4] = 'Not on Viewed Schedule'
+                else:
+                    print(f'Job {pdep[0][-1]} not on the current calendar')
+                    pdep[0][-1][3] = 'orange-text'
+                    pdep[0][-1][4] = 'Not on Viewed Schedule'
+
+            if timport:
+                if hstat == 1:
+                    print(f'Job {pdio[0][-1]} not on the current calendar')
+                    pdio[0][-1][3] = 'orange-text'
+                    pdio[0][-1][4] = 'Not on Viewed Schedule'
+                else:
+                    print(f'Job {pdip[0][-1]} not on the current calendar')
+                    pdip[0][-1][3] = 'orange-text'
+                    pdip[0][-1][4] = 'Not on Viewed Schedule'
+
+
+
+
+    return pdio, pdip, pdeo, pdep, busdays
+
+def initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist):
+    pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [
+        [], [], [], [], [], []]
+    # See which of these listed items have been checked
+    print(f'Initializing calendar checks based on jolist {jolist}')
+    if jolist == 0: return pdiovec, pdipvec, pdeovec, pdepvec
+    for jx in range(6):
+        for ix, item in enumerate(pdio[jx]):
+            if item[5] in jolist:
+                pdiovec[jx].append(ix + 1)
+
+        for ix, item in enumerate(pdip[jx]):
+            if item[5] in jolist:
+                pdipvec[jx].append(ix + 1)
+
+        for ix, item in enumerate(pdeo[jx]):
+            if item[5] in jolist:
+                pdeovec[jx].append(ix + 1)
+
+        for ix, item in enumerate(pdep[jx]):
+            if item[5] in jolist:
+                pdepvec[jx].append(ix + 1)
+
+    return pdiovec, pdipvec, pdeovec, pdepvec
+
+def cal_to_orders(jolist, checked_data):
+    ckdatalist = []
+    for jo in jolist:
+        od = Orders.query.filter(Orders.Jo == jo).first()
+        if od is not None:
+            ckdatalist.append(od.id)
+    ckdatalen = len(ckdatalist)
+    new_checked_data = []
+    for ck in checked_data:
+        if ck[0] == 'Orders':
+            new_checked_data.append(['Orders', ckdatalen, ckdatalist])
+        else:
+            new_checked_data.append(ck)
+    return new_checked_data
+
+def get_calendar_checks(pdio, pdip, pdeo, pdep):
+    pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
+    jolist_all = []
+    jolist_cal = []
+    # See which of these listed items have been checked
+    for jx in range(6):
+        for ix, item in enumerate(pdio[jx]):
+            if jx == 0:
+                test = request.values.get(f'x{item[5]}')
+            else: test = request.values.get(f'{item[5]}')
+            if test is not None:
+                pdiovec[jx].append(ix + 1)
+                if jx == 0: jolist_all.append(item[5])
+                else: jolist_cal.append(item[5])
+
+        for ix, item in enumerate(pdip[jx]):
+            if jx == 0:
+                test = request.values.get(f'x{item[5]}')
+            else:
+                test = request.values.get(f'{item[5]}')
+            if test is not None:
+                pdipvec[jx].append(ix + 1)
+                if jx == 0:
+                    jolist_all.append(item[5])
+                else:
+                    jolist_cal.append(item[5])
+
+        for ix, item in enumerate(pdeo[jx]):
+            if jx == 0:
+                test = request.values.get(f'x{item[5]}')
+            else:
+                test = request.values.get(f'{item[5]}')
+            if test is not None:
+                pdeovec[jx].append(ix + 1)
+                if jx == 0:
+                    jolist_all.append(item[5])
+                else:
+                    jolist_cal.append(item[5])
+
+        for ix, item in enumerate(pdep[jx]):
+            if jx == 0:
+                test = request.values.get(f'x{item[5]}')
+            else:
+                test = request.values.get(f'{item[5]}')
+            if test is not None:
+                pdepvec[jx].append(ix + 1)
+                if jx == 0:
+                    jolist_all.append(item[5])
+                else:
+                    jolist_cal.append(item[5])
+
+    jolist = list(set(jolist_all + jolist_cal))
+
+    return pdiovec, pdipvec, pdeovec, pdepvec, jolist
+
+
 def Table_maker(genre):
     username = session['username'].capitalize()
     # Gather information about the tables inside the genre
@@ -736,6 +1026,8 @@ def Table_maker(genre):
     table_filters = eval(f"{genre}_genre['table_filters']")
     task_boxes = eval(f"{genre}_genre['task_boxes']")
     task_box_map = eval(f"{genre}_genre['task_box_map']")
+
+    print(f'The genre is {genre} and the genre tables are: {genre_tables}')
 
     # Left size is the portion out of 12 devoted to table and document display
     leftsize = 8
@@ -749,12 +1041,32 @@ def Table_maker(genre):
 
 
     if request.method == 'POST' and resethit is None:
-        #print('Method is POST')
+
         # See if a task is active and ongoing
         tasktype = nononestr(request.values.get('tasktype'))
         taskon = nononestr(request.values.get('taskon'))
         task_focus = nononestr(request.values.get('task_focus'))
         task_iter = nonone(request.values.get('task_iter'))
+        if genre == 'Planning':
+            pdio, pdip, pdeo, pdep, busdays = create_cal_data()
+            if task_iter == 0:
+                pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
+                print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
+            else:
+                jolist = []
+                for jp in range(1, 5):
+                    jox = f'jo{jp}'
+                    jo = request.values.get(jox)
+                    print(jp, jox, jo)
+                    if jo is not None: jolist.append(jo)
+                print(f'Starting POST of genre {genre} with return of jolist: {jolist}')
+                pdiovec, pdipvec, pdeovec, pdepvec = initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist)
+            # Set Orders table to checks used in calendar whether or not the Order table is on...
+            checked_data = cal_to_orders(jolist, checked_data)
+
+
+
+        print(f'Method is POST with tasktype {tasktype}, taskon {taskon}, task_focus {task_focus}, task_iter {task_iter}')
 
         #Gather filter settings to keep them set as desired
 
@@ -773,16 +1085,21 @@ def Table_maker(genre):
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
 
             if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
+            pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
 
         else:
 
             taskon = nononestr(taskon)
-            #print(f'Return hit is none so task continues with task tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
+            print(f'Return hit is none so task continues with task tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
 
-            # Get data only for tables that have been checked on
+            # Get data only for tables that have been checked on and not specialized
+            # However, we must convert the calendar into the order data if using the calendar.
             genre_tables_on = checked_tables(genre_tables)
             tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
-            #print(f'The tables on: {tables_on} with task {taskon}')
+            if genre == 'Planning':
+                if 'Orders' not in tables_on: tables_on.append('Orders')
+
+            print(f'The tables on: {tables_on} with task {taskon}')
 
             # Only check the launch boxes, filters, and task selections if no task is running
             if not hasinput(taskon):
@@ -803,9 +1120,9 @@ def Table_maker(genre):
                             tasktype = tasklist[0]
                             taskon, task_focus = tasklist[1:]
 
-                #print('The task is:', taskon)
-                #print('The task focus is:', task_focus)
-                #print('The task_iter is:', task_iter)
+                print('The task is:', taskon)
+                print('The task focus is:', task_focus)
+                print('The task_iter is:', task_iter)
 
             # See if a table filter has been selected, this can take place even during a task
             for filter in table_filters:
@@ -840,7 +1157,7 @@ def Table_maker(genre):
 
 
 
-    #First time thru (not a Post)
+    #First time thru (not a Post) below#########################################################
     else:
         #print('Method is NOT POST')
         genre_tables_on = ['off'] * len(genre_tables)
@@ -856,7 +1173,14 @@ def Table_maker(genre):
         taskon, task_iter, task_focus, tasktype = None, None, None, None
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
+        if genre == 'Planning':
+            print(f'Executing the Calendar first time thru....')
+            # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
+            pdio, pdip, pdeo, pdep, busdays = create_cal_data()
+            pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
+            jolist = []
 
+###########All done in this section##################################################################################################################
     # Execute these parts whether it is a Post or Not:
     # genre_data = [genre,genre_tables,genre_tables_on,contypes]
     genre_data = eval(f"{genre}_genre")
@@ -868,19 +1192,22 @@ def Table_maker(genre):
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
+    if genre == 'Planning': checked_data = cal_to_orders(jolist, checked_data)
 
     # Remove the checks during reset of tables
     if resethit is not None:
         for check in checked_data:  check[2] = []
+        pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [],[]], [[], [], [], [], [], []]
 
     # Execute the task here if a task is on...,,,,
     if hasvalue(taskon):
-        #print(f'About to execute task with tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
+        print(f'1164 About to execute task with tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter} for genre {genre}')
+        print(f'1165 and also checked data: {checked_data} and err: {err} ')
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
             # If complete set the task on to none
             taskon = None
-            #print(f'completed task: the tables on are: {tables_on} with task {taskon}')
+            print(f'completed task: the tables on are: {tables_on} with task {taskon}')
             if tables_on == []:
                 genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport, tfilters = reset_state_hard(task_boxes, genre_tables)
                 genre_data = eval(f"{genre}_genre")
@@ -888,34 +1215,33 @@ def Table_maker(genre):
             else:
                 #print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
                 jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
+            if genre == 'Planning':
+                # If the tesk is completed and we never left the calendar then keep the checks we used
+                #Reset the calendar
+                pdio, pdip, pdeo, pdep, busdays = create_cal_data()
+                pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
+                if jolist == []:
+                    print(f'checked data is {checked_data}')
+                #pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
+
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else:
             #print(f'On task_iter {task_iter} keydata is {keydata}')
             task_iter = int(task_iter) + 1
             # Need to pick up some of the keydata after table build
             if checked_data != [] and checked_data is not None:
-                #print(checked_data)
-                if checked_data[0] == 'Orders': keydata = get_Orders_keydata(keydata, checked_data)
+                print(f'Checked Data is: {checked_data}')
+                print(f'Keydata is: {keydata}')
+                print(checked_data[0])
+                if checked_data[0][0] == 'Orders':
+                    keydata = get_Orders_keydata(keydata, checked_data)
+                    print(f'Keydata obtained is: {keydata}')
 
-
-        #for e in err:
-            #if 'Created' in e:
-                #taskon = None
-                #task_iter = 0
-        # Treat a cancel job as a completed task instead of this........
-        #if request.values.get('Cancel') is not None:
-            #jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
-            #err = ['Entry canceled']
-            #taskon = None
-            #task_iter = 0
-            #holdvec = [''] * 50
-            #entrydata = []
-            #viewport = ['tables'] + ['0']*5
     else:
         taskon = None
         task_iter = 0
         tasktype = ''
-        holdvec = [''] * 99
+        holdvec = [''] * 150
         #print(f'labpassvec is {labpassvec}')
         entrydata = []
         #err = ['All is well']
@@ -926,7 +1252,7 @@ def Table_maker(genre):
     if returnhit is not None:
         checked_data = [0,'0',['0']]
 
-    if len(holdvec)<100: holdvec = holdvec + ['']*(100-len(holdvec))
+    if len(holdvec)<101: holdvec = holdvec + ['']*(101-len(holdvec))
     checkcol = [eval(f"{ix}_setup['checklocation']") for ix in tables_on]
     holdvec[98] = checkcol
     holdvec[99] = labpassvec
@@ -1028,7 +1354,7 @@ def Table_maker(genre):
 
     if (putbuff is not None or anyamber) and 'Orders' in tables_on:
         holdvec[96] = []
-        #print(f'Doing the paste buffer for {checked_data} {tables_on}')
+        print(f'Doing the paste buffer for {checked_data} {tables_on}')
         sids = checked_data[0][2]
         if sids != []:
             if len(sids) <= 2:
@@ -1078,10 +1404,19 @@ def Table_maker(genre):
     if leftcheck == '9x3': leftsize = 9
     if leftcheck == '10x2': leftsize = 10
     if leftcheck == 'Top-Bot': leftsize = 12
+
     #print(f'Leftsize on exit is {leftsize}')
     err = erud(err)
 
     holdvec[80] = request.values.get('showcolorstable')
+
+    if genre == 'Planning':
+        print(f'The length of holdvec is {len(holdvec)}')
+        print(f'Sending over jolist = {jolist}')
+        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays, jolist]
+        print(f'Holdvec[100] = {holdvec[100]}')
+
+    print(checked_data)
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
@@ -1151,7 +1486,7 @@ def get_dbdata(table_setup, tfilters):
         query_adds.append(f"{table}.{highfilter} {logic} '{highfilter_value}'")
 
     # If this table has no color capability then it cannot be filtered by date or type
-    #print(f'the color_selector is {color_selector}')
+    print(f'the color_selector is {color_selector}')
     if color_selector is not None:
         # Determine if time filter applies to query:
         if 'Date Filter' in tfilters:
@@ -1232,7 +1567,7 @@ def get_dbdata(table_setup, tfilters):
         if htest is not None and htest != 'All Drivers' :
             hfilter = f"{table}.DriverStart == '{htest}'"
             query_adds.append(hfilter)
-
+    print(tfilters, query_adds)
     # Put the filters together from the 3 possible pieces: time, type1, type2
     if query_adds == []:
         table_query = f'{table}.query.all()'
@@ -1735,6 +2070,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     err = [f"Running Edit task with task_iter {task_iter} using {itable}"]
     completed = False
     viewport = ['0'] * 6
+    print(f'1993 Running Edit task with task_iter {task_iter} using {itable}')
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -1771,10 +2107,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     form_show = tablesetup['form show']['Edit']
     form_checks = tablesetup['form checks']['Edit']
 
-    #print('')
-    #print(f'*********************************************************************')
-    #print(f'***Running edit with task_iter {task_iter} and old data is {htold}***')
-    #print(f'*********************************************************************')
+    print('')
+    print(f'*********************************************************************')
+    print(f'***Running edit with task_iter {task_iter} and old data is {htold}***')
+    print(f'*********************************************************************')
 
     if task_iter > 0:
         failed = 0
@@ -1902,7 +2238,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
 
 def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
-    #print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
+    print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
@@ -1933,6 +2269,15 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
                     if nstat-1 > -1: odat.Istat = nstat-1
                 if task_focus == 'Inv Emailed': odat.Istat = 3
                 if task_focus == 'Inv Paid': odat.Istat = 8
+
+            if 'Date' in task_focus:
+                nstat = odat.Date3
+                if isinstance(nstat, datetime.date):
+                    if task_focus == 'Date+1':
+                        odat.Date3 = nstat + datetime.timedelta(days=1)
+                    if task_focus == 'Date-1':
+                        odat.Date3 = nstat - datetime.timedelta(days=1)
+
     db.session.commit()
     holdvec, entrydata, err = [], [], []
     viewport = ['0'] * 6

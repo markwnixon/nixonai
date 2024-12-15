@@ -4,6 +4,7 @@
         <div class="row">
             <div class="col-sm-12" align="center">
                 {% include 'Table_Row.html' %}
+                {%  if genre == 'Planning' %} {% include 'Calendar_Rows.html' %} {% endif %}
             </div>
         </div>
         {% set atc = "font-weight-bold text-center" %}

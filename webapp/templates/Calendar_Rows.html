@@ -1,0 +1,68 @@
+{% set calview = 5 %}
+{% set caldata = holdvec[100] %}
+{% set pdio = caldata[0] %}
+{% set pdip = caldata[1] %}
+{% set pdeo = caldata[2] %}
+{% set pdep = caldata[3] %}
+{% if calview == 3 %}{% set cbr = 3 %}{% endif %}
+{% if calview == 5 or calview == 10%}{% set cbr = 2 %}{% endif %}
+{% set pdiovec = caldata[4]%}
+{% set pdipvec = caldata[5] %}
+{% set pdeovec = caldata[6] %}
+{% set pdepvec = caldata[7] %}
+{% set busdays = caldata[8] %}
+{% set jolist = caldata[9] %}
+{% set fbcdg = "font-weight-bold text-center dark-grey-text" %}
+{% set caltop = "font-weight-bold text-center text-warning bg-dark" %}
+{% set fbci = "font-weight-bold text-center indigo-text" %}
+{% set fbcp = "font-weight-bold text-center purple-text" %}
+{% set fbcr = "font-weight-bold text-center red-text" %}
+{% set fbcc = "font-weight-bold text-center cyan-text" %}
+
+<div class="row">
+    <div class="col-sm-{{ cbr }} text-left">
+        <div class="{{ caltop }}"> All Dates </div>
+        {% if pdio[0] %}<div class="{{ fbci }}">Imports Out</div>{% endif %}
+            {% for io in pdio[0] %}
+                <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdiovec[0] %} checked {% endif %} name="x{{ io[5] }}"> {{ io[0] }} <br> {{ io[1] }}<br> {{ io[2] }}<br>{% if io[4] %}{{ io[4] }} <br>{% endif %}</p>
+            {% endfor %}
+        {% if pdip[0] %}<div class="{{ fbci }}">Imports in Port</div>{% endif %}
+            {% for ip in pdip[0] %}
+                <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[0] %} checked {% endif %} name="x{{ ip[5] }}"> {{ ip[0] }} <br> {{ ip[1] }}<br> {{ ip[2] }}<br>{% if ip[4] %}{{ ip[4] }} <br>{% endif %}</p>
+            {% endfor %}
+        {% if pdeo[0] %}<div class="{{ fbci }}">Exports Out</div>{% endif %}
+            {% for eo in pdeo[0] %}
+                <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[0] %} checked {% endif %} name="x{{ eo[5] }}"> {{ eo[0] }} <br> {{ eo[1] }}<br> {{ eo[2] }}<br>{% if eo[4] %}{{ eo[4] }} <br>{% endif %}</p>
+            {% endfor %}
+        {% if pdep[0] %}<div class="{{ fbci }}">Exports Not Pulled</div>{% endif %}
+            {% for ep in pdep[0] %}
+                <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[0] %} checked {% endif %} name="x{{ ep[5] }}"> {{ ep[0] }} <br> {{ ep[1] }}<br> {{ ep[2] }}<br>{% if ep[4] %}{{ ep[4] }} <br>{% endif %}</p>
+            {% endfor %}
+        <br>
+    </div>
+    {% if calview == 5 %}
+        {% for ix in range(1, calview+1) %}
+            <div class="col-sm-{{ cbr }} text-left">
+                <div class="{{ caltop }}">{{ busdays[ix-1] }}</div>
+                {% if pdio[ix] or pdip[ix]%}<div class="{{ fbci }}">Import Deliveries</div>{% endif %}
+                    {% for io in pdio[ix] %}
+                        <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdiovec[ix] %} checked {% endif %} name="{{ io[5] }}"> {{ io[0] }} <br> {{ io[1] }}<br> {{ io[2] }}<br> {% if io[4] %}{{ io[4] }} <br>{% endif %} {{ io[5] }} <br></p>
+                    {% endfor %}
+
+                    {% for ip in pdip[ix] %}
+                        <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}"> {{ ip[0] }} <br> {{ ip[1] }}<br> {{ ip[2] }}<br>{% if ip[4] %}{{ ip[4] }} <br>{% endif %}</p>
+                    {% endfor %}
+
+                {% if pdeo[ix] or pdep[ix] %}<div class="{{ fbci }}">Export Deliveries</div>{% endif %}
+                    {% for eo in pdeo[ix] %}
+                        <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}"> {{ eo[0] }} <br> {{ eo[1] }}<br> {{ eo[2] }}<br>{% if eo[4] %}{{ eo[4] }} <br>{% endif %}</p>
+                    {% endfor %}
+
+                    {% for ep in pdep[ix] %}
+                        <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}"> {{ ep[0] }} <br> {{ ep[1] }}<br> {{ ep[2] }}<br>{% if ep[4] %}{{ ep[4] }} <br>{% endif %}</p>
+                    {% endfor %}
+                <br>
+            </div>
+       {% endfor %}
+    {% endif %}
+</div>
