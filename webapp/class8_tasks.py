@@ -901,14 +901,17 @@ def create_cal_data(tfilters, dlist):
                 on_alldates = 1
                 for ix in range(5):
                     if delivery == caldays[ix]:
-                        if lfd < delivery:
-                            colorline = 'red-text'
-                            comment = ['****']
-                            comment.append('Past LFD for pull')
-                        elif lfd == delivery:
-                            colorline = 'orange-text'
-                            comment = ['****']
-                            comment.append('Today LFD for pull')
+                        if lfd is not None:
+                            if lfd < delivery:
+                                colorline = 'red-text'
+                                comment = ['****']
+                                comment.append('Past LFD for pull')
+                            elif lfd == delivery:
+                                colorline = 'orange-text'
+                                comment = ['****']
+                                comment.append('Today LFD for pull')
+                            else:
+                                colorline = 'black-text'
                         else:
                             colorline = 'black-text'
                         pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
@@ -947,13 +950,14 @@ def create_cal_data(tfilters, dlist):
                 else: colorline = 'blue-text'
 
                 comment = []
-
-                if gatein < erd:
-                    colorline = 'orange-text'
-                    comment.append(f'No return before {erd_s}')
-                if gatein > cut:
-                    colorline = 'orange-text'
-                    comment.append(f'Ret post cut {cut_s}')
+                if erd is not None:
+                    if gatein < erd:
+                        colorline = 'orange-text'
+                        comment.append(f'No return before {erd_s}')
+                if cut is not None:
+                    if gatein > cut:
+                        colorline = 'orange-text'
+                        comment.append(f'Ret post cut {cut_s}')
                 if not hasinput(in_booking):
                     in_booking = release
                 if in_booking != release:
@@ -981,10 +985,11 @@ def create_cal_data(tfilters, dlist):
                 colorline = 'black-text'
                 dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
                 shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
-                if delivery < erd:
-                    colorline = 'orange-text'
-                    comment = ['****']
-                    comment.append(f'No return before {erd_s}')
+                if erd is not None:
+                    if delivery < erd:
+                        colorline = 'orange-text'
+                        comment = ['****']
+                        comment.append(f'No return before {erd_s}')
                 pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
                 on_alldates = 1
                 for ix in range(5):
