@@ -1240,7 +1240,7 @@ def make_new_order():
                    Release=0, Shipper=a[0], Type=a[9], Time3=None, Bid=idb, Lid=idl, Did=idd, Label='FileUpload',
                    Dropblock1=newdrop1, Dropblock2=newdrop2, Commodity=a[12], Packing=a[13], Links=None, Hstat=0, Istat=0,
                    Proof=None,Invoice=None,Gate=None,Package=None,Manifest=None,Scache=0,Pcache=0,Icache=0,Mcache=0,
-                   Pkcache=0, QBi=0)
+                   Pkcache=0, QBi=0, Date3=None, Date4=None, Date5=None, Date6=None, Date7=None, Date8=None)
     db.session.add(input)
     db.session.commit()
 

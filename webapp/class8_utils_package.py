@@ -4,7 +4,7 @@ from webapp.models import People, Drops, Drivers, Vehicles, Interchange
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
-from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2 import PdfReader, PdfWriter, Transformation
 #from PyPDF2.pdf import PageObject
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import datetime
@@ -134,7 +134,7 @@ def stamp_document(genre, odat, stamplist, stampdata, err, docin):
 def blendticks(gfile1,gfile2,outfile):
 
     reader1 = PdfReader(open(gfile1, 'rb'))
-    p1 = reader1.ages[0]
+    p1 = reader1.pages[0]
 
     reader2 = PdfReader(open(gfile2, 'rb'))
     p2 = reader2.pages[0]
@@ -145,8 +145,9 @@ def blendticks(gfile1,gfile2,outfile):
     #p2.cropBox.lowerLeft = (50,400)
     #p2.cropBox.upperRight = (600,700)
     #translate first page
-    p3.mergeTranslatedPage(p1, 0, -100, expand=False)
-
+    #p3.mergeTranslatedPage(p1, 0, -100, expand=False)
+    p1.add_transformation(Transformation().translate(tx=0, ty=-80))
+    p3.merge_page(p1)
 
     #offset_x = p2.mediaBox[2]
     offset_x = 0
@@ -154,9 +155,12 @@ def blendticks(gfile1,gfile2,outfile):
     offset_y = -325
 
     # add second page to first one
-    p3.mergeTranslatedPage(p2, offset_x, offset_y, expand=False)
-    p3.cropBox.lowerLeft = (50,250)
-    p3.cropBox.upperRight = (550,800)
+    #p3.mergeTranslatedPage(p2, offset_x, offset_y, expand=False)
+    p2.add_transformation(Transformation().translate(tx=offset_x, ty=offset_y))
+    p3.merge_page(p2)
+    #p3.cropbox.lower_left = (50,250)
+    p3.cropbox.lower_left = (50, 150)
+    p3.cropbox.upper_right = (550,800)
 
     output = PdfWriter()
     output.add_page(p3)

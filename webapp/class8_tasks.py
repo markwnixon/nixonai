@@ -74,7 +74,7 @@ def due_back(date):
 
 def short_date(date):
     if date is not None:  return date.strftime("%m-%d")
-    else: return ''
+    else: return 'XX-XX'
 
 
 
@@ -750,38 +750,62 @@ def next_business_day(date, jx):
             kx += 1
             if kx == abs(jx): return next_day
 
-def create_cal_data():
+def create_cal_data(tfilters, dlist):
     # Define the dates shown for the selection based on current date
     todaynow = datetime.datetime.now()
     todaynow = todaynow.date()
+    whatweek = tfilters['Date Filter']
+    weekmv = dlist.index(whatweek) - 2
     # See if todaynow is a business day.  If not get the next business day.
+    todaynow = todaynow + timedelta(days=weekmv*7)
     pcdat = PortClosed.query.filter(PortClosed.Date == todaynow).first()
     if pcdat is not None: todaynow = next_business_day(todaynow, 1)
     busweek = 1
     if busweek:
         sw = todaynow - timedelta(days=todaynow.weekday())
-        busdays = [sw, next_business_day(sw, 1), next_business_day(sw, 2), next_business_day(sw, 3),
-                   next_business_day(sw, 4)]
+        #busdays = [sw, next_business_day(sw, 1), next_business_day(sw, 2), next_business_day(sw, 3), next_business_day(sw, 4)]
+        caldays = [sw, sw+timedelta(days=1), sw+timedelta(days=2), sw+timedelta(days=3), sw+timedelta(days=4)]
 
-    # busdays = [next_business_day(todaynow, -2), next_business_day(todaynow, -1), todaynow, next_business_day(todaynow, 1), next_business_day(todaynow, 2)]
-
-    lbdate = datetime.datetime.now() - timedelta(90)
+    lbdate = datetime.datetime.now() - timedelta(20)
     lbdate = lbdate.date()
-    podata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date3 > lbdate)).all()
+    #podata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date3 > lbdate)).all()
+    podata = Orders.query.filter(Orders.Date3 > lbdate).all()
 
     pdio, pdip, pdeo, pdep = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [],
                                                                                                             [], [], []]
+    pdic, pdec = [[], [], [], [], [], []], [[], [], [], [], [], []]
+
     for podat in podata:
         hstat = podat.Hstat
         container = podat.Container
         shipper = podat.Shipper
+        if len(shipper) > 25: shipper = shipper[0:25]
+        ht = podat.HaulType
         jo = podat.Jo
+        contype = podat.Type
+        location = podat.Dropblock2
+        release = podat.Booking
+        in_booking = podat.BOL
+        description = podat.Description
+        address = podat.Dropblock2
+        ship = f'{podat.Ship} {podat.Voyage}'
+        notes = podat.Location
+        if notes is None: notes = ''
+        comment = []
+        if hstat > 1: completed = 1
+        else: completed = 0
+        # Once pulled, Need to place the container by delivery date if not delivered yet, or planned gate in if delivered
+        if hstat == 1:
+            proof = podat.Proof
+            pcache = podat.Pcache
+            if proof is not None or pcache == 1: completed = 1
+
         on_alldates = 0
         on_calendar = 0
 
         gateout = podat.Date
-        gatein = podat.Date2
         delivery = podat.Date3
+        gatein = podat.Date2
         arrives = podat.Date6
         dueback = podat.Date7
         del_s = short_date(delivery)
@@ -804,6 +828,25 @@ def create_cal_data():
             avail_s = short_date(avail)
             lfd = podat.Date5
             lfd_s = short_date(lfd)
+            datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback]
+
+            if hstat >= 1:
+
+                bc1 = f'{container} GO:{pulled}'
+                bc2 = f'{container} DV:{del_s}'
+                bc3 = f'{container} GI:{ret_s}'
+                custline = f'{shipper}'
+                if hstat == 1: colorline = 'blue-text'
+                else: colorline = 'purple-text'
+
+                for ix in range(5):
+                    if gateout == caldays[ix]:
+                        pdic[ix + 1].append([bc1,custline, colorline])
+                    if gatein == caldays[ix]:
+                        if hstat > 1:
+                            pdic[ix + 1].append([bc3, custline, colorline])
+
+
 
             if hstat == 1:
                 if not isinstance(dueback, datetime.datetime): dueback = due_back(gateout)
@@ -813,113 +856,164 @@ def create_cal_data():
                 custline = f'{shipper}'
                 dateline = f'GO:{pulled} DV:{del_s} DB:{due_s}'
                 colorline = 'blue-text'
-                comment = 0
-                print(f'Container {container} was pulled on {pulled} and is due back on {dueback}')
-                print(f'This is an import with dateline: {dateline}')
-                pdio[0].append([firstline, custline, dateline, colorline, comment, jo])
+                comment = []
+                pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype])
                 on_alldates = 1
+
                 for ix in range(5):
-                    if delivery == busdays[ix]:
-                        if dueback < delivery:
-                            colorline = 'red-text'
-                            comment = f'Container past due back {dueback}'
-                        elif dueback == delivery:
-                            colorline = 'text-warning'
-                            comment = 'Container due back today'
-                        else:
-                            colorline = 'blue-text'
-                            comment = 0
-                        pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
-                        on_calendar = 1
+                    if completed:
+                        if gatein == caldays[ix]:
+                            if gatein > dueback:
+                                colorline = 'red-text'
+                                comment.append(f'Past due back {dueback}')
+                            elif gatein == dueback:
+                                colorline = 'text-warning'
+                                comment.append('Due back today')
+                            else:
+                                colorline = 'green-text'
+                            pdio[ix + 1].append(
+                                [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                 in_booking, description, ship, notes, datecluster])
+                            on_calendar = 1
+                    else:
+                        if delivery == caldays[ix]:
+                            if dueback < delivery:
+                                colorline = 'red-text'
+                                comment = ['****']
+                                comment.append(f'Past due back {dueback}')
+                            elif dueback == delivery:
+                                colorline = 'text-warning'
+                                comment = ['****']
+                                comment.append('Due back today')
+                            else:
+                                colorline = 'blue-text'
+
+                            pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
+                            on_calendar = 1
 
             elif hstat < 1:
                 firstline = f'{container}'
                 custline = f'{shipper}'
                 dateline = f'AP:{avail_s} DV:{del_s} LFD:{lfd_s}'
                 colorline = 'black-text'
-                comment = 0
-                print(f'Container {container} is not pulled yet')
-                print(f'This is an import with dateline: {dateline}')
-                pdip[0].append([firstline, custline, dateline, colorline, comment, jo])
+                comment = []
+                pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype])
                 on_alldates = 1
                 for ix in range(5):
-                    if delivery == busdays[ix]:
+                    if delivery == caldays[ix]:
                         if lfd < delivery:
                             colorline = 'red-text'
-                            comment = 'Past LFD for pull'
+                            comment = ['****']
+                            comment.append('Past LFD for pull')
                         elif lfd == delivery:
                             colorline = 'orange-text'
-                            comment = 'Today LFD for pull'
+                            comment = ['****']
+                            comment.append('Today LFD for pull')
                         else:
                             colorline = 'black-text'
-                            comment = 0
-                        pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
+                        pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
                         on_calendar = 1
+
+
         if texport:
             erd = podat.Date4
             erd_s = short_date(erd)
             cut = podat.Date5
             cut_s = short_date(cut)
+            datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback]
+
+            if hstat >= 1:
+
+                bc1 = f'{container} GO:{pulled}'
+                bc3 = f'{container} GI:{ret_s}'
+                custline = f'{shipper}'
+                if hstat == 1: colorline = 'blue-text'
+                else: colorline = 'purple-text'
+
+                for ix in range(5):
+                    if gateout == caldays[ix]:
+                        pdec[ix + 1].append([bc1,custline, colorline])
+                    if gatein == caldays[ix]:
+                        if hstat > 1:
+                            pdec[ix + 1].append([bc3, custline, colorline])
 
             if hstat == 1:
-                firstline = f'{podat.Booking}|{container}'
+                firstline = f'{container}'
                 custline = f'{shipper}'
-                dateline = f'GO:{pulled} DV:{del_s} ERD:{erd_s} CUT:{cut_s}'
-                colorline = 'blue-text'
-                comment = 0
-                if delivery < erd:
-                    colorline = 'orange-text'
-                    comment = f'No return before {erd_s}'
+                addrline = f'{address}'
+                dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
+                shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
+                if completed: colorline = 'green-text'
+                else: colorline = 'blue-text'
 
-                print(f'Container {container} was pulled on {pulled} and is due back on {due_s}')
-                print(f'This is an export out with dateline: {dateline}')
-                pdeo[0].append([firstline, custline, dateline, colorline, comment, jo])
+                comment = []
+
+                if gatein < erd:
+                    colorline = 'orange-text'
+                    comment.append(f'No return before {erd_s}')
+                if gatein > cut:
+                    colorline = 'orange-text'
+                    comment.append(f'Ret post cut {cut_s}')
+                if not hasinput(in_booking):
+                    in_booking = release
+                if in_booking != release:
+                    colorline = 'orange-text'
+                    comment.append(f'Ret booking change')
+                if comment != []: comment.insert(0, '****')
+
+                pdeo[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
                 on_alldates = 1
+
                 for ix in range(5):
-                    if delivery == busdays[ix]:
-                        pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
-                        on_calendar = 1
+                    if completed:
+                        if gatein == caldays[ix]:
+                            pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
+                            on_calendar = 1
+                    else:
+                        if delivery == caldays[ix]:
+                            pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
+                            on_calendar = 1
+
             elif hstat < 1:
                 firstline = f'{podat.Booking}'
                 custline = f'{shipper}'
+                addrline = f'{address}'
                 colorline = 'black-text'
-                comment = 0
-                dateline = f'DV:{del_s} ERD:{erd_s} CUT: {cut_s}'
-                print(f'Booking {podat.Booking} is not pulled yet')
-                print(f'This is an export out with dateline: {dateline}')
-                pdep[0].append([firstline, custline, dateline, colorline, comment, jo])
+                dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
+                shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
+                if delivery < erd:
+                    colorline = 'orange-text'
+                    comment = ['****']
+                    comment.append(f'No return before {erd_s}')
+                pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
                 on_alldates = 1
                 for ix in range(5):
-                    if delivery == busdays[ix]:
-                        pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo])
+                    if delivery == caldays[ix]:
+                        pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
                         on_calendar = 1
 
-        print(on_alldates, on_calendar)
         if on_alldates and not on_calendar:
             if texport:
                 if hstat == 1:
-                    print(f'Job {pdeo[0][-1]} not on the current calendar')
+                    #print(f'Job {pdeo[0][-1]} not on the current calendar')
                     pdeo[0][-1][3] = 'orange-text'
-                    pdeo[0][-1][4] = 'Not on Viewed Schedule'
+                    pdeo[0][-1][4] = ['Not on Viewed Schedule']
                 else:
-                    print(f'Job {pdep[0][-1]} not on the current calendar')
+                    #print(f'Job {pdep[0][-1]} not on the current calendar')
                     pdep[0][-1][3] = 'orange-text'
-                    pdep[0][-1][4] = 'Not on Viewed Schedule'
+                    pdep[0][-1][4] = ['Not on Viewed Schedule']
 
             if timport:
                 if hstat == 1:
-                    print(f'Job {pdio[0][-1]} not on the current calendar')
+                    #print(f'Job {pdio[0][-1]} not on the current calendar')
                     pdio[0][-1][3] = 'orange-text'
-                    pdio[0][-1][4] = 'Not on Viewed Schedule'
+                    pdio[0][-1][4] = ['Not on Viewed Schedule']
                 else:
-                    print(f'Job {pdip[0][-1]} not on the current calendar')
+                    #print(f'Job {pdip[0][-1]} not on the current calendar')
                     pdip[0][-1][3] = 'orange-text'
-                    pdip[0][-1][4] = 'Not on Viewed Schedule'
+                    pdip[0][-1][4] = ['Not on Viewed Schedule']
 
-
-
-
-    return pdio, pdip, pdeo, pdep, busdays
+    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec
 
 def initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist):
     pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [
@@ -1016,6 +1110,120 @@ def get_calendar_checks(pdio, pdip, pdeo, pdep):
 
     return pdiovec, pdipvec, pdeovec, pdepvec, jolist
 
+def update_calendar_form(pdio, pdip, pdeo, pdep):
+    # Some changes on the update may require a re-update, like date moves will move the position on the calendar
+    reupdate = 0
+    for jx in range(1,6):
+        for ix, item in enumerate(pdio[jx]):
+            jo = item[5]
+            note = request.values.get(f'note{jo}')
+            delv = request.values.get(f'delv{jo}')
+            gin = request.values.get(f'gin{jo}')
+            dwp = request.values.get(f'dwp{jo}')
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                if note is not None:
+                    odat.Location = note
+                    pdio[jx][ix][12] = note
+                    reupdate = 1
+                if delv is not None:
+                    odat.Date3 = delv
+                    pdio[jx][ix][13][1] = delv
+                    reupdate = 1
+                if gin is not None:
+                    odat.Date2 = gin
+                    pdio[jx][ix][13][2] = gin
+                    reupdate = 1
+                if dwp is not None:
+                    odat.Pcache = 1
+                    reupdate = 1
+                db.session.commit()
+
+
+        for ix, item in enumerate(pdip[jx]):
+            jo = item[5]
+            note = request.values.get(f'note{jo}')
+            gout = request.values.get(f'gout{jo}')
+            delv = request.values.get(f'delv{jo}')
+            gin = request.values.get(f'gin{jo}')
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                if note is not None:
+                    odat.Location = note
+                    pdip[jx][ix][12] = note
+                    reupdate = 1
+                if delv is not None:
+                    odat.Date3 = delv
+                    pdip[jx][ix][13][1] = delv
+                    reupdate = 1
+                if gin is not None:
+                    odat.Date2 = gin
+                    pdip[jx][ix][13][2] = gin
+                    reupdate = 1
+                if gout is not None:
+                    odat.Date = gout
+                    pdip[jx][ix][13][0] = gout
+                    reupdate = 1
+                db.session.commit()
+
+        for ix, item in enumerate(pdeo[jx]):
+            jo = item[5]
+            note = request.values.get(f'note{jo}')
+            delv = request.values.get(f'delv{jo}')
+            gin = request.values.get(f'gin{jo}')
+            book = request.values.get(f'book{jo}')
+            dwp = request.values.get(f'dwp{jo}')
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                if note is not None:
+                    odat.Location = note
+                    pdeo[jx][ix][12] = note
+                    reupdate = 1
+                if delv is not None:
+                    odat.Date3 = delv
+                    pdeo[jx][ix][13][1] = delv
+                    reupdate = 1
+                if gin is not None:
+                    odat.Date2 = gin
+                    pdeo[jx][ix][13][2] = gin
+                    reupdate = 1
+                if book is not None:
+                    odat.BOL = book
+                    pdeo[jx][ix][9] = book
+                    reupdate = 1
+                if dwp is not None:
+                    odat.Pcache = 1
+                    reupdate = 1
+                db.session.commit()
+
+        for ix, item in enumerate(pdep[jx]):
+            jo = item[5]
+            note = request.values.get(f'note{jo}')
+            gout = request.values.get(f'gout{jo}')
+            delv = request.values.get(f'delv{jo}')
+            gin = request.values.get(f'gin{jo}')
+            odat = Orders.query.filter(Orders.Jo == jo).first()
+            if odat is not None:
+                if note is not None:
+                    odat.Location = note
+                    pdep[jx][ix][12] = note
+                    reupdate = 1
+                if delv is not None:
+                    odat.Date3 = delv
+                    pdep[jx][ix][13][1] = delv
+                    reupdate = 1
+                if gin is not None:
+                    odat.Date2 = gin
+                    pdep[jx][ix][13][2] = gin
+                    reupdate = 1
+                if gout is not None:
+                    odat.Date = gout
+                    pdep[jx][ix][13][0] = gout
+                    reupdate = 1
+                db.session.commit()
+
+    return pdio, pdip, pdeo, pdep, reupdate
+
 
 def Table_maker(genre):
     username = session['username'].capitalize()
@@ -1048,7 +1256,15 @@ def Table_maker(genre):
         task_focus = nononestr(request.values.get('task_focus'))
         task_iter = nonone(request.values.get('task_iter'))
         if genre == 'Planning':
-            pdio, pdip, pdeo, pdep, busdays = create_cal_data()
+            for filter in table_filters:
+                for key, value in filter.items():
+                    tfilters[key] = request.values.get(key)
+                    print('planner filter set 1', key, tfilters[key])
+            dlist = table_filters[0]['Date Filter']
+
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+            pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
+            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
             if task_iter == 0:
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
                 print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
@@ -1059,6 +1275,7 @@ def Table_maker(genre):
                     jo = request.values.get(jox)
                     print(jp, jox, jo)
                     if jo is not None: jolist.append(jo)
+
                 print(f'Starting POST of genre {genre} with return of jolist: {jolist}')
                 pdiovec, pdipvec, pdeovec, pdepvec = initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist)
             # Set Orders table to checks used in calendar whether or not the Order table is on...
@@ -1128,7 +1345,7 @@ def Table_maker(genre):
             for filter in table_filters:
                 for key, value in filter.items():
                     tfilters[key] = request.values.get(key)
-                    #print('check1',key,tfilters[key])
+                    print('check1',key,tfilters[key])
             if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
             #Reset Pay and Haul Filters if Show All selected (no filter applied)
@@ -1168,15 +1385,20 @@ def Table_maker(genre):
         #session['table_defaults'] = tables_on
         #session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
-        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both', 'Viewer': '8x4'}
+        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 45 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both', 'Viewer': '8x4'}
         jscripts = ['dtTrucking']
         taskon, task_iter, task_focus, tasktype = None, None, None, None
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
         if genre == 'Planning':
             print(f'Executing the Calendar first time thru....')
+            tfilters = {'Shipper Filter': None, 'Date Filter': 'This Week', 'Pay Filter': None, 'Haul Filter': None,
+                        'Color Filter': 'Both', 'Viewer': '8x4'}
             # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
-            pdio, pdip, pdeo, pdep, busdays = create_cal_data()
+            dlist = table_filters[0]['Date Filter']
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+            pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
+            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
             pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
             jolist = []
 
@@ -1218,7 +1440,10 @@ def Table_maker(genre):
             if genre == 'Planning':
                 # If the tesk is completed and we never left the calendar then keep the checks we used
                 #Reset the calendar
-                pdio, pdip, pdeo, pdep, busdays = create_cal_data()
+                dlist = table_filters[0]['Date Filter']
+                pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+                pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
+                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
                 if jolist == []:
                     print(f'checked data is {checked_data}')
@@ -1411,12 +1636,17 @@ def Table_maker(genre):
     holdvec[80] = request.values.get('showcolorstable')
 
     if genre == 'Planning':
-        print(f'The length of holdvec is {len(holdvec)}')
-        print(f'Sending over jolist = {jolist}')
-        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays, jolist]
-        print(f'Holdvec[100] = {holdvec[100]}')
+        #print(f'The length of holdvec is {len(holdvec)}')
+        #print(f'Sending over jolist = {jolist}')
+        cal_labels = []
+        for bday in busdays:
+            bdat = PortClosed.query.filter(PortClosed.Date == bday).first()
+            if bdat is None: cal_labels.append(bday)
+            else: cal_labels.append(bdat.Reason)
+        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, cal_labels, jolist, pdic, pdec]
+        #print(f'Holdvec[100] = {holdvec[100]}')
 
-    print(checked_data)
+    #print(checked_data)
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
@@ -1794,13 +2024,13 @@ def mask_apply(entrydata, masks, ht):
             if 'Third Date' in entry[1]:
                 mask = masks['load3date']
                 entrydata[jx][2] = mask[this_index]
-            if '1st Call' in entry[1]:
+            if 'ERD/APP' in entry[1]:
                 mask = masks['date4']
                 entrydata[jx][2] = mask[this_index]
-            if '2nd Call' in entry[1]:
+            if 'Cut/LFD' in entry[1]:
                 mask = masks['date5']
                 entrydata[jx][2] = mask[this_index]
-            if '3rd Call' in entry[1]:
+            if 'Ship Arrive' in entry[1]:
                 mask = masks['date6']
                 entrydata[jx][2] = mask[this_index]
             if 'Chassis' in entry[1]:
@@ -2704,9 +2934,9 @@ def BlendGate_task(genre, task_iter, tablesetup, task_focus, checked_data, thist
         con = odat.Container
         jo = odat.Jo
     except:
-        err.append('Could not create blended ticket')
+        err.append('Could not find Container or Jo in the Order')
         return holdvec, entrydata, err, viewport, True
-    try:
+    if 1 == 1:
         idata = Interchange.query.filter(Interchange.Jo == jo).all()
         if idata:
             if len(idata) > 1:
@@ -2734,7 +2964,7 @@ def BlendGate_task(genre, task_iter, tablesetup, task_focus, checked_data, thist
                         err.append(f'Could not find file {g1}')
                     if not os.path.isfile(g2):
                         err.append(f'Could not find file {g2}')
-    except:
+    if 1 == 2:
         err.append('Could not create blended ticket')
 
     return holdvec, entrydata, err, viewport, True
