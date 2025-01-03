@@ -185,6 +185,9 @@ def get_invo_data(qblines, myo):
             if code == 'dd':
                 desc = 'Free time 0700-0900, detention 0900-1000'
 
+            if code == 'ow':
+                desc = 'Cargo Weight exceeds 45,000 lbs'
+
             if '=' in qbl:
                 newqty = get_digits_after_character(qbl, '=')
                 try:

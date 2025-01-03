@@ -14,6 +14,7 @@
 {% set jolist = caldata[9] %}
 {% set pdic = caldata[10] %}
 {% set pdec = caldata[11] %}
+{% set pmon = caldata[12] %}
 
 {% set fbcdg = "font-weight-bold text-center dark-grey-text" %}
 {% set caltop = "font-weight-bold text-center text-warning bg-dark" %}
@@ -23,6 +24,8 @@
 {% set fbcc = "font-weight-bold text-center cyan-text" %}
 {% set lmt = "font-weight-bold text-right" %}
 {% set rmt = "font-weight-bold text-left" %}
+{% set ct = "font-weight-bold text-center" %}
+{% set mtxt = "font-weight-bold text-center text-white bk-success" %}
 
 <div class="row">
     <div class="col-sm-{{ cbr }} text-left">
@@ -57,6 +60,39 @@
         {% for ix in range(1, calview+1) %}
             <div class="col-sm-{{ cbr }} text-center">
                 <div class="{{ caltop }}">{{ busdays[ix-1] }}</div>
+
+                {% if pmon[ix] %}
+                    {% set mon = pmon[ix][0] %}
+                        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#mon{{ ix }}">
+                            <b>{{ mon[4] }}</b>
+                        </button>
+                        <!-- The Modal -->
+                                    <div class="modal fade" id="mon{{ ix }}" tabindex="-1" role="dialog" aria-labelledby="monl{{ ix }}" aria-hidden="true">
+                                        <div class="modal-dialog" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="monl{{ ix }}">Invoice Amounts</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <table>
+                                                    <tr><th class="{{ ct }}">JO</th><th class="{{ ct }}">Container</th><th class="{{ ct }}">Amount</th></tr>
+                                                        {% for item in pmon[ix] %}
+                                                            <tr><td class="{{ ct }}">{{ item[0] }}</td><td class="{{ ct }}">{{ item[1] }}</td><td class="{{ ct }}">{{ item[2] }}</td></tr>
+                                                        {% endfor %}
+                                                    </table>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                    <button type="submit" class="btn btn-primary">Save changes</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                {% endif %}
+
                 {% if pdio[ix] or pdip[ix]%}<div class="{{ fbci }}">Import Deliveries</div>{% endif %}
 
                     {% for io in pdio[ix] %}

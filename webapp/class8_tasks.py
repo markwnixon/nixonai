@@ -773,7 +773,7 @@ def create_cal_data(tfilters, dlist):
 
     pdio, pdip, pdeo, pdep = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [],
                                                                                                             [], [], []]
-    pdic, pdec = [[], [], [], [], [], []], [[], [], [], [], [], []]
+    pdic, pdec, pmon = [[], [], [], [], [], []], [[], [], [], [], [], []],[[], [], [], [], [], []]
 
     for podat in podata:
         hstat = podat.Hstat
@@ -823,6 +823,21 @@ def create_cal_data(tfilters, dlist):
         else:
             texport = 0
 
+        if hstat == 2:
+            #Getting invoices for calendar date regardless of import or export
+            colorline = 'bg-success text-white'
+
+            for ix in range(5):
+                if gatein == caldays[ix]:
+                    if podat.Istat > 0:
+                        amount = float(podat.InvoTotal)
+                        pmon[ix + 1].append([jo, container, amount, colorline, 0.00])
+                        sum = 0
+                        for mon in pmon[ix + 1]:
+                            amt = mon[2]
+                            sum += amt
+                        pmon[ix + 1][0][4] = sum
+
         if timport:
             avail = podat.Date4
             avail_s = short_date(avail)
@@ -831,7 +846,6 @@ def create_cal_data(tfilters, dlist):
             datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback]
 
             if hstat >= 1:
-
                 bc1 = f'{container} GO:{pulled}'
                 bc2 = f'{container} DV:{del_s}'
                 bc3 = f'{container} GI:{ret_s}'
@@ -1018,7 +1032,7 @@ def create_cal_data(tfilters, dlist):
                     pdip[0][-1][3] = 'orange-text'
                     pdip[0][-1][4] = ['Not on Viewed Schedule']
 
-    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec
+    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec, pmon
 
 def initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist):
     pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [
@@ -1267,9 +1281,9 @@ def Table_maker(genre):
                     print('planner filter set 1', key, tfilters[key])
             dlist = table_filters[0]['Date Filter']
 
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
             pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
             if task_iter == 0:
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
                 print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
@@ -1401,9 +1415,9 @@ def Table_maker(genre):
                         'Color Filter': 'Both', 'Viewer': '8x4'}
             # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
             dlist = table_filters[0]['Date Filter']
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
             pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
             pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
             jolist = []
 
@@ -1446,9 +1460,9 @@ def Table_maker(genre):
                 # If the tesk is completed and we never left the calendar then keep the checks we used
                 #Reset the calendar
                 dlist = table_filters[0]['Date Filter']
-                pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
                 pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec = create_cal_data(tfilters, dlist)
+                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
                 if jolist == []:
                     print(f'checked data is {checked_data}')
@@ -1648,7 +1662,7 @@ def Table_maker(genre):
             bdat = PortClosed.query.filter(PortClosed.Date == bday).first()
             if bdat is None: cal_labels.append(bday)
             else: cal_labels.append(bdat.Reason)
-        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, cal_labels, jolist, pdic, pdec]
+        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, cal_labels, jolist, pdic, pdec, pmon]
         #print(f'Holdvec[100] = {holdvec[100]}')
 
     #print(checked_data)
