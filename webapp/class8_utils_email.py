@@ -818,7 +818,8 @@ def html_mimemail(emaildata):
     # See if there is an attachment
     for ix, invoice in enumerate(invoices):
         if invoice is not None:
-            cfrom = addpath(f'static/{scac}/data/vInvoice/{invoice}')
+            if 'SI' in invoice: cfrom = addpath(f'static/{scac}/data/vPackage/{invoice}')
+            else: cfrom = addpath(f'static/{scac}/data/vInvoice/{invoice}')
             newfile = addpath(f'static/{scac}/data/temp/{ni[ix]}')
             #print(cfrom,newfile)
             shutil.copy(cfrom,newfile)

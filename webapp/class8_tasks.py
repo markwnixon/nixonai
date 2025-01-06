@@ -777,6 +777,7 @@ def create_cal_data(tfilters, dlist):
 
     for podat in podata:
         hstat = podat.Hstat
+        istat = podat.Istat
         container = podat.Container
         shipper = podat.Shipper
         if len(shipper) > 25: shipper = shipper[0:25]
@@ -829,14 +830,14 @@ def create_cal_data(tfilters, dlist):
 
             for ix in range(5):
                 if gatein == caldays[ix]:
-                    if podat.Istat > 0:
+                    if istat > 0:
                         amount = float(podat.InvoTotal)
-                        pmon[ix + 1].append([jo, container, amount, colorline, 0.00])
+                        pmon[ix + 1].append([jo, container, d2s(amount), colorline, 0.00, shipper])
                         sum = 0
                         for mon in pmon[ix + 1]:
-                            amt = mon[2]
+                            amt = float(mon[2])
                             sum += amt
-                        pmon[ix + 1][0][4] = sum
+                        pmon[ix + 1][0][4] = d2s(sum)
 
         if timport:
             avail = podat.Date4
@@ -847,20 +848,18 @@ def create_cal_data(tfilters, dlist):
 
             if hstat >= 1:
                 bc1 = f'{container} GO:{pulled}'
-                bc2 = f'{container} DV:{del_s}'
-                bc3 = f'{container} GI:{ret_s}'
+                bc2 = f'{container} GI:{ret_s}'
                 custline = f'{shipper}'
-                if hstat == 1: colorline = 'blue-text'
-                else: colorline = 'purple-text'
 
                 for ix in range(5):
                     if gateout == caldays[ix]:
-                        pdic[ix + 1].append([bc1,custline, colorline])
+                        pdic[ix + 1].append([bc1,custline, 'blue-text'])
                     if gatein == caldays[ix]:
+                        #Need hast check because gatein can be planned
                         if hstat > 1:
-                            pdic[ix + 1].append([bc3, custline, colorline])
-
-
+                            if istat > 0: colorline = 'green-text'
+                            else: colorline = 'purple-text'
+                            pdic[ix + 1].append([bc2, custline, colorline])
 
             if hstat == 1:
                 if not isinstance(dueback, datetime.datetime): dueback = due_back(gateout)
@@ -942,17 +941,17 @@ def create_cal_data(tfilters, dlist):
             if hstat >= 1:
 
                 bc1 = f'{container} GO:{pulled}'
-                bc3 = f'{container} GI:{ret_s}'
+                bc2 = f'{container} GI:{ret_s}'
                 custline = f'{shipper}'
-                if hstat == 1: colorline = 'blue-text'
-                else: colorline = 'purple-text'
 
                 for ix in range(5):
                     if gateout == caldays[ix]:
-                        pdec[ix + 1].append([bc1,custline, colorline])
+                        pdec[ix + 1].append([bc1,custline, 'blue-text'])
                     if gatein == caldays[ix]:
                         if hstat > 1:
-                            pdec[ix + 1].append([bc3, custline, colorline])
+                            if istat > 0: colorline = 'green-text'
+                            else: colorline = 'purple-text'
+                            pdec[ix + 1].append([bc2, custline, colorline])
 
             if hstat == 1:
                 firstline = f'{container}'

@@ -64,7 +64,7 @@
                 {% if pmon[ix] %}
                     {% set mon = pmon[ix][0] %}
                         <button type="button" class="btn btn-success" data-toggle="modal" data-target="#mon{{ ix }}">
-                            <b>{{ mon[4] }}</b>
+                            <b>${{ mon[4] }}</b>
                         </button>
                         <!-- The Modal -->
                                     <div class="modal fade" id="mon{{ ix }}" tabindex="-1" role="dialog" aria-labelledby="monl{{ ix }}" aria-hidden="true">
@@ -78,9 +78,9 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <table>
-                                                    <tr><th class="{{ ct }}">JO</th><th class="{{ ct }}">Container</th><th class="{{ ct }}">Amount</th></tr>
+                                                    <tr><th class="{{ ct }}">JO</th><th class="{{ ct }}">Shipper</th><th class="{{ ct }}">Container</th><th class="{{ ct }}">Amount</th></tr>
                                                         {% for item in pmon[ix] %}
-                                                            <tr><td class="{{ ct }}">{{ item[0] }}</td><td class="{{ ct }}">{{ item[1] }}</td><td class="{{ ct }}">{{ item[2] }}</td></tr>
+                                                            <tr><td class="{{ ct }}">{{ item[0] }}</td><td class="{{ ct }}">{{ item[5] }}</td><td class="{{ ct }}">{{ item[1] }}</td><td class="{{ ct }}">{{ item[2] }}</td></tr>
                                                         {% endfor %}
                                                     </table>
                                                 </div>

@@ -60,13 +60,43 @@
                                                         <th style="font-weight:bold">Container</th>
                                                         <th style="font-weight:bold">Release</th>
                                                         <th style="font-weight:bold">InvoDate</th>
-                                                        <th style="font-weight:bold">InvoTotal</th>
+                                                        <th style="font-weight:bold">OrigTotal</th>
+                                                        <th style="font-weight:bold">Bal Due</th>
                                                         <th style="font-weight:bold">IN</th>
                                                         <th style="font-weight:bold">PK</th>
                                                     </tr>
                                                     </thead>
                                                     <tbody>
                                                     {% set d30 = emaildata[7] %}
+                                                    {% for sdat in sdata %}
+                                                        {% set idate = sdat.Date %}
+                                                        {% if idate > d30 %}
+                                                            {% set atc1="font-weight-bold" %}
+                                                        {% else %}
+                                                            {% set atc1="red-text font-weight-bold" %}
+                                                        {% endif %}
+                                                        <tr>
+                                                            <td align="center" class="{{atc1}}">
+                                                                  <input class="align-middle" type="checkbox"  {% if sboxes[loop.index-1] == 'on'%} checked {% endif %} name="sbox{{ loop.index-1 }}">
+                                                            </td>
+                                                            <td align="center" class="{{atc1}}">{{ sdat.Billto }}</td>
+                                                            <td align="center" class="{{atc1}}">{{ sdat.Si }}</td>
+                                                            <td align="right" class="{{atc1}}">Summary</td>
+                                                            <td align="center" class="{{atc1}}">Invoice</td>
+                                                            <td align="right" class="{{atc1}}">Summary</td>
+                                                            <td align="center" class="{{atc1}}">Invoice</td>
+                                                            <td align="right" class="{{atc1}}">{{ idate }}</td>
+                                                            <td align="right" class="{{atc1}}">{{ sdat.Total }}</td>
+                                                            <td align="right" class="{{atc1}}">{{ sdat.Baldue }}</td>
+                                                            {% if sdat.Source is not none %}
+                                                                <td class="{{ atlink }}">  <a href="{{ linkpath2 }}{{ sdat.Source }}" class="{{ atlink }}" target="_blank">[O]</a></td>
+                                                            {% else %}
+                                                                <td class="{{ atlink }}">-</td>
+                                                            {% endif %}
+                                                            <td class="{{ atlink }}">-</td>
+
+                                                        </tr>
+                                                    {% endfor %}
                                                     {% for odat in odata %}
                                                         {% if odat.Label is not none %}{% set odr = odat.Label %}{% else %}{% set odr = odat.Order %}{% endif %}
                                                         {% if odat.InvoDate is not none %}{% set idate = odat.InvoDate %}{% else %}{% set idate = odat.Date3 %}{% endif %}
@@ -87,6 +117,7 @@
                                                         <td align="center" class="{{atc1}}">{{ odat.Booking }}</td>
                                                         <td align="right" class="{{atc1}}">{{ idate }}</td>
                                                         <td align="right" class="{{atc1}}">{{ odat.InvoTotal }}</td>
+                                                        <td align="right" class="{{atc1}}">{{ odat.BalDue }}</td>
                                                         {% if odat.Invoice is not none %}
                                                             <td class="{{ atlink }}">  <a href="{{ linkpath }}{{ odat.Invoice }}" class="{{ atlink }}" target="_blank">[O]</a></td>
                                                         {% else %}
@@ -201,8 +232,10 @@
                                     </div>
                                  </div>
                         {% set etone = tboxes[27] %}
-                           Tone of Email:
+                           Type of Email:
                         <select class="mdb-select md-form small" name="tbox27" onchange="this.form.submit()">
+                              <option {% if etone == 'Submittal' %} selected {% endif %} value="Submittal">Submittal</option>
+                              <option {% if etone == 'Statement' %} selected {% endif %} value="Statement">Statement</option>
                               <option {% if etone == 'Light Reminder' %} selected {% endif %} value="Light Reminder">Light Reminder</option>
                               <option {% if etone == 'Standard Request' %} selected {% endif %} value='Standard Request'>Standard Request</option>
                               <option {% if etone == 'Strong Request' %} selected {% endif %} value= 'Strong Request'>Strong Request</option>

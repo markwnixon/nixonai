@@ -108,6 +108,18 @@
                 </thead>
                 <tbody>
                 {% set atc1="font-weight-bold" %}
+                {% for sdat in sdata %}
+                <tr>
+                    <td align="center" class="{{atc1}}">{{ sdat.Billto }}</td>
+                    <td align="center" class="{{atc1}}">{{ sdat.Si }}</td>
+                    <td align="right" class="{{atc1}}">N/A</td>
+                    <td align="center" class="{{atc1}}">Summary</td>
+                    <td align="right" class="{{atc1}}">N/A</td>
+                    <td align="center" class="{{atc1}}">N/A</td>
+                    <td align="right" class="{{atc1}}">{{ sdat.Date }}</td>
+                    <td align="right" class="{{atc1}}">{{ sdat.Total }}</td>
+                </tr>
+                {% endfor %}
                 {% for odat in odata %}
                     {% if odat.Label is not none %}{% set odr = odat.Label %}{% else %}{% set odr = odat.Order %}{% endif %}
                     {% if odat.InvoDate is not none %}{% set idate = odat.InvoDate %}{% else %}{% set idate = odat.Date3 %}{% endif %}

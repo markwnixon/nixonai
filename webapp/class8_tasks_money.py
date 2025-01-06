@@ -821,6 +821,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
             for sdat in sdata:
                 sdat.Total = d2s(thetotal)
+                sdat.Baldue = d2s(thetotal)
             db.session.commit()
 
         if siupdate is not None:
@@ -922,7 +923,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     docref = f'{si}.pdf'
                     amt = d2s(odat.InvoTotal)
                     #print(f'amt input to suminv for jo {jo} is {amt} for {odat.InvoTotal}')
-                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.BOL, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, Date = invodate)
+                    input = SumInv(Si = si, Jo=jo, Begin=odat.Date, End=odat.Date2, Release=odat.BOL, Container=odat.Container, Type=odat.Type, Description=desc, Amount=amt, Total='0.00', Source=docref, Status=stat, Cache=cache_start, Pid = odat.Bid, Billto = odat.Shipper, Date = invodate, Paid='0.00', Baldue='0.00', Pstat=0)
                     db.session.add(input)
                     odat.Label = si
                     odat.Istat = 6
@@ -930,6 +931,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             sdata = SumInv.query.filter(SumInv.Si == si).all()
             for sdat in sdata:
                 sdat.Total = d2s(total)
+                sdat.Baldue = d2s(total)
             db.session.commit()
             sdata = SumInv.query.filter(SumInv.Si == si).all()
             sdat = SumInv.query.filter( (SumInv.Si == si) & (SumInv.Status >= 1) ).first()
@@ -1016,6 +1018,13 @@ def income_record(jopaylist, err):
                     if istat == 6 or istat == 7:
                         odat.Istat = 8
                         if hstat == 2 or hstat == 3: odat.Hstat = 8
+                        jo = odat.Jo
+                        sumdat = SumInv.query.filter(SumInv.Jo == jo).first()
+                        if sumdat is not None:
+                            sumdat.Paid = d2s(totpaid)
+                            sumdat.Baldue = d2s(baldue)
+                            sumdat.Pstat = 1
+
                 db.session.commit()
 
                 idata = Invoices.query.filter(Invoices.Jo == jo).all()

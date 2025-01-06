@@ -1479,8 +1479,11 @@ class SumInv(db.Model):
     Pid = db.Column('Pid', db.Integer)
     Billto = db.Column('Billto', db.String(50))
     Date = db.Column('Date', db.DateTime)
+    Paid = db.Column('Paid', db.String(45))
+    Baldue = db.Column('Baldue', db.String(45))
+    Pstat = db.Column('Pstat', db.Integer)
 
-    def __init__(self, Si, Jo, Begin, End, Release, Container, Type, Description, Amount, Source, Status, Cache, Pid, Total, Billto, Date):
+    def __init__(self, Si, Jo, Begin, End, Release, Container, Type, Description, Amount, Source, Status, Cache, Pid, Total, Billto, Date, Paid, Baldue, Pstat):
         self.Jo = Jo
         self.Si = Si
         self.Begin = Begin
@@ -1497,6 +1500,10 @@ class SumInv(db.Model):
         self.Pid = Pid
         self.Billto = Billto
         self.Date = Date
+        self.Paid = Paid
+        self.Baldue = Baldue
+        self.Pstat = Pstat
+
 
 
 class Income(db.Model):
