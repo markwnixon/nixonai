@@ -824,7 +824,7 @@ def create_cal_data(tfilters, dlist):
         else:
             texport = 0
 
-        if hstat == 2:
+        if hstat >= 2:
             #Getting invoices for calendar date regardless of import or export
             colorline = 'bg-success text-white'
 
@@ -1915,9 +1915,9 @@ def make_new_entry(tablesetup,holdvec):
             holdvec[jx] = eval(f"get_new_{creation}('{entry[3]}')")
             #err = [f'New {creation} {holdvec[jx]} created']
 
-    #print('The attr_names are:',attr_names)
-    #for c_attr in inst.mapper.column_attrs:
-        #print('Attrloop:',c_attr)
+    print('The attr_names are:',attr_names)
+    for c_attr in inst.mapper.column_attrs:
+        print('Attrloop:',c_attr)
 
     dbnew = f'{table}('
     for col in attr_names:
@@ -1929,7 +1929,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()

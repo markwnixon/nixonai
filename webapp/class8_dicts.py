@@ -933,7 +933,7 @@ Autos_setup = {'name' : 'Auto Job',
 
 
 Planning_genre =   {'table': 'Orders',
-                  'genre_tables': ['Orders', 'Ships', 'Imports', 'Exports'],
+                  'genre_tables': ['Orders', 'Ships', 'Imports', 'Exports', 'PortClosed'],
                   'genre_tables_on': ['on', 'off', 'off', 'off'],
                   'quick_buttons': ['New Job', 'Edit Item', 'Update Planner', 'Mark Delivered'],
                   'table_filters': [{'Date Filter': ['Week Before Last', 'Last Week', 'This Week', 'Next Week', 'Week After Next']},
@@ -942,7 +942,7 @@ Planning_genre =   {'table': 'Orders',
                                                      'Show All']},
                                     {'Color Filter': ['Haul', 'Status', 'Both']},
                                     {'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
-                  'task_boxes': [{'Adding': ['New Job', 'New From Copy',]},
+                  'task_boxes': [{'Adding': ['New Job', 'New From Copy', 'New Port Closure']},
                                  {'Editing': ['Edit Item', 'Date+1', 'Date-1', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
                                                  'Inv-1', 'Inv Emailed', 'Set Col To']},
                                  {'View Docs': ['Purchase Receipt', 'Tow BOL', 'Title', 'Invoice',
@@ -990,14 +990,8 @@ Planning_genre =   {'table': 'Orders',
                                     'Adding':
                                         {
                                          'New Job': ['Table_Selected', 'New', 'Newjobs'],
-                                         'New Customer' : ['Table_Selected', 'New', 'Customers'],
-                                         'New Interchange' : ['Table_Selected', 'New', 'Interchange'],
-                                         'New Service' : ['Table_Selected', 'New', 'Services'],
-                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', ''],
-                                         'New Manifest' : ['Single_Item_Selection', 'New_Manifest', ''],
-                                         'Upload Purchase' : ['Single_Item_Selection', 'Upload', 'Source'],
-                                         'Upload Tow BOL' : ['Single_Item_Selection', 'Upload', 'Proof'],
-                                         'Upload Title' : ['Single_Item_Selection', 'Upload', 'TitleDoc']
+                                         'New Port Closure' : ['Table_Selected', 'New', 'PortClosed'],
+                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', '']
                                          },
 
                                     'Editing':
@@ -1056,14 +1050,33 @@ Planning_genre =   {'table': 'Orders',
                                     }
                     }
 
-
-Calendar_setup = {'name' : 'Calendar',
-                  'table' : 'Calendar',
+PortClosed_setup = {'name' : 'PortClosed',
+                  'table': 'PortClosed',
                   'filter': None,
                   'filterval': None,
-                  'entry data' : [None],
-                  'filteron': [],
-                  'colorfilter': None
+                  'checklocation': 1,
+                  'creators': [],
+                  'ukey': 'Reason',
+                  'simplify': [],
+                  'entry data': [['Date', 'Date', 'Date', 'date', 'date', 0, 'ok', 'cc', None, 'Always'],
+                                 ['Reason', 'Reason', 'Reason', 'text', 'text', 0, 'ok', 'cc', None, 'Always']],
+                    'hidden data' : [],
+                  'haulmask': [],
+                  'default values': None,
+                  'colorfilter': None,
+                   'filteron':  [],
+                  'side data': [],
+                  'form show': {
+                      'New': [],
+                      'Edit': []
+                  },
+                  'form checks': {
+                      'New': ['Company'],
+                      'Edit': ['Company']
+                  },
+                  'jscript': 'dtHorizontalVerticalExample4',
+                  'documents': [],
+                  'copyswaps' : {}
                   }
 
 Ships_setup = {'name' : 'Ships',
