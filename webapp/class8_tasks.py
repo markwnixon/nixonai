@@ -883,7 +883,7 @@ def create_cal_data(tfilters, dlist):
                                 colorline = 'text-warning'
                                 comment.append('Due back today')
                             else:
-                                colorline = 'green-text'
+                                colorline = 'purple-text'
                             pdio[ix + 1].append(
                                 [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
                                  in_booking, description, ship, notes, datecluster])
@@ -959,7 +959,7 @@ def create_cal_data(tfilters, dlist):
                 addrline = f'{address}'
                 dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
                 shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
-                if completed: colorline = 'green-text'
+                if completed: colorline = 'purple-text'
                 else: colorline = 'blue-text'
 
                 comment = []
@@ -1915,9 +1915,9 @@ def make_new_entry(tablesetup,holdvec):
             holdvec[jx] = eval(f"get_new_{creation}('{entry[3]}')")
             #err = [f'New {creation} {holdvec[jx]} created']
 
-    print('The attr_names are:',attr_names)
-    for c_attr in inst.mapper.column_attrs:
-        print('Attrloop:',c_attr)
+    #print('The attr_names are:',attr_names)
+    #for c_attr in inst.mapper.column_attrs:
+        #print('Attrloop:',c_attr)
 
     dbnew = f'{table}('
     for col in attr_names:
@@ -1929,7 +1929,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
