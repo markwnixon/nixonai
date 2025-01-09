@@ -3048,7 +3048,6 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
             if col in creators:
                 dbnew = dbnew + f", {col}='{thisitem}'"
             else:
-
                 thisvalue = getattr(olddat, f'{col}')
                 if col == colorcol[0]: thisvalue = -1
                 # Check if thisvalue requires a compliment value
