@@ -37,6 +37,7 @@
 
                                 {% if entry[4] == 'customerdata' %} {% set klist = keydata.customerdata %}
                                     {% elif entry[4] == 'truckdata' %} {% set klist = keydata.truckdata %}
+                                    {% elif entry[4] == 'tagdata' %} {% set klist = keydata.tagdata %}
                                     {% elif entry[4] == 'driverdata' %} {% set klist = keydata.driverdata %}
                                     {% elif entry[4] == 'container_types' %}{% set klist = genre_data['container_types'] %}
                                     {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
