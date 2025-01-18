@@ -11,6 +11,37 @@ today = my_datetime.date()
 now = my_datetime.time()
 cutoff = today - datetime.timedelta(45)
 
+def scrub_export(idata):
+    len_idata = len(idata)
+    base = idata[0]
+    release = base.Release
+    type = base.Type
+    for ix in range(1, len_idata):
+        tdat = idata[ix]
+        trel = tdat.Release
+        ttype = tdat.Type
+        if trel == release and ttype == type:
+            #This is duplicate gate ticket, need to remove it
+            idkill = tdat.id
+            Interchange.query.filter(Interchange.id == idkill).delete()
+            db.session.commit()
+    return base
+
+def add_dash(rout, rin):
+    if '-' in rin:
+        rbase, rdash = rin.split('-')
+        print(f'rbase is {rbase}, rdash is {rdash}')
+        rbase2, rdash2 = rout.split('-')
+        print(f'rbase2 is {rbase2}, rdash2 is {rdash2}')
+        new_rin = f'{rbase2}-{rdash}'
+        return new_rin
+    return rin
+
+
+
+
+
+
 def Gate_Match(con, lbdate, nbk, ptype, odat):
     if ptype == 'Import':
         iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Load Out')).first()
@@ -38,15 +69,23 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
             return 0
 
     elif ptype == 'Export':
-        iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).first()
-        iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Load In')).first()
+        iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).all()
+        iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Load In')).all()
+        #Make absolutely sure we only have one empty out and one load in for the export container
+        niout = len(iout)
+        niin = len(iin)
+        if niout == 1: iout = iout[0]
+        elif niout > 1: iout = scrub_export(iout)
+        if niin == 1: iin = iin[0]
+        elif niin > 1: iin = scrub_export(iin)
+
         if iout and iin:
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
-                test = iout.Release
-                if len(test)>7: iin.Release = iout.Release
-                #Only force them the same if have multiple bookings else could be a different inbooking
+                #If number of bookings is more than one, need to check the dash number.  Ensure the base number does not change
+                updated_release = add_dash(iout.Release, iin.Release)
+                iin.Release = updated_release
             iin.Jo = iout.Jo
             iin.Company = iout.Company
             db.session.commit()
@@ -63,13 +102,21 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
     elif ptype == 'Dray In' or ptype == 'Import Dray-In':
         iout = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray Out')).first()
         iin = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate) & (Interchange.Type == 'Dray In')).first()
+
+        niout = len(iout)
+        niin = len(iin)
+        if niout == 1: iout = iout[0]
+        elif niout > 1: iout = scrub_export(iout)
+        if niin == 1: iin = iin[0]
+        elif niin > 1: iin = scrub_export(iin)
+
         if iout and iin:
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
-                test = iout.Release
-                if len(test) > 7: iin.Release = iout.Release
-                # Only force them the same if have multiple bookings else could be a different inbooking
+                # If number of bookings is more than one, need to check the dash number.  Ensure the base number does not change
+                updated_release = add_dash(iout.Release, iin.Release)
+                iin.Release = updated_release
             iin.Jo = iout.Jo
             iin.Company = iout.Company
             db.session.commit()
@@ -92,9 +139,9 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
-                test = iout.Release
-                if len(test) > 7: iin.Release = iout.Release
-                # Only force them the same if have multiple bookings else could be a different inbooking
+                # If number of bookings is more than one, need to check the dash number.  Ensure the base number does not change
+                updated_release = add_dash(iout.Release, iin.Release)
+                iin.Release = updated_release
             iin.Jo = iout.Jo
             iin.Company = iout.Company
             db.session.commit()
@@ -114,8 +161,11 @@ def Gate_Update(ider):
     bk = ikat.Release
     con = ikat.Container
     htype = ikat.Type
-    if hasinput(con) and hasinput(htype): pass
-    else: return err
+    if hasinput(con) and hasinput(htype):
+        err = ['Gate Update is well']
+    else:
+        err = ['Need both container and type']
+        return err
     lbdate = ikat.Date - timedelta(120)
     nbk = 1
     if hasinput(bk) and len(bk)>5 and htype == 'Empty Out':
@@ -123,7 +173,7 @@ def Gate_Update(ider):
             bklist = bk.split('-')
             bk = bklist[0]
         # Check to see if there are multiple bookings for this job
-        edata = Orders.query.filter((Orders.HaulType == 'Dray Export') & (Orders.Booking.contains(bk)) & (Orders.Date > lbdate)).all()
+        edata = Orders.query.filter((Orders.HaulType.contains('Export')) & (Orders.Booking.contains(bk)) & (Orders.Date > lbdate)).all()
         nbk = len(edata)
         if nbk > 1 and len(bk) > 6:
             # there are multiple bookings so we need to modify the interchange tickets to coincide, make sure have a valid booking not blankj
@@ -233,15 +283,9 @@ def Gate_Update(ider):
             odat.Hstat = Gate_Match(con, lbdate, nbk, 'Import', odat)
             db.session.commit()
 
-    ikat = Interchange.query.get(ider)
+    #ikat = Interchange.query.get(ider)
     ###print(f'The interchange source doe is {ikat.Source}')
     ###print(f'The gate name should be {gate_name}')
-
-
-
-
-
-
 
 
 def Order_Container_Update(oder, err):
@@ -257,7 +301,7 @@ def Order_Container_Update(oder, err):
     #print(f'**********Order_Container_Update*********** container:{con}, bkout:{bkout} htype:{htype}')
 
     #If export check for multiple bookings and control accordingly
-    if htype == 'Dray Export':
+    if 'Export' in htype:
         #Only run if have a legitimate booking number.
         if len(bkout) > 5:
             # Make sure start from the base booking without dashes:
@@ -265,7 +309,7 @@ def Order_Container_Update(oder, err):
                 bklist = bkout.split('-')
                 bkout = bklist[0]
                 if len(bkout) < 7: bkout = 'NoBook'
-            edata = Orders.query.filter((Orders.HaulType == 'Dray Export') & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
+            edata = Orders.query.filter((Orders.HaulType.contains('Export')) & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
             nbk = len(edata)
             if nbk > 1:
                 for ix, edat in enumerate(edata):
@@ -308,7 +352,8 @@ def Order_Container_Update(oder, err):
                     edat.Booking = bkout
                     idat = Interchange.query.filter((Interchange.Release.contains(bkout)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).first()
                     if idat is not None:
-                        idat.Release = bkout
+                        if '-' in idat.Relese:
+                            idat.Release = bkout
                 db.session.commit()
 
         else:
@@ -338,7 +383,7 @@ def Order_Container_Update(oder, err):
                 #print(f'{idat1.Type}: {idat1.Release} {idat1.Container}')
                 # Check to see if pairing completed and this is only Order for that container (in case duplicated)
                 if 'Out' in idat0.Type and 'In' in idat1.Type:
-                    allorders = idata = Orders.query.filter((Orders.Container == con) & (Orders.Date3 > lbdate)).all()
+                    allorders = Orders.query.filter((Orders.Container == con) & (Orders.Date3 > lbdate)).all()
                     if len(allorders) == 1:
                         jo = okat.Jo
                         shipper = okat.Shipper

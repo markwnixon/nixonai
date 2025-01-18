@@ -619,7 +619,7 @@ def invoice_mimemail(docref, err, lastpath, sids):
     cdata = companydata()
 
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
-    closing = f'  <br><br>Kind Regards,<br>Accounts Payable Team<br>{company_info}'
+    closing = f'  <br><br>Kind Regards,<br>Accounting Team<br>{company_info}'
 
     ourserver = websites['mailserver']
 
@@ -708,7 +708,7 @@ def info_mimemail(emaildata, sids):
     err=[]
     cdata = companydata()
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
-    closing = f'<br><br>Accounts Payable Team<br>{company_info}'
+    closing = f'<br><br>Accounting Team<br>{company_info}'
 
     #print((f'for info mimemail sids is {sids}')
 

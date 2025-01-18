@@ -45,6 +45,21 @@ cmpdata = companydata()
 main = Blueprint('main',__name__)
 
 
+@main.route('/get_containers_out', methods=['GET'])
+def get_data():
+    odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).all()
+    data = []
+    for odat in odata:
+        data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
+    #row_dict = {key: value for key, value in row.__dict__.items() if not key.startswith('_')}
+    #row_json = json.dumps(row_dict)
+    #odata = [{'SCAC': scac},{'MACHINE': 'test'},{'TUNNEL': 'test'}]
+    #return jsonify(odat)
+    #jsonify([dict(odat) for odat in odata])
+    #jdata = json.dumps(data)
+    return data
+
+
 @main.route('/FileUpload', methods=['GET', 'POST'])
 def FileUpload():
     err=[]
