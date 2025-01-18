@@ -30,6 +30,7 @@ from webapp.viewfuncs import make_new_order, nonone, monvals, getmonths, nonones
 from webapp.class8_utils_email import email_template, info_mimemail, check_person, add_person
 
 from webapp.class8_utils import *
+import ast
 
 today = datetime.datetime.today()
 year = str(today.year)
@@ -45,21 +46,38 @@ cmpdata = companydata()
 main = Blueprint('main',__name__)
 
 
-@main.route('/get_containers_out', methods=['GET'])
-def get_data():
-    lbdate = now.date()
-    lbdate = lbdate - timedelta(days=360)
-    odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).all()
-    data = []
-    for odat in odata:
-        data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
-    #row_dict = {key: value for key, value in row.__dict__.items() if not key.startswith('_')}
-    #row_json = json.dumps(row_dict)
-    #odata = [{'SCAC': scac},{'MACHINE': 'test'},{'TUNNEL': 'test'}]
-    #return jsonify(odat)
-    #jsonify([dict(odat) for odat in odata])
-    #jdata = json.dumps(data)
-    return data
+@main.route('/get_api_data', methods=['GET', 'POST'])
+def handle_data():
+
+    if request.method == 'GET':
+        data_needed = request.args.get('data_needed')
+        print(f'This is a get request for data:{data_needed}')
+        if data_needed == 'shipper_containers_out':
+            arglist = request.args.get('arglist')
+            print(f'Was able to get the payload data for arglist: {arglist}')
+            params = ast.literal_eval(arglist)
+            shipper = params[0]
+            print(f'Was able to get the shipper: {shipper}')
+            lb_days = 20
+            try:
+                lb_days = params[1]
+            except:
+                lb_days = 20
+                params.append(lb_days)
+            lbdate = now.date()
+            lbdate = lbdate - timedelta(days=lb_days)
+            print(f'Looking back to this date: {lbdate}')
+            odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2) & (Orders.Shipper == shipper)).all()
+            ret_data = []
+            for odat in odata:
+                ret_data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
+
+            return_payload = jsonify([ret_data, data_needed, params])
+
+            return return_payload
+
+
+
 
 
 @main.route('/FileUpload', methods=['GET', 'POST'])
