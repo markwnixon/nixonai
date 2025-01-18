@@ -47,6 +47,8 @@ main = Blueprint('main',__name__)
 
 @main.route('/get_containers_out', methods=['GET'])
 def get_data():
+    lbdate = now.date()
+    lbdate = lbdate - timedelta(days=360)
     odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).all()
     data = []
     for odat in odata:
