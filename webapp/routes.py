@@ -73,8 +73,9 @@ def handle_data():
                 ret_data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
 
             return_payload = jsonify([ret_data, data_needed, params])
+            test = {'container':'CAAU8649700'}
 
-            return return_payload
+            return test
 
 
 
