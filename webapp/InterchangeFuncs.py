@@ -30,9 +30,7 @@ def scrub_export(idata):
 def add_dash(rout, rin):
     if '-' in rin:
         rbase, rdash = rin.split('-')
-        print(f'rbase is {rbase}, rdash is {rdash}')
         rbase2, rdash2 = rout.split('-')
-        print(f'rbase2 is {rbase2}, rdash2 is {rdash2}')
         new_rin = f'{rbase2}-{rdash}'
         return new_rin
     return rin
@@ -82,10 +80,23 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
         if iout and iin:
             iout.Status = 'IO'
             iin.Status = 'IO'
+            ####################################################################################
             if nbk > 1:
                 #If number of bookings is more than one, need to check the dash number.  Ensure the base number does not change
                 updated_release = add_dash(iout.Release, iin.Release)
                 iin.Release = updated_release
+            ########################################################################################
+            bk_out = iout.Release
+            bk_in = iin.Release
+            if '-' in bk_out:
+                # Need to match up for the dash also
+                bk_mat_out = bk_out.split('-')
+                bk_base_out = bk_mat_out[0]
+                bk_appen_out = bk_mat_out[1]
+                bk_mat_in = bk_in.split('-')
+                bk_base_in = bk_mat_out[0]
+                new_release = f'{bk_base_in}-{bk_appen_out}'
+                iin.Release = new_release
             iin.Jo = iout.Jo
             iin.Company = iout.Company
             db.session.commit()
@@ -114,9 +125,11 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
             iout.Status = 'IO'
             iin.Status = 'IO'
             if nbk > 1:
+                ########################################################################################
                 # If number of bookings is more than one, need to check the dash number.  Ensure the base number does not change
                 updated_release = add_dash(iout.Release, iin.Release)
                 iin.Release = updated_release
+                #########################################################################################
             iin.Jo = iout.Jo
             iin.Company = iout.Company
             db.session.commit()
@@ -138,10 +151,12 @@ def Gate_Match(con, lbdate, nbk, ptype, odat):
         if iout and iin:
             iout.Status = 'IO'
             iin.Status = 'IO'
+            ########################################################################################
             if nbk > 1:
                 # If number of bookings is more than one, need to check the dash number.  Ensure the base number does not change
                 updated_release = add_dash(iout.Release, iin.Release)
                 iin.Release = updated_release
+            #######################################################################################
             iin.Jo = iout.Jo
             iin.Company = iout.Company
             db.session.commit()
@@ -176,29 +191,47 @@ def Gate_Update(ider):
         edata = Orders.query.filter((Orders.HaulType.contains('Export')) & (Orders.Booking.contains(bk)) & (Orders.Date > lbdate)).all()
         nbk = len(edata)
         if nbk > 1 and len(bk) > 6:
-            # there are multiple bookings so we need to modify the interchange tickets to coincide, make sure have a valid booking not blankj
-            idata = Interchange.query.filter((Interchange.Release.contains(bk)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).all()
-            if idata:
-                for ix, idat in enumerate(idata):
-                    bklabel = f'{bk}-{ix+1}'
-                    idat.Release = bklabel
-                db.session.commit()
-                #May have rearranged the pulls to need to update all the Interchange tickets
-                for idat in idata:
-                    con = idat.Container
-                    bk = idat.Release
-                    chas = idat.Chassis
-                    odat = Orders.query.filter((Orders.Booking == bk) & (Orders.Date > lbdate)).first()
-                    if odat is not None:
-                        ###print(f'UPdate order with booking {bk} to match the interchange release with container {con}')
-                        jo = odat.Jo
-                        shipper = odat.Shipper
-                        idat.Jo = jo
-                        idat.Company = shipper
-                        odat.Container = con
-                        odat.Chassis = chas
-                        odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
-                        db.session.commit()
+            multibooking = 0
+            #Check to make sure they all have the same base booking.
+            jo_multibook = []
+            for edat in edata:
+                tbooking = edat.Booking
+                tbklist = tbooking.split('-')
+                tbook = tbklist[0]
+                if tbook == bk:
+                    multibooking += 1
+                    jo_multibook.append(edat.Jo)
+
+            if multibooking > 1:
+                # there may be multiple bookings so we need to modify the interchange tickets to coincide, make sure have a valid booking not blankj
+                idata = Interchange.query.filter((Interchange.Release.contains(bk)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).all()
+                if idata:
+                    ix = 1
+                    for jx, idat in enumerate(idata):
+                        this_release = idat.Release
+                        check_release = this_release.split('-')
+                        base_release = check_release[0]
+                        if bk == base_release:
+                            bklabel = f'{base_release}-{ix}'
+                            idat.Release = bklabel
+                            ix += 1
+                    db.session.commit()
+                    #May have rearranged the pulls to need to update all the Interchange tickets
+                    for idat in idata:
+                        con = idat.Container
+                        bk = idat.Release
+                        chas = idat.Chassis
+                        odat = Orders.query.filter((Orders.Booking == bk) & (Orders.Date > lbdate)).first()
+                        if odat is not None:
+                            ###print(f'UPdate order with booking {bk} to match the interchange release with container {con}')
+                            jo = odat.Jo
+                            shipper = odat.Shipper
+                            idat.Jo = jo
+                            idat.Company = shipper
+                            odat.Container = con
+                            odat.Chassis = chas
+                            odat.Hstat = Gate_Match(con, lbdate, multibooking, 'Export', odat)
+                            db.session.commit()
 
 
     # Next match up the container and release to the job
@@ -260,17 +293,14 @@ def Gate_Update(ider):
     if htype == 'Load In':
         gate_name = f'{con}_LOAD_IN.pdf'
         #Could be different booking going in so have to look for both, but need to look at the inbook first
-        odat = Orders.query.filter((Orders.BOL == bk) & (Orders.Date > lbdate)).first()
-        if odat is None:
-            odat = Orders.query.filter((Orders.Booking == bk) & (Orders.Date > lbdate)).first()
-            if odat is None:
-                odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lbdate)).first()
+        odat = Orders.query.filter((Orders.Container == con) & (Orders.HaulType.contains('Export')) & (Orders.Date > lbdate)).first()
         if odat is not None:
             jo = odat.Jo
             shipper = odat.Shipper
             ikat.Jo = jo
             ikat.Company = shipper
-            odat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', odat)
+            hstat_ret = Gate_Match(con, lbdate, nbk, 'Export', odat)
+            odat.Hstat = hstat_ret
             db.session.commit()
     if htype == 'Empty In':
         gate_name = f'{con}_EMPTY_IN.pdf'
@@ -283,9 +313,6 @@ def Gate_Update(ider):
             odat.Hstat = Gate_Match(con, lbdate, nbk, 'Import', odat)
             db.session.commit()
 
-    #ikat = Interchange.query.get(ider)
-    ###print(f'The interchange source doe is {ikat.Source}')
-    ###print(f'The gate name should be {gate_name}')
 
 
 
@@ -300,7 +327,6 @@ def Order_Container_Update(oder, err):
     ntick = 0
     kdat = None
     nbk = 1
-    #print(f'**********Order_Container_Update*********** container:{con}, bkout:{bkout} htype:{htype}')
 
     #If export check for multiple bookings and control accordingly
     if 'Export' in htype:
@@ -325,6 +351,13 @@ def Order_Container_Update(oder, err):
                     if tbook == bkout:
                         multibooking += 1
                         jo_multibook.append(edat.Jo)
+
+                if multibooking < 2:
+                    jo_multibook = []
+                    multibooking = 0
+                    nbk = 1
+
+
 
                 if multibooking > 1:
                     ix = 1

@@ -279,9 +279,9 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
 
         #Section to determine what items have been checked
         numchecked, avec = get_checked(tableget, db_data[1])
-        print('returning checks numc, avec=',numchecked, avec)
+        #print('returning checks numc, avec=',numchecked, avec)
         checked_data.append([tableget,numchecked,avec])
-        print('after',checked_data)
+        #print('after',checked_data)
 
         boxchecks = db_data[6]
         boxlist = db_data[7]
@@ -413,7 +413,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
     viewport = ['tables'] + ['0'] * 5
     # This rstring runs the task.  Task name is thetask_task and passes parameters: task_iter and focus_setup where focus is the Table data that goes with the task
     # If the task can be run for/with multiple Tables then the focus setup must be hashed wihin the specific task
-    print(f'Taskon:{taskon}, task_focus:{task_focus}, tasktype:{tasktype}, task_iter:{task_iter}')
+    #print(f'Taskon:{taskon}, task_focus:{task_focus}, tasktype:{tasktype}, task_iter:{task_iter}')
 
     if tasktype == 'Table_Selected':
         tablesetup = eval(f'{task_focus}_setup')
@@ -448,16 +448,16 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
         nc = sum(cks[1] for cks in checked_data)
         tids = [cks[2] for cks in checked_data if cks[2] != []]
         tabs = [cks[0] for cks in checked_data if cks[1] != 0]
-        print('nc=', nc)
-        print(tids)
-        print(tabs)
+        #print('nc=', nc)
+        #print(tids)
+        #print(tabs)
         if nc == 1:
             thistable = tabs[0]
             sid = tids[0][0]
-            print('made it here with this table sid taskiter', thistable, sid, task_iter)
+            #print('made it here with this table sid taskiter', thistable, sid, task_iter)
             tablesetup = eval(f'{thistable}_setup')
             rstring = f"{taskon}_task(genre, task_iter, {thistable}_setup, task_focus, checked_data, thistable, sid)"
-            print(f'rstring = {rstring}')
+            #print(f'rstring = {rstring}')
             holdvec, entrydata, err, viewport, completed = eval(rstring)
             #print('returned with:', viewport, completed)
         elif nc > 1:
@@ -545,8 +545,7 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             err.append('Need to select item(s) to undo')
             completed = True
             tablesetup = None
-    #print(f'Returning from runthetask with viewport = {viewport} and completed {completed}')
-    print(f'The genre is {genre}')
+
     return holdvec, entrydata, err, completed, viewport, tablesetup
 
 def get_address_details(address):
@@ -1037,7 +1036,7 @@ def initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist):
     pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [
         [], [], [], [], [], []]
     # See which of these listed items have been checked
-    print(f'Initializing calendar checks based on jolist {jolist}')
+    #print(f'Initializing calendar checks based on jolist {jolist}')
     if jolist == 0: return pdiovec, pdipvec, pdeovec, pdepvec
     for jx in range(6):
         for ix, item in enumerate(pdio[jx]):
@@ -1253,7 +1252,7 @@ def Table_maker(genre):
     task_boxes = eval(f"{genre}_genre['task_boxes']")
     task_box_map = eval(f"{genre}_genre['task_box_map']")
 
-    print(f'The genre is {genre} and the genre tables are: {genre_tables}')
+    #print(f'The genre is {genre} and the genre tables are: {genre_tables}')
 
     # Left size is the portion out of 12 devoted to table and document display
     leftsize = 8
@@ -1277,7 +1276,7 @@ def Table_maker(genre):
             for filter in table_filters:
                 for key, value in filter.items():
                     tfilters[key] = request.values.get(key)
-                    print('planner filter set 1', key, tfilters[key])
+                    #print('planner filter set 1', key, tfilters[key])
             dlist = table_filters[0]['Date Filter']
 
             pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
@@ -1285,23 +1284,22 @@ def Table_maker(genre):
             if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
             if task_iter == 0:
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
-                print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
+                #print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
             else:
                 jolist = []
                 for jp in range(1, 5):
                     jox = f'jo{jp}'
                     jo = request.values.get(jox)
-                    print(jp, jox, jo)
                     if jo is not None: jolist.append(jo)
 
-                print(f'Starting POST of genre {genre} with return of jolist: {jolist}')
+                #print(f'Starting POST of genre {genre} with return of jolist: {jolist}')
                 pdiovec, pdipvec, pdeovec, pdepvec = initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist)
             # Set Orders table to checks used in calendar whether or not the Order table is on...
             checked_data = cal_to_orders(jolist, checked_data)
 
 
 
-        print(f'Method is POST with tasktype {tasktype}, taskon {taskon}, task_focus {task_focus}, task_iter {task_iter}')
+        #print(f'Method is POST with tasktype {tasktype}, taskon {taskon}, task_focus {task_focus}, task_iter {task_iter}')
 
         #Gather filter settings to keep them set as desired
 
@@ -1325,7 +1323,7 @@ def Table_maker(genre):
         else:
 
             taskon = nononestr(taskon)
-            print(f'Return hit is none so task continues with task tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
+            #print(f'Return hit is none so task continues with task tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter}')
 
             # Get data only for tables that have been checked on and not specialized
             # However, we must convert the calendar into the order data if using the calendar.
@@ -1334,7 +1332,7 @@ def Table_maker(genre):
             if genre == 'Planning':
                 if 'Orders' not in tables_on: tables_on.append('Orders')
 
-            print(f'The tables on: {tables_on} with task {taskon}')
+            #print(f'The tables on: {tables_on} with task {taskon}')
 
             # Only check the launch boxes, filters, and task selections if no task is running
             if not hasinput(taskon):
@@ -1355,15 +1353,14 @@ def Table_maker(genre):
                             tasktype = tasklist[0]
                             taskon, task_focus = tasklist[1:]
 
-                print('The task is:', taskon)
-                print('The task focus is:', task_focus)
-                print('The task_iter is:', task_iter)
+                #print('The task is:', taskon)
+                #print('The task focus is:', task_focus)
+                #print('The task_iter is:', task_iter)
 
             # See if a table filter has been selected, this can take place even during a task
             for filter in table_filters:
                 for key, value in filter.items():
                     tfilters[key] = request.values.get(key)
-                    print('check1',key,tfilters[key])
             if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
             #Reset Pay and Haul Filters if Show All selected (no filter applied)
@@ -1409,7 +1406,7 @@ def Table_maker(genre):
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
         if genre == 'Planning':
-            print(f'Executing the Calendar first time thru....')
+            #print(f'Executing the Calendar first time thru....')
             tfilters = {'Shipper Filter': None, 'Date Filter': 'This Week', 'Pay Filter': None, 'Haul Filter': None,
                         'Color Filter': 'Both', 'Viewer': '8x4'}
             # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
@@ -1441,13 +1438,10 @@ def Table_maker(genre):
 
     # Execute the task here if a task is on...,,,,
     if hasvalue(taskon):
-        print(f'1164 About to execute task with tasktype:{tasktype}, taskon:{taskon}, task_focus:{task_focus}, task_iter:{task_iter} for genre {genre}')
-        print(f'1165 and also checked data: {checked_data} and err: {err} ')
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
             # If complete set the task on to none
             taskon = None
-            print(f'completed task: the tables on are: {tables_on} with task {taskon}')
             if tables_on == []:
                 genre_tables_on, tables_on, jscripts, taskon, task_iter, task_focus, tboxes, viewport, tfilters = reset_state_hard(task_boxes, genre_tables)
                 genre_data = eval(f"{genre}_genre")
@@ -1463,9 +1457,6 @@ def Table_maker(genre):
                 pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
                 if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
-                if jolist == []:
-                    print(f'checked data is {checked_data}')
-                #pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
 
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else:
@@ -1473,12 +1464,8 @@ def Table_maker(genre):
             task_iter = int(task_iter) + 1
             # Need to pick up some of the keydata after table build
             if checked_data != [] and checked_data is not None:
-                print(f'Checked Data is: {checked_data}')
-                print(f'Keydata is: {keydata}')
-                print(checked_data[0])
                 if checked_data[0][0] == 'Orders':
                     keydata = get_Orders_keydata(keydata, checked_data)
-                    print(f'Keydata obtained is: {keydata}')
 
     else:
         taskon = None
@@ -1597,7 +1584,7 @@ def Table_maker(genre):
 
     if (putbuff is not None or anyamber) and 'Orders' in tables_on:
         holdvec[96] = []
-        print(f'Doing the paste buffer for {checked_data} {tables_on}')
+        #print(f'Doing the paste buffer for {checked_data} {tables_on}')
         sids = checked_data[0][2]
         if sids != []:
             if len(sids) <= 2:
@@ -1734,7 +1721,7 @@ def get_dbdata(table_setup, tfilters):
         query_adds.append(f"{table}.{highfilter} {logic} '{highfilter_value}'")
 
     # If this table has no color capability then it cannot be filtered by date or type
-    print(f'the color_selector is {color_selector}')
+    #print(f'the color_selector is {color_selector}')
     if color_selector is not None:
         # Determine if time filter applies to query:
         if 'Date Filter' in tfilters:
@@ -1815,7 +1802,7 @@ def get_dbdata(table_setup, tfilters):
         if htest is not None and htest != 'All Drivers' :
             hfilter = f"{table}.DriverStart == '{htest}'"
             query_adds.append(hfilter)
-    print(tfilters, query_adds)
+    #print(tfilters, query_adds)
     # Put the filters together from the 3 possible pieces: time, type1, type2
     if query_adds == []:
         table_query = f'{table}.query.all()'
@@ -2209,7 +2196,7 @@ def New_task(tablesetup, task_iter):
     err = [f"Running New task with task_iter {task_iter} using {itable}"]
     form_show = tablesetup['form show']['New']
     form_checks = tablesetup['form checks']['New']
-    print(f'Entering New Task with task iter {task_iter} and itable: {itable}')
+    #print(f'Entering New Task with task iter {task_iter} and itable: {itable}')
     htold = ''
 
     cancelnow = request.values.get('Cancel')
@@ -2318,7 +2305,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     err = [f"Running Edit task with task_iter {task_iter} using {itable}"]
     completed = False
     viewport = ['0'] * 6
-    print(f'1993 Running Edit task with task_iter {task_iter} using {itable}')
+    #print(f'1993 Running Edit task with task_iter {task_iter} using {itable}')
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -2355,10 +2342,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     form_show = tablesetup['form show']['Edit']
     form_checks = tablesetup['form checks']['Edit']
 
-    print('')
-    print(f'*********************************************************************')
-    print(f'***Running edit with task_iter {task_iter} and old data is {htold}***')
-    print(f'*********************************************************************')
+    #print('')
+    #print(f'*********************************************************************')
+    #print(f'***Running edit with task_iter {task_iter} and old data is {htold}***')
+    #print(f'*********************************************************************')
 
     if task_iter > 0:
         failed = 0
@@ -2486,7 +2473,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
 
 def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
-    print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
+    #print(f'Running Status Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
@@ -2536,7 +2523,7 @@ def Status_task(genre, task_focus, task_iter, nc, tids, tabs):
 
 def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
     err = []
-    print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, tids= {tids} tabs= {tabs}')
+    #print(f'Running Undo Task with genre={genre}, task_iter={task_iter}, task_focus = {task_focus}, tids= {tids} tabs= {tabs}')
     for jx, thistable in enumerate(tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
