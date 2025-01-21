@@ -288,6 +288,8 @@ def Gate_Update(ider):
     ###print(f'The gate name should be {gate_name}')
 
 
+
+
 def Order_Container_Update(oder, err):
 
     okat = Orders.query.get(oder)
@@ -311,50 +313,75 @@ def Order_Container_Update(oder, err):
                 if len(bkout) < 7: bkout = 'NoBook'
             edata = Orders.query.filter((Orders.HaulType.contains('Export')) & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
             nbk = len(edata)
+            multibooking = 1
             if nbk > 1:
-                for ix, edat in enumerate(edata):
-                    bklabel = f'{bkout}-{ix+1}'
-                    edat.Booking = bklabel
-                db.session.commit()
+                multibooking = 0
+                #Check to make sure they all have the same base booking.
+                jo_multibook = []
+                for edat in edata:
+                    tbooking = edat.Booking
+                    tbklist = tbooking.split('-')
+                    tbook = tbklist[0]
+                    if tbook == bkout:
+                        multibooking += 1
+                        jo_multibook.append(edat.Jo)
 
-                # Now have to update and relabel the Interchange tickets to match
-                idata = Interchange.query.filter((Interchange.Release.contains(bkout)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).all()
-                if idata:
-                    for ix, idat in enumerate(idata):
-                        bklabel = f'{bkout}-{ix+1}'
-                        idat.Release = bklabel
+                if multibooking > 1:
+                    ix = 1
+                    for edat in edata:
+                        jo = edat.Jo
+                        if jo in jo_multibook:
+                            bklabel = f'{bkout}-{ix}'
+                            edat.Booking = bklabel
+                            ix += 1
                     db.session.commit()
 
-                #Now reset the order:
-                for edat in edata:
-                    bkout = edat.Booking
-                    jdat = Interchange.query.filter((Interchange.Release.contains(bkout)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).first()
-                    if jdat is not None:
+                    # Now have to update and relabel the Interchange tickets to match, and make sure the dashes match the orders only if the base bookings match
+                    ix = 1
+                    idata = Interchange.query.filter((Interchange.Release.contains(bkout)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).all()
+                    if idata:
+                        for jx, idat in enumerate(idata):
+                            current_booking = idat.Release
+                            base_nodash = current_booking.split('-')
+                            release_nodash = base_nodash[0]
+                            if bkout == release_nodash:
+                                bklabel = f'{release_nodash}-{ix}'
+                                idat.Release = bklabel
+                                container = idat.Container
+                                mdat = Interchange.query.filter((Interchange.Container == container) & (Interchange.Date > lbdate) & (Interchange.Type == 'Load In')).first()
+                                if mdat is not None:
+                                    mdat_booking = mdat.Release
+                                    mbase_nodash = mdat_booking.split('-')
+                                    mrelease_nodash = mbase_nodash[0]
+                                    if bkout == mrelease_nodash:
+                                        mbklabel = f'{mrelease_nodash}-{ix}'
+                                        mdat.Release = mbklabel
+                                ix += 1
+                        db.session.commit()
+
+                    #Now reset the order using the relabeled bookings that have dashes:
+                    edata = Orders.query.filter((Orders.HaulType.contains('Export')) & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
+                    for edat in edata:
                         jo = edat.Jo
-                        shipper = edat.Shipper
-                        jdat.Jo = jo
-                        jdat.Company = shipper
-                        con = jdat.Container
-                        edat.Container = con
-                        edat.Chassis = jdat.Chassis
-                        edat.Hstat = Gate_Match(con, lbdate, nbk, 'Export', edat)
-                        db.session.commit()
-                    else:
-                        edat.Container = ''
-                        edat.Chassis = ''
-                        edat.Hstat = 0
-                        db.session.commit()
+                        if jo in jo_multibook:
+                            whole_booking = edat.Booking
+                            jdat = Interchange.query.filter((Interchange.Release == whole_booking) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).first()
+                            if jdat is not None:
+                                jo = edat.Jo
+                                shipper = edat.Shipper
+                                jdat.Jo = jo
+                                jdat.Company = shipper
+                                con = jdat.Container
+                                edat.Container = con
+                                edat.Chassis = jdat.Chassis
+                                edat.Hstat = Gate_Match(con, lbdate, multibooking, 'Export', edat)
+                                db.session.commit()
+                            else:
+                                edat.Container = ''
+                                edat.Chassis = ''
+                                edat.Hstat = 0
+                                db.session.commit()
 
-
-            elif nbk == 1:
-                #Check to see if had multiple bookings but now have just one
-                for edat in edata:
-                    edat.Booking = bkout
-                    idat = Interchange.query.filter((Interchange.Release.contains(bkout)) & (Interchange.Date > lbdate) & (Interchange.Type == 'Empty Out')).first()
-                    if idat is not None:
-                        if '-' in idat.Relese:
-                            idat.Release = bkout
-                db.session.commit()
 
         else:
             err = ['Cannot create or update an export without a booking number']

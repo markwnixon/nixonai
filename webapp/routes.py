@@ -48,34 +48,33 @@ main = Blueprint('main',__name__)
 
 @main.route('/get_api_data', methods=['GET', 'POST'])
 def handle_data():
-
-    if request.method == 'GET':
-        data_needed = request.args.get('data_needed')
-        print(f'This is a get request for data:{data_needed}')
-        if data_needed == 'shipper_containers_out':
-            arglist = request.args.get('arglist')
-            print(f'Was able to get the payload data for arglist: {arglist}')
-            params = ast.literal_eval(arglist)
-            shipper = params[0]
-            print(f'Was able to get the shipper: {shipper}')
-            lb_days = 20
-            try:
-                lb_days = params[1]
-            except:
+    if 1 == 2:
+        if request.method == 'GET':
+            data_needed = request.args.get('data_needed')
+            print(f'This is a get request for data:{data_needed}')
+            if data_needed == 'shipper_containers_out':
+                arglist = request.args.get('arglist')
+                print(f'Was able to get the payload data for arglist: {arglist}')
+                params = ast.literal_eval(arglist)
+                shipper = params[0]
+                print(f'Was able to get the shipper: {shipper}')
                 lb_days = 20
-                params.append(lb_days)
-            lbdate = now.date()
-            lbdate = lbdate - timedelta(days=lb_days)
-            print(f'Looking back to this date: {lbdate}')
-            odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2) & (Orders.Shipper == shipper)).all()
-            ret_data = []
-            for odat in odata:
-                ret_data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
+                try:
+                    lb_days = params[1]
+                except:
+                    lb_days = 20
+                    params.append(lb_days)
+                lbdate = now.date()
+                lbdate = lbdate - timedelta(days=lb_days)
+                print(f'Looking back to this date: {lbdate}')
+                odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2) & (Orders.Shipper == shipper)).all()
+                ret_data = []
+                for odat in odata:
+                    ret_data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
 
-            return_payload = jsonify([ret_data, data_needed, params])
-            test = {'container':'CAAU8649700'}
-
-            return test
+                return_payload = jsonify([ret_data, data_needed, params])
+    test = jsonify({'container':'CAAU8649700'})
+    return test
 
 
 
