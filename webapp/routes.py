@@ -30,6 +30,7 @@ from webapp.viewfuncs import make_new_order, nonone, monvals, getmonths, nonones
 from webapp.class8_utils_email import email_template, info_mimemail, check_person, add_person
 
 from webapp.class8_utils import *
+from webapp.class8_api_call import api_call
 import ast
 
 today = datetime.datetime.today()
@@ -48,33 +49,26 @@ main = Blueprint('main',__name__)
 
 @main.route('/get_api_data', methods=['GET', 'POST'])
 def handle_data():
-    if 1 == 2:
-        if request.method == 'GET':
-            data_needed = request.args.get('data_needed')
-            print(f'This is a get request for data:{data_needed}')
-            if data_needed == 'shipper_containers_out':
-                arglist = request.args.get('arglist')
-                print(f'Was able to get the payload data for arglist: {arglist}')
-                params = ast.literal_eval(arglist)
-                shipper = params[0]
-                print(f'Was able to get the shipper: {shipper}')
-                lb_days = 20
-                try:
-                    lb_days = params[1]
-                except:
-                    lb_days = 20
-                    params.append(lb_days)
-                lbdate = now.date()
-                lbdate = lbdate - timedelta(days=lb_days)
-                print(f'Looking back to this date: {lbdate}')
-                odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2) & (Orders.Shipper == shipper)).all()
-                ret_data = []
-                for odat in odata:
-                    ret_data.append([{'id':odat.id,'JO':odat.Jo,'SCAC':scac,'Shipper':odat.Shipper,'Container':odat.Container,'Hstat':odat.Hstat}])
+    if request.method == 'GET':
+        data_needed = request.args.get('data_needed')
+        print(f'This is a get request for data_needed:{data_needed}:')
 
-                return_payload = jsonify([ret_data, data_needed, params])
-    test = jsonify({'container':'CAAU8649700'})
-    return test
+        arglist = request.args.get('arglist')
+        print(f'Was able to get the payload data for arglist:{arglist}:')
+
+        if data_needed == 'test1':
+            return jsonify({'container':'CAAU8649700'})
+
+        elif data_needed == 'test2':
+            return jsonify([{'id':1,'container':'CAAU8649700','shipper':'one'},
+                            {'id':1,'container':'XXXX8649700','shipper':'two'}])
+
+        else:
+            data_return = api_call(scac, now, data_needed,arglist)
+            return jsonify(data_return)
+
+    else:
+        return []
 
 
 
