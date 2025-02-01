@@ -56,12 +56,25 @@ def handle_data():
         arglist = request.args.get('arglist')
         print(f'Was able to get the payload data for arglist:{arglist}:')
 
-        if data_needed == 'test1':
+        if data_needed == 'test0':
             return jsonify({'container':'CAAU8649700'})
 
-        elif data_needed == 'test2':
+        elif data_needed == 'test1':
             return jsonify([{'id':1,'container':'CAAU8649700','shipper':'one'},
-                            {'id':1,'container':'XXXX8649700','shipper':'two'}])
+                            {'id':2,'container':'XXXX8649700','shipper':'two'}])
+
+        elif data_needed == 'test2':
+            return jsonify([{'id':1,'day':'Monday','item':'Empty Pickup'},
+                            {'id':2,'day':'Tuesday','item':'Load In'},
+                            {'id':3, 'day':'Wednesday','item':'Load In'}])
+
+        elif data_needed == 'test3':
+            return jsonify([{'id':1,'day':'Thursday','Amount':'10,023.43'},
+                            {'id':2,'day':'Friday','Amount':'9,230.44'}])
+
+        elif data_needed == 'test4':
+            return jsonify([{'id':1,'driver':'John Doe','CDL':'CDX-001'},
+                            {'id':2,'driver':'Sam Spade','CDL':'CRJ-0033'}])
 
         else:
             data_return = api_call(scac, now, data_needed,arglist)
