@@ -39,6 +39,7 @@ def api_call(scac, now, data_needed, arglist):
         today = now.date()
         lbdate = today - timedelta(days=lb_days)
         active_date = today + timedelta(days=10)
+        fd = '1900-01-01'
         print(f'Looking back to this date: {lbdate}')
         odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
         ret_data = []
@@ -50,12 +51,32 @@ def api_call(scac, now, data_needed, arglist):
             if hstat >= 2 and odat.Date2 < active_date:
                 print(f'Container {container} returned before the active date of {active_date}')
             else:
-                gateout = f'{odat.Date}'
-                gatein = f'{odat.Date2}'
-                delivery = f'{odat.Date3}'
-                port_early = f'{odat.Date4}'
-                port_late = f'{odat.Date5}'
-                dueback = f'{odat.Date6}'
+                #Must return dates in a valid date format or the api readers will fail
+                if isinstance(odat.Date, datetime.date):
+                    gateout = f'{odat.Date}'
+                else:
+                    gateout = fd
+                if isinstance(odat.Date2, datetime.date):
+                    gatein = f'{odat.Date2}'
+                else:
+                    gatein = fd
+                if isinstance(odat.Date3, datetime.date):
+                    delivery = f'{odat.Date3}'
+                else:
+                    delivery = fd
+                if isinstance(odat.Date4, datetime.date):
+                    port_early = f'{odat.Date4}'
+                else:
+                    port_early = fd
+                if isinstance(odat.Date5, datetime.date):
+                    port_late = f'{odat.Date5}'
+                else:
+                    port_late = fd
+                if isinstance(odat.Date6, datetime.date):
+                    dueback = f'{odat.Date6}'
+                else:
+                    dueback = fd
+
 
                 if hstat <= 0:
                     status = 'Unpulled'
