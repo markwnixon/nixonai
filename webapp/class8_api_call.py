@@ -44,8 +44,11 @@ def api_call(scac, now, data_needed, arglist):
         ret_data = []
         for odat in odata:
             hstat = odat.Hstat
+            htype = odat.HaulType
+            container = odat.Container
+            booking = odat.Booking
             if hstat >= 2 and odat.Date2 < active_date:
-                print(f'Container {odat.Container} returned before the active date of {active_date}')
+                print(f'Container {container} returned before the active date of {active_date}')
             else:
                 gateout = f'{odat.Date}'
                 gatein = f'{odat.Date2}'
@@ -63,8 +66,12 @@ def api_call(scac, now, data_needed, arglist):
                 else:
                     status = 'Undefined'
 
-                ret_data.append({'id': odat.id, 'jo': odat.Jo, 'scac': scac, 'shipper': odat.Shipper,
-                                  'container': odat.Container, 'status': status, 'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery, 'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback})
+                if hstat <= 0 and 'Export' in htype:
+                    print(f'Export job has not been pulled yet')
+                    container = 'Unpulled Export'
+
+                ret_data.append({'id': odat.id, 'jo': odat.Jo, 'scac': scac, 'shipper': odat.Shipper, 'release':booking,
+                                  'container': container, 'status': status, 'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery, 'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback})
 
         return ret_data
 
