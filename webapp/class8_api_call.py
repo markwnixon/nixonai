@@ -36,21 +36,35 @@ def api_call(scac, now, data_needed, arglist):
 
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
         lb_days = 60
-        lbdate = now.date()
-        lbdate = lbdate - timedelta(days=lb_days)
+        today = now.date()
+        lbdate = today - timedelta(days=lb_days)
+        active_date = today + timedelta(days=10)
         print(f'Looking back to this date: {lbdate}')
         odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
         ret_data = []
         for odat in odata:
-            gateout = f'{odat.Date}'
-            gatein = f'{odat.Date2}'
-            delivery = f'{odat.Date3}'
-            port_early = f'{odat.Date4}'
-            port_late = f'{odat.Date5}'
-            dueback = f'{odat.Date6}'
+            hstat = odat.Hstat
+            if hstat >= 2 and odat.Date2 < active_date:
+                print(f'Container {odat.Container} returned before the active date of {active_date}')
+            else:
+                gateout = f'{odat.Date}'
+                gatein = f'{odat.Date2}'
+                delivery = f'{odat.Date3}'
+                port_early = f'{odat.Date4}'
+                port_late = f'{odat.Date5}'
+                dueback = f'{odat.Date6}'
 
-            ret_data.append({'id': odat.id, 'Jo': odat.Jo, 'SCAC': scac, 'Shipper': odat.Shipper,
-                              'Container': odat.Container, 'Hstat': odat.Hstat, 'Gateout': gateout, 'Gatein': gatein, 'Delivery': delivery, 'PortEarly': port_early, 'PortLate': port_late, 'DueBack':dueback})
+                if hstat <= 0:
+                    status = 'Unpulled'
+                elif hstat == 1:
+                    status = 'Out'
+                elif hstat >= 2:
+                    status = 'Returned'
+                else:
+                    status = 'Undefined'
+
+                ret_data.append({'id': odat.id, 'jo': odat.Jo, 'scac': scac, 'shipper': odat.Shipper,
+                                  'container': odat.Container, 'status': status, 'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery, 'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback})
 
         return ret_data
 
