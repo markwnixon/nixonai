@@ -45,12 +45,15 @@ def api_call(scac, now, data_needed, arglist):
         ret_data = []
         for odat in odata:
             hstat = odat.Hstat
-            htype = odat.HaulType
             container = odat.Container
-            booking = odat.Booking
+
             if hstat >= 2 and odat.Date2 < active_date:
                 print(f'Container {container} returned before the active date of {active_date}')
             else:
+                booking = odat.Booking
+                htype = odat.HaulType
+                del_address = odat.Dropblock2
+
                 #Must return dates in a valid date format or the api readers will fail
                 if isinstance(odat.Date, datetime.date):
                     gateout = f'{odat.Date}'
@@ -92,7 +95,10 @@ def api_call(scac, now, data_needed, arglist):
                     container = 'Unpulled Export'
 
                 ret_data.append({'id': odat.id, 'jo': odat.Jo, 'scac': scac, 'shipper': odat.Shipper, 'release':booking,
-                                  'container': container, 'status': status, 'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery, 'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback})
+                                  'container': container, 'status': status, 'haulType':htype, 'delAddress':del_address,
+                                  'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery,
+                                  'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback
+                                 })
 
         return ret_data
 
