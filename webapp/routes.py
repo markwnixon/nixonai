@@ -77,7 +77,7 @@ def handle_data():
                             {'id':2,'driver':'Sam Spade','CDL':'CRJ-0033'}])
 
         else:
-            data_return = api_call(scac, now, data_needed,arglist)
+            data_return = api_call(scac, now, data_needed, arglist)
             return jsonify(data_return)
 
     else:

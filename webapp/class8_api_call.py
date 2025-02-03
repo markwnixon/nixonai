@@ -114,6 +114,7 @@ def api_call(scac, now, data_needed, arglist):
         ret_data = []
         earliest = None
         latest = None
+        cal_id = 0
         for odat in odata:
             hstat = odat.Hstat
             container = odat.Container
@@ -137,64 +138,100 @@ def api_call(scac, now, data_needed, arglist):
                 htype = odat.HaulType
                 del_address = odat.Dropblock2
 
-                #Must return dates in a valid date format or the api readers will fail
-                if isinstance(odat.Date, datetime.date):
-                    gateout = f'{odat.Date}'
-                else:
-                    gateout = fd
-                if isinstance(odat.Date2, datetime.date):
-                    gatein = f'{odat.Date2}'
-                else:
-                    gatein = fd
-                if isinstance(odat.Date3, datetime.date):
-                    delivery = f'{odat.Date3}'
-                else:
-                    delivery = fd
-                if isinstance(odat.Date4, datetime.date):
-                    port_early = f'{odat.Date4}'
-                else:
-                    port_early = fd
-                if isinstance(odat.Date5, datetime.date):
-                    port_late = f'{odat.Date5}'
-                else:
-                    port_late = fd
-                if isinstance(odat.Date6, datetime.date):
-                    dueback = f'{odat.Date6}'
-                else:
-                    dueback = fd
+                # Determine how many calendar entries we have for each job based on the gatein, gateout, and delivery dates
+                gout = odat.Date
+                gin = odat.Date2
+                deliv = odat.Date3
+                if isinstance(gout, datetime.date) and isinstance(gin, datetime.date) and isinstance(deliv, datetime.date):
+                    print('We have three good dates')
+                    #We have three good dates to use and compare
+                    cal_message = []
+                    cal_dates = []
+                    if gout == deliv and gout == gin:
+                        #Plan is to pull deliv and return same day
+                        cal_message.append('Pull, deliver, and return same day')
+                        cal_dates.append(gout)
+                        dtype = 'All same day'
+                    elif gout == deliv and gout != gin:
+                        cal_message.append('Pull and deliver today')
+                        cal_message.append(f'Return container still out from {deliv}')
+                        cal_dates.append(gout)
+                        cal_dates.append(gin)
+                        dtype = 'Pull and deliver not return'
+                    elif gout != deliv and deliv == gin:
+                        cal_message.append(f'Pull container today, deliver {deliv}')
+                        cal_message.append(f'Deliver container and return')
+                        cal_dates.append(gout)
+                        cal_dates.append(gin)
+                        dtype = 'Prepull then deliver and return'
+                    elif gout != deliv and deliv != gin:
+                        cal_message.append(f'Pull container today, deliver {deliv}')
+                        cal_message.append(f'Deliver container today but return {gout}')
+                        cal_message.append(f'Return container today')
+                        cal_dates.append(gout)
+                        cal_dates.append(deliv)
+                        cal_dates.append(gin)
+                        dtype = 'Prepull, then deliver, then return'
 
-                if isinstance(earliest, datetime.date):
-                    earliest_str = f'{earliest}'
+                    #Must return dates in a valid date format or the api readers will fail
+                    gateout = f'{gout}'
+                    gatein = f'{gin}'
+                    delivery = f'{deliv}'
+
+                    if isinstance(odat.Date4, datetime.date):
+                        port_early = f'{odat.Date4}'
+                    else:
+                        port_early = fd
+                    if isinstance(odat.Date5, datetime.date):
+                        port_late = f'{odat.Date5}'
+                    else:
+                        port_late = fd
+                    if isinstance(odat.Date6, datetime.date):
+                        dueback = f'{odat.Date6}'
+                    else:
+                        dueback = fd
+
+                    if isinstance(earliest, datetime.date):
+                        earliest_str = f'{earliest}'
+                    else:
+                        earliest_str = fd
+
+                    if isinstance(latest, datetime.date):
+                        latest_str = f'{latest}'
+                    else:
+                        latest_str = fd
+
+
+                    if hstat <= 0:
+                        status = 'Unpulled'
+                    elif hstat == 1:
+                        status = 'Out'
+                    elif hstat >= 2:
+                        status = 'Returned'
+                    else:
+                        status = 'Undefined'
+
+                    if hstat <= 0 and 'Export' in htype:
+                        print(f'Export job has not been pulled yet')
+                        container = 'Unpulled Export'
+
+                    for ix in range(len(cal_message)):
+                        cal_id += 1
+
+                        this_cal_date = f'{cal_dates[ix]}'
+
+                        ret_data.append({'id': cal_id, 'jo': odat.Jo, 'scac': scac, 'shipper': odat.Shipper, 'release':booking,
+                                          'container': container, 'status': status, 'haulType':htype, 'delAddress':del_address,
+                                          'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery,
+                                          'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback,
+                                          'calDate':this_cal_date, 'calMessage':cal_message[ix], 'delType':dtype
+                                         })
                 else:
-                    earliest_str = fd
+                    print(f'We have bad dates on container {container}')
+        #Now sort the return data by the calendar dates
+        ret_data_sorted = sorted(ret_data, key=lambda x: x['calDate'])
 
-                if isinstance(latest, datetime.date):
-                    latest_str = f'{latest}'
-                else:
-                    latest_str = fd
-
-
-                if hstat <= 0:
-                    status = 'Unpulled'
-                elif hstat == 1:
-                    status = 'Out'
-                elif hstat >= 2:
-                    status = 'Returned'
-                else:
-                    status = 'Undefined'
-
-                if hstat <= 0 and 'Export' in htype:
-                    print(f'Export job has not been pulled yet')
-                    container = 'Unpulled Export'
-
-                ret_data.append({'id': odat.id, 'jo': odat.Jo, 'scac': scac, 'shipper': odat.Shipper, 'release':booking,
-                                  'container': container, 'status': status, 'haulType':htype, 'delAddress':del_address,
-                                  'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery,
-                                  'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback,
-                                 'earliest': earliest_str, 'latest': latest_str
-                                 })
-
-        return ret_data
+        return ret_data_sorted
 
 
 
