@@ -775,7 +775,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
     thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055]  # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
     dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659]  # Dulles Toll Rd Plaza
-    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
+    tollcodes = ['BHT', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
     onceonly = []
     tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox,
                  dtr_tollbox]
@@ -805,6 +805,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
                             legtolls[jx] = 24.00
                         legcodes[jx] = tollcode
                         onceonly.append(tollcode)
+
             if jx > 0:
                 lam = (lah + lal) / 2.0
                 lom = (loh + lol) / 2.0
@@ -813,11 +814,12 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
                 stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
                 if stat3 == 1 and stat4 == 1:
                     tollcode = tollcodes[kx]
-                    if tollcode == 'DTR':
-                        legtolls[jx] = 10.50
-                    else:
-                        legtolls[jx] = md_toll
-                    legcodes[jx] = tollcode
+                    if tollcode not in onceonly:
+                        if tollcode == 'DTR':
+                            legtolls[jx] = 10.50
+                        else:
+                            legtolls[jx] = md_toll
+                        legcodes[jx] = tollcode
         ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
 
     tot_tolls = 0.00
