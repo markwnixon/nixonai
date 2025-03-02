@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Gledger, Invoices, JO, Income, Bills, Accounts, People, Focusareas, Deposits, Adjusting, Orders
+from webapp.models import Gledger, Invoices, JO, Income, Bills, Accounts, People, Focusareas, Deposits, Adjusting, Orders, PaymentsRec
 import datetime
 from webapp.viewfuncs import stripper
 import json
@@ -57,6 +57,15 @@ def gledger_multi_job(bus,jolist,acctdb,acctcr):
         date = odat.PaidDate
         co = get_company(pid)
         ref = odat.PayRef
+
+        print(f'Filing multiple account payments with Amount = {amt}, Account = {acctcr}, Source = {co}')
+        #input_paymnt = PaymentsRec(Amount=amt, Account=acctcr, Source=co, Type=dtype, Com=cc, Recorded=dt, Date=paidon, Ref=payref)
+        #db.session.add(input_paymnt)
+        #db.session.commit()
+        #refid = input_paymnt.id  # this links the total payment to the applied payment for the job
+        #odat.QBi = refid
+
+
 
         amt = 0
         for joget in jolist:
@@ -135,7 +144,7 @@ def gledger_app_write(sapp,jo,cofor,id1,id2,amt):
     db.session.commit()
 
 
-def gledger_write(busvec,jo,acctdb,acctcr):
+def gledger_write(busvec,jo,acctdb,acctcr,refid):
     if 1 == 1:
         err = []
         bus = busvec[0]
@@ -185,6 +194,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
                 db.session.commit()
 
         if bus=='income':
+
             amtpaid, paidon, payref, paymethod = busvec[1], busvec[2], busvec[3], busvec[4]
             amt = int(float(amtpaid) * 100)
             if 'Cash' in acctdb or 'Check' in acctdb or 'Mcheck' in acctdb or 'Undeposited' in acctdb:
@@ -192,12 +202,13 @@ def gledger_write(busvec,jo,acctdb,acctcr):
                 dtype = 'ID'
             else: dtype = 'DD'
             acctcr='Accounts Receivable'
+
+
             odat=Orders.query.filter(Orders.Jo==jo).first()
             #amt=int(float(odat.PaidAmt)*100)
             pid=odat.Bid
             #date = odat.PaidDate
             co = get_company(pid)
-           #print(f'Attempting to adb {acctdb} and {cc}')
 
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first()
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first()
@@ -211,7 +222,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
                 gdat.Date = paidon
                 gdat.Ref = payref
             else:
-                input1 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='IC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=paidon,Ref=payref)
+                input1 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=refid,Type='IC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=paidon,Ref=payref)
                 db.session.add(input1)
             db.session.commit()
             gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type==dtype)).first()
@@ -222,7 +233,7 @@ def gledger_write(busvec,jo,acctdb,acctcr):
                 gdat.Aid = adb.id
                 gdat.Date = paidon
             else:
-                input2 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type=dtype,Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=paidon,Ref=payref)
+                input2 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=refid,Type=dtype,Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=paidon,Ref=payref)
                 db.session.add(input2)
             db.session.commit()
 

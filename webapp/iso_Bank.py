@@ -374,7 +374,7 @@ def isoBank():
 
 
                     from gledger_write import gledger_write
-                    gledger_write('deposit',depojo,acctsel,0)
+                    gledger_write('deposit',depojo,acctsel,0, 0, 0)
 
                 else:
                     cache,docref=reportmaker('deposit',odervec)

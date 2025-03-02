@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -1381,7 +1381,7 @@ def Table_maker(genre):
 
                 if tfilters['Color Filter'] == 'Haul':
                     Orders_setup['colorfilter'] = ['Hstat']
-                    Newjobs_setup['colorfilter'] = ['Hstat']
+                    #Newjobs_setup['colorfilter'] = ['Hstat']
                 elif tfilters['Color Filter'] == 'Invoice':
                     Orders_setup['colorfilter'] = ['Istat']
                 elif tfilters['Color Filter'] == 'Both':
@@ -2283,7 +2283,7 @@ def New_task(tablesetup, task_iter):
                                 bdat.Pid = pdat.id
                                 db.session.commit()
                                 bdat = Bills.query.get(bid)
-                            err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
+                            err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount, 0)
                 else:
                     err.append(f'Cannot create entry until input errors shown in red below are resolved')
 
@@ -2413,7 +2413,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 # The amount could change on a bill, so if a bill need to update
                 if table == 'Bills':
                     bdat = eval(nextquery)
-                    err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount)
+                    err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount, 0)
                 if table == 'Orders':
                     #print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
@@ -2571,11 +2571,24 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 elif table == 'Orders' and task_focus == 'Payment':
                     rstring = f'{table}.query.get({sid})'
                     odat = eval(rstring)
+                    refid = odat.QBi
                     sinow = odat.Label
-                    slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
-                    odata = Orders.query.filter(Orders.Label == sinow).all()
+                    if sinow is not None:
+                        slead = SumInv.query.filter((SumInv.Si == sinow) & (SumInv.Status > 0)).first()
+                        odata = Orders.query.filter(Orders.Label == sinow).all()
+                        olen = len(odata)
+                    else:
+                        olen = 0
+                        slead = None
 
-                    if slead is None:
+                    if refid is not None:
+                        pdata = Orders.query.filter(Orders.QBi == refid).all()
+                        plen = len(pdata)
+                    else:
+                        plen = 0
+                    print(refid,sinow,olen,plen)
+
+                    if olen == 1 or plen == 1:
                         odat.Istat = 3
                         if odat.Hstat == 5:
                             odat.Hstat = 3
@@ -2586,6 +2599,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         odat.PaidDate = None
                         odat.PaidAmt = None
                         odat.Payments = '0.00'
+                        odat.QBi = None
                         odat.BalDue = odat.InvoTotal
                         db.session.commit()
                         jo = odat.Jo
@@ -2593,13 +2607,48 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         for data in idata:
                             data.Status = 'New'
                         db.session.commit()
-                        Income.query.filter(Income.Jo == jo).delete()
+                        if refid is not None:
+                            PaymentsRec.query.filter(PaymentsRec.id == refid).delete()
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
                         Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
                         db.session.commit()
 
-                    else:
+                    elif plen > 1:
+
+                        if refid is not None:
+                            PaymentsRec.query.filter(PaymentsRec.id == refid).delete()
+
+                        if slead is not None:
+                            slead.Status = 2
+
+                        for each in pdata:
+                            each.Istat = 3
+                            if each.Hstat == 5:
+                                each.Hstat = 3
+
+                            each.PaidInvoice = None
+                            each.PayRef = None
+                            each.PayMeth = None
+                            each.PayAcct = None
+                            each.PaidDate = None
+                            each.PaidAmt = None
+                            each.QBi = None
+                            each.Payments = None
+                            each.BalDue = each.InvoTotal
+                            jo = each.Jo
+                            idata = Invoices.query.filter(Invoices.Jo == jo).all()
+                            for data in idata:
+                                data.Status = 'New'
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'IC')).delete()
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'ID')).delete()
+                            Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
+                        db.session.commit()
+
+                    elif olen > 1:
+
+                        if refid is not None:
+                            PaymentsRec.query.filter(PaymentsRec.id == refid).delete()
 
                         for each in odata:
                             each.PaidInvoice = None
@@ -2609,6 +2658,9 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                             each.PaidDate = None
                             each.PaidAmt = None
                             each.Istat = 6
+                            each.QBi = None
+                            each.Payments = None
+                            each.BalDue = each.InvoTotal
                             if each.Hstat == 5:
                                 each.Hstat = 3
 
@@ -2621,6 +2673,8 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                             Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'DD')).delete()
                         slead.Status = 2
                         db.session.commit()
+
+
 
                 elif table == 'Bills' and task_focus == 'Payment':
                     #print('In the unpay bill section')
@@ -3644,7 +3698,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
 
         if record_requested or email_requested:
             if slead is None:
-                jopaylist = [[jo, amtpaid, paidon,  payref, paymethod, depoacct]]
+                jopaylist = [[jo, amtpaid, paidon,  payref, paymethod, depoacct, amtpaid]]
                 err, success = income_record(jopaylist, err)
                 if success:
                     if email_requested: info_mimemail(emaildata, [sid])
@@ -3885,7 +3939,7 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
                     #odat.PaidInvoice = basefile
                     #odat.Icache = cache + 1
-                    jopaylist.append([invojo, recamount, recdate, holdvec[8], depmethod, acctdb])
+                    jopaylist.append([invojo, recamount, recdate, holdvec[8], depmethod, acctdb, holdvec[5]])
                 else:
                     success = False
                     err.append(f'Have no Invoice to Receive Against for JO={invojo}')
@@ -4163,7 +4217,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 for sid in sids:
                     nextquery = f"{table}.query.get({sid})"
                     each_bdat = eval(nextquery)
-                    err = gledger_write(['paybill'], each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount)
+                    err = gledger_write(['paybill'], each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount, 0)
                     err.append(f'Ledger paid {each_bdat.Jo} to {each_bdat.bAccount} from {each_bdat.pAccount}')
                     each_bdat.Check = docref
                     each_bdat.Ccache = cache + 1

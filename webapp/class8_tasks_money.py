@@ -1,7 +1,7 @@
 import sqlalchemy.sql
 
 from webapp import db
-from webapp.models import Orders, Invoices, People, Services, Drops, SumInv, Interchange
+from webapp.models import Orders, Invoices, People, Services, Drops, SumInv, Interchange, PaymentsRec
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.class8_utils_email import etemplate_truck, emaildata_update, invoice_mimemail, etemplate_suminv
@@ -13,7 +13,7 @@ from webapp.viewfuncs import newjo
 #Python functions that require database access
 from webapp.class8_utils import *
 from webapp.utils import *
-from webapp.class8_tasks_gledger import gledger_write
+from webapp.class8_tasks_gledger import gledger_write, get_company
 
 import usaddress
 from datetime import timedelta
@@ -50,13 +50,13 @@ def loginvo_m(odat,ix):
                 amtinvo = thisodat.InvoTotal
                 #print(aoder,thisodat.Istat)
                 jo = thisodat.Jo
-                gledger_write(['invoice',amtinvo], jo, 0, 0)
+                gledger_write(['invoice',amtinvo], jo, 0, 0, 0)
                 thisodat.Istat = ix
                 db.session.commit()
     else:
         jo = odat.Jo
         amtinvo = odat.InvoTotal
-        err = gledger_write(['invoice', amtinvo], jo, 0, 0)
+        err = gledger_write(['invoice', amtinvo], jo, 0, 0, 0)
         odat.Istat = ix
         db.session.commit()
     return err
@@ -978,11 +978,26 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
 def income_record(jopaylist, err):
     success = False
+    jo1 = jopaylist[0]
+    jo, amtpaid, paidon, payref, paymethod, depoacct, amt_total = [jo1[i] for i in range(7)]
+    dt = datetime.datetime.now()
+    idat = Invoices.query.filter(Invoices.Jo == jo).first()
+    pid = idat.Pid
+    co = get_company(pid)
+    cc = jo[0]
+    print(f'About to write the income total payment in a multi payment with amount {amt_total}')
+    amt_int = int(float(amt_total)*100)
+    input_paymnt = PaymentsRec(Amount=amt_int, Account=depoacct, Source=co, Type=paymethod, Com=cc, Recorded=dt, Date=paidon, Ref=payref)
+    db.session.add(input_paymnt)
+    db.session.commit()
+    refid = input_paymnt.id  # this links the total payment to the applied payment for the job
+
+
     for jopay in jopaylist:
         #print(jopay)
-        jo, amtpaid, paidon, payref, paymethod, depoacct = [jopay[i] for i in range(6)]
+        jo, amtpaid, paidon, payref, paymethod, depoacct, amt_total = [jopay[i] for i in range(7)]
         #print(jo, amtpaid, paidon, payref, paymethod, depoacct)
-        adderr = gledger_write(['income', amtpaid, paidon,  payref, paymethod], jo, depoacct, 0 )
+        adderr = gledger_write(['income', amtpaid, paidon,  payref, paymethod], jo, depoacct, 0, refid)
         if adderr == []:
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
@@ -992,6 +1007,7 @@ def income_record(jopaylist, err):
                 odat.PayRef = payref
                 odat.PayMeth = paymethod
                 odat.PayAcct = depoacct
+                odat.QBi = refid
                 paysofar = odat.Payments
                 if paysofar is not None:
                     paysofar = float(paysofar)

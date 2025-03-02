@@ -546,6 +546,14 @@ def ARMaker():
     else:
         return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, arsent=arsent, this_shipper=this_shipper, odata=odata, sdata=sdata, task=task, emaildata=emaildata, boxes=boxes, sboxes=sboxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails_cust=ar_emails_cust, rview=rview)
 
+@main.route('/ARPayments', methods=['GET', 'POST'])
+@login_required
+def ARPayments():
+    from iso_Pay import isoPay
+    status, this_id, odata, pdata, tot = isoPay()
+    if status == 'exitnow': return redirect(url_for('main.Class8Main',genre='Trucking'))
+    else:
+        return render_template('ARpayments.html', cmpdata=cmpdata, scac=scac, this_id=this_id, odata=odata, pdata=pdata, tot=tot)
 
 @main.route('/Reports', methods=['GET', 'POST'])
 @login_required

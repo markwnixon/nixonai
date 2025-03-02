@@ -968,6 +968,11 @@ def isoAR():
             #print(f'The shipper of interest is {this_shipper}')
             task = 'analysis'
 
+        elif payments is not None or active_task == 'payments':
+            this_shipper = request.values.get('optradio')
+            task = 'payments'
+
+
 
 
         # Not exiting after a Post
