@@ -1396,6 +1396,12 @@ def Table_maker(genre):
     #First time thru (not a Post) below#########################################################
     else:
         #print('Method is NOT POST')
+        # This is a reset so try to flush the session variable and get data from database fresh no cached
+        print(f'Hit the RESET ALL button')
+        db.session.expire_all()
+        db.session.close()
+        username = session['username'].capitalize()
+
         genre_tables_on = ['off'] * len(genre_tables)
         genre_tables_on[0] = 'on'
         tables_on = [eval(f"{genre}_genre['table']")]
