@@ -1155,6 +1155,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Pcache = 1
                     reupdate = 1
                 db.session.commit()
+                db.session.expire_all()
 
 
         for ix, item in enumerate(pdip[jx]):
@@ -1182,6 +1183,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdip[jx][ix][13][0] = gout
                     reupdate = 1
                 db.session.commit()
+                db.session.expire_all()
 
         for ix, item in enumerate(pdeo[jx]):
             jo = item[5]
@@ -1212,6 +1214,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Pcache = 1
                     reupdate = 1
                 db.session.commit()
+                db.session.expire_all()
 
         for ix, item in enumerate(pdep[jx]):
             jo = item[5]
@@ -1238,6 +1241,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdep[jx][ix][13][0] = gout
                     reupdate = 1
                 db.session.commit()
+                db.session.expire_all()
 
     return pdio, pdip, pdeo, pdep, reupdate
 
