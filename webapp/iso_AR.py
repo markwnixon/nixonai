@@ -317,11 +317,11 @@ def get_open_sort_totals(arlist):
         cdata.append([cust,io30, d2s(dolo30), iu30, d2s(dolu30), iall, d2s(dolall)])
     return cdata
 
-def get_open_for_cust(this_shipper):
+def get_open_for_cust(this_shipper, lb_date):
     dat30 = today - datetime.timedelta(30)
-    lb360 = today - datetime.timedelta(360)
-    odata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat>1) & (Orders.Istat<4)) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
-    sodata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date3 > lb360)).order_by(Orders.Date3).all()
+
+    odata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat>1) & (Orders.Istat<4)) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
+    sodata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date3 > lb_date)).order_by(Orders.Date3).all()
     sumlist = []
     sdata = []
     for sodat in sodata:
@@ -332,7 +332,11 @@ def get_open_for_cust(this_shipper):
     for sin in sumlist:
         sdat = SumInv.query.filter(SumInv.Si == sin).first()
         if sdat is not None: sdata.append(sdat)
-    adata = Ardata.query.filter((Ardata.Customer == this_shipper) & (Ardata.Date1 > lb360) & (Ardata.Emailtype == 'Direct')).all()
+    # Now sort the data in sdata by invoide date
+    sdata = sorted(sdata, key=lambda x: x.Date, reverse=True)
+
+
+    adata = Ardata.query.filter((Ardata.Customer == this_shipper) & (Ardata.Date1 > lb_date) & (Ardata.Emailtype == 'Direct')).all()
     tdata = []
     for adat in adata:
         jol= adat.Jolist
@@ -357,7 +361,7 @@ def read_tboxes():
     tboxes = [0]*30
     for ix in range(30):
         tboxes[ix] = request.values.get(f'tbox{ix}')
-    #print(f'the tboxes here are {tboxes}')
+    print(f'the tboxes here are {tboxes}')
     return tboxes
 
 def attach_rename_inv(odat, name):
@@ -460,6 +464,7 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
     align = ["center", "center", "center", "center", "center", "right", "center"]
     atc = 'align="center"'
     ftotal = 0.00
+    stotal = 0.00
     invoices = []
     packages = []
     new_invoices = []
@@ -471,6 +476,9 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
     intable = ''
     sdatago = []
     odatago = []
+    nsums = 0
+    nords = 0
+
     for ix, sdat in enumerate(sdata):
         if sboxes[ix] == 'on':
             sdatago.append(sdat)
@@ -482,6 +490,8 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
         intable = f'<table><tr><td {atc}><b>Summary Invoice #</b></td><td {atc}><b>Date Sent</b></td><td {atc}><b>Orig Amount</b></td><td {atc}><b>Remaining Amount</b></td></tr>'
 
         for sdat in sdatago:
+            stotal = stotal + float(sdat.Baldue)
+            nsums += 1
             #Summaries are included regardless of wheter using package or invoices
             intable = f'{intable}<tr><td {atc}>{sdat.Si}</td><td {atc}>{sdat.Date}</td><td {atc}>${sdat.Total}</td><td {atc}>${sdat.Baldue}</td></tr>'
             if tboxes[7] == 'on':
@@ -499,6 +509,11 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
 
         intable = f'{intable}</table>'
 
+        stotal_s = "${:,.2f}".format(stotal)
+        intable = f'{intable}<br>Total for above table: {stotal_s}'
+
+
+
 
     if odatago != []:
         if sdatago != []: intable = f'{intable}<br><br>'
@@ -513,6 +528,7 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
             datei = odat.InvoDate
             if datei is None: datei = odat.Date3
 
+            nords += 1
             ftotal = ftotal + float(odat.InvoTotal)
             duedate = datei + datetime.timedelta(30)
             odr = odat.Label
@@ -540,11 +556,14 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
                         new_packages.append(attach_rename_pack(odat, packname))
         intable = f'{intable}</table>'
 
+        ftotal_s = "${:,.2f}".format(ftotal)
+        intable = f'{intable}<br>Total for above table: {ftotal_s}<br>'
+
     if make_wb: wbfile = make_workbook(customer, ydata, tboxes, ftotal)
 
     num_invoices = len(ydata)
 
-    return intable, ftotal, invoices, packages, new_invoices, new_packages, wbfile, num_invoices
+    return intable, nsums, stotal, nords, ftotal, invoices, packages, new_invoices, new_packages, wbfile, num_invoices
 
 def final_update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, email_update):
     cdata = companydata()
@@ -653,7 +672,10 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
     else: make_wb = 0
     newwb = None
 
-    table_in, ftotal, invoices, packages, new_invoices, new_packages, newwb, ndue = get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, this_shipper)
+    table_in, nsums, stotal, nords, ototal, invoices, packages, new_invoices, new_packages, newwb, ndue = get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, this_shipper)
+
+    ftotal = stotal + ototal
+    ftotal_s = "${:,.2f}".format(ftotal)
 
     # Tone specific items:
     tone = tboxes[27]
@@ -663,10 +685,18 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         ebody = f'Hi {salutation},<br><br>'
         if ndue == 1:
             ebody = f'{ebody} Here is a statement of jobs completed that currently show a balance due.'
+            if nsums == 0:
+                ebody = f'{ebody} The total of amount shown is {ftotal_s} as listed in the following table:'
+            else:
+                ebody = f'{ebody} The total of amount shown is {ftotal_s}as listed in the following table:'
         else:
-            ebody = f'{ebody} Here is a statement of jobs completed that currently show a balance due.'
+            ebody = f'{ebody} Here is a statement of jobs completed that currently have a balance due.'
+            if nsums == 0 or nords == 0:
+                ebody = f'{ebody} The total of amounts shown is {ftotal_s} as listed in the following table:'
+            else:
+                ebody = f'{ebody} The total of amounts shown is {ftotal_s} as listed in the following tables:'
         ebody = f'{ebody}<br><br>{table_in}'
-        ebody = f'{ebody}<br>Please do not hesitate to call if there are any questions. {closing}'
+        ebody = f'{ebody}<br><br>Please do not hesitate to call if there are any questions. {closing}'
 
         #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
         ebody = ebody.replace('<br><br>', '<br><br>\n\n')
@@ -680,7 +710,7 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         else:
             ebody = f'{ebody} Please accept the attached invoice packages for payment.  A summary of the attached is shown below:'
         ebody = f'{ebody}<br><br>{table_in}'
-        ebody = f'{ebody}<br>Please do not hesitate to call if there are any questions. {closing}'
+        ebody = f'{ebody}<br><br>Please do not hesitate to call if there are any questions. {closing}'
 
         #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
         ebody = ebody.replace('<br><br>', '<br><br>\n\n')
@@ -689,12 +719,19 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         etitle = 'Friendly Reminder:  Invoice Payments Due'
         closing = f'  Thank you for your cooperation.<br><br>Kind Regards,<br>Accounts Receivables Team<br>{company_info}'
         ebody = f'Hi {salutation},<br><br>'
+
         if ndue == 1:
             ebody = f'{ebody} I hope this message finds you well. We appreciate your business and would like to remind you the invoice shown below has become due:'
         else:
-            ebody = f'{ebody} I hope this message finds you well. We appreciate your business and would like to remind you the invoices shown below have become due:'
+            if nsums == 0 or nords == 0:
+                ebody = f'{ebody} I hope this message finds you well. We appreciate your business and would like to remind you the invoices on the table shown below have become due:'
+            else:
+                ebody = f'{ebody} I hope this message finds you well. We appreciate your business and would like to remind you the invoices on the tables shown below have become due:'
+
+
         ebody = f'{ebody}<br><br>{table_in}'
-        ebody = f'{ebody}<br>Please make the necessary arrangements to ensure timely payment. If you have already processed the payment, we sincerely thank you for your prompt attention to this matter.'
+        if nsums !=0 and nords !=0: ebody = f'{ebody}Total for both tables: {ftotal_s}'
+        ebody = f'{ebody}<br><br>Please make the necessary arrangements to ensure timely payment. If you have already processed the payment, we sincerely thank you for your prompt attention to this matter.'
         ebody = f'{ebody}<br><br>If there are any concerns or if you require any additional information, feel free to reach out to us. We value our partnership and are here to assist you.. {closing}'
 
         #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
@@ -704,9 +741,13 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         etitle = f'Open Balance Report for {this_shipper} as of {today}'
         closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Receivables Team<br>{company_info}'
         ebody = f'Hello {salutation},<br><br>'
-        ebody = f'{ebody} We are showing a total balance due of ${d2s(ftotal)} as listed in the following table:'
+        if nsums == 0 or nords == 0:
+            ebody = f'{ebody} We are showing a total balance due of {ftotal_s} as listed in the following table:'
+        else:
+            ebody = f'{ebody} We are showing a total balance due of {ftotal_s} as listed in the following tables:'
+
         ebody = f'{ebody}<br><br>{table_in}'
-        ebody = f'{ebody}<br>Please review this information and let us know when we can expect payment, or if you have sent payment already please indicate what has been paid so that we may review on our side. {closing}'
+        ebody = f'{ebody}<br><br>Please review this information and let us know when we can expect payment, or if you have sent payment already please indicate what has been paid so that we may review on our side. {closing}'
         #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
         ebody = ebody.replace('<br><br>', '<br><br>\n\n')
 
@@ -714,9 +755,13 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         etitle = f'Open Balance Report - Overdue Notice - Urgent Attention Required'
         closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Receivables Team<br>{company_info}'
         ebody = f'Dear {salutation},<br><br>'
-        ebody = f'{ebody} We are showing a total balance due of ${d2s(ftotal)} as listed in the following table:'
+        if nsums == 0 or nords == 0:
+            ebody = f'{ebody} We are showing a total balance due of {ftotal_s} as listed in the following table:'
+        else:
+            ebody = f'{ebody} We are showing a total balance due of {ftotal_s} as listed in the following tables:'
+
         ebody = f'{ebody}<br><br>{table_in}'
-        ebody = f'{ebody}<br>We have communicated about this matter previously, but have not yet received a payment.  Please review this information and let us know when we may expect resoluton of this matter.'
+        ebody = f'{ebody}<br><br>We have communicated about this matter previously, but have not yet received a payment.  Please review this information and let us know when we may expect resolution of this matter.'
         ebody = f'{ebody}<br><br>If there are reasons for the delay please contact us immediately. {closing}'
         #For readability on preview put line breaks whereever there is a <br> then take them out before sending email...
         ebody = ebody.replace('<br><br>', '<br><br>\n\n')
@@ -725,12 +770,14 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         if ndue == 1:
             etitle = f'Outstanding Invoice - Urgent Attention Required'
             invtense = 'invoice remains'
-            phrase2 = 'This is'
+            phrase1 = 'invoice'
+            phrase2 = 'is'
             phrase3 = 'date'
         else:
             etitle = f'Outstanding Invoices - Urgent Attention Required'
             invtense = 'invoices remain'
-            phrase2 = 'These are all'
+            phrase1 = 'invoices'
+            phrase2 = 'are'
             phrase3 = 'dates'
 
         closing = f'  Thank you for your prompt attention to this matter.<br><br>Sincerely,<br>Accounts Receivables Team<br>{company_info}'
@@ -738,10 +785,19 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
         ebody = f'Dear {salutation},<br><br>'
         ebody = f'{ebody} I trust this note finds you well.  We appreciate your business and the opportunity to serve your needs.  \
                  However, it has come to our attention that the following {invtense} unpaid, despite our previous communications.'
+
+
+
         ebody = f'{ebody}<br><br>{table_in}'
-        ebody = f'{ebody}<br>{phrase2} well past the due {phrase3}, and the outstanding amount of ${d2s(ftotal)} is causing a significant impact on our cash flow.  We understand\
-        that unforeseen circumstances may arise, but we kindly request your immediate attention to this matter.'
-        ebody = f'{ebody}<br><br>Previous attempts to collect this balance have failed.  We urge you to address this matter promply and sumit the payment by {today + datetime.timedelta(12)}.'
+
+        if nsums == 0 or nords == 0:
+            ebody = f'{ebody}<br><br>The {phrase1} listed on the above table {phrase2} well past the due {phrase3}, and the outstanding amount of {ftotal_s} is causing a significant impact on our cash flow.  We understand\
+            that unforeseen circumstances may arise, but we kindly request your immediate attention to this matter.'
+        else:
+            ebody = f'{ebody}<br><br>The {phrase1} listed on the above tables {phrase2} well past the associated due {phrase3}, and the outstanding amount of {ftotal_s} is causing a significant impact on our cash flow.  We understand\
+            that unforeseen circumstances may arise, but we kindly request your immediate attention to this matter.'
+
+        ebody = f'{ebody}<br><br>Previous attempts to collect this balance have failed.  We urge you to address this matter promptly and submit the payment by {today + datetime.timedelta(12)}.'
         ebody = f'{ebody}<br><br>If payment is not received by this specified deadline, we may have no alternative but to escalate this matter for collection.  This action could result in\
                  additional fees, damage to your credit rating, and potential legal proceedings.'
         ebody = f'{ebody}<br><br>We value our business relationship and would prefer to resolve this matter amicably.  Should you encounter any challenges or require assistance, please contact our accounts team as soon as possible. {closing}'
@@ -942,15 +998,23 @@ def isoAR():
             htmltext = os.environ[uhtml]
         except:
             htmltext = ''
-        #print(f'This is a POST with iter {iter} and last mid {oldmid}')
 
+        lookbacktime = request.values.get('lookbacktime')
+        if lookbacktime is None or lookbacktime == 'One Year':
+            lookbacktime = 'One Year'
+            lookback = 364
+        elif lookbacktime == 'Two Years':
+            lookback = 728
+        elif lookbacktime == 'Three Years':
+            lookback = 1092
+        print(f'Lookbacktime: {lookbacktime}')
 
 
         #print(f'Values are {exitnow} {analysis} {emailgo} {exitnow}')
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+            return 'exitnow', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
         elif redirect is not None:
             this_shipper = request.values.get('this_shipper')
@@ -967,12 +1031,6 @@ def isoAR():
 
             #print(f'The shipper of interest is {this_shipper}')
             task = 'analysis'
-
-        elif payments is not None or active_task == 'payments':
-            this_shipper = request.values.get('optradio')
-            task = 'payments'
-
-
 
 
         # Not exiting after a Post
@@ -991,26 +1049,36 @@ def isoAR():
         username = session['username'].capitalize()
         this_shipper = None
         task = 'artable review'
+        lookback = 364
+        lookbacktime = 'One Year'
 
-    lb360 = today - datetime.timedelta(360)
-    arorders = Orders.query.filter( ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==6) |(Orders.Istat==7))) & (Orders.Date3>lb360)).order_by(Orders.Date3).all()
+    lb_date = today - datetime.timedelta(lookback)
+    arorders = Orders.query.filter( ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==6) |(Orders.Istat==7))) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
     arlist = get_sorted_cust(arorders)
     arbycust = get_open_sort_totals(arlist)
     if this_shipper is None:
         this_shipper = arlist[0]
 
-    odata, sdata, arsent = get_open_for_cust(this_shipper)
+    odata, sdata, arsent = get_open_for_cust(this_shipper, lb_date)
 
     boxes = [0] * len(odata)
     sboxes = [0] * len(sdata)
 
     if task == 'analysis':
         dat30 = today - datetime.timedelta(30)
-        if tboxes[20] == 'on':
+
+        if tboxes[19] == 'on':   #If select All is 'On' is supercedes select Over 30 days
             for ix, odat in enumerate(odata):
-                if odat.Date3 < dat30: boxes[ix] = 'on'
+                boxes[ix] = 'on'
             for ix, sdat in enumerate(sdata):
-                if sdat.Date < dat30: sboxes[ix] = 'on'
+                sboxes[ix] = 'on'
+            tboxes[20] = 'off'
+        elif tboxes[20] == 'on':
+            for ix, odat in enumerate(odata):
+                if odat.InvoDate <= dat30: boxes[ix] = 'on'
+            for ix, sdat in enumerate(sdata):
+                print(f'For {sdat.Si} detecting if {sdat.Date} is less than {dat30}')
+                if sdat.Date <= dat30: sboxes[ix] = 'on'
         else:
             for ix, odat in enumerate(odata):
                 boxes[ix] = request.values.get(f'box{ix}')
@@ -1071,4 +1139,4 @@ def isoAR():
     #print(f'invoname:{invoname}, packname"{packname}')
     #print(f'emaildata is {emaildata}')
     #print(f'rview is {rview}')
-    return 'keepgoing', arbycust, arsent, this_shipper, odata, sdata, task, emaildata, boxes, sboxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview
+    return 'keepgoing', arbycust, arsent, this_shipper, odata, sdata, task, emaildata, boxes, sboxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview, lookbacktime

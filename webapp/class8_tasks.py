@@ -102,6 +102,8 @@ def Order_Addresses_Update(sid):
             if odat.Date is None: odat.Date = d1
             if odat.Date2 is None: odat.Date2 = d2
         db.session.commit()
+
+
 def address_resolver(json):
     final = {}
     if json['results']:
@@ -749,7 +751,7 @@ def next_business_day(date, jx):
             kx += 1
             if kx == abs(jx): return next_day
 
-def create_cal_data(tfilters, dlist):
+def create_cal_data(tfilters, dlist, username, resetmod):
     # Define the dates shown for the selection based on current date
     todaynow = datetime.datetime.now()
     todaynow = todaynow.date()
@@ -767,9 +769,13 @@ def create_cal_data(tfilters, dlist):
 
     lbdate = datetime.datetime.now() - timedelta(20)
     lbdate = lbdate.date()
+    userlist = []
     #podata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date3 > lbdate)).all()
+    ##########################################################
+
     podata = Orders.query.filter(Orders.Date3 > lbdate).all()
 
+    ##########################################################
     pdio, pdip, pdeo, pdep = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [],
                                                                                                             [], [], []]
     pdic, pdec, pmon = [[], [], [], [], [], []], [[], [], [], [], [], []],[[], [], [], [], [], []]
@@ -779,6 +785,14 @@ def create_cal_data(tfilters, dlist):
         istat = podat.Istat
         container = podat.Container
         shipper = podat.Shipper
+        user = podat.UserMod
+        if user != username:
+            if user not in userlist:
+                userlist.append(user)
+            if resetmod is not None:
+                podat.UserMod = username
+                db.session.commit()
+
         if len(shipper) > 25: shipper = shipper[0:25]
         ht = podat.HaulType
         jo = podat.Jo
@@ -1030,7 +1044,9 @@ def create_cal_data(tfilters, dlist):
                     pdip[0][-1][3] = 'orange-text'
                     pdip[0][-1][4] = ['Not on Viewed Schedule']
 
-    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec, pmon
+    if userlist == []: userchange = 0
+    else: userchange = 1
+    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec, pmon, userchange
 
 def initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist):
     pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [
@@ -1129,7 +1145,9 @@ def get_calendar_checks(pdio, pdip, pdeo, pdep):
 
 def update_calendar_form(pdio, pdip, pdeo, pdep):
     # Some changes on the update may require a re-update, like date moves will move the position on the calendar
+    #print(f'***In update_calendar_form***')
     reupdate = 0
+    #Cycle through each day
     for jx in range(1,6):
         for ix, item in enumerate(pdio[jx]):
             jo = item[5]
@@ -1155,7 +1173,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Pcache = 1
                     reupdate = 1
                 db.session.commit()
-                db.session.expire_all()
+                #db.session.expire_all()
 
 
         for ix, item in enumerate(pdip[jx]):
@@ -1183,7 +1201,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdip[jx][ix][13][0] = gout
                     reupdate = 1
                 db.session.commit()
-                db.session.expire_all()
+                #db.session.expire_all()
 
         for ix, item in enumerate(pdeo[jx]):
             jo = item[5]
@@ -1214,7 +1232,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Pcache = 1
                     reupdate = 1
                 db.session.commit()
-                db.session.expire_all()
+                #db.session.expire_all()
 
         for ix, item in enumerate(pdep[jx]):
             jo = item[5]
@@ -1241,7 +1259,6 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdep[jx][ix][13][0] = gout
                     reupdate = 1
                 db.session.commit()
-                db.session.expire_all()
 
     return pdio, pdip, pdeo, pdep, reupdate
 
@@ -1267,9 +1284,10 @@ def Table_maker(genre):
     returnhit = None
     resethit = request.values.get('Reset')
     invoicehit = request.values.get('InvoiceSet')
+    resetmod = request.values.get('ResetMod')
 
 
-    if request.method == 'POST' and resethit is None:
+    if request.method == 'POST' and resethit is None and resetmod is None:
 
         # See if a task is active and ongoing
         tasktype = nononestr(request.values.get('tasktype'))
@@ -1283,9 +1301,25 @@ def Table_maker(genre):
                     #print('planner filter set 1', key, tfilters[key])
             dlist = table_filters[0]['Date Filter']
 
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
-            pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+
+            if not userchange:
+                pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
+                if resetmod is None:
+                    err.append(f'User {username} has control of calendar data')
+                else:
+                    err.append(f'User {username} now has control of calendar data')
+            else:
+                reupdate = 0
+                if resetmod is None:
+                    err.append('Another User Has Charge of Calendar Data')
+                    err.append('Hit Reset Calendar to Take Ownership of Modifications')
+                else:
+                    err.append(f'User {username} now has control of calendar data')
+
+            if reupdate:
+                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+
             if task_iter == 0:
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
                 #print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
@@ -1395,13 +1429,7 @@ def Table_maker(genre):
 
     #First time thru (not a Post) below#########################################################
     else:
-        #print('Method is NOT POST')
-        # This is a reset so try to flush the session variable and get data from database fresh no cached
-        print(f'Hit the RESET ALL button')
-        db.session.expire_all()
-        db.session.close()
         username = session['username'].capitalize()
-
         genre_tables_on = ['off'] * len(genre_tables)
         genre_tables_on[0] = 'on'
         tables_on = [eval(f"{genre}_genre['table']")]
@@ -1421,9 +1449,23 @@ def Table_maker(genre):
                         'Color Filter': 'Both', 'Viewer': '8x4'}
             # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
             dlist = table_filters[0]['Date Filter']
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
-            pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+            if not userchange:
+                pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
+                if resetmod is None:
+                    err.append(f'User {username} has control of calendar data')
+                else:
+                    err.append(f'User {username} now has control of calendar data')
+            else:
+                reupdate = 0
+                if resetmod is None:
+                    err.append('Another User Has Charge of Calendar Data')
+                    err.append('Hit Reset Calendar to Take Ownership of Modifications')
+                else:
+                    err.append(f'User {username} now has control of calendar data')
+
+
+            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
             pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
             jolist = []
 
@@ -1442,7 +1484,7 @@ def Table_maker(genre):
     if genre == 'Planning': checked_data = cal_to_orders(jolist, checked_data)
 
     # Remove the checks during reset of tables
-    if resethit is not None:
+    if resethit is not None or resetmod is not None:
         for check in checked_data:  check[2] = []
         pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [],[]], [[], [], [], [], [], []]
 
@@ -1459,13 +1501,27 @@ def Table_maker(genre):
             else:
                 #print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
                 jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
+
             if genre == 'Planning':
                 # If the tesk is completed and we never left the calendar then keep the checks we used
                 #Reset the calendar
                 dlist = table_filters[0]['Date Filter']
-                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
-                pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon = create_cal_data(tfilters, dlist)
+                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+                if not userchange:
+                    pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
+                    if resetmod is None:
+                        err.append(f'User {username} has control of calendar data')
+                    else:
+                        err.append(f'User {username} now has control of calendar data')
+                else:
+                    reupdate = 0
+                    if resetmod is None:
+                        err.append('Another User Has Charge of Calendar Data')
+                        err.append('Hit Reset Calendar to Take Ownership of Modifications')
+                    else:
+                        err.append(f'User {username} now has control of calendar data')
+
+                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
 
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
@@ -1646,7 +1702,9 @@ def Table_maker(genre):
     if leftcheck == 'Top-Bot': leftsize = 12
 
     #print(f'Leftsize on exit is {leftsize}')
+    print(err)
     err = erud(err)
+    print(err)
 
     holdvec[80] = request.values.get('showcolorstable')
 
@@ -2596,7 +2654,6 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         plen = len(pdata)
                     else:
                         plen = 0
-                    print(refid,sinow,olen,plen)
 
                     if olen == 1 or plen == 1:
                         odat.Istat = 3

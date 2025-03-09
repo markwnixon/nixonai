@@ -6,6 +6,7 @@
 <div class="row">
 
 {% set etype = 'AR' %}
+{% set time_options = ['One Year', 'Two Years', 'Three Years'] %}
 
 {% if task == 'analysis'%}
     {% set linkpath = emaildata[6] %}
@@ -35,16 +36,20 @@
                                 <div class = "card-header">
                                     List of Outstanding Invoices for {{ this_shipper }} &nbsp; &nbsp;
                                     <div class="custom-control custom-checkbox custom-control-inline">
+                                      <input type="checkbox" class="custom-control-input" id="box19" {% if tboxes[19]=='on' %} checked {% endif %} name="tbox19" onchange="this.form.submit()">
+                                      <label class="custom-control-label" for="box19">Select All</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox custom-control-inline">
                                       <input type="checkbox" class="custom-control-input" id="box20" {% if tboxes[20]=='on' %} checked {% endif %} name="tbox20" onchange="this.form.submit()">
                                       <label class="custom-control-label" for="box20">Select Over 30 Days</label>
                                     </div>
                                     <div class="custom-control custom-checkbox custom-control-inline">
                                       <input type="checkbox" class="custom-control-input" id="box21" {% if tboxes[21]=='on' %} checked {% endif %} name="tbox21" onchange="this.form.submit()">
-                                      <label class="custom-control-label" for="box21">Show Email Composition</label>
+                                      <label class="custom-control-label" for="box21">Show Email Comp</label>
                                     </div>
                                     <div class="custom-control custom-checkbox custom-control-inline">
                                       <input type="checkbox" class="custom-control-input" id="box22" {% if tboxes[22]=='on' %} checked {% endif %} name="tbox22" onchange="this.form.submit()">
-                                      <label class="custom-control-label" for="box22">Show Past Emails Associated</label>
+                                      <label class="custom-control-label" for="box22">Show Past Emails</label>
                                     </div>
                                 </div>
 
@@ -240,6 +245,12 @@
                               <option {% if etone == 'Standard Request' %} selected {% endif %} value='Standard Request'>Standard Request</option>
                               <option {% if etone == 'Strong Request' %} selected {% endif %} value= 'Strong Request'>Strong Request</option>
                               <option {% if etone == 'Strongest Request'%} selected {% endif %} value= 'Strongest Request'>Strongest Request</option>
+                        </select>
+                                Filter back:
+                        <select class="mdb-select md-form small" id="lookbacktime" name="lookbacktime" onchange="this.form.submit()">
+                                {% for option in time_options %}
+                                    <option value="{{ option }}" {% if option == lookbacktime %}selected{% endif %} >{{ option }}</option>
+                                {% endfor %}
                         </select>
 
             <br>

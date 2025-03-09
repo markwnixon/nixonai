@@ -236,7 +236,8 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ['Location3', 'hidden', 'Dropblock3'],
                                 ['Emailjp', 'hidden', 'Emailjp'],
                                 ['Emailoa', 'hidden', 'Emailoa'],
-                                ['Emailap', 'hidden', 'Emailap']
+                                ['Emailap', 'hidden', 'Emailap'],
+                                ['UserMod', 'hidden', 'UserMod']
                                 ],
                 'defaults': [
                                 ['Hstat', -1],

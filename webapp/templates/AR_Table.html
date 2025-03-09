@@ -1,3 +1,4 @@
+{% set time_options = ['One Year', 'Two Years', 'Three Years'] %}
 <div class="col-sm-6" align="center">
 <div class="row">
 <div class="col-sm-12" align="center">
@@ -6,6 +7,13 @@
         <br>
         <button type="submit" class="btn btn-green btn-sm" name="analysis">&nbsp AR Analysis &nbsp</button>
         <button type="submit" class="btn btn-blue btn-sm" name="exitAR">Exit AR Work</button>
+        Filter back:
+        <select id="lookbacktime" name="lookbacktime" onchange="this.form.submit()">
+                {% for option in time_options %}
+                    <option value="{{ option }}" {% if option == lookbacktime %}selected{% endif %} >{{ option }}</option>
+                {% endfor %}
+        </select>
+
     </div>
  </div>
 </div>

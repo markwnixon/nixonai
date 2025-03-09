@@ -541,10 +541,10 @@ def QuoteMaker():
 @login_required
 def ARMaker():
     from iso_AR import isoAR
-    status, ardata, arsent, this_shipper, odata, sdata, task, emaildata, boxes, sboxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview= isoAR()
+    status, ardata, arsent, this_shipper, odata, sdata, task, emaildata, boxes, sboxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview, lookbacktime= isoAR()
     if status == 'exitnow': return redirect(url_for('main.Class8Main',genre='Trucking'))
     else:
-        return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, arsent=arsent, this_shipper=this_shipper, odata=odata, sdata=sdata, task=task, emaildata=emaildata, boxes=boxes, sboxes=sboxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails_cust=ar_emails_cust, rview=rview)
+        return render_template('ARmaker.html', cmpdata=cmpdata, scac=scac, ardata=ardata, arsent=arsent, this_shipper=this_shipper, odata=odata, sdata=sdata, task=task, emaildata=emaildata, boxes=boxes, sboxes=sboxes, tboxes=tboxes, invoname=invoname, packname=packname, pdat=pdat, emailsend=emailsend, ar_emails_cust=ar_emails_cust, rview=rview, lookbacktime=lookbacktime)
 
 @main.route('/ARPayments', methods=['GET', 'POST'])
 @login_required
