@@ -1000,9 +1000,9 @@ def writechecks(sids,pmeth):
             c.drawString(50, m2+offup-14, cdata[5])
             c.drawString(50, m2+offup-28, cdata[6])
             memoline2 = memoline2 + 1
-            c.drawString(ltm+70, memoline2, payee)
-            c.drawString(ltm+70, memoline2-14, addr1)
-            c.drawString(ltm+70, memoline2-28, addr2)
+            c.drawString(ltm+50, memoline2, payee)
+            c.drawString(ltm+50, memoline2-14, addr1)
+            c.drawString(ltm+50, memoline2-28, addr2)
             zip = getzip(addr2)
             #print('myzipcode is',zip)
             if zip != 0:

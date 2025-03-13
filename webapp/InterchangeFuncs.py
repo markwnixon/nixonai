@@ -419,6 +419,8 @@ def Order_Container_Update(oder, err):
         else:
             err = ['Cannot create or update an export without a booking number']
 
+
+
     if nbk == 1:
         if hasinput(con):
             idata = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date > lbdate)).all()

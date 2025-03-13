@@ -136,24 +136,27 @@ def hoursbydriver(drivers, fdata):
     return ddata
 
 def Street_Turn_task(err, holdvec, iter):
-    print(f'Running Street Turn task')
+    #print(f'Running Street Turn task')
     holdvec = ['']*30
     holdvec[23] = 0
 
     if iter == 0:
-        print(f'Running Street Turn Task Info Colleciton with iter {iter}')
+        print(f'Running Street Turn Task Info Colleciton with iter {iter} to place the window')
         completed = False
 
     elif iter > 0:
-        print(f'Running Street Turn Task with iter {iter}')
+        #print(f'Running Street Turn Task with iter {iter}')
         completed = True
         container = request.values.get('container')
         booking = request.values.get('booking')
         dateturn = request.values.get('dateturn')
+        #print(f'Creating street turn for {container} to {booking} on {dateturn}')
+        if container is not None: container=container.strip()
+        if booking is not None: booking=booking.strip()
 
         tdat = StreetTurns.query.filter(StreetTurns.Container==container).first()
         if tdat is None:
-            print(f'Creating street turn for {container} to {booking} on {dateturn}')
+            #print(f'Adding street turn for {container} to {booking} on {dateturn}')
             input = StreetTurns(Container=container, BookingTo=booking, Date=dateturn, Status=0)
             db.session.add(input)
             db.session.commit()
@@ -161,7 +164,7 @@ def Street_Turn_task(err, holdvec, iter):
 
             sdat = StreetTurns.query.filter( (StreetTurns.Container == container) & (StreetTurns.Status == 0) ).first()
             if sdat is not None:
-                print(f'Manipulating street turn for {container} to {booking} on {dateturn} to *****')
+                #print(f'Manipulating street turn for {container} to {booking} on {dateturn} to *****')
                 sdat.Status = 1
                 con = sdat.Container
                 bk = sdat.BookingTo
