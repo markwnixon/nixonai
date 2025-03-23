@@ -785,264 +785,269 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         istat = podat.Istat
         container = podat.Container
         shipper = podat.Shipper
-        user = podat.UserMod
-        if user != username:
-            if user not in userlist:
-                userlist.append(user)
-            if resetmod is not None:
-                podat.UserMod = username
-                db.session.commit()
+        order = podat.Order
 
-        if len(shipper) > 25: shipper = shipper[0:25]
-        ht = podat.HaulType
-        jo = podat.Jo
-        contype = podat.Type
-        location = podat.Dropblock2
-        release = podat.Booking
-        in_booking = podat.BOL
-        description = podat.Description
-        address = podat.Dropblock2
-        ship = f'{podat.Ship} {podat.Voyage}'
-        notes = podat.Location
-        if notes is None: notes = ''
-        comment = []
-        if hstat > 1: completed = 1
-        else: completed = 0
-        # Once pulled, Need to place the container by delivery date if not delivered yet, or planned gate in if delivered
-        if hstat == 1:
-            proof = podat.Proof
-            pcache = podat.Pcache
-            if proof is not None or pcache == 1: completed = 1
-
-        on_alldates = 0
-        on_calendar = 0
-
-        gateout = podat.Date
-        delivery = podat.Date3
-        gatein = podat.Date2
-        arrives = podat.Date6
-        dueback = podat.Date7
-        del_s = short_date(delivery)
-        arr_s = short_date(arrives)
-        due_s = short_date(dueback)
-        pulled = short_date(gateout)
-        ret_s = short_date(gatein)
-
-        if 'Import' in podat.HaulType:
-            timport = 1
+        if shipper == 'Global Business Link' and 'outside' not in order:
+            print(f'Skipping Globa Drop-Hook Runs for Calendar')
         else:
-            timport = 0
-        if 'Export' in podat.HaulType:
-            texport = 1
-        else:
-            texport = 0
+            user = podat.UserMod
+            if user != username:
+                if user not in userlist:
+                    userlist.append(user)
+                if resetmod is not None:
+                    podat.UserMod = username
+                    db.session.commit()
 
-        if hstat >= 2:
-            #Getting invoices for calendar date regardless of import or export
-            colorline = 'bg-success text-white'
-
-            for ix in range(5):
-                if gatein == caldays[ix]:
-                    if istat > 0:
-                        amount = float(podat.InvoTotal)
-                        pmon[ix + 1].append([jo, container, d2s(amount), colorline, 0.00, shipper])
-                        sum = 0
-                        for mon in pmon[ix + 1]:
-                            amt = float(mon[2])
-                            sum += amt
-                        pmon[ix + 1][0][4] = d2s(sum)
-
-        if timport:
-            avail = podat.Date4
-            avail_s = short_date(avail)
-            lfd = podat.Date5
-            lfd_s = short_date(lfd)
-            datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback]
-
-            if hstat >= 1:
-                bc1 = f'{container} GO:{pulled}'
-                bc2 = f'{container} GI:{ret_s}'
-                custline = f'{shipper}'
-
-                for ix in range(5):
-                    if gateout == caldays[ix]:
-                        pdic[ix + 1].append([bc1,custline, 'blue-text'])
-                    if gatein == caldays[ix]:
-                        #Need hast check because gatein can be planned
-                        if hstat > 1:
-                            if istat > 0: colorline = 'green-text'
-                            else: colorline = 'purple-text'
-                            pdic[ix + 1].append([bc2, custline, colorline])
-
+            if len(shipper) > 25: shipper = shipper[0:25]
+            ht = podat.HaulType
+            jo = podat.Jo
+            contype = podat.Type
+            location = podat.Dropblock2
+            release = podat.Booking
+            in_booking = podat.BOL
+            description = podat.Description
+            address = podat.Dropblock2
+            ship = f'{podat.Ship} {podat.Voyage}'
+            notes = podat.Location
+            if notes is None: notes = ''
+            comment = []
+            if hstat > 1: completed = 1
+            else: completed = 0
+            # Once pulled, Need to place the container by delivery date if not delivered yet, or planned gate in if delivered
             if hstat == 1:
-                if not isinstance(dueback, datetime.datetime): dueback = due_back(gateout)
-                due_s = short_date(dueback)
+                proof = podat.Proof
+                pcache = podat.Pcache
+                if pcache is None: pcache = 0
+                if pcache > 0 or proof is not None: completed = 1
 
-                firstline = f'{container}'
-                custline = f'{shipper}'
-                dateline = f'GO:{pulled} DV:{del_s} DB:{due_s}'
-                colorline = 'blue-text'
-                comment = []
-                pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype])
-                on_alldates = 1
+            on_alldates = 0
+            on_calendar = 0
 
-                for ix in range(5):
-                    if completed:
-                        if gatein == caldays[ix]:
-                            if gatein > dueback:
-                                colorline = 'red-text'
-                                comment.append(f'Past due back {dueback}')
-                            elif gatein == dueback:
-                                colorline = 'text-warning'
-                                comment.append('Due back today')
-                            else:
-                                colorline = 'purple-text'
-                            pdio[ix + 1].append(
-                                [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
-                                 in_booking, description, ship, notes, datecluster])
-                            on_calendar = 1
-                    else:
-                        if delivery == caldays[ix]:
-                            if dueback < delivery:
-                                colorline = 'red-text'
-                                comment = ['****']
-                                comment.append(f'Past due back {dueback}')
-                            elif dueback == delivery:
-                                colorline = 'text-warning'
-                                comment = ['****']
-                                comment.append('Due back today')
-                            else:
-                                colorline = 'blue-text'
+            gateout = podat.Date
+            delivery = podat.Date3
+            gatein = podat.Date2
+            arrives = podat.Date6
+            dueback = podat.Date7
+            del_s = short_date(delivery)
+            arr_s = short_date(arrives)
+            due_s = short_date(dueback)
+            pulled = short_date(gateout)
+            ret_s = short_date(gatein)
 
-                            pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
-                            on_calendar = 1
+            if 'Import' in podat.HaulType:
+                timport = 1
+            else:
+                timport = 0
+            if 'Export' in podat.HaulType:
+                texport = 1
+            else:
+                texport = 0
 
-            elif hstat < 1:
-                firstline = f'{container}'
-                custline = f'{shipper}'
-                dateline = f'AP:{avail_s} DV:{del_s} LFD:{lfd_s}'
-                colorline = 'black-text'
-                comment = []
-                pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype])
-                on_alldates = 1
-                for ix in range(5):
-                    if delivery == caldays[ix]:
-                        if lfd is not None:
-                            if lfd < delivery:
-                                colorline = 'red-text'
-                                comment = ['****']
-                                comment.append('Past LFD for pull')
-                            elif lfd == delivery:
-                                colorline = 'orange-text'
-                                comment = ['****']
-                                comment.append('Today LFD for pull')
-                            else:
-                                colorline = 'black-text'
-                        else:
-                            colorline = 'black-text'
-                        pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
-                        on_calendar = 1
-
-
-        if texport:
-            erd = podat.Date4
-            erd_s = short_date(erd)
-            cut = podat.Date5
-            cut_s = short_date(cut)
-            datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback]
-
-            if hstat >= 1:
-
-                bc1 = f'{container} GO:{pulled}'
-                bc2 = f'{container} GI:{ret_s}'
-                custline = f'{shipper}'
+            if hstat >= 2:
+                #Getting invoices for calendar date regardless of import or export
+                colorline = 'bg-success text-white'
 
                 for ix in range(5):
-                    if gateout == caldays[ix]:
-                        pdec[ix + 1].append([bc1,custline, 'blue-text'])
                     if gatein == caldays[ix]:
-                        if hstat > 1:
-                            if istat > 0: colorline = 'green-text'
-                            else: colorline = 'purple-text'
-                            pdec[ix + 1].append([bc2, custline, colorline])
-
-            if hstat == 1:
-                firstline = f'{container}'
-                custline = f'{shipper}'
-                addrline = f'{address}'
-                dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
-                shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
-                if completed: colorline = 'purple-text'
-                else: colorline = 'blue-text'
-
-                comment = []
-                if erd is not None:
-                    if gatein < erd:
-                        colorline = 'orange-text'
-                        comment.append(f'No return before {erd_s}')
-                if cut is not None:
-                    if gatein > cut:
-                        colorline = 'orange-text'
-                        comment.append(f'Ret post cut {cut_s}')
-                if not hasinput(in_booking):
-                    in_booking = release
-                if in_booking != release:
-                    colorline = 'orange-text'
-                    comment.append(f'Ret booking change')
-                if comment != []: comment.insert(0, '****')
-
-                pdeo[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
-                on_alldates = 1
-
-                for ix in range(5):
-                    if completed:
-                        if gatein == caldays[ix]:
-                            pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
-                            on_calendar = 1
-                    else:
-                        if delivery == caldays[ix]:
-                            pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
-                            on_calendar = 1
-
-            elif hstat < 1:
-                firstline = f'{podat.Booking}'
-                custline = f'{shipper}'
-                addrline = f'{address}'
-                colorline = 'black-text'
-                dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
-                shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
-                if erd is not None:
-                    if delivery < erd:
-                        colorline = 'orange-text'
-                        comment = ['****']
-                        comment.append(f'No return before {erd_s}')
-                pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
-                on_alldates = 1
-                for ix in range(5):
-                    if delivery == caldays[ix]:
-                        pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
-                        on_calendar = 1
-
-        if on_alldates and not on_calendar:
-            if texport:
-                if hstat == 1:
-                    #print(f'Job {pdeo[0][-1]} not on the current calendar')
-                    pdeo[0][-1][3] = 'orange-text'
-                    pdeo[0][-1][4] = ['Not on Viewed Schedule']
-                else:
-                    #print(f'Job {pdep[0][-1]} not on the current calendar')
-                    pdep[0][-1][3] = 'orange-text'
-                    pdep[0][-1][4] = ['Not on Viewed Schedule']
+                        if istat > 0:
+                            amount = float(podat.InvoTotal)
+                            pmon[ix + 1].append([jo, container, d2s(amount), colorline, 0.00, shipper])
+                            sum = 0
+                            for mon in pmon[ix + 1]:
+                                amt = float(mon[2])
+                                sum += amt
+                            pmon[ix + 1][0][4] = d2s(sum)
 
             if timport:
+                avail = podat.Date4
+                avail_s = short_date(avail)
+                lfd = podat.Date5
+                lfd_s = short_date(lfd)
+                datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback]
+
+                if hstat >= 1:
+                    bc1 = f'{container} GO:{pulled}'
+                    bc2 = f'{container} GI:{ret_s}'
+                    custline = f'{shipper}'
+
+                    for ix in range(5):
+                        if gateout == caldays[ix]:
+                            pdic[ix + 1].append([bc1,custline, 'blue-text'])
+                        if gatein == caldays[ix]:
+                            #Need hast check because gatein can be planned
+                            if hstat > 1:
+                                #if istat > 0: colorline = 'green-text'
+                                #else: colorline = 'purple-text'
+                                colorline = 'purple-text'
+                                pdic[ix + 1].append([bc2, custline, colorline])
+
                 if hstat == 1:
-                    #print(f'Job {pdio[0][-1]} not on the current calendar')
-                    pdio[0][-1][3] = 'orange-text'
-                    pdio[0][-1][4] = ['Not on Viewed Schedule']
-                else:
-                    #print(f'Job {pdip[0][-1]} not on the current calendar')
-                    pdip[0][-1][3] = 'orange-text'
-                    pdip[0][-1][4] = ['Not on Viewed Schedule']
+                    if not isinstance(dueback, datetime.datetime): dueback = due_back(gateout)
+                    due_s = short_date(dueback)
+
+                    firstline = f'{container}'
+                    custline = f'{shipper}'
+                    dateline = f'GO:{pulled} DV:{del_s} DB:{due_s}'
+                    colorline = 'blue-text'
+                    comment = []
+                    pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype])
+                    on_alldates = 1
+
+                    for ix in range(5):
+                        if completed:
+                            if gatein == caldays[ix]:
+                                colorline = 'purple-text'
+                                if gatein > dueback:
+                                    #colorline = 'red-text'
+                                    comment.append(f'Past due back {dueback}')
+                                elif gatein == dueback:
+                                    #colorline = 'text-warning'
+                                    comment.append('Due back today')
+
+                                pdio[ix + 1].append(
+                                    [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                     in_booking, description, ship, notes, datecluster])
+                                on_calendar = 1
+                        else:
+                            if delivery == caldays[ix]:
+                                colorline = 'blue-text'
+                                if dueback < delivery:
+                                    #colorline = 'red-text'
+                                    comment = ['****']
+                                    comment.append(f'Past due back {dueback}')
+                                elif dueback == delivery:
+                                    #colorline = 'text-warning'
+                                    comment = ['****']
+                                    comment.append('Due back today')
+
+                                pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
+                                on_calendar = 1
+
+                elif hstat < 1:
+                    firstline = f'{container}'
+                    custline = f'{shipper}'
+                    dateline = f'AP:{avail_s} DV:{del_s} LFD:{lfd_s}'
+                    colorline = 'black-text'
+                    comment = []
+                    pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype])
+                    on_alldates = 1
+                    for ix in range(5):
+                        if delivery == caldays[ix]:
+                            if lfd is not None:
+                                if lfd < delivery:
+                                    colorline = 'red-text'
+                                    comment = ['****']
+                                    comment.append('Past LFD for pull')
+                                elif lfd == delivery:
+                                    colorline = 'orange-text'
+                                    comment = ['****']
+                                    comment.append('Today LFD for pull')
+                                else:
+                                    colorline = 'black-text'
+                            else:
+                                colorline = 'black-text'
+                            pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster])
+                            on_calendar = 1
+
+
+            if texport:
+                erd = podat.Date4
+                erd_s = short_date(erd)
+                cut = podat.Date5
+                cut_s = short_date(cut)
+                datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback]
+
+                if hstat >= 1:
+
+                    bc1 = f'{container} GO:{pulled}'
+                    bc2 = f'{container} GI:{ret_s}'
+                    custline = f'{shipper}'
+
+                    for ix in range(5):
+                        if gateout == caldays[ix]:
+                            pdec[ix + 1].append([bc1,custline, 'blue-text'])
+                        if gatein == caldays[ix]:
+                            if hstat > 1:
+                                colorline = 'purple-text'
+                                pdec[ix + 1].append([bc2, custline, colorline])
+
+                if hstat == 1:
+                    colorline = 'blue-text'
+                    comment = []
+                    firstline = f'{container}'
+                    custline = f'{shipper}'
+                    addrline = f'{address}'
+                    dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
+                    shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
+                    if completed:  comment.append(f'Delivery Completed')
+
+                    if erd is not None:
+                        if gatein < erd:
+                            #colorline = 'orange-text'
+                            comment.append(f'No return before {erd_s}')
+                    if cut is not None:
+                        if gatein > cut:
+                            #colorline = 'orange-text'
+                            comment.append(f'Ret post cut {cut_s}')
+                    if not hasinput(in_booking):
+                        in_booking = release
+                    if in_booking != release:
+                        #colorline = 'orange-text'
+                        comment.append(f'Ret booking change')
+                    if comment != []: comment.insert(0, '****')
+
+                    pdeo[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
+                    on_alldates = 1
+
+                    for ix in range(5):
+                        if completed:
+                            if gatein == caldays[ix]:
+                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
+                                on_calendar = 1
+                        else:
+                            if delivery == caldays[ix]:
+                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
+                                on_calendar = 1
+
+                elif hstat < 1:
+                    firstline = f'{podat.Booking}'
+                    custline = f'{shipper}'
+                    addrline = f'{address}'
+                    colorline = 'black-text'
+                    dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
+                    shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
+                    if erd is not None:
+                        if delivery < erd:
+                            #colorline = 'orange-text'
+                            comment = ['****']
+                            comment.append(f'No return before {erd_s}')
+                    pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates])
+                    on_alldates = 1
+                    for ix in range(5):
+                        if delivery == caldays[ix]:
+                            pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates])
+                            on_calendar = 1
+
+            if on_alldates and not on_calendar:
+                if texport:
+                    if hstat == 1:
+                        #print(f'Job {pdeo[0][-1]} not on the current calendar')
+                        pdeo[0][-1][3] = 'blue-text'
+                        pdeo[0][-1][4] = ['Not on Viewed Schedule']
+                    else:
+                        #print(f'Job {pdep[0][-1]} not on the current calendar')
+                        pdep[0][-1][3] = 'black-text'
+                        pdep[0][-1][4] = ['Not on Viewed Schedule']
+
+                if timport:
+                    if hstat == 1:
+                        #print(f'Job {pdio[0][-1]} not on the current calendar')
+                        pdio[0][-1][3] = 'blue-text'
+                        pdio[0][-1][4] = ['Not on Viewed Schedule']
+                    else:
+                        #print(f'Job {pdip[0][-1]} not on the current calendar')
+                        pdip[0][-1][3] = 'black-text'
+                        pdip[0][-1][4] = ['Not on Viewed Schedule']
 
     if userlist == []: userchange = 0
     else: userchange = 1
@@ -3096,6 +3101,13 @@ def BlendGate_task(genre, task_iter, tablesetup, task_focus, checked_data, thist
     return holdvec, entrydata, err, viewport, True
 
 
+def quote_strip(tv):
+    tvitems = tv.split('+')
+    tvnew = tvitems[0]
+    for ei in tvitems[1:]:
+        if 'dd' not in ei and 'rd' not in ei:
+            tvnew = f'{tvnew}+{ei}'
+    return tvnew
 
 
 
@@ -3161,6 +3173,9 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
                 # Check if thisvalue requires a compliment value
                 if thisvalue in ckswaps:
                     thisvalue = swaps[thisvalue]
+                #Special exemption for the Order Quote Builder, take out items that are just for one invoice
+                if col == 'Quote':
+                    thisvalue = quote_strip(thisvalue)
                 if defaults:
                     for thisdef in defaults:
                         if col in thisdef:  thisvalue = thisdef[1]

@@ -5,6 +5,14 @@
 {% set etitle = emaildata[0] %}
 {% set ebody = emaildata[1] %}
 {% set attachname = emaildata[6] %}
+
+{% if '@' not in emailin1 %}
+    {% set emailin1 = 'Invalid Email' %}
+    {% set etype1 = 'text-danger' %}
+{% else %}
+    {% set etype1 = 'text-black' %}
+{% endif %}
+
 {% if holdvec %}
     {% set eprof = holdvec[0] %}
 {% else %}
@@ -40,8 +48,8 @@
 <div class="input-group-text">E-Body:</div>
 <textarea class="form-control" type="text" name="edat1" rows="5">{{ebody | safe}}</textarea>
 
-<div class="input-group-text">Email To1:</div>
-<input class="form-control" type="text" value="{{emailin1}}" name="edat2">
+<div class="input-group-text {{ etype1 }}">Email To1:</div>
+<input class="form-control {{ etype1 }}" type="text" value="{{emailin1}}" name="edat2">
 
 <div class="input-group-text">Email To2:</div>
 <input class="form-control" type="text" value="{{emailin2}}" name="edat3">

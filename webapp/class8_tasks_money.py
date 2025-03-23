@@ -84,7 +84,7 @@ def getservice(myo, service, serviceqty, serviceamt, servicestr):
 
     sdat = Services.query.filter(Services.Code == service).first()
     if sdat is not None:
-        #print(f'Evaluating {service}, {serviceqty}, {serviceamt}, {servicestr}')
+        print(f'Evaluating {service}, {serviceqty}, {serviceamt}, {servicestr}')
         nextservice = sdat.Service
         if str(serviceamt) == 'default':
             each = float(sdat.Price)
@@ -102,7 +102,7 @@ def getservice(myo, service, serviceqty, serviceamt, servicestr):
         descript = 'Nothing'
 
     if nextservice == 'Per Diem':
-        descript = 'Shipline invoiced per diem'
+        descript = 'Ship line invoiced per diem'
     elif nextservice == 'Drv Detention':
         if servicestr == 'default':
             descript = f'Actual Time of Load = {2 + serviceqty} Hours'
@@ -152,7 +152,7 @@ def get_digits_after_character(input_string, character):
 
     return ''.join(digits)
 
-def get_invo_data(qblines, myo):
+def get_invo_data(qblines, myo, err):
     codes = []
     qtys = []
     prices = []
@@ -176,31 +176,51 @@ def get_invo_data(qblines, myo):
                 desc = f'Days of Chassis, {myo.Date} - {myo.Date2}'
 
             if code == 'sf':
-                qty = myo.Date2 - myo.Date
-                qty = qty.days
-                date2 = myo.Date2
-                stodate2 = date2 - timedelta(1)
-                desc = f'Days of Storage, {myo.Date} - {stodate2}'
+                dates = myo.Date + timedelta(1)
+                datef = myo.Date2 - timedelta(1)
+                qty = datef - dates
+                qty = qty.days + 1
+                if qty <= 0:
+                    qty = 0
+                    desc = f'No Storage Charges Based on Gate Dates'
+                else:
+                    desc = f'Days of Storage, {dates} - {datef}'
 
             if code == 'dd':
                 desc = 'Free time 0700-0900, detention 0900-1000'
 
             if code == 'ow':
-                desc = 'Cargo Weight exceeds 45,000 lbs'
+                etype = myo.Type
+                if '40' in etype or '45' in etype:
+                    desc = f'Cargo Weight for {etype} exceeds 44,500 lbs'
+                elif '20' in etype:
+                    desc = f'Cargo Weight for {etype} exceeds 38,000 lbs'
+                else:
+                    desc = 'Cargo is Overweight but no container information'
+
+
+            if code == 'rf':
+                desc = f'Reefer with Genset Used'
+
+            if code == 'rd':
+                desc = f'Residential or Urban Delivery'
+
+            if code == 'pp':
+                desc = f'Pre-pull and store for delivery'
 
             if '=' in qbl:
                 newqty = get_digits_after_character(qbl, '=')
                 try:
                     qty = int(newqty)
                 except:
-                    continue
+                    err.append(f'Invalid char for {code} after = must be an integer, using defaults')
 
             if '$' in qbl:
                 newamt = get_digits_after_character(qbl, '$')
                 try:
                     price = float(newamt)
                 except:
-                    continue
+                    err.append(f'Invalid char for {code} after $ must be a float value, using defaults')
 
             if '*' in qbl:
                 #Need everything after the # sign
@@ -211,16 +231,18 @@ def get_invo_data(qblines, myo):
                 if status == 1:
                     desc = f'Free time {time1}-{time2}, detention {time2}-{time3}'
                 else:
-                    desc = 'Improper times provided on input'
-
-
+                    desc = f'Improper times for {code} provided on input'
+                    err.append(f'Invalid chars after * must be a time value with :')
 
             qtys.append(qty)
             prices.append(price)
             descs.append(desc)
             labels.append(label)
 
-    return codes, labels, descs, qtys, prices
+        else:
+            err.append(f'Service code {code} is not found')
+
+    return codes, labels, descs, qtys, prices, err
 
 
 
@@ -228,6 +250,7 @@ def initialize_invoice(myo, err):
     # First time through: have an order to invoice
     shipper = myo.Shipper
     jo = myo.Jo
+
 
     ldat = Invoices.query.filter(Invoices.Jo == jo).first()
     if ldat is None:
@@ -244,7 +267,7 @@ def initialize_invoice(myo, err):
             err.append(f'Billing data added for {myo.Shipper}')
 
         if bid:
-            err.append('Have needed items to make invoice')
+            err.append('Have Bill To information')
             cache = myo.Icache
             if not hasvalue(cache):
                 cache = 0
@@ -281,7 +304,7 @@ def initialize_invoice(myo, err):
                 if len(qblines) > 1:
                     qblines = qblines[1:]
                     #print(qblines)
-                    codes, labels, descs, qtys, prices = get_invo_data(qblines, myo)
+                    codes, labels, descs, qtys, prices, err = get_invo_data(qblines, myo, err)
                     #print(codes)
                     #print(labels)
                     #print(descs)
@@ -308,6 +331,9 @@ def initialize_invoice(myo, err):
                                  Original=None, Status='New')
                 db.session.add(input)
                 db.session.commit()
+
+        else:
+            err.append('Cannot find bill to information for this invoice')
     return err
 
 def add_service(myo):

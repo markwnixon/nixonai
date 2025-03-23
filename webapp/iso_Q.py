@@ -203,6 +203,8 @@ def add_quote_emails():
             mid = extract_for_code(email_message["Message-ID"])
             mid = mid.strip()
             fromp = extract_for_code(email_message["From"])
+            print(fromp)
+            if '@' not in fromp: fromp = 'Invalid Email'
             #print(f'Message ID: {mid}')
             #print(f'Subject: {subject}')
             #print(f'From: {fromp}')
@@ -314,9 +316,28 @@ def checkcross(lam,la_last,la,lom,lo_last,lo):
     locross = 0
     if (la_last<lam and la>lam) or (la_last>lam and la<lam):
         lacross = 1
+        print('Toll by latitude Method 2')
     if (lo_last<lom and lo>lom) or (lo_last>lom and lo<lom):
         locross = 1
+        print('Toll by longitude Method 2')
     return lacross, locross
+
+def checkcross2(la_last, la, lo_last, lo, xmin, ymin, xmax, ymax):
+
+    lanow = la_last
+    lonow = lo_last
+    lastep = (la - la_last)/100
+    lostep = (lo - lo_last)/100
+
+    for step in range(100):
+        lanow = lanow+lastep
+        lonow = lonow+lostep
+
+        if lanow > ymin and lanow < ymax and lonow > xmin and lonow < xmax:
+            return 1
+
+    return 0
+
 
 def maketable(expdata):
     bdata = '<br><br>\n'
@@ -334,14 +355,19 @@ def maketable(expdata):
 
 
 def sendquote():
+    error = 0
     etitle = request.values.get('edat0')
     ebody = request.values.get('edat1')
     emailin1 = request.values.get('edat2')
     emailin2 = request.values.get('edat3')
     emailcc1 = request.values.get('edat4')
     emailcc2 = request.values.get('edat5')
+    if '@' not in emailin1 or '@' not in emailin2:
+        print('Cannot Send this Email')
+        error = 1
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
-    send_mimemail(emaildata,'qsnd')
+    if error == 0:
+        send_mimemail(emaildata,'qsnd')
     return emaildata
 
 
@@ -767,60 +793,50 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 
     # Calculate plaza tolls
     fm_tollbox = [39.267757, -76.610192, 39.261248, -76.563158]
-    bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
+    #bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
+    bht_tollbox = [39.269962, -76.566240, 39.239063, -76.58]
     fsk_tollbox = [39.232770, -76.502453, 39.202279, -76.569906]
     bay_tollbox = [39.026893, -76.417512, 38.964938, -76.290104]
-    sus_tollbox = [39.585193, -76.142883, 39.572328, -76.033975]
-    new_tollbox = [39.647121, -75.774523, 39.642613, -75.757187]  # Newark Delaware Toll Center
-    dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
-    thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055]  # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
-    dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659]  # Dulles Toll Rd Plaza
-    tollcodes = ['BHT', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
+    sus_tollbox = [39.478100, -76.112203, 39.608403, -76.062308]  # Susquehena  or Rt 40 Bridge  39.642894, -76.061942
+    new_tollbox = [39.634568, -75.773041, 39.657970, -75.754566]  # Newark Delaware Toll Center 39.634568, -75.773041
+    dmb_tollbox = [39.644216, -75.570003, 39.721472, -75.465073]  # Delaware Memorial Bridge
+    dtr_tollbox = [38.932101, -77.243797, 38.942280, -77.230473]  # Dulles Toll Rd Plaza
+    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'DTR']
     onceonly = []
-    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox,
-                 dtr_tollbox]
+    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, dtr_tollbox]
+
 
     for jx, lat in enumerate(lats):
-        stat1 = 'ok'
-        stat2 = 'ok'
-        stat3 = 0
-        stat4 = 0
+        tollpass = 0
         tollcode = 'None'
         la = float(lat)
         lo = float(lons[jx])
-        for kx, tollbox in enumerate(tollboxes):
-            lah = max([tollbox[0], tollbox[2]])
-            lal = min([tollbox[0], tollbox[2]])
-            loh = max([tollbox[1], tollbox[3]])
-            lol = min([tollbox[1], tollbox[3]])
-            if la > lal and la < lah:
-                stat1 = 'toll'
-                if lo > lol and lo < loh:
-                    stat2 = 'toll'
-                    tollcode = tollcodes[kx]
-                    if tollcode not in onceonly:
-                        if tollcode == 'DTR':
-                            legtolls[jx] = 10.50
-                        else:
-                            legtolls[jx] = 24.00
-                        legcodes[jx] = tollcode
-                        onceonly.append(tollcode)
 
-            if jx > 0:
-                lam = (lah + lal) / 2.0
-                lom = (loh + lol) / 2.0
-                la_last = float(lats[jx - 1])
-                lo_last = float(lons[jx - 1])
-                stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
-                if stat3 == 1 and stat4 == 1:
+        if jx > 0:
+            la_last = float(lats[jx - 1])
+            lo_last = float(lons[jx - 1])
+
+            for kx, tollbox in enumerate(tollboxes):
+                lah = max([tollbox[0], tollbox[2]])
+                lal = min([tollbox[0], tollbox[2]])
+                loh = max([tollbox[1], tollbox[3]])
+                lol = min([tollbox[1], tollbox[3]])
+
+                #print(f'Checking tollcode {tollcodes[kx]}')
+                tollpass = checkcross2(la_last, la, lo_last, lo, lol, lal, loh, lah)
+
+                if tollpass:
                     tollcode = tollcodes[kx]
+                    #print(f'This leg by method 2 is a tollcode: {tollcode}')
                     if tollcode not in onceonly:
+                        onceonly.append(tollcode)
                         if tollcode == 'DTR':
                             legtolls[jx] = 10.50
                         else:
                             legtolls[jx] = md_toll
                         legcodes[jx] = tollcode
-        ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
+
+            #print(lat,lons[jx],tollpass, tollcode, legcodes, onceonly)
 
     tot_tolls = 0.00
     porttime = 1.4
@@ -996,6 +1012,7 @@ def go_to_next(mid, oldmid, taskbox):
 
 def get_costs_old(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 
+    print('YES using the get costs old method')
     # Get the currently used cost per mile and cost per hour data used in the base bids
     ph_driver = float(qidat.ph_driver) / 100
     fuel = float(qidat.fuelpergal) / 100
@@ -1080,8 +1097,9 @@ def get_costs_old(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
                 lom = (loh + lol) / 2.0
                 la_last = float(lats[jx - 1])
                 lo_last = float(lons[jx - 1])
-                stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
-                if stat3 == 1 and stat4 == 1:
+                #stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
+                tollpass = checkcross2(la_last, la, lo_last, lo, lol, lal, loh, lah)
+                if tollpass:
                     tollcode = tollcodes[kx]
                     if tollcode == 'DTR':
                         legtolls[jx] = 10.50
@@ -1152,7 +1170,7 @@ def get_terminal(locto):
     term = request.values.get('terminal')
     if locto is None:
         locto_update = request.values.get('locto')
-        print(f'locto update is {locto_update}')
+        #print(f'locto update is {locto_update}')
         if locto_update is not None and locto_update != 'None': locto = locto_update
 
     if term is None:
@@ -1253,7 +1271,7 @@ def isoQuote():
         qbid = request.values.get('quickbid')
         qdel = request.values.get('quickdel')
         getnumq = request.values.get('numcit')
-        print(f'Here, locfrom is: {locfrom}')
+        #print(f'Here, locfrom is: {locfrom}')
         if getnumq is not None:
             if 1 == 1:
                 try: multibid[1] = int(getnumq)
@@ -1475,7 +1493,7 @@ def isoQuote():
                 emailto = usernames['serv']
 
             if quot > 0 or taskbox == 5:
-                print(f'Here2a, locfrom is: {locfrom} and locto is {locto}')
+                #print(f'Here2a, locfrom is: {locfrom} and locto is {locto}')
                 if qdat is not None:
                     locfrom1 = qdat.Start
                     term, locfrom2, locto, port = get_terminal(locto)
@@ -1486,12 +1504,12 @@ def isoQuote():
                             #update qdat
                             qdat.Start = locfrom2
                             locfrom = locfrom2
-                    print(f'Here, locfrom is: {locfrom} and locto is {locto}')
+                    #print(f'Here, locfrom is: {locfrom} and locto is {locto}')
                     if locfrom is None:
                         term, locfrom, locto, port = get_terminal(locto)
                 else:
                     term, locfrom, locto, port = get_terminal(locto)
-                print(f'Here2b, locfrom is: {locfrom} and locto is {locto}')
+
 
                 if updatego is not None or updatebid is not None or emailgo is not None or updateE is not None:
                     if multibid[0] == 'on':
@@ -1521,10 +1539,9 @@ def isoQuote():
                         locto = 'No Location Found'
                     locfrom = request.values.get('locfrom')
                     emailto = request.values.get('edat2')
-                    print(f'Here3, locfrom is: {locfrom}')
                     respondnow = datetime.datetime.now()
                     if taskbox == 1 or taskbox == 5:
-                        print(f'Here setting qdat.start with, locfrom is: {locfrom}')
+                        #print(f'Here setting qdat.start with, locfrom is: {locfrom}')
                         qdat.Start = locfrom
                         qdat.Location = locto
                         qdat.From = emailto
@@ -1746,7 +1763,7 @@ def isoQuote():
         for loctest in loci:
             if loctest == 'No Location Found': locto = 'No Location Found'
 
-    print(f'Here at end, locfrom is: {locfrom}')
+    #print(f'Here at end, locfrom is: {locfrom}')
     multibid.append(term)
     print(multibid)
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')

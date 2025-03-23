@@ -123,7 +123,7 @@
                                                     <tr><td class="{{ lmt }}">Vessel/Voyage:</td><td class="{{ rmt }}">{{ io[11] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">JO:</td><td class="{{ rmt }}">{{ io[5] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Bill To:</td><td class="{{ rmt }}">{{ io[1] }}</td></tr>
-                                                    <tr><td class="{{ lmt }}">Mark Delivered:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" name="dwp{{ io[5] }}"> When Pulled</td></tr>
+                                                    <tr><td class="{{ lmt }}">Mark Delivered:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" name="dwp{{ io[5] }}"> If live load delivered or drop-pick is picked</td></tr>
                                                     <tr><td class="{{ lmt }}">Warnings:</td><td class="{{ rmt }}">{% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}</td></tr>
                                                     <tr><td class="{{ lmt }}">&nbsp;</td><td class="{{ rmt }}">&nbsp;</td></tr>
                                                     <tr><td class="{{ lmt }}">Add comments:</td><td class="{{ rmt }}">&nbsp;</td></tr>
@@ -219,7 +219,7 @@
                                                     <tr><td class="{{ lmt }}">Vessel/Voyage:</td><td class="{{ rmt }}">{{ eo[11] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">JO:</td><td class="{{ rmt }}">{{ eo[5] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Bill To:</td><td class="{{ rmt }}">{{ eo[1] }}</td></tr>
-                                                <tr><td class="{{ lmt }}">Mark Delivered:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" name="dwp{{ eo[5] }}"> When Pulled</td></tr>
+                                                <tr><td class="{{ lmt }}">Mark Delivered:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" name="dwp{{ eo[5] }}"> If live load delivered or drop-pick is picked</td></tr>
                                                     <tr><td class="{{ lmt }}">Warnings:</td><td class="{{ rmt }}">{% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}</td></tr>
                                                     <tr><td class="{{ lmt }}">&nbsp;</td><td class="{{ rmt }}">&nbsp;</td></tr>
                                                     <tr><td class="{{ lmt }}">Add comments:</td><td class="{{ rmt }}">&nbsp;</td></tr>
