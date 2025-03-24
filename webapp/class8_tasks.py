@@ -3175,7 +3175,8 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
                     thisvalue = swaps[thisvalue]
                 #Special exemption for the Order Quote Builder, take out items that are just for one invoice
                 if col == 'Quote':
-                    thisvalue = quote_strip(thisvalue)
+                    if thisvalue is not None:
+                        thisvalue = quote_strip(thisvalue)
                 if defaults:
                     for thisdef in defaults:
                         if col in thisdef:  thisvalue = thisdef[1]

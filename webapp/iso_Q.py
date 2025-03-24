@@ -362,7 +362,7 @@ def sendquote():
     emailin2 = request.values.get('edat3')
     emailcc1 = request.values.get('edat4')
     emailcc2 = request.values.get('edat5')
-    if '@' not in emailin1 or '@' not in emailin2:
+    if '@' not in emailin1:
         print('Cannot Send this Email')
         error = 1
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
