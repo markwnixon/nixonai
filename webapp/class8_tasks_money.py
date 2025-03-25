@@ -595,7 +595,7 @@ def set_desc(odat):
         if 'outside' in order.lower() or 'george' in order.lower():
             addon = order
         else:
-            addon = ''
+            addon = f'Chassis:{odat.Chassis}'
         if hasinput(bk2):
             if bk1 != bk2:
                 desc = f'{desc} Pulled under booking {bk1} {addon}'
@@ -816,12 +816,12 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             try: fchamt = float(chamt)
             except: fchamt = 0.00
             for sdat in sdata:
+                odat = Orders.query.filter(Orders.Jo == sdat.Jo).first()
                 this_amt = d2s(fbamt+fchamt)
-                sdat.Description = f'Line Haul={d2s(bamt)}, Chassis={d2s(chamt)}'
+                sdat.Description = f'Line Haul={d2s(bamt)}, Chassis={d2s(chamt)}({odat.Chassis})'
                 famt = float(this_amt)
                 thetotal += famt
                 sdat.Amount = this_amt
-                odat = Orders.query.filter(Orders.Jo == sdat.Jo).first()
                 odat.InvoTotal = this_amt
                 idata = Invoices.query.filter(Invoices.Jo == sdat.Jo).all()
                 if idata != []:
