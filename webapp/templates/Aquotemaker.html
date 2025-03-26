@@ -7,8 +7,10 @@
 
 {% set etype = 'Quote' %}
 {% set emailin1=emaildata[2] %}
-{% if '@' not in emailin1 %}
-    {% set emailin1 = 'Invalid Email' %}
+{% if emailin1 %}
+    {% if '@' not in emailin1 %}
+        {% set emailin1 = 'Invalid Email' %}
+    {% endif %}
 {% endif %}
 
 {% if taskbox == 1 or taskbox == 5%}
