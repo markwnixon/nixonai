@@ -540,7 +540,7 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
     if multibid[0] == 'on':
         loci = multibid[2]
         bids = multibid[3]
-        etitle = f'{cdata[0]} Quotes to'
+        etitle = f'{cdata[0]} (MC#{cdata[12]}) Quotes to'
         for loc in loci:
             if hasinput(loc): etitle = etitle + f' {loc};'
         etitle = etitle[:-1]
@@ -652,14 +652,14 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
                 ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
 
     if len(btype) == 1 and stype == 'ml':
-        ebody = ebody.replace('this','these').replace('load', 'loads')
+        ebody = ebody.replace('this','each of these').replace('load', 'loads')
         ebody = ebody.replace('these quote', 'this quote')
 
     if len(btype) == 1 and mixtype == 'mix':
-        ebody = ebody.replace('is inclusive','is for both 20ft and 40ft containers and is inclusive')
+        ebody = ebody.replace('is inclusive','is valid for either 20ft or 40ft containers and is inclusive')
 
     if len(btype) > 1 and mixtype == 'mix':
-        ebody = ebody.replace('is inclusive','is for both 20ft and 40ft containers and is inclusive')
+        ebody = ebody.replace('is inclusive','is valid for either 20ft or 40ft containers and is inclusive')
 
     return ebody, tbox, etitle, bidtypeamount
 
@@ -1613,7 +1613,7 @@ def isoQuote():
 
                 if quotbut is not None:
                     #Set the email data:
-                    etitle = f'{cdata[0]} Quote to {locto} from {port}'
+                    etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
                     if qdat is not None:
                         customer = qdat.Person
                         if customer is None:
@@ -1646,7 +1646,7 @@ def isoQuote():
                     if updatebid is not None or updatego is not None:
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-                        etitle = f'{cdata[0]} Quote to {locto} from {port}'
+                        etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
                         ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle, port)
                         ebody = ebody + maketable(expdata)
                         #print(f'The bidtypeamount here after 2nd lower call is {bidtypeamount} and amount in database is {qdat.Amount}')
