@@ -1,0 +1,60 @@
+{% set tdat = holdvec[1] %}
+{% set co = holdvec[2] %}
+{% set dt = holdvec[3] %}
+{% set bk = holdvec[4] %}
+{% set con = holdvec[5] %}
+{% set drv = holdvec[6] %}
+
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-around align-items-center">
+                <div class="p-0">Viewing Exports with Booking Change </div>
+                <div class="p-0">
+                    <select class="mdb-select md-form" name="timeslot" onchange="this.form.submit()">
+                        <option {% if tdat == 7 %} selected {% endif %} value="7" >Over Past Week</option>
+                        <option {% if tdat == 30 %} selected {% endif %} value="30" >Over Past Month</option>
+                    </select>
+
+                    <button type="submit" class="btn btn-md btn-primary" name="Return">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <div class="row">
+                <div class="col-sm-12" align="center">
+                    <b>Exports Returned with Different Booking</b>
+                </div>
+            </div>
+
+            {% if co %}
+                <div class="row">
+                    <div class="small col-sm-2" align="left">
+                        {% for c in co %}
+                            {{ c }}<br>
+                        {% endfor %}
+                    </div>
+                    <div class="small col-sm-3" align="left">
+                        {% for c in dt %}
+                            {{ c }}<br>
+                        {% endfor %}
+                    </div>
+                    <div class="small col-sm-7" align="left">
+                        {% for c in bk %}
+                            {{ c }} &nbsp; {{ con[loop.index-1] }}<br>
+                        {% endfor %}
+                    </div>
+                </div>
+
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+
+<input type = "hidden" name="uploadtype" id="uploadtype" value="source">
+<input type = "hidden" name="username" id="username" value="{{ username }}">
+<input type = "hidden" name="username" id="username" value="{{ username }}">

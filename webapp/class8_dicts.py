@@ -28,13 +28,13 @@ Trucking_genre = {'table': 'Orders',
                                  {'View Docs': ['Source', 'Proof', 'Manifest', 'Interchange', 'Invoice',
                                                 'Paid Invoice', 'Package']},
                                  {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment', 'Undo Docs', 'Undo Docs xSource', 'Undo Proof', 'Undo 2nd Proof', 'Undo RateCon']},
-                                 {'Tasks': ['Street Turn', 'Unpulled Containers', 'Assign Drivers', 'Driver Hours',
-                                            'Truck Logs', 'CMA-APL', 'Container Update']}],
+                                 {'Tasks': ['Street Turn', 'Unpulled Containers', 'Exports Pulled', 'Exports Returned', 'Exports Bk Diff', 'Imports Out']}],
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"', '40\' UT 9\'6\"', '40\' UT 8\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
                   'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP','Dray Transfer', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out', 'Dray Out', 'Dray In'],
+                  'delivery_types': ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice'],
                   'document_profiles'  : {
                                         'Custom' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
                                         'Custom-Invoice' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
@@ -133,12 +133,10 @@ Trucking_genre = {'table': 'Orders',
                                         {
                                           'Street Turn': ['No_Selection_Plus_Display', 'Street_Turn', 'None'],
                                           'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None'],
-                                          'Assign Drivers': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Assign_Drivers', 'None'],
-                                          'Driver Hours': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Driver_Hours', 'None'],
-                                          'Driver Payroll': ['No_Item_Selection', 'Driver_Payroll', 'None'],
-                                          'Truck Logs': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Truck_Logs', ''],
-                                          'CMA-APL': ['No_Selection_Plus_Display', 'CMA_APL', 'None'],
-                                          'Container Update': ['No_Display', 'Container_Update', 'None']
+                                          'Exports Pulled': ['No_Selection_Plus_Display', 'Exports_Pulled', 'None'],
+                                          'Exports Returned': ['No_Selection_Plus_Display', 'Exports_Returned', 'None'],
+                                          'Exports Bk Diff': ['No_Selection_Plus_Display', 'Exports_Bk_Diff', 'None'],
+                                          'Imports Out': ['No_Selection_Plus_Display', 'Imports_Out', 'None']
                                         }
 
                                     }
@@ -188,8 +186,9 @@ Orders_setup = {'name' : 'Trucking Job',
                                ['Invoice', 'IV', 'Invoice', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                 ['Package', 'PK', 'Package', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                 ['PaidInvoice', 'PI', 'PaidInvoice', None, 'text', 0, 'ok', 'cL', None, 'Docs'],
-                                ['Date3', 'Delivery', 'Delivery', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
-                            ['Time3', 'DelTime', 'DelTime', 'time', 'time', 0, 'ok', 'cc', None, 'Job'],
+                                ['Date3', 'Delivery', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['Delivery', 'Dtype', 'Select Delivery Type', 'select', 'delivery_types', 0, 'ok', 'cc', None, 'Job'],
+                               ['Time3', 'DelTime', 'DelTime', 'time', 'time', 0, 'ok', 'cc', None, 'Job'],
                                ['HaulType', 'HaulType', 'Select Haul Type', 'select', 'haul_types', 0, 'ok', 'cl', None, 'Job'],
                                 ['Type', 'ConType', 'Select Container Type', 'select', 'container_types', 0, 'ok', 'cc', None, 'Job'],
                                 ['Booking', 'Release', 'Release', 'text', 'release', 0, 'ok', 'cc', None, 'Job'],
@@ -860,8 +859,7 @@ Auto_genre =   {'table': 'Autos',
                                  {'View Docs': ['Purchase Receipt', 'Tow BOL', 'Title', 'Invoice',
                                                 'Paid Invoice', 'Package']},
                                  {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment']},
-                                 {'Tasks': ['Street Turn', 'Unpulled Containers', 'Assign Drivers', 'Driver Hours',
-                                            'Truck Logs', 'CMA-APL', 'Container Update']}],
+                                 {'Tasks': ['Street Turn', 'Unpulled Containers']}],
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
@@ -953,13 +951,7 @@ Auto_genre =   {'table': 'Autos',
                                     'Tasks':
                                         {
                                           'Street Turn': ['No_Selection_Plus_Display', 'Street_Turn', 'None'],
-                                          'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None'],
-                                          'Assign Drivers': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Assign_Drivers', 'None'],
-                                          'Driver Hours': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Driver_Hours', 'None'],
-                                          'Driver Payroll': ['No_Item_Selection', 'Driver_Payroll', 'None'],
-                                          'Truck Logs': ['No_Item_Selection', 'Truck_Logs', 'None'],
-                                          'CMA-APL': ['No_Selection_Plus_Display', 'CMA_APL', 'None'],
-                                          'Container Update': ['No_Display', 'Container_Update', 'None']
+                                          'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None']
                                         }
 
                                     }
@@ -1103,11 +1095,11 @@ Planning_genre =   {'table': 'Orders',
                                  {'View Docs': ['Purchase Receipt', 'Tow BOL', 'Title', 'Invoice',
                                                 'Paid Invoice', 'Package']},
                                  {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment']},
-                                 {'Tasks': ['Street Turn', 'Unpulled Containers', 'Assign Drivers', 'Driver Hours',
-                                            'Truck Logs', 'CMA-APL', 'Container Update']}],
+                                 {'Tasks': ['Street Turn', 'Unpulled Containers']}],
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"', '40\' UT 9\'6\"', '40\' UT 8\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
+                  'delivery_types': ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice'],
                   'pickupdata': ['Baltimore Seagirt', 'CSX Rail', 'East Coast CES', 'Belts'],
                   'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP', 'Dray Transfer', 'Import Extra Stop', 'Export Extra Stop', 'OTR Standard', 'OTR Extra Stop', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
@@ -1193,13 +1185,7 @@ Planning_genre =   {'table': 'Orders',
                                     'Tasks':
                                         {
                                           'Street Turn': ['No_Selection_Plus_Display', 'Street_Turn', 'None'],
-                                          'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None'],
-                                          'Assign Drivers': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Assign_Drivers', 'None'],
-                                          'Driver Hours': ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'Driver_Hours', 'None'],
-                                          'Driver Payroll': ['No_Item_Selection', 'Driver_Payroll', 'None'],
-                                          'Truck Logs': ['No_Item_Selection', 'Truck_Logs', 'None'],
-                                          'CMA-APL': ['No_Selection_Plus_Display', 'CMA_APL', 'None'],
-                                          'Container Update': ['No_Display', 'Container_Update', 'None']
+                                          'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None']
                                         }
 
                                     }

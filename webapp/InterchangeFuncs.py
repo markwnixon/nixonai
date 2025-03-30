@@ -336,7 +336,7 @@ def Order_Container_Update(oder, err):
             if '-' in bkout:
                 bklist = bkout.split('-')
                 bkout = bklist[0]
-                if len(bkout) < 7: bkout = 'NoBook'
+                if len(bkout) < 6: bkout = 'NoBook'
             edata = Orders.query.filter((Orders.HaulType.contains('Export')) & (Orders.Booking.contains(bkout)) & (Orders.Date > lbdate)).all()
             nbk = len(edata)
             multibooking = 1
@@ -389,6 +389,9 @@ def Order_Container_Update(oder, err):
                                     if bkout == mrelease_nodash:
                                         mbklabel = f'{mrelease_nodash}-{ix}'
                                         mdat.Release = mbklabel
+                                        odat2 = Orders.query.filter((Orders.Container == container) & (Orders.Booking == bklabel)).first()
+                                        if odat2 is not None:
+                                            odat2.BOL = mbklabel
                                 ix += 1
                         db.session.commit()
 

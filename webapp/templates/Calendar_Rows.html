@@ -97,9 +97,10 @@
 
                     {% for io in pdio[ix] %}
                         {% set dc = io[13] %}
-                        <button type="button" class="btn mt-1" data-toggle="modal" data-target="#m{{ io[0] }}">
-                            <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ io[5] }}"> <b>{{ io[0] }} ({{ io[6] }})</b><br>{{ io[1] }}<br>{{ io[2] }}<br>
-                                {% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}</p>
+                        <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ io[0] }}">
+                            <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ io[5] }}"> <b>{{ io[0] }} ({{ io[6] }})</b><br>{{ io[1] }}<br>{{ io[2] }}<br><i>{{ io[14] }}</i>
+                                {% if io[4] != [] %}<br>{% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
+                            </p>
                         </button>
                                 <!-- The Modal -->
                                 <div class="modal fade" id="m{{ io[0] }}" tabindex="-1" role="dialog" aria-labelledby="ml{{ io[0] }}" aria-hidden="true">
@@ -142,9 +143,10 @@
 
                     {% for ip in pdip[ix] %}
                         {% set dc = ip[13] %}
-                                <button type="button" class="btn mt-1" data-toggle="modal" data-target="#m{{ ip[0] }}">
-                                    <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}"> <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br>
-                                       {% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}</p>
+                                <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ip[0] }}">
+                                    <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}"> <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br><i>{{ ip[14] }}</i>
+                                       {% if ip[4] != [] %}<br>{% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
+                                    </p>
                                 </button>
                                 <!-- The Modal -->
                                 <div class="modal fade" id="m{{ ip[0] }}" tabindex="-1" role="dialog" aria-labelledby="ml{{ ip[0] }}" aria-hidden="true">
@@ -190,9 +192,10 @@
                     {% for eo in pdeo[ix] %}
                         {% set dc = eo[13] %}
 
-                               <button type="button" class="btn mt-1" data-toggle="modal" data-target="#m{{ eo[8] }}">
-                                    <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}"> {{ eo[0] }} ({{ eo[6] }})<br>{{ eo[9] }}<br>{{ eo[1] }}<br>{{ eo[2] }}<br>{{ eo[15] }}<br>
-                                        {% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}</p>
+                               <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ eo[8] }}">
+                                    <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}"> {{ eo[0] }} ({{ eo[6] }})<br>{{ eo[9] }}<br>{{ eo[1] }}<br>{{ eo[2] }}<br>{{ eo[15] }}<br><i>{{ eo[16] }}</i>
+                                    {% if eo[4] != [] %}<br>{% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
+                                    </p>
                                 </button>
                                 <!-- The Modal -->
                                 <div class="modal fade" id="m{{ eo[8] }}" tabindex="-1" role="dialog" aria-labelledby="ml{{ eo[0] }}" aria-hidden="true">
@@ -241,9 +244,10 @@
                     {% for ep in pdep[ix] %}
                         {% set dc = ep[13] %}
 
-                                <button type="button" class="btn mt-1" data-toggle="modal" data-target="#m{{ ep[0] }}">
-                                    <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}"> {{ ep[0] }} ({{ ep[6] }})<br> {{ ep[1] }}<br> {{ ep[2] }}<br>{{ ep[15] }}<br>
-                                        {% for cmt in ep[4] %}{{ cmt }}<br>{% endfor %}</p>
+                                <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ep[0] }}">
+                                    <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}"> {{ ep[0] }} ({{ ep[6] }})<br> {{ ep[1] }}<br> {{ ep[2] }}<br>{{ ep[15] }}<br><i>{{ ep[16] }}</i>
+                                        {% if ep[4] != [] %}<br>{% for cmt in ep[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
+                                    </p>
                                 </button>
                                 <!-- The Modal -->
                                 <div class="modal fade" id="m{{ ep[0] }}" tabindex="-1" role="dialog" aria-labelledby="ml{{ ep[0] }}" aria-hidden="true">

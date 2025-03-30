@@ -50,6 +50,7 @@
                             {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                             {% elif entry[4] == 'shipdata' %}{% set klist = keydata.shipdata %}
                             {% elif entry[4] == 'emaildata' %}{% set klist = keydata.emaildata %}
+                            {% elif entry[4] == 'delivery_types' %}{% set klist = genre_data['delivery_types'] %}
                             {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}

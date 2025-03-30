@@ -141,7 +141,7 @@ def Street_Turn_task(err, holdvec, iter):
     holdvec[23] = 0
 
     if iter == 0:
-        print(f'Running Street Turn Task Info Colleciton with iter {iter} to place the window')
+        #print(f'Running Street Turn Task Info Colleciton with iter {iter} to place the window')
         completed = False
 
     elif iter > 0:
@@ -244,7 +244,7 @@ def Street_Turn_task(err, holdvec, iter):
 
 def Unpulled_Containers_task(err, holdvec, task_iter):
     holdvec = ['']*30
-    print(f'Running Unpulled Containers task')
+    #print(f'Running Unpulled Containers task')
     impco,impcon,impbol,expco,expbk = [], [], [], [], []
     bol = request.values.get('BOL')
 
@@ -287,9 +287,223 @@ def Unpulled_Containers_task(err, holdvec, task_iter):
 
     completed = False
     err.append('Unpulled Container run Successful')
-    for jx, imp in enumerate(impco):
-        print(f'{imp} {impbol[jx]} {impcon[jx]}')
+
     return completed, err, holdvec
+
+def Exports_Pulled_task(err, holdvec, task_iter):
+    holdvec = ['']*30
+    #print(f'Running Exports Pulled task')
+    expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
+
+    ts = request.values.get('timeslot')
+    if ts is None: ts=1
+    else: ts = int(ts)
+
+    stopdate = today-datetime.timedelta(days=ts)
+    comps = []
+    if ts == 7: tjobs = Orders.query.filter( (Orders.Date >= stopdate) & (Orders.HaulType.contains('Export')) ).all()
+    else: tjobs = Orders.query.filter( (Orders.Date == stopdate) & (Orders.HaulType.contains('Export')) ).all()
+    for job in tjobs:
+        com = job.Shipper
+        hstat = job.Hstat
+        if hstat is None:
+            hstat = 0
+            job.Hstat = 0
+        if hstat >= 1 and com not in comps:
+            comps.append(com)
+    db.session.commit()
+
+    if len(comps) >= 1:
+        for com in comps:
+            if ts == 7: tjobs = Orders.query.filter( (Orders.Shipper==com) & (Orders.Date >= stopdate) & (Orders.Hstat >= 1) & (Orders.HaulType.contains('Export'))).all()
+            else: tjobs = Orders.query.filter( (Orders.Shipper==com) & (Orders.Date == stopdate) & (Orders.Hstat >= 1) & (Orders.HaulType.contains('Export'))).all()
+            for ix,job in enumerate(tjobs):
+                con = job.Container
+                bk = job.Booking
+                idat = Interchange.query.filter( (Interchange.Container == con) & (Interchange.Date == job.Date) & (Interchange.Type.contains('Empty')) ).first()
+                if idat is not None:
+                    time = idat.Time
+                    driver = idat.Driver
+                else:
+                    time = ''
+                    driver = ''
+                date = f'{job.Date} {time}'
+                expco.append(com)
+                expbk.append(bk)
+                expcon.append(con)
+                expdt.append(date)
+                expdrv.append(driver)
+
+    if  expdt:
+        sorted_lists = sorted(zip(expdt, expco, expbk, expcon, expdrv))
+        expdt, expco, expbk, expcon, expdrv = zip(*sorted_lists)
+
+    holdvec[1] = ts
+    holdvec[2] = expdt
+    holdvec[3] = expco
+    holdvec[4] = expbk
+    holdvec[5] = expcon
+    holdvec[6] = expdrv
+
+    err.append('Exports Pulled History')
+
+    completed = False
+    err.append('Exports Pulled run Successful')
+    return completed, err, holdvec
+
+def Exports_Returned_task(err, holdvec, task_iter):
+    holdvec = ['']*30
+    #print(f'Running Exports Returned task')
+    expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
+
+    ts = request.values.get('timeslot')
+    if ts is None: ts=1
+    else: ts = int(ts)
+
+    stopdate = today-datetime.timedelta(days=ts)
+    comps = []
+    if ts == 7: tjobs = Orders.query.filter( (Orders.Date2 >= stopdate) & (Orders.HaulType.contains('Export')) ).all()
+    else: tjobs = Orders.query.filter( (Orders.Date2 == stopdate) & (Orders.HaulType.contains('Export')) ).all()
+    for job in tjobs:
+        com = job.Shipper
+        hstat = job.Hstat
+        if hstat is None:
+            hstat = 0
+            job.Hstat = 0
+        if hstat >= 2 and com not in comps:
+            comps.append(com)
+    db.session.commit()
+
+    if len(comps) >= 1:
+        for com in comps:
+            if ts == 7: tjobs = Orders.query.filter( (Orders.Shipper==com) & (Orders.Date2 >= stopdate) & (Orders.Hstat >= 2) & (Orders.HaulType.contains('Export'))).all()
+            else: tjobs = Orders.query.filter( (Orders.Shipper==com) & (Orders.Date2 == stopdate) & (Orders.Hstat >= 2) & (Orders.HaulType.contains('Export'))).all()
+            for ix,job in enumerate(tjobs):
+                con = job.Container
+                inbk = job.BOL
+                outbk = job.Booking
+                idat = Interchange.query.filter( (Interchange.Container == con) & (Interchange.Date == job.Date2) & (Interchange.Type.contains('Load')) ).first()
+                if idat is not None:
+                    time = idat.Time
+                    driver = idat.Driver
+                else:
+                    time = ''
+                    driver = ''
+
+                if inbk is None:
+                    bk = outbk
+                else:
+                    if inbk == outbk:
+                        bk = inbk
+                    else:
+                        bk = f'*{inbk}*'
+
+                date = f'{job.Date2} {time}'
+                expco.append(com)
+                expbk.append(bk)
+                expcon.append(con)
+                expdt.append(date)
+                expdrv.append(driver)
+
+    if  expdt:
+        sorted_lists = sorted(zip(expdt, expco, expbk, expcon, expdrv))
+        expdt, expco, expbk, expcon, expdrv = zip(*sorted_lists)
+
+    holdvec[1] = ts
+    holdvec[2] = expdt
+    holdvec[3] = expco
+    holdvec[4] = expbk
+    holdvec[5] = expcon
+    holdvec[6] = expdrv
+
+    err.append('Exports Load-In History')
+
+    completed = False
+    err.append('Exports Returned run Successful')
+    return completed, err, holdvec
+
+def Exports_Bk_Diff_task(err, holdvec, task_iter):
+    holdvec = ['']*30
+    #print(f'Running Exports With Bk Diff task')
+    expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
+
+    ts = request.values.get('timeslot')
+    if ts is None: ts=7
+    else: ts = int(ts)
+
+    stopdate = today-datetime.timedelta(days=ts)
+    comps = []
+    tjobs = Orders.query.filter( (Orders.Date2 >= stopdate) & (Orders.HaulType.contains('Export')) ).all()
+    for job in tjobs:
+        com = job.Shipper
+        hstat = job.Hstat
+        if hstat is None:
+            hstat = 0
+            job.Hstat = 0
+        if hstat >= 2 and com not in comps:
+            bkin = job.BOL
+            bkout = job.Booking
+            con = job.Container
+            if bkin is not None:
+                if bkin != bkout:
+                    comps.append(con)
+    db.session.commit()
+
+    if len(comps) >= 1:
+        for con in comps:
+            tjobs = Orders.query.filter( (Orders.Container==con) & (Orders.Date2 >= stopdate) & (Orders.Hstat >= 2) & (Orders.HaulType.contains('Export'))).all()
+
+            for ix,job in enumerate(tjobs):
+                com = job.Shipper
+                inbk = job.BOL
+                outbk = job.Booking
+                idat = Interchange.query.filter( (Interchange.Container == con) & (Interchange.Date == job.Date2) & (Interchange.Type.contains('Load')) ).first()
+                if idat is not None:
+                    time = idat.Time
+                    driver = idat.Driver
+                    inbki = idat.Release
+                else:
+                    time = ''
+                    driver = ''
+                    inbki = ''
+                jdat = Interchange.query.filter((Interchange.Container == con) & (Interchange.Date == job.Date) & (Interchange.Type.contains('Empty'))).first()
+                if jdat is not None:
+                    outbki = jdat.Release
+                else:
+                    outbki = ''
+
+                if outbki == outbk and inbki == inbk:
+                    gatematch = 'Gate Match'
+                else:
+                    gatematch = 'Gate Mismatch'
+
+
+                bk = f'Out: {outbk}  In: {inbk} {gatematch}'
+
+                date = f'{job.Date2} {time}'
+                expco.append(com)
+                expbk.append(bk)
+                expcon.append(con)
+                expdt.append(date)
+                expdrv.append(driver)
+
+    if  expdt:
+        sorted_lists = sorted(zip(expdt, expco, expbk, expcon, expdrv))
+        expdt, expco, expbk, expcon, expdrv = zip(*sorted_lists)
+
+    holdvec[1] = ts
+    holdvec[2] = expdt
+    holdvec[3] = expco
+    holdvec[4] = expbk
+    holdvec[5] = expcon
+    holdvec[6] = expdrv
+
+    err.append('Exports Load-In History')
+
+    completed = False
+    err.append('Exports Returned run Successful')
+    return completed, err, holdvec
+
 
 def Assign_Drivers_task(err, holdvec, iter):
     drivers= Drivers.query.filter(Drivers.Active == 1).all()
@@ -305,7 +519,7 @@ def Assign_Drivers_task(err, holdvec, iter):
         trucknow = tdat.Unit
 
     if iter == 0:
-        print(f'Running Assign Drivers task setup with iter {iter} and driver {drivernow} and Unit {trucknow}')
+        #print(f'Running Assign Drivers task setup with iter {iter} and driver {drivernow} and Unit {trucknow}')
         completed = False
         #Set initial dates to the
         saturday = today - datetime.timedelta(days=today.weekday()) + datetime.timedelta(days=5, weeks=-1)
@@ -344,7 +558,7 @@ def Assign_Drivers_task(err, holdvec, iter):
             drv = drivernow
             units = request.values.get('trks' + str(jx))
             unite = request.values.get('trke' + str(jx))
-            print(f'Updating units {units} and unite {unite}')
+            #print(f'Updating units {units} and unite {unite}')
             tdat = DriverAssign.query.filter((DriverAssign.Date == d1) & (DriverAssign.Driver == drv)).first()
             if tdat is not None:
                 tdat.UnitStart = units
@@ -387,9 +601,6 @@ def Assign_Drivers_task(err, holdvec, iter):
     holdvec[10] = drivernow
     holdvec[11] = trucknow
 
-    for fdat in fdata:
-        print(f'Here if the fdata: {fdat.Date} {fdat.Unit}')
-    print(holdvec[16], holdvec[17])
 
     return completed, err, holdvec
 
@@ -408,7 +619,7 @@ def Driver_Hours_task(err, holdvec, iter):
         trucknow = tdat.Unit
 
     if iter == 0:
-        print(f'Running Driver Hours task setup with iter {iter} and driver {drivernow} and Unit {trucknow}')
+        #print(f'Running Driver Hours task setup with iter {iter} and driver {drivernow} and Unit {trucknow}')
         completed = False
         # Set initial dates to the
         saturday = today - datetime.timedelta(days=today.weekday()) + datetime.timedelta(days=5, weeks=-1)
@@ -451,10 +662,10 @@ def Driver_Hours_task(err, holdvec, iter):
 
 
 def CMA_APL_task(err,holdvec, task_iter):
-    print(f'Running Text Output task')
+    #print(f'Running Text Output task')
 
     holdvec = ['']*30
-    print(f'Running CMA-APL task')
+    #print(f'Running CMA-APL task')
     cmajobs, apljobs, cmadone, apldone = [], [], [], []
     bol = request.values.get('BOL')
 
@@ -493,7 +704,7 @@ def CMA_APL_task(err,holdvec, task_iter):
     return completed, err, holdvec
 
 def Container_Update_task(err):
-    print(f'Running Container Update task')
+    #print(f'Running Container Update task')
     runat = datetime.datetime.now()
     lookback = runat - datetime.timedelta(30)
     lbdate = lookback.date()
