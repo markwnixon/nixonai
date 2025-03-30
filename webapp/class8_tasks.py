@@ -767,7 +767,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         #busdays = [sw, next_business_day(sw, 1), next_business_day(sw, 2), next_business_day(sw, 3), next_business_day(sw, 4)]
         caldays = [sw, sw+timedelta(days=1), sw+timedelta(days=2), sw+timedelta(days=3), sw+timedelta(days=4)]
 
-    lbdate = datetime.datetime.now() - timedelta(20)
+    lbdate = datetime.datetime.now() - timedelta(15)
     lbdate = lbdate.date()
     userlist = []
     #podata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date3 > lbdate)).all()
@@ -779,6 +779,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
     pdio, pdip, pdeo, pdep = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [],
                                                                                                             [], [], []]
     pdic, pdec, pmon = [[], [], [], [], [], []], [[], [], [], [], [], []],[[], [], [], [], [], []]
+    day_sequence = [[], [], [], [], [], []]
 
     for podat in podata:
         hstat = podat.Hstat
@@ -789,11 +790,14 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         dtype = podat.Delivery
         dtime = podat.Time3
         if dtype is None:
-            deliverline = f'Delivery Not Specified'
-        elif dtime is None:
-            deliverline = f'Delivery {dtype}'
+            deliverline = 'Placholder'
         else:
-            deliverline = f'Delivery {dtype} {dtime}'
+            deliverline = f'{dtype}'
+
+        if dtime is None:
+            delivertime = ''
+        else:
+            delivertime = f'{dtime}'
 
         user = podat.UserMod
         if user != username:
@@ -805,7 +809,9 @@ def create_cal_data(tfilters, dlist, username, resetmod):
 
         if shipper == 'Global Business Link' and 'outside' not in order:
             #Create special block to show loads in and empties out
-            print(f'Skipping Global Drop-Hook Runs for Calendar')
+            #print(f'Skipping Global Drop-Hook Runs for Calendar')
+            globalrun = 1
+
         else:
 
             if len(shipper) > 25: shipper = shipper[0:25]
@@ -908,7 +914,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     dateline = f'GO:{pulled} DV:{del_s} DB:{due_s}'
                     colorline = 'blue-text'
                     comment = []
-                    pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline])
+                    pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline, delivertime])
                     on_alldates = 1
 
                     for ix in range(5):
@@ -924,7 +930,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
 
                                 pdio[ix + 1].append(
                                     [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
-                                     in_booking, description, ship, notes, datecluster, deliverline])
+                                     in_booking, description, ship, notes, datecluster, deliverline, delivertime])
                                 on_calendar = 1
                         else:
                             if delivery == caldays[ix]:
@@ -938,7 +944,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                                     comment = ['****']
                                     comment.append('Due back today')
 
-                                pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline])
+                                pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime])
                                 on_calendar = 1
 
                 elif hstat < 1:
@@ -947,7 +953,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     dateline = f'AP:{avail_s} DV:{del_s} LFD:{lfd_s}'
                     colorline = 'black-text'
                     comment = []
-                    pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline])
+                    pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline, delivertime])
                     on_alldates = 1
                     for ix in range(5):
                         if delivery == caldays[ix]:
@@ -964,7 +970,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                                     colorline = 'black-text'
                             else:
                                 colorline = 'black-text'
-                            pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline])
+                            pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime])
                             on_calendar = 1
 
 
@@ -1018,17 +1024,17 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                         comment.append(f'Ret booking change')
                     if comment != []: comment.insert(0, '****')
 
-                    pdeo[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates, deliverline])
+                    pdeo[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates, deliverline, delivertime])
                     on_alldates = 1
 
                     for ix in range(5):
                         if completed:
                             if gatein == caldays[ix]:
-                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline])
+                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime])
                                 on_calendar = 1
                         else:
                             if delivery == caldays[ix]:
-                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline])
+                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime])
                                 on_calendar = 1
 
                 elif hstat < 1:
@@ -1043,11 +1049,11 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                             #colorline = 'orange-text'
                             comment = ['****']
                             comment.append(f'No return before {erd_s}')
-                    pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates, deliverline])
+                    pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates, deliverline, delivertime])
                     on_alldates = 1
                     for ix in range(5):
                         if delivery == caldays[ix]:
-                            pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline])
+                            pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime])
                             on_calendar = 1
 
             if on_alldates and not on_calendar:
@@ -1070,6 +1076,27 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                         #print(f'Job {pdip[0][-1]} not on the current calendar')
                         pdip[0][-1][3] = 'black-text'
                         pdip[0][-1][4] = ['Not on Viewed Schedule']
+
+    custom_order = ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder']
+    order_map = {level: i for i, level in enumerate(custom_order)}
+    for ix in range(1,6):
+        for jx, io in enumerate(pdio[ix]):
+            day_sequence[ix].append(['pdio',jx,io[14],io[15]])
+        for jx, ip in enumerate(pdip[ix]):
+            day_sequence[ix].append(['pdip',jx,ip[14],ip[15]])
+        for jx, eo in enumerate(pdeo[ix]):
+            day_sequence[ix].append(['pdeo',jx,eo[16],eo[17]])
+        for jx, ep in enumerate(pdep[ix]):
+            day_sequence[ix].append(['pdep',jx,ep[16],ep[17]])
+
+    new_day = [[],[],[],[],[],[]]
+    for ix in range(1,6):
+        new_day[ix] = sorted(day_sequence[ix], key=lambda x: (order_map[x[2]],x[3]))
+
+    #for ix in range(1,6):
+        #for day in new_day[ix]:
+            #print(ix,day)
+
 
     if userlist == []: userchange = 0
     else: userchange = 1

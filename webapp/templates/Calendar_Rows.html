@@ -99,6 +99,7 @@
                         {% set dc = io[13] %}
                         <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ io[0] }}">
                             <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ io[5] }}"> <b>{{ io[0] }} ({{ io[6] }})</b><br>{{ io[1] }}<br>{{ io[2] }}<br><i>{{ io[14] }}</i>
+                            {% if io[15] %}<i>{{ io[15] }}</i>{% endif %}
                                 {% if io[4] != [] %}<br>{% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                             </p>
                         </button>
@@ -145,7 +146,8 @@
                         {% set dc = ip[13] %}
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ip[0] }}">
                                     <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}"> <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br><i>{{ ip[14] }}</i>
-                                       {% if ip[4] != [] %}<br>{% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
+                                       {% if ip[15] %}<i>{{ ip[15] }}</i>{% endif %}
+                                        {% if ip[4] != [] %}<br>{% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
                                 <!-- The Modal -->
@@ -194,7 +196,8 @@
 
                                <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ eo[8] }}">
                                     <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}"> {{ eo[0] }} ({{ eo[6] }})<br>{{ eo[9] }}<br>{{ eo[1] }}<br>{{ eo[2] }}<br>{{ eo[15] }}<br><i>{{ eo[16] }}</i>
-                                    {% if eo[4] != [] %}<br>{% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
+                                    {% if eo[17] %}<i>{{ eo[17] }}</i>{% endif %}
+                                        {% if eo[4] != [] %}<br>{% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
                                 <!-- The Modal -->
@@ -246,6 +249,7 @@
 
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ep[0] }}">
                                     <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}"> {{ ep[0] }} ({{ ep[6] }})<br> {{ ep[1] }}<br> {{ ep[2] }}<br>{{ ep[15] }}<br><i>{{ ep[16] }}</i>
+                                        {% if ep[17] %}<i>{{ ep[17] }}</i>{% endif %}
                                         {% if ep[4] != [] %}<br>{% for cmt in ep[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
