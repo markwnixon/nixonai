@@ -790,7 +790,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         dtype = podat.Delivery
         dtime = podat.Time3
         if dtype is None:
-            deliverline = 'Placholder'
+            deliverline = 'Placeholder'
         else:
             deliverline = f'{dtype}'
 
