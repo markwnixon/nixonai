@@ -15,6 +15,7 @@
 {% set pdic = caldata[10] %}
 {% set pdec = caldata[11] %}
 {% set pmon = caldata[12] %}
+{% set do = caldata[13] %}
 
 {% set fbcdg = "font-weight-bold text-center dark-grey-text" %}
 {% set caltop = "font-weight-bold text-center text-warning bg-dark" %}
@@ -61,6 +62,7 @@
             <div class="col-sm-{{ cbr }} text-center">
                 <div class="{{ caltop }}">{{ busdays[ix-1] }}</div>
 
+
                 {% if pmon[ix] %}
                     {% set mon = pmon[ix][0] %}
                         <button type="button" class="btn btn-success" data-toggle="modal" data-target="#mon{{ ix }}">
@@ -93,13 +95,17 @@
                                     </div>
                 {% endif %}
 
-                {% if pdio[ix] or pdip[ix]%}<div class="{{ fbci }}">Import Deliveries</div>{% endif %}
+                <!-- Begin Loop for Ordered by Time and Load Type -->
+                {% for job in do[ix] %}
+                    {% set jtype = job[0] %}
+                    {% set kx = job[1] %}
 
-                    {% for io in pdio[ix] %}
+                    {% if jtype == 'pdio' %}
+                        {% set io = pdio[ix][kx] %}
                         {% set dc = io[13] %}
                         <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ io[0] }}">
                             <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ io[5] }}"> <b>{{ io[0] }} ({{ io[6] }})</b><br>{{ io[1] }}<br>{{ io[2] }}<br><i>{{ io[14] }}</i>
-                            {% if io[15] %}<i>{{ io[15] }}</i>{% endif %}
+                            {% if io[15] != '25:00' %}<i>{{ io[15] }}</i>{% endif %}
                                 {% if io[4] != [] %}<br>{% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                             </p>
                         </button>
@@ -140,13 +146,14 @@
                                     </div>
                                 </div>
 
-                    {% endfor %}
+                    {% endif %}
 
-                    {% for ip in pdip[ix] %}
+                    {% if jtype == 'pdip' %}
+                        {% set ip = pdip[ix][kx] %}
                         {% set dc = ip[13] %}
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ip[0] }}">
                                     <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}"> <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br><i>{{ ip[14] }}</i>
-                                       {% if ip[15] %}<i>{{ ip[15] }}</i>{% endif %}
+                                       {% if ip[15] != '25:00' %}<i>{{ ip[15] }}</i>{% endif %}
                                         {% if ip[4] != [] %}<br>{% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
@@ -188,15 +195,15 @@
                                     </div>
                                 </div>
 
-                    {% endfor %}
+                    {% endif %}
 
-                {% if pdeo[ix] %}<div class="{{ fbci }}">Exports to Port</div>{% endif %}
-                    {% for eo in pdeo[ix] %}
+                    {% if jtype == 'pdeo' %}
+                        {% set eo = pdeo[ix][kx] %}
                         {% set dc = eo[13] %}
 
                                <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ eo[8] }}">
                                     <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}"> {{ eo[0] }} ({{ eo[6] }})<br>{{ eo[9] }}<br>{{ eo[1] }}<br>{{ eo[2] }}<br>{{ eo[15] }}<br><i>{{ eo[16] }}</i>
-                                    {% if eo[17] %}<i>{{ eo[17] }}</i>{% endif %}
+                                    {% if eo[17] != '25:00' %}<i>{{ eo[17] }}</i>{% endif %}
                                         {% if eo[4] != [] %}<br>{% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
@@ -241,15 +248,15 @@
                                 </div>
 
 
-                    {% endfor %}
+                    {% endif %}
 
-            {% if pdep[ix] %}<div class="{{ fbci }}">Export Pulls</div>{% endif %}
-                    {% for ep in pdep[ix] %}
+                    {% if jtype == 'pdep' %}
+                        {% set ep = pdep[ix][kx] %}
                         {% set dc = ep[13] %}
 
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ep[0] }}">
                                     <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}"> {{ ep[0] }} ({{ ep[6] }})<br> {{ ep[1] }}<br> {{ ep[2] }}<br>{{ ep[15] }}<br><i>{{ ep[16] }}</i>
-                                        {% if ep[17] %}<i>{{ ep[17] }}</i>{% endif %}
+                                        {% if ep[17] != '25:00' %}<i>{{ ep[17] }}</i>{% endif %}
                                         {% if ep[4] != [] %}<br>{% for cmt in ep[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
@@ -290,8 +297,8 @@
                                 </div>
 
 
-                    {% endfor %}
-
+                    {% endif %}
+                {% endfor %}
 
                     {% for ic in pdic[ix] %}
                         <p class="small {{ ic[2] }}">{{ ic[0] }}<br>{{ ic[1] }}

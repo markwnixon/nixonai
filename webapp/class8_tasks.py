@@ -794,10 +794,13 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         else:
             deliverline = f'{dtype}'
 
-        if dtime is None:
-            delivertime = ''
-        else:
+        if hasinput(dtime):
             delivertime = f'{dtime}'
+        else:
+            delivertime = '25:00'
+
+
+        print(f'{deliverline}: delivertime is {delivertime}')
 
         user = podat.UserMod
         if user != username:
@@ -1091,16 +1094,16 @@ def create_cal_data(tfilters, dlist, username, resetmod):
 
     new_day = [[],[],[],[],[],[]]
     for ix in range(1,6):
-        new_day[ix] = sorted(day_sequence[ix], key=lambda x: (order_map[x[2]],x[3]))
+        new_day[ix] = sorted(day_sequence[ix], key=lambda x: ( x[3], order_map[x[2]]) )
 
-    #for ix in range(1,6):
-        #for day in new_day[ix]:
-            #print(ix,day)
+    for ix in range(1,6):
+        for day in new_day[ix]:
+            print(ix,day)
 
 
     if userlist == []: userchange = 0
     else: userchange = 1
-    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec, pmon, userchange
+    return pdio, pdip, pdeo, pdep, caldays, pdic, pdec, pmon, userchange, new_day
 
 def initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist):
     pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [
@@ -1355,7 +1358,7 @@ def Table_maker(genre):
                     #print('planner filter set 1', key, tfilters[key])
             dlist = table_filters[0]['Date Filter']
 
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
 
             if not userchange:
                 pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
@@ -1372,7 +1375,7 @@ def Table_maker(genre):
                     err.append(f'User {username} now has control of calendar data')
 
             if reupdate:
-                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
 
             if task_iter == 0:
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
@@ -1503,7 +1506,7 @@ def Table_maker(genre):
                         'Color Filter': 'Both', 'Viewer': '8x4'}
             # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
             dlist = table_filters[0]['Date Filter']
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
             if not userchange:
                 pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
                 if resetmod is None:
@@ -1519,7 +1522,7 @@ def Table_maker(genre):
                     err.append(f'User {username} now has control of calendar data')
 
 
-            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
             pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
             jolist = []
 
@@ -1560,7 +1563,7 @@ def Table_maker(genre):
                 # If the tesk is completed and we never left the calendar then keep the checks we used
                 #Reset the calendar
                 dlist = table_filters[0]['Date Filter']
-                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
                 if not userchange:
                     pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
                     if resetmod is None:
@@ -1575,7 +1578,7 @@ def Table_maker(genre):
                     else:
                         err.append(f'User {username} now has control of calendar data')
 
-                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange = create_cal_data(tfilters, dlist, username, resetmod)
+                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
                 pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
 
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
@@ -1769,7 +1772,7 @@ def Table_maker(genre):
             bdat = PortClosed.query.filter(PortClosed.Date == bday).first()
             if bdat is None: cal_labels.append(bday)
             else: cal_labels.append(bdat.Reason)
-        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, cal_labels, jolist, pdic, pdec, pmon]
+        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, cal_labels, jolist, pdic, pdec, pmon, do]
         #print(f'Holdvec[100] = {holdvec[100]}')
 
     #print(checked_data)
