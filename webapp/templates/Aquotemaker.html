@@ -12,6 +12,15 @@
         {% set emailin1 = 'Invalid Email' %}
     {% endif %}
 {% endif %}
+{% set showcosts = whouse[0] %}
+{% set showfees = whouse[1] %}
+{% set showhouse = whouse[2] %}
+{% set wdray = whouse[3] %}
+{% set palletxfer = whouse[4] %}
+{% set stopallet = whouse[5] %}
+{% set floorunload = whouse[6] %}
+{% set palletization = whouse[7] %}
+{% set palletcost = whouse[8] %}
 
 {% if taskbox == 1 or taskbox == 5%}
         <div class="col-sm-4" align="left">
@@ -29,96 +38,160 @@
 
         <div class="col-sm-4" align="left">
         <br>
-        {% if expdata %}
-            <div class="card">
-              <div class="card-header">
-                Experienced-Based Cost Rates <button type="submit" class="btn btn-elegant btn-sm" name="newcosts">Update Costs</button><button type="submit" class="btn btn-blue btn-sm" name="oldcosts">Return to Default</button>
-              </div>
-            <div class="card-body">
-                <table class="table table-condensed">
-                    <tbody>
-                  <tr>
-                      <td><b>Driver Rate</b></td><td><b>Fuel</b></td><td><b>MPG</b></td><td><b>Truck Insurance</b></td><td><b>Mark-Up</b></td>
-                  </tr>
-                      <td>$/hr(full burden)</td><td>$/gal</td><td>miles/gal</td><td>$/year each truck</td><td>xcost factor</td>
-                 </tr>
-                  <tr>
-                      <td><input class="form-control" type="text" name='driver' value={{ expdata[0] }}></td>
-                      <td><input class="form-control" type="text" name='fuel' value={{ expdata[1] }}></td>
-                      <td><input class="form-control" type="text" name='mpg' value={{ expdata[2] }}></td>
-                      <td><input class="form-control" type="text" name='insurance' value={{ expdata[3] }}></td>
-                      <td><input class="form-control" type="text" name='markup' value={{ expdata[4] }}></td>
-                 </tr>
-                  <tr>
-                      </td><td><b>Toll Rate</b></td><td><b>G&A Rate</b></td><td><b>R&M Rate</b></td><td><b>LicFeeReg Rate</b></td><td><b>Other</b></td>
-                  </tr>
-                      <td>5-axle rate</td><td>%</td><td>$/mile</td><td>$/mile</td><td>$/mile</td>
-                 </tr>
-                  <tr>
-                      <td><input class="form-control" type="text" name='toll' value={{ expdata[5] }}></td>
-                      <td><input class="form-control" type="text" name='gapct' value={{ expdata[6] }}></td>
-                      <td><input class="form-control" type="text" name='rm' value={{ expdata[7] }}></td>
-                      <td><input class="form-control" type="text" name='fees' value={{ expdata[8] }}></td>
-                      <td><input class="form-control" type="text" name='other' value={{ expdata[9] }}></td>
-                 </tr>
-                  <tr>
-                      <td><b>Fuel Rate</b></td><td><b>Insur Rate</b></td><td><b>Total per Mile</b></td><td><b>Total per Hour</b></td><td>&nbsp</td>
-                  </tr>
-                      <td>$/mile</td><td>$/hr</td><td>$/mile</td><td>$/hour</td><td>&nbsp</td>
-                 </tr>
-                  <tr>
 
-                      <td><input class="form-control" type="text" placeholder={{ expdata[10] }} disabled></td>
-                      <td><input class="form-control" type="text" placeholder={{ expdata[11] }} disabled></td>
-                      <td><input class="form-control" type="text" placeholder={{ expdata[12] }} disabled></td>
-                      <td><input class="form-control" type="text" placeholder={{ expdata[13] }} disabled></td>
-                      <td>&nbsp</td>
-                 </tr>
-                </tbody>
-            </table>
-            </div></div>
+            {% if expdata %}
+                <div class="card">
+                  <div class="card-header">
+                    Experienced-Based Cost Rates <button type="submit" class="btn btn-elegant btn-sm" name="newcosts" {% if not showcosts %}disabled{% endif %} >Update Costs</button><button type="submit" class="btn btn-blue btn-sm" name="oldcosts" {% if not showcosts %}disabled{% endif %}>Return to Default</button>
+                      <div class="custom-control custom-checkbox custom-control-inline">
+                          <input type="checkbox" class="custom-control-input" id="showcosts" {% if showcosts=='on' %} checked {% endif %} name="showcosts">
+                          <label class="custom-control-label" for="showcosts">Show Cost Rates</label>
+                      </div>
+                  </div>
+                  {% if showcosts %}
+                        <div class="card-body">
+                        <table class="table table-condensed">
+                            <tbody>
+                              <tr>
+                                  <td><b>Driver Rate</b></td><td><b>Fuel</b></td><td><b>MPG</b></td><td><b>Truck Insurance</b></td><td><b>Mark-Up</b></td>
+                              </tr>
+                                  <td>$/hr(full burden)</td><td>$/gal</td><td>miles/gal</td><td>$/year each truck</td><td>xcost factor</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='driver' value={{ expdata[0] }}></td>
+                                  <td><input class="form-control" type="text" name='fuel' value={{ expdata[1] }}></td>
+                                  <td><input class="form-control" type="text" name='mpg' value={{ expdata[2] }}></td>
+                                  <td><input class="form-control" type="text" name='insurance' value={{ expdata[3] }}></td>
+                                  <td><input class="form-control" type="text" name='markup' value={{ expdata[4] }}></td>
+                              </tr>
+                              <tr>
+                                  </td><td><b>Toll Rate</b></td><td><b>G&A Rate</b></td><td><b>R&M Rate</b></td><td><b>LicFeeReg Rate</b></td><td><b>Other</b></td>
+                              </tr>
+                                  <td>5-axle rate</td><td>%</td><td>$/mile</td><td>$/mile</td><td>$/mile</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='toll' value={{ expdata[5] }}></td>
+                                  <td><input class="form-control" type="text" name='gapct' value={{ expdata[6] }}></td>
+                                  <td><input class="form-control" type="text" name='rm' value={{ expdata[7] }}></td>
+                                  <td><input class="form-control" type="text" name='fees' value={{ expdata[8] }}></td>
+                                  <td><input class="form-control" type="text" name='other' value={{ expdata[9] }}></td>
+                              </tr>
+                              <tr>
+                                  <td><b>Fuel Rate</b></td><td><b>Insur Rate</b></td><td><b>Total per Mile</b></td><td><b>Total per Hour</b></td><td>&nbsp</td>
+                              </tr>
+                              <tr>
+                                  <td>$/mile</td><td>$/hr</td><td>$/mile</td><td>$/hour</td><td>&nbsp</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[10] }} disabled></td>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[11] }} disabled></td>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[12] }} disabled></td>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[13] }} disabled></td>
+                                  <td>&nbsp</td>
+                              </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                  {% endif %}
+                </div>
 
-            <div class="card">
-              <div class="card-header">
-                Accessorial Fees <button type="submit" class="btn btn-elegant btn-sm" name="newfees">Update Fees</button>
-              </div>
-            <div class="card-body">
-                <table class="table table-condensed table-hover">
-                    <tbody>
-                  <tr>
-                      <td><b>FSC %</b></td><td><b>Tandem Chas</b></td><td><b>Triaxle Chas</b></td><td><b>Prepull Fee</b></td><td><b>Yard Stor</b></td>
-                  </tr>
-                  <tr>
-                      <td><input class="form-control" type="text" name='fsc' value={{ expdata[14] }}></td>
-                      <td><input class="form-control" type="text" name='chassis2' value={{ expdata[15] }}></td>
-                      <td><input class="form-control" type="text" name='chassis3' value={{ expdata[16] }}></td>
-                      <td><input class="form-control" type="text" name='prepull' value={{ expdata[17] }}></td>
-                      <td><input class="form-control" type="text" name='store' value={{ expdata[18] }}></td>
-                 </tr>
-                  <tr>
-                      <td><b>Driver Det</b></td><td><b>Extra Stop</b></td><td><b>Overwt Base</b></td><td><b>OW per mile</b></td><td><b>Reefer</b></td>
-                  <tr>
-                      <td><input class="form-control" type="text" name='detention' value={{ expdata[19] }}></td>
-                      <td><input class="form-control" type="text" name='extrastop' value={{ expdata[20] }}></td>
-                      <td><input class="form-control" type="text" name='overweight' value={{ expdata[21] }}></td>
-                      <td><input class="form-control" type="text" name='owmile' value={{ expdata[22] }}></td>
-                      <td><input class="form-control" type="text" name='reefer' value={{ expdata[23] }}></td>
-                 </tr>
-                  <tr>
-                      <td><b>Scale Tick</b></td><td><b>Residential</b></td><td><b>Port Congest</b></td><td><b>Chass Splt</b></td><td><b>Permits</b></td>
-                  <tr>
-                 <tr>
-                      <td><input class="form-control" type="text" name='scale' value={{ expdata[24] }}></td>
-                      <td><input class="form-control" type="text" name='residential' value={{ expdata[25] }}></td>
-                      <td><input class="form-control" type="text" name='congestion' value={{ expdata[26] }}></td>
-                      <td><input class="form-control" type="text" name='chassplit' value={{ expdata[27] }}></td>
-                      <td><input class="form-control" type="text" name='permits' value={{ expdata[28] }}></td>
-                 </tr>
 
-                </tbody>
-            </table>
-            </div></div>
-        {% endif %}
+                <div class="card">
+                    <div class="card-header">
+                        Accessorial Fees <button type="submit" class="btn btn-elegant btn-sm" name="newfees" {% if not showfees %}disabled{% endif %}>Update Fees</button>
+                        <div class="custom-control custom-checkbox custom-control-inline">
+                            <input type="checkbox" class="custom-control-input" id="showfees" {% if showfees=='on' %} checked {% endif %} name="showfees">
+                            <label class="custom-control-label" for="showfees">Show Accessorial Fees</label>
+                        </div>
+                    </div>
+
+                    {% if showfees %}
+                    <div class="card-body">
+                        <table class="table table-condensed table-hover">
+                            <tbody>
+                              <tr>
+                                  <td><b>FSC %</b></td><td><b>Tandem Chas</b></td><td><b>Triaxle Chas</b></td><td><b>Prepull Fee</b></td><td><b>Yard Stor</b></td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='fsc' value={{ expdata[14] }}></td>
+                                  <td><input class="form-control" type="text" name='chassis2' value={{ expdata[15] }}></td>
+                                  <td><input class="form-control" type="text" name='chassis3' value={{ expdata[16] }}></td>
+                                  <td><input class="form-control" type="text" name='prepull' value={{ expdata[17] }}></td>
+                                  <td><input class="form-control" type="text" name='store' value={{ expdata[18] }}></td>
+                             </tr>
+                             <tr>
+                                  <td><b>Driver Det</b></td><td><b>Extra Stop</b></td><td><b>Overwt Base</b></td><td><b>OW per mile</b></td><td><b>Reefer</b></td>
+                             <tr>
+                                  <td><input class="form-control" type="text" name='detention' value={{ expdata[19] }}></td>
+                                  <td><input class="form-control" type="text" name='extrastop' value={{ expdata[20] }}></td>
+                                  <td><input class="form-control" type="text" name='overweight' value={{ expdata[21] }}></td>
+                                  <td><input class="form-control" type="text" name='owmile' value={{ expdata[22] }}></td>
+                                  <td><input class="form-control" type="text" name='reefer' value={{ expdata[23] }}></td>
+                             </tr>
+                              <tr>
+                                  <td><b>Scale Tick</b></td><td><b>Residential</b></td><td><b>Port Congest</b></td><td><b>Chass Splt</b></td><td><b>Permits</b></td>
+                              <tr>
+                             <tr>
+                                  <td><input class="form-control" type="text" name='scale' value={{ expdata[24] }}></td>
+                                  <td><input class="form-control" type="text" name='residential' value={{ expdata[25] }}></td>
+                                  <td><input class="form-control" type="text" name='congestion' value={{ expdata[26] }}></td>
+                                  <td><input class="form-control" type="text" name='chassplit' value={{ expdata[27] }}></td>
+                                  <td><input class="form-control" type="text" name='permits' value={{ expdata[28] }}></td>
+                             </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                      <div class="card-header">
+                            Warehouse Fees <button type="submit" class="btn btn-elegant btn-sm" name="updatehousefees" {% if not showhouse %}disabled{% endif %}>Update Warehouse Fees</button>
+                            <div class="custom-control custom-checkbox custom-control-inline">
+                                  <input type="checkbox" class="custom-control-input" id="showhouse" {% if showhouse=='on' %} checked {% endif %} name="showhouse">
+                                  <label class="custom-control-label" for="showhouse">Show Warehouse Fees</label>
+                            </div>
+                      </div>
+
+                      {% if showhouse %}
+                      <div class="card-body">
+                            <table class="table table-condensed table-hover">
+                                <tbody>
+                                  <tr>
+                                      <td><b>Drayage</b></td><td><b>Pallet Xfer</b></td><td><b>Pallet Sto</b></td><td><b>Floor Loaded</b></td><td><b>Palletization</b></td>
+                                  </tr>
+                                  <tr>
+                                      <td><input class="form-control" type="text" name='xdray' value={{ expdata[29] }}></td>
+                                      <td><input class="form-control" type="text" name='xpalletxfer' value={{ expdata[30] }}></td>
+                                      <td><input class="form-control" type="text" name='xstopallet' value={{ expdata[31] }}></td>
+                                      <td><input class="form-control" type="text" name='xfloorunload' value={{ expdata[32] }}></td>
+                                      <td><input class="form-control" type="text" name='xpalletization' value={{ expdata[33] }}></td>
+                                 </tr>
+                                  <tr>
+                                      <td><b>Pallet Cost</b></td><td><b>Future</b></td><td><b>Future</b></td><td><b>Future</b></td><td><b>Future</b></td>
+                                  </tr>
+                                  <tr>
+                                      <td><input class="form-control" type="text" name='xpalletcost' value={{ expdata[34] }}></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                 </tr>
+                                </tbody>
+                            </table>
+                      </div>
+                      {% endif %}
+                </div>
+
+            {% endif %}
+
+
+
+
+
+
+
+
         <br>
         {% if timedata %}
             <div class="card">
@@ -230,6 +303,7 @@
 {% else %}
     {% set ncit = multibid[1]|int %}
     {% set term = multibid[4] %}
+    {% set terminals = multibid[5] %}
     <div class="col-sm-4" align="left">
     <br>
         <div class="card">
@@ -250,13 +324,11 @@
                 </select>
             </div>
             <div class="custom-control custom-checkbox custom-control-inline">
-                Change Terminal To:&nbsp;&nbsp;
+                From Terminal:&nbsp;&nbsp;
                 <select class="form-select" aria-label="Default select example" name="terminal" onchange="this.form.submit()">
-                      <option {% if term == 'BAL' %} selected {% endif %} value='BAL'>Baltimore Seagirt</option>
-                      <option {% if term == 'NIT' %} selected {% endif %} value='NIT'>Norfolk Int Terminal</option>
-                      <option {% if term == 'VIG' %} selected {% endif %} value='VIG'>Virginia Int Gateway</option>
-                      <option {% if term == 'PAC' %} selected {% endif %} value='PAC'>Packer Ave Marine Term</option>
-                      <option {% if term == 'PNCT' %} selected {% endif %} value='PNCT'>PNCT-Maher Terminals</option>
+                    {% for terminal in terminals %}
+                      <option {% if term == terminal.Name %} selected {% endif %} value='{{ terminal.Name }}'>{{ terminal.Name }}</option>
+                    {% endfor %}
                 </select>
             </div>
         {% if multibid[0] == 'on' %}
@@ -264,7 +336,7 @@
             {% set mbids = multibid[3] %}
             <table>
                 <tr>
-                      <td align="right"> <b>From Location: &nbsp</b></td>
+                      <td align="right"> <b>Terminal Start: &nbsp</b></td>
                       <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
 
                 </tr>
@@ -291,31 +363,29 @@
 
             <table>
                   <tr>
-                      <td align="right"> <b>To Location: &nbsp</b></td>
-                      <td colspan="3"><textarea class="form-control" type="text" name="locto" rows="2">{{locto}}</textarea></td>
-                 </tr>
-                  <tr>
-                      <td align="right"> <b>From Location: &nbsp</b></td>
-                      <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
+                      <td align="right"> <b>To: &nbsp</b></td>
+                      <td colspan="5"><textarea class="form-control" type="text" name="locto" rows="2">{{locto}}</textarea></td>
+                      <td colspan="6"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
                  </tr>
                 {% set types = [' Live', ' Drop-Pick', ' Drop-Hook', ' FSC Live'] %}
                  {%  for jx in range(1,5) %}
                      {% if tbox[11+loop.index]=='on' %}
                       <tr>
-                          <td align="right"> <b>Bid/Override{{ types[loop.index-1] }}: &nbsp</b></td>
+                          <td align="right"> <b>O.R. Bid{{ types[loop.index-1] }}: &nbsp</b></td>
                           <td colspan="3"><textarea class="form-control" type="text" name="bidthis{{ loop.index-1 }}" rows="1">{{bidthis[jx-1]}}</textarea></td>
-                     </tr>
+
                      {% endif %}
                  {% endfor %}
-                <tr>
+
                           <td align="right">
-                              <b>Override Costs Mark-Up: &nbsp</b>
+                              <b>O.R. Markup: &nbsp</b>
                           </td>
                           <td colspan="3"><textarea class="form-control" type="text" name="optmarkup" rows="1">{{newmarkup}}</textarea></td>
-                </tr>
-                  <tr>
-                      <td align="right"> <b>Salutation Name/Override: &nbsp</b></td>
+
+                      <td align="right"> <b>O.R. Name: &nbsp</b></td>
                       <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
+                      <td></td>
+                      <td></td>
                  </tr>
             </table>
         {% endif %}
@@ -407,8 +477,6 @@
               <input type="checkbox" class="custom-control-input" id="box18" {% if tbox[18]=='on' %} checked {% endif %} name="tbox18">
               <label class="custom-control-label" for="box18">Mix 20-40</label>
             </div>
-        <br><br>
-                Indicate capacity:<br>
             <div class="custom-control custom-checkbox custom-control-inline">
               <input type="checkbox" class="custom-control-input" id="box19" {% if tbox[19]=='on' %} checked {% endif %} name="tbox19">
               <label class="custom-control-label" for="box19">Immediate</label>
@@ -417,6 +485,32 @@
               <input type="checkbox" class="custom-control-input" id="box20" {% if tbox[20]=='on' %} checked {% endif %} name="tbox20">
               <label class="custom-control-label" for="box20">Next Week</label>
             </div>
+        <br><br>
+                Warehouse Selections:<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="wdray" {% if wdray == 'on' %} checked {% endif %} name="wdray">
+              <label class="custom-control-label" for="wdray">Drayage</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="palletxfer" {% if palletxfer=='on' %} checked {% endif %} name="palletxfer">
+              <label class="custom-control-label" for="palletxfer">Pallets On/Off</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="stopallet" {% if stopallet=='on' %} checked {% endif %} name="stopallet">
+              <label class="custom-control-label" for="stopallet">Store Pallets</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="floorunload" {% if floorunload=='on' %} checked {% endif %} name="floorunload">
+              <label class="custom-control-label" for="floorunload">Floor Unload</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="palletization" {% if palletization=='on' %} checked {% endif %} name="palletization">
+              <label class="custom-control-label" for="palletization">Palletization</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="palletcost" {% if palletcost=='on' %} checked {% endif %} name="palletcost">
+              <label class="custom-control-label" for="palletcost">Pallet Cost</label>
+            </div>
             <br><br>
              <button type="submit" class="btn btn-elegant btn-sm" name="GetQuote">Update<br>Quote</button>
              <button type="submit" class="btn btn-elegant btn-sm" name="Update">Override<br>Bid/Name</button>
@@ -424,7 +518,9 @@
              <button type="submit" class="btn btn-green btn-sm" name="Email" {% if locto == 'No Location Found' or emailin1 == 'Invalid Email'%}disabled{% endif %}>Email Qte<br>& Next</button>
              <button type="submit" class="btn btn-blue btn-sm" name="Return">Return To<br>Table</button>
              <button type="submit" class="btn btn-red btn-sm" name="RemoveGo">Remove &<br>Next</button>
-             <button type="submit" class="btn btn-blue btn-sm" name="Ware">Warehouse &<br>Next</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="Ware">&nbsp;&nbsp;Mark&nbsp;&nbsp;<br>as WH</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="WareBB">&nbsp;WH FAST&nbsp;<br>BID</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="WareUD">&nbsp;&nbsp;WH&nbsp;&nbsp;<br>Update</button>
 
         </div></div>
 

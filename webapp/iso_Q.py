@@ -16,12 +16,15 @@ from email.utils import parsedate_to_datetime
 from bs4 import BeautifulSoup
 
 import datetime
-from webapp.models import Quotes, Quoteinput
+from webapp.models import Quotes, Quoteinput, Terminals
 from send_mimemail import send_mimemail
 from pyzipcode import ZipCodeDatabase
 zcdb = ZipCodeDatabase()
 
 from viewfuncs import dataget_Q, nonone, numcheck
+from zoneinfo import ZoneInfo
+import time
+from tzlocal import get_localzone
 
 API_KEY_GEO = apikeys['gkey']
 API_KEY_DIS = apikeys['dkey']
@@ -32,6 +35,7 @@ date_y4=re.compile(r'([1-9]|0[1-9]|[12][0-9]|3[01]) (Jan|Feb|Mar|Apr|May|Jun|Jul
 today_now = datetime.datetime.now()
 today = today_now.date()
 timenow = today_now.time()
+include_text = ''
 
 def roundup(x):
     return int(math.ceil(x / 10.0)) * 10
@@ -203,7 +207,7 @@ def add_quote_emails():
             mid = extract_for_code(email_message["Message-ID"])
             mid = mid.strip()
             fromp = extract_for_code(email_message["From"])
-            print(fromp)
+            #print(fromp)
             if '@' not in fromp: fromp = 'Invalid Email'
             #print(f'Message ID: {mid}')
             #print(f'Subject: {subject}')
@@ -213,20 +217,30 @@ def add_quote_emails():
             try:
                 date_time_str = email_message["Date"]
                 date_time = parsedate_to_datetime(date_time_str)
-                thisdate = date_time.date()
-                thistime = date_time.time()
-                #print(f'Date: {str(thisdate)}')
-                #print(f'Time: {str(thistime)}')
+                #utc_offset = date_time.utcoffset()
+                utc_dt = date_time.astimezone(ZoneInfo("UTC"))
+                local_tz = get_localzone()
+                local_dt = utc_dt.astimezone(local_tz)
+                #print(f'DateTime: {date_time}')
+                #print(f'UTC Time: {utc_dt}')
+                #print(f'Date: {thisdate}')
+                #print(f'Time: {thistime}')
+                #local_tz = ZoneInfo(time.tzname[0])
+                #local_dt = utc_dt.astimezone(local_tz)
+                #print(f'Local Date Time: {local_dt}')
             except:
                 date_time = today_now
                 thisdate = today
                 thistime = timenow
+                utc_dt = date_time.astimezone(ZoneInfo("UTC"))
+                local_tz = get_localzone()
+                local_dt = utc_dt.astimezone(local_tz)
                 #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
 
             qdat = Quotes.query.filter(Quotes.Mid == mid).first()
             if qdat is None:
                 try:
-                    input = Quotes(Date=date_time, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
+                    input = Quotes(Date=local_dt, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
                                    Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD', Markup=None)
                     db.session.add(input)
                     db.session.commit()
@@ -316,10 +330,10 @@ def checkcross(lam,la_last,la,lom,lo_last,lo):
     locross = 0
     if (la_last<lam and la>lam) or (la_last>lam and la<lam):
         lacross = 1
-        print('Toll by latitude Method 2')
+        #print('Toll by latitude Method 2')
     if (lo_last<lom and lo>lom) or (lo_last>lom and lo<lom):
         locross = 1
-        print('Toll by longitude Method 2')
+        #print('Toll by longitude Method 2')
     return lacross, locross
 
 def checkcross2(la_last, la, lo_last, lo, xmin, ymin, xmax, ymax):
@@ -363,7 +377,7 @@ def sendquote():
     emailcc1 = request.values.get('edat4')
     emailcc2 = request.values.get('edat5')
     if '@' not in emailin1:
-        print('Cannot Send this Email')
+        #print('Cannot Send this Email')
         error = 1
     emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
     if error == 0:
@@ -405,8 +419,9 @@ def get_directions(start,end):
     end = end.replace(" ", "+")
     url = f'https://maps.googleapis.com/maps/api/directions/json?origin={start}&destination={end}'
     url = url + f'&key={API_KEY_DIS}'
-    #print(url)
+    #print(f'url:{url}')
     response = get(url)
+    #print(response.json())
     dis, dus, hts, las, los  = direct_resolver(response.json())
 
     #Convert all mixed units to miles, hours and convert from text to floats
@@ -441,6 +456,8 @@ def get_directions(start,end):
     for lo in los:
         lons.append(float(lo))
 
+    #print(f'dists:{dists} duras:{duras} tot_dist:{tot_dist}')
+
     return dists, duras, lats, lons, hts, tot_dist, tot_dura
 
 def get_place(subject, body, multibid):
@@ -465,7 +482,7 @@ def get_place(subject, body, multibid):
     #print(f'the address is {testp}, {testq}, {testq2}, {testq3}')
     for test in testp:
         ziptest = test.strip()
-        print(f'this zip is: {ziptest}')
+        #print(f'this zip is: {ziptest}')
         try:
             zb = zcdb[ziptest]
             location = f'{zb.city}, {zb.state}  {ziptest}'
@@ -480,7 +497,7 @@ def get_place(subject, body, multibid):
 
     for test in testq:
         ziptest = test.strip()
-        print(f'this zip is: {ziptest}')
+        #print(f'this zip is: {ziptest}')
         if zip != '21224':
             try:
                 zb = zcdb[ziptest]
@@ -512,7 +529,7 @@ def get_place(subject, body, multibid):
             loci.append('No Location Found')
     if len(loci) > requested:
         loci = loci[0:requested]
-    print(f'returning location {location} loci {loci}')
+    #print(f'returning location {location} loci {loci}')
     return location, loci
 
 def friendly(emailin):
@@ -531,11 +548,51 @@ def emailonly(emailin):
     except:
         return emailin
 
-def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port):
+def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD):
     sen, tbox, btype, stype, mixtype = insert_adds(tbox,expdata,takedef,distdata,multibid)
-    #print(f'btype is {btype}')
+    #print(f'btype is {btype} and wareBB is {wareBB}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     ebody = ''
+
+    if wareBB is not None or wareUD is not None:
+        #print('Running the warehouse wareBB section')
+        sdray = f'Drayage from {port} to {cdata[0]} warehouse: <b>${expdata[29]}</b>'
+        spallet1 = f'Pallets off-loaded at warehouse: <b>${expdata[30]} per pallet</b>'
+        spallet2 = f'Pallets on-loaded from warehouse: <b>${expdata[30]} per pallet</b>'
+        sstopallet = f'Storage in warehouse: <b>${expdata[31]} per pallet per day</b>'
+        if wareBB is not None:
+            ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote to dray and transload your container load from {port} to our warehouse in {cdata[6]}.<br><br>'
+            ebody = ebody + f'\n{tabover}{sdray}<br>'
+            ebody = ebody + f'\n{tabover}{spallet1}<br>'
+            ebody = ebody + f'\n{tabover}{spallet2}<br>'
+            ebody = ebody + f'\n{tabover}{sstopallet}<br>'
+
+            bidtypeamount = [None, None]
+            return ebody, tbox, etitle, bidtypeamount
+
+        if wareUD is not None:
+            if whouse[3]:
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote to dray and transload your container load from {port} to our warehouse in {cdata[6]}.<br><br>'
+            else:
+                ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote to transload your load at our warehouse in {cdata[6]}.<br><br>'
+            if whouse[3]:
+                ebody = ebody + f'\n{tabover}{sdray}<br>'
+            if whouse[4]:
+                ebody = ebody + f'\n{tabover}{spallet1}<br>'
+                ebody = ebody + f'\n{tabover}{spallet2}<br>'
+            if whouse [5]:
+                ebody = ebody + f'\n{tabover}{sstopallet}<br>'
+            if whouse [6]:
+                ebody = ebody + f'\n{tabover}Unload each floor loaded container or dry van at a cost of <b>${expdata[32]}</b><br>'
+            if whouse [7]:
+                ebody = ebody + f'\n{tabover}Palletize the product at a cost of <b>${expdata[33]}</b> per pallet<br>'
+            if whouse [8]:
+                ebody = ebody + f'\n{tabover}Provide pallets for palletization at a cost of <b>${expdata[34]}</b> per pallet<br>'
+            bidtypeamount = [None, None]
+            return ebody, tbox, etitle, bidtypeamount
+
+
+
     bidtypeamount = [None, None]
     if multibid[0] == 'on':
         loci = multibid[2]
@@ -596,7 +653,7 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
         else:
             if 'all-in' in btype:
                 ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto} from {port}.' \
-                        f'\nThe quote is inclusive of tolls, 2-days chassis, pre-pull, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
+                        f'\nThe quote is inclusive of {include_text}, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
                 ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
                 bidtypeamount[0] = 'all-in'
                 bidtypeamount[1] = bidthis[4]
@@ -739,7 +796,8 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
 
     return sen, tbox, btype, stype, mixtype
 
-def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
+def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata):
+    #print(f'miles: {miles}, hours: {hours}, lats: {lats}, lons: {lons}, dirdata: {dirdata}')
     # Get the base inputs costs:
     ph_driver = float(qidat.ph_driver) / 100
     fuel = float(qidat.fuelpergal) / 100
@@ -854,6 +912,8 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
     totmiles = tripmiles + portmiles + glidemiles
     distdata = [d1s(tripmiles), d1s(portmiles), '0.0', d1s(glidemiles), d1s(totmiles)]
 
+    #print(f'timedata: {timedata}, distdata: {distdata}')
+
     newdirdata = []
     for lx, aline in enumerate(dirdata):
         tot_tolls += legtolls[lx]
@@ -890,10 +950,58 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
                 pm_fuel + pm_repairs + pm_fees + pm_other)) * (1 + gapct / 100)
     drbid = dpbid + bobtailcost * markupx
     fuelbid = bid / (1 + fsc / 100)
-    allbid = bid + 2 * 40
+
+    for ix in range(len(tbox)):
+        tbox[ix] = request.values.get(f'tbox{str(ix)}')
+    #print(f'distdata here near end: {distdata} and tbox is {tbox}')
+    #print(f'expdata here near end: {expdata}')
+
+    allbid = bid
+    include_text = 'tolls, fuel'
+    if tbox[0]:
+        allbid += 2*chassis2
+        include_text = f'{include_text}, 2-days chassis'
+    if tbox[1]:
+        allbid += 2*chassis3
+        include_text = f'{include_text}, 2-days triax chassis'
+    if tbox[2]:
+        allbid += prepull
+        include_text = f'{include_text}, prepull'
+    if tbox[3]:
+        allbid += store
+        include_text = f'{include_text}, 1-day storage'
+    if tbox[4]:
+        #print('Making the OW calsulations')
+        owfee1 = round(int(float(expdata[21])))
+        owfee2 = round(int(float(expdata[22]) * float(distdata[0]) / 2) / 10) * 10
+        owfeetot = owfee1 + owfee2
+        #print(owfeetot)
+        allbid += owfeetot
+        include_text = f'{include_text}, overweight fees'
+    if tbox[5]:
+        allbid += float(expdata[28])
+        include_text = f'{include_text}, permits'
+    if tbox[6]:
+        allbid += float(expdata[20])
+        include_text = f'{include_text}, extra stops'
+    if tbox[7]:
+        allbid += float(expdata[23])
+        include_text = f'{include_text}, reefer fees'
+    if tbox[8]:
+        allbid += float(expdata[24])
+        include_text = f'{include_text}, scale tickets'
+    if tbox[9]:
+        allbid += float(expdata[25])
+        include_text = f'{include_text}, residential fees'
+    if tbox[11]:
+        allbid += float(expdata[25])
+        include_text = f'{include_text}, chassis split fees'
 
     biddata = [d2s(roundup(bid)), d2s(roundup(drbid)), d2s(roundup(dpbid)), d2s(roundup(fuelbid)), d2s(roundup(allbid))]
-    return timedata, distdata, costdata, biddata, newdirdata
+
+    #print(f'returning distdata:{distdata} and biddata: {biddata}')
+
+    return timedata, distdata, costdata, biddata, newdirdata, include_text
 
 def get_body_text(qdat):
 
@@ -1012,7 +1120,7 @@ def go_to_next(mid, oldmid, taskbox):
 
 def get_costs_old(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 
-    print('YES using the get costs old method')
+    #print('YES using the get costs old method')
     # Get the currently used cost per mile and cost per hour data used in the base bids
     ph_driver = float(qidat.ph_driver) / 100
     fuel = float(qidat.fuelpergal) / 100
@@ -1178,28 +1286,62 @@ def get_terminal(locto):
         thisterm = 'BAL'
         port = 'Baltimore Seagirt'
     else:
-        if term == 'BAL':
+        tdat = Terminals.query.filter(Terminals.Name == term).first()
+        if tdat is not None:
+            thisterm = tdat.Name
+            locfrom = tdat.Address
+            locfrom = locfrom.replace(thisterm, '')
+            locfrom = locfrom.strip()
+            port = tdat.Name
+        else:
             locfrom = '2600 Broening Hwy, Baltimore, MD 21224'
             thisterm = 'BAL'
             port = 'Baltimore Seagirt'
-        elif term == 'NIT':
-            locfrom = '1431 Terminal Blvd, Norfolk, VA 23505'
-            thisterm = 'NIT'
-            port = 'Virginia Ports-NIT'
-        elif term == 'VIG':
-            locfrom = '1000 Virginia International Gateway Blvd, Portsmouth, VA 23703'
-            thisterm = 'VIG'
-            port = 'Virginia Ports-VIG'
-        elif term == 'PAC':
-            locfrom = '3301 S Columbus Boulevard, Philadelphia, PA 19148'
-            thisterm = 'PAC'
-            port = 'Packard Ave Marine Terminal'
-        elif term == 'PNCT':
-            locfrom = '1210 Corbin St Elizabeth, NJ 07201'
-            thisterm = 'PNCT'
-            port = 'PNCT-Maher'
+    #print(thisterm, locfrom, port)
     return thisterm, locfrom, locto, port
 
+def get_whouse_values(iter, whouse):
+    showcosts = request.values.get('showcosts')
+    showfees = request.values.get('showfees')
+    showhouse = request.values.get('showhouse')
+    wdray = request.values.get('wdray')
+    palletxfer = request.values.get('palletxfer')
+    stopallet = request.values.get('stopallet')
+    floorunload = request.values.get('floorunload')
+    palletization = request.values.get('palletization')
+    palletcost = request.values.get('palletcost')
+    setquotehouse = request.values.get('setquotehouse')
+    whouse = [showcosts, showfees, showhouse, wdray, palletxfer, stopallet, floorunload, palletization, palletcost, setquotehouse, 0, 0, 0, 0, 0]
+    return whouse
+
+def get_new_fees():
+
+    qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
+    alist = []
+    blist = [int(float(a) * 100) for a in alist]
+
+    anames = ['driver', 'fuel', 'mpg', 'insurance', 'markup', 'toll', 'gapct', 'rm', 'fees', 'other', 'fsc', 'chassis2', 'chassis3',
+              'prepull', 'store', 'detention', 'extrastop', 'overweight', 'reefer', 'scale', 'residential', 'congestion', 'chassplit',
+              'owmiles', 'permits', 'xdray', 'xpalletxfer', 'xstopallet', 'xfloorunload', 'xpalletization', 'xpalletcost']
+
+    dnames = ['ph_driver', 'fuelpergal', 'mpg', 'insurance_annual_truck', 'markup', 'toll', 'ga', 'pm_repairs', 'pm_fees', 'pm_other',
+                'FSC', 'chassis2', 'chassis3', 'prepull', 'store', 'detention', 'extrastop', 'overweight', 'reefer', 'scale', 'residential', 'congestion', 'chassplit', 'owmile', 'permits',
+                'xdray', 'xpalletxfer', 'xstopallet', 'xfloorunload', 'xpalletization', 'xpalletcost']
+
+    for ix, a in enumerate(anames):
+        aval = request.values.get(a)
+        #print(a, aval)
+        if aval is None:
+            d = dnames[ix]
+            astr = f'qidat.{d}'
+            aval = eval(astr)
+            aval = float(aval/100)
+
+        alist.append(aval)
+
+    #for anow in alist: print(anow)
+
+    return alist
 
 
 def isoQuote():
@@ -1224,6 +1366,8 @@ def isoQuote():
     plaintext = None
     mid = ''
     locto = None
+    include_text = ''
+    whouse = [0]*15
 
 
     if request.method == 'POST':
@@ -1255,9 +1399,24 @@ def isoQuote():
         exitnow = request.values.get('exitquotes')
 
 
+
+        wareBB = request.values.get('WareBB')
+        wareUD = request.values.get('WareUD')
+        if wareBB is not None or wareUD is not None:
+            #Run the warehouse cost estimator and skip the route updates
+            whouse = get_whouse_values(iter, whouse)
+
+
+
+
+
         if exitnow is not None:
             #print('Exiting quotes')
             return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None
+
+
+
+
 
         for jx in range(5):
             bidthis[jx] = request.values.get(f'bidthis{jx}')
@@ -1301,23 +1460,22 @@ def isoQuote():
         updatecosts = request.values.get('newcosts')
         def_costs = request.values.get('oldcosts')
         updatefees = request.values.get('newfees')
+        updatehousefees = request.values.get('updatehousefees')
 
 
-        if updatecosts is not None or updatefees is not None:
-            alist = [request.values.get('driver'), request.values.get('fuel'), request.values.get('mpg'), request.values.get('insurance'), request.values.get('markup'),
-                     request.values.get('toll'), request.values.get('gapct'), request.values.get('rm'), request.values.get('fees'), request.values.get('other'),
-                     request.values.get('fsc'), request.values.get('chassis2'), request.values.get('chassis3'), request.values.get('prepull'), request.values.get('store'), request.values.get('detention'),
-                     request.values.get('extrastop'),request.values.get('overweight'), request.values.get('reefer'), request.values.get('scale'), request.values.get('residential'),
-                     request.values.get('congestion'), request.values.get('chassplit'), request.values.get('owmile'), request.values.get('permits')]
-            #for a in alist: print(a)
+        if updatecosts is not None or updatefees is not None or updatehousefees is not None:
+            alist = get_new_fees()
             blist = [int(float(a)*100) for a in alist]
             pmf=int(100*float(alist[1])/float(alist[2]))
             phi=int(100*float(alist[3])/1992)
             #print(f'pmf={pmf} and phi={phi}')
             pmt = pmf+blist[7]+blist[8]+blist[9]
             pht = blist[0] + phi
-            input = Quoteinput(ph_driver=blist[0],fuelpergal=blist[1],mpg=blist[2],insurance_annual_truck=blist[3],markup=blist[4],toll=blist[5],ga=blist[6],pm_repairs=blist[7],pm_fees=blist[8],pm_other=blist[9],pm_fuel=pmf,ph_insurance=phi,pm_total=pmt,ph_total=pht,FSC=blist[10],
-                               chassis2=blist[11], chassis3=blist[12], prepull=blist[13], store=blist[14], detention=blist[15], extrastop=blist[16], overweight=blist[17], reefer=blist[18], scale=blist[19], residential=blist[20], congestion=blist[21], chassplit=blist[22], owmile=blist[23], permits=blist[24])
+            input = Quoteinput(ph_driver=blist[0],fuelpergal=blist[1],mpg=blist[2],insurance_annual_truck=blist[3],markup=blist[4],toll=blist[5],ga=blist[6],pm_repairs=blist[7],pm_fees=blist[8],
+                               pm_other=blist[9],pm_fuel=pmf,ph_insurance=phi,pm_total=pmt,ph_total=pht,FSC=blist[10],
+                               chassis2=blist[11], chassis3=blist[12], prepull=blist[13], store=blist[14], detention=blist[15], extrastop=blist[16], overweight=blist[17],
+                               reefer=blist[18], scale=blist[19], residential=blist[20], congestion=blist[21], chassplit=blist[22], owmile=blist[23], permits=blist[24],
+                               xdray=blist[25], xpalletxfer=blist[26], xstopallet=blist[27], xfloorunload=blist[28], xpalletization=blist[29], xpalletcost=blist[30])
             db.session.add(input)
             db.session.commit()
             qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
@@ -1380,12 +1538,21 @@ def isoQuote():
         try: permits = float(qidat.permits) / 100
         except: permits = 0.00
 
+        #Wahrehouse costs
+        xdray = float(qidat.xdray) / 100
+        xpalletxfer = float(qidat.xpalletxfer) / 100
+        xstopallet = float(qidat.xstopallet) / 100
+        xfloorunload = float(qidat.xfloorunload) / 100
+        xpalletization = float(qidat.xpalletization) / 100
+        xpalletcost = float(qidat.xpalletcost) / 100
+
         #print(f'ph_driver is {ph_driver} and d2s gives {d2s(ph_driver)}')
         expdata = [d2s(ph_driver), d2s(fuel), d2s(mpg), d2s(ins), d2s(markup), d2s(toll), d2s(gapct),
                    d2s(pm_repairs), d2s(pm_fees), d2s(pm_other), d2s(pm_fuel), d2s(ph_insurance), d2s(pmc), d2s(phc),
                    d1s(fsc), d2s(chassis2), d2s(chassis3), d2s(prepull), d2s(store), d2s(detention), d2s(extrastop),
-                   d2s(overweight), d2s(owmile), d2s(reefer), d2s(scale), d2s(resid), d2s(congest), d2s(chassplit), d2s(permits)]
-
+                   d2s(overweight), d2s(owmile), d2s(reefer), d2s(scale), d2s(resid), d2s(congest), d2s(chassplit), d2s(permits),
+                   d2s(xdray), d2s(xpalletxfer), d2s(xstopallet), d2s(xfloorunload), d2s(xpalletization), d2s(xpalletcost)]
+                    #29              30                 31              32               33                   34
 
         if quotbut is not None:
             quot=nonone(quotbut)
@@ -1411,7 +1578,7 @@ def isoQuote():
             db.session.commit()
             #Now moving to the next email on the list.....
             qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
-            print(f'locto from email is {locto}')
+            #print(f'locto from email is {locto}')
 
 
         #If no radio button selected then go with generic
@@ -1521,7 +1688,7 @@ def isoQuote():
                             #print(f'Getting data for going to location {locto}')
                             if hasinput(locto) and locto != 'No Location Found':
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
-                                timedata, distdata, costdata, biddata, newdirdata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
+                                timedata, distdata, costdata, biddata, newdirdata, include_text = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata)
                                 #print(biddata)
                                 if tbox[15]: mbids.append(biddata[4])
                                 elif tbox[12]: mbids.append(biddata[0])
@@ -1540,6 +1707,11 @@ def isoQuote():
                     locfrom = request.values.get('locfrom')
                     emailto = request.values.get('edat2')
                     respondnow = datetime.datetime.now()
+
+                    respond_utc_dt = respondnow.astimezone(ZoneInfo("UTC"))
+                    local_tz = get_localzone()
+                    respond_local_dt = respond_utc_dt.astimezone(local_tz)
+
                     if taskbox == 1 or taskbox == 5:
                         #print(f'Here setting qdat.start with, locfrom is: {locfrom}')
                         qdat.Start = locfrom
@@ -1548,7 +1720,7 @@ def isoQuote():
                         qdat.Markkup = newmarkup
                         qdat.Person = bidname
                         qdat.Responder = username
-                        qdat.RespDate = respondnow
+                        qdat.RespDate = respond_local_dt
                         qdat.Status = 1
                         db.session.commit()
                         qdat = Quotes.query.get(quot)
@@ -1575,7 +1747,7 @@ def isoQuote():
                         miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
 
                         ####################################  Cost & Bid Section  ######################################
-                        timedata, distdata, costdata, biddata, newdirdata = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat)
+                        timedata, distdata, costdata, biddata, newdirdata, include_text = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata)
 
                         if updatego is not None or quotbut is not None or (taskbox == 5 and updatebid is None):
                             for ix in range(len(tbox)):
@@ -1613,7 +1785,11 @@ def isoQuote():
 
                 if quotbut is not None:
                     #Set the email data:
-                    etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
+                    if wareBB or wareUD:
+                        etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote for Warehouse Services from {port}'
+                    else:
+                        etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
+
                     if qdat is not None:
                         customer = qdat.Person
                         if customer is None:
@@ -1628,9 +1804,12 @@ def isoQuote():
                         bidname = bidnamelist[0]
                     except:
                         bidname = ''
-                    ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port)
+                    ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD)
                     #print(f'The bidtypeamount here after call is {bidtypeamount} and amount in database is {qdat.Amount} for {quot}')
-                    ebody = ebody + maketable(expdata)
+                    if wareBB is not None or wareUD is not None:
+                        ebody = ebody + f'<br><br><em>{signoff}</em>'
+                    else:
+                        ebody = ebody + maketable(expdata)
                     emailin1 = request.values.get('edat2')
                     if updatego is None:
                         emailin1 = emailonly(emailto)
@@ -1643,12 +1822,20 @@ def isoQuote():
                     qdat = Quotes.query.get(quot)
                 else:
                     #Set the email data:
-                    if updatebid is not None or updatego is not None:
+                    if updatebid is not None or updatego is not None or wareBB is not None or wareUD is not None:
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
-                        etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
-                        ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle, port)
-                        ebody = ebody + maketable(expdata)
+
+                        if wareBB is not None or wareUD is not None:
+                            etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote for Warehouse Services from {port}'
+                        else:
+                            etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
+                        ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD)
+                        if wareBB is not None or wareUD is not None:
+                            ebody = ebody + f'<br><br><em>{signoff}</em>'
+                        else:
+                            ebody = ebody + maketable(expdata)
+
                         #print(f'The bidtypeamount here after 2nd lower call is {bidtypeamount} and amount in database is {qdat.Amount}')
                         qdat.Amount = bidtypeamount[1]
                     else:
@@ -1765,6 +1952,8 @@ def isoQuote():
 
     #print(f'Here at end, locfrom is: {locfrom}')
     multibid.append(term)
-    print(multibid)
+    terminals = Terminals.query.all()
+    multibid.append(terminals)
+    #print(multibid)
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
-    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup
+    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup, whouse

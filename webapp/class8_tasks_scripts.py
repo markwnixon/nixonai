@@ -745,7 +745,7 @@ def Container_Update_task(err):
         imat = Interchange.query.filter(
             ((Interchange.Container == con) | (Interchange.Release == bk)) & (Interchange.Type.contains('In')) & (
                         Interchange.Date > lbdate)).first()
-        print(con, bk)
+        #print(con, bk)
         if imat is not None:
             imat.Status = 'IO'
             idat.Status = 'IO'

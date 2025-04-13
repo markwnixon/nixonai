@@ -8,7 +8,7 @@ genre = 'Trucking'
 jobcode = co[10] + genre[0]
 
 Trucking_genre = {'table': 'Orders',
-                  'genre_tables': ['Orders', 'Interchange', 'Customers', 'Services', 'Summaries', 'Drivers', 'Trucks', 'Pins'],
+                  'genre_tables': ['Orders', 'Interchange', 'Customers', 'Services', 'Summaries', 'Drivers', 'Trucks', 'Pins', 'Terminals'],
                   'genre_tables_on': ['on', 'off', 'off', 'off', 'off', 'off', 'off'],
                   'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice',  'Receive Payment'],
                   'table_filters': [{'Shipper Filter': ['get_Shippers', 'Show All']},
@@ -20,7 +20,7 @@ Trucking_genre = {'table': 'Orders',
                                     {'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}
                                     ],
                   'task_boxes': [{'Adding': ['New Job', 'New Customer', 'New Interchange', 'New Service', 'New From Copy',
-                                             'New Manifest', 'Upload Source', 'Upload Proof', 'Upload 2nd Proof', 'Upload RateCon', 'Make Blended Gate']},
+                                             'New Manifest', 'Upload Source', 'Upload Proof', 'Upload 2nd Proof', 'Upload RateCon', 'Make Blended Gate', 'New Terminal']},
                                  {'Editing': ['Edit Item', 'Match', 'Accept', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
                                                  'Inv-1', 'Inv Emailed', 'Inv Paid', 'Set Col To']},
                                  {'Money Flow': ['Edit Invoice', 'Edit Summary Inv', 'Send Package', 'Receive Payment',
@@ -32,7 +32,7 @@ Trucking_genre = {'table': 'Orders',
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"', '40\' UT 9\'6\"', '40\' UT 8\'6\"',
                                       '53\' Dry', 'LCL', 'RORO'],
-                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP','Dray Transfer', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver', 'Dray Transfer'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out', 'Dray Out', 'Dray In'],
                   'delivery_types': ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder'],
                   'document_profiles'  : {
@@ -80,7 +80,8 @@ Trucking_genre = {'table': 'Orders',
                                          'Upload Proof' : ['Single_Item_Selection', 'Upload', 'Proof'],
                                          'Upload 2nd Proof' : ['Single_Item_Selection', 'Upload', 'Proof2'],
                                          'Upload RateCon' : ['Single_Item_Selection', 'Upload', 'RateCon'],
-                                         'Make Blended Gate' : ['Single_Item_Selection', 'BlendGate', '']
+                                         'Make Blended Gate' : ['Single_Item_Selection', 'BlendGate', ''],
+                                         'New Terminal' : ['Table_Selected', 'New', 'Terminals']
                                          },
 
                                     'Editing':
@@ -264,6 +265,7 @@ Orders_setup = {'name' : 'Trucking Job',
                 'side data': [{'customerdata': ['People', [['Ptype', 'Trucking']], 'Company']},
                               {'driverdata': ['Drivers', [['Active', 1]], 'Name']},
                               {'truckdata': ['Vehicles', [['Active', 1]], 'Unit']},
+                              {'terminaldata': ['Terminals', [['Name', 'All']], 'Name']},
                               {'emaildata1': ['Orders', [['Shipper', 'get_Shipper']], 'Emailjp']},
                                 {'emaildata2': ['Orders', [['Shipper', 'get_Shipper']], 'Emailoa']},
                                 {'emaildata3': ['Orders', [['Shipper', 'get_Shipper']], 'Emailap']},
@@ -293,21 +295,21 @@ Orders_setup = {'name' : 'Trucking Job',
                 'documents': ['Source', 'Proof', 'Interchange', 'Invoice', 'Paid Invoice'],
                 'sourcenaming': ['Source_Jo', 'c0', 'Jo'],
                 'copyswaps' : {},
-                #'haul_types': ['Dray Import', 'Dray Export', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
+                #'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP, 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver'],
                 'haulmask' : {
-                                'release': ['Release: BOL', 'Release: Booking Out', 'Release: BOL', 'Release: Booking Out',    'Release: BOL', 'Release: Booking Out', 'OTR Release', 'no', 'Trailer-In', 'Release: BOL', 'Trailer-In', 'Release: BOL'],
-                                'container': ['Container', 'Container', 'Container', 'Container', 'Container', 'Container',    'Trailer No.', 'no', 'Trailer-Out', 'Container', 'Trailer-Out', 'Container'],
-                                'inbook': ['no', 'In-Book', 'no', 'In-Book', 'no', 'In-Book',    'no', 'no', 'no','Trailer-Out', 'Delivery Vehicle', 'Delivery Vehicle'],
-                                'load1': ['Pick Up and Return', 'Pick Up and Return', 'Pick Up From', 'Pick Up From', 'Pick Up and Return', 'Pick Up and Return',    'Pick Up From', 'Pick Up From', 'no', 'Dray Terminal', 'Deliver To','Dray Terminal'],
-                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date', 'Dray Terminal','Pick Up From','Pick Up From'],
-                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To', 'Load At',     'Deliver To', 'Deliver To','Transload Location','Transload Location','Transload Location','Transload Location'],
-                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date', 'no', 'no'],
-                                'load3': ['no', 'no', 'Return To', 'Return To', 'Extra Stop', 'Extra Stop',     'no', 'no', 'no', 'no', 'no', 'Delivery After Transload'],
-                                'load3date': ['no', 'no', 'Stop2 Date', 'Stop2 Date', 'no','Stop2 Date','no', 'Stop2 Date','Stop2 Date','Stop2 Date'],
-                                'date4': ['Import Available','Export ERD', 'Import Available', 'Export ERD', 'Import Available','Export ERD',    'no','no', 'no','no', 'no', 'no'],
-                                'date5': ['Port LFD', 'Export Cut', 'Port LFD', 'Export Cut', 'Port LFD', 'Export Cut',    'no','no', 'no','no', 'no', 'no'],
-                                'date6': ['Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD',    'no', 'no', 'no','no', 'no','no'],
-                                'chassis': ['Chassis', 'Chassis', 'Chassis', 'Chassis', 'Chassis', 'Chassis',    'no', 'no', 'no','no', 'no','no']
+                                'release': ['Release: BOL', 'Release: Booking Out', 'Release: BOL', 'Release: Booking Out', 'Release: BOL', 'Release: Booking Out',    'Release: BOL', 'Release: Booking Out', 'OTR Release', 'no', 'Trailer-In', 'Release: BOL', 'Trailer-In', 'Release: BOL'],
+                                'container': ['Container', 'Container','Container','Container', 'Container', 'Container', 'Container', 'Container',    'Trailer No.', 'no', 'Trailer-Out', 'Container', 'Trailer-Out', 'Container'],
+                                'inbook': ['no', 'In-Book', 'no', 'In-Book', 'no', 'In-Book', 'no', 'In-Book',    'no', 'no', 'no','Trailer-Out', 'Delivery Vehicle', 'Delivery Vehicle'],
+                                'load1': ['Pick Up and Return', 'Pick Up and Return','Pick Up and Return','Pick Up and Return', 'Pick Up From', 'Pick Up From', 'Pick Up and Return', 'Pick Up and Return',    'Pick Up From', 'Pick Up From', 'no', 'Dray Terminal', 'Deliver To','Dray Terminal'],
+                                'load1date': ['PickUp/Return Date', 'PickUp/Return Date','PickUp/Return Date','PickUp/Return Date', 'PickUp/Ret Date', 'Pick Up Empty Date', 'Pick Up Load Date', 'Pick Up Load Date', 'Pick Up Date', 'Dray Terminal','Pick Up From','Pick Up From'],
+                                'load2': ['Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To', 'Load At', 'Deliver To', 'Load At',     'Deliver To', 'Deliver To','Transload Location','Transload Location','Transload Location','Transload Location'],
+                                'load2date': ['Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Load Empty Date', 'Delivery Date', 'Deliver Stop1 Date', 'Pick Up Date', 'Transload Date', 'no', 'no'],
+                                'load3': ['no', 'no', 'no', 'no', 'Return To', 'Return To', 'Extra Stop', 'Extra Stop','no', 'no', 'no', 'no', 'no', 'Delivery After Transload'],
+                                'load3date': ['no', 'no', 'no', 'no', 'Stop2 Date', 'Stop2 Date', 'no','Stop2 Date','no', 'Stop2 Date','Stop2 Date','Stop2 Date'],
+                                'date4': ['Import Available','Export ERD', 'Import Available','Export ERD','Import Available', 'Export ERD', 'Import Available','Export ERD',    'no','no', 'no','no', 'no', 'no'],
+                                'date5': ['Port LFD', 'Export Cut', 'Port LFD', 'Export Cut', 'Port LFD', 'Export Cut', 'Port LFD', 'Export Cut',    'no','no', 'no','no', 'no', 'no'],
+                                'date6': ['Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD', 'Empty Return LFD', 'Load Return LFD',    'no', 'no', 'no','no', 'no','no'],
+                                'chassis': ['Chassis', 'Chassis', 'Chassis', 'Chassis','Chassis', 'Chassis', 'Chassis', 'Chassis',    'no', 'no', 'no','no', 'no','no']
                               },
                 'matchfrom':    {
                                  'Orders': ['Shipper', 'Type', 'Company', 'Company2', 'Dropblock1', 'Dropblock2', 'Commodity', 'Packing'],
@@ -727,7 +729,7 @@ Trucks_setup = {'name' : 'Trucks',
                   'copyswaps' : {}
                   }
 
-Pins_setup = {'name' : 'Trucks',
+Pins_setup = {'name' : 'Pins',
                  'table': 'Pins',
                  'filter': None,
                  'filterval': None,
@@ -757,6 +759,37 @@ Pins_setup = {'name' : 'Trucks',
                   'haulmask': [],
                   'colorfilter': ['Unit'],
                   'filteron':  ['Date'],
+                  'side data': [],
+                  'default values': {'get_Shipper': 'Fill This Later'},
+                  'form show': {
+                      'New': [],
+                      'Edit': []
+                  },
+                  'form checks': {
+                      'New': ['Company'],
+                      'Edit': ['Company']
+                  },
+                  'jscript': 'dtHorizontalVerticalExample5',
+                  'documents': [],
+                  'copyswaps' : {}
+                  }
+
+Terminals_setup = {'name' : 'Terminals',
+                 'table': 'Terminals',
+                 'filter': None,
+                 'filterval': None,
+                  'checklocation': 1,
+                  'creators': [],
+                  'ukey': 'Name',
+                  'simplify': [],
+                  'entry data': [
+                                 ['Name', 'Name', 'Name', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                ['Address', 'Address', 'Address', 'multitext', 'address', 0, 'Shipper', 'll', None, 'Always']
+                                 ],
+                  'hidden data' : [],
+                  'haulmask': [],
+                  'colorfilter': None,
+                  'filteron':  [],
                   'side data': [],
                   'default values': {'get_Shipper': 'Fill This Later'},
                   'form show': {

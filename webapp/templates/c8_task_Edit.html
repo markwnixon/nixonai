@@ -11,6 +11,11 @@
 </div>
 
 {% set form_show = tablesetup['form show']['Edit'] %}
+{% set numitems = entrydata | length %}
+{% set termvec = holdvec[numitems] %}
+{% set secterm = termvec[0] %}
+{% set noterm = termvec[1] %}
+{% set secstop = termvec[2] %}
 
 <div class="card-body">
 <table class="table table-condensed table-hover">
@@ -51,6 +56,7 @@
                             {% elif entry[4] == 'shipdata' %}{% set klist = keydata.shipdata %}
                             {% elif entry[4] == 'emaildata' %}{% set klist = keydata.emaildata %}
                             {% elif entry[4] == 'delivery_types' %}{% set klist = genre_data['delivery_types'] %}
+                            {% elif entry[4] == 'terminaldata' %}{% set klist = keydata.terminaldata %}
                             {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
@@ -65,15 +71,44 @@
 
         {%  elif entry[3] == 'multitext' %}
             {% if entry[4] != 'text' %}
-                {% if entry[4] == 'dropblock1' %}{% set klist = keydata.dropblock1 %}{% endif %}
-                {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% endif %}
-                {% if entry[4] == 'dropblock3' %}{% set klist = keydata.dropblock3 %}{% endif %}
+                {% if entry[4] == 'dropblock1' %}
+                    {% if noterm %}
+                        {% set klist = keydata.dropbolck1 %}{% set que0 = 'Previous Pick Up' %}
+                        {% set que1 = 'Optional Choose from Previous' %}{% set que2 = 'Previous Pick Up' %}
+                    {% elif secterm %}
+                        {% set klist = keydata.terminaldata %}{% set que0 = 'Terminal Pick Up' %}
+                        {% set que1 = 'Optional Choose Terminal' %}{% set que2 = 'Terminal Pick Up Address' %}
+                    {% else %}
+                        {% set klist = keydata.terminaldata %}
+                        {% set que0 = 'Terminal Pick Up and Return' %}
+                        {% set que1 = 'Optional Choose Terminal' %}{% set que2 = 'Terminal PU/Return Address' %}
+                    {% endif %}
+                {% endif %}
+                {% if entry[4] == 'dropblock2' %}
+                    {% set klist = keydata.dropblock2 %}{% set que0 = 'Previous Load At' %}
+                    {% set que1 = 'Optional Choose from Previous' %}{% set que2 = 'Load At' %}
+                {% endif %}
+                {% if entry[4] == 'dropblock3' %}
+                    {% if noterm %}
+                        {% set klist = keydata.dropblock3 %}
+                        {% set que0 = 'Previous Extra Stop' %}
+                        {% set que1 = 'Optional Choose from Previous' %}{% set que2 = 'Extra Stop Address' %}
+                    {% elif secterm %}
+                        {% set klist = keydata.terminaldata %}
+                        {% set que0 = 'Terminal Return To' %}
+                        {% set que1 = 'Optional Choose Terminal' %}{% set que2 = 'Terminal Return Address' %}
+                    {% else %}
+                        {% set klist = keydata.dropblock3 %}
+                        {% set que0 = 'Previous Extra Stop' %}
+                        {% set que1 = 'Optional Choose from Previous' %}{% set que2 = 'Extra Stop Address' %}
+                    {% endif %}
+                {% endif %}
                 {% if klist %}
                             <tr>
-                                <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
+                                <td><div class="input-group-text">{{ que0 }}</div></td>
                                 <td>
                                     <select class="form-control" type="text" name="{{ entry[4] }}" onchange="this.form.submit()">
-                                    <option value="">Optional Choose from Previous</option>
+                                    <option value="">{{ que1 }}</option>
                                     {% for du in klist %}
                                         <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
                                     {% endfor %}
@@ -83,7 +118,7 @@
                 {%  endif  %}
             {% endif %}
                 <tr>
-                    <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ entry[2] }} </div></td>
+                    <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ que2 }} </div></td>
                     <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>
                 </tr>
 

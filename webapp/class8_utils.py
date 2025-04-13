@@ -249,6 +249,11 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
             status = 2
             message = 'Must select a customer'
 
+    elif type == 'terminaldata':
+        if text == 'Choose Later' or not hasinput(text):
+            status = 2
+            message = 'Must select a terminal'
+
     elif type == 'shipdata':
         if text == 'Choose Later' or not hasinput(text):
             status = 2
@@ -309,20 +314,78 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
                 message = 'Warning: this must be set when paying bill'
 
     elif type == 'dropblock1' or type == 'dropblock2' or type == 'dropblock3':
-        from webapp.class8_tasks import get_drop, Review_Drop
-        #print(f'*********************starting this test for type {type} with text: {text}')
-        if hasinput(text):
-            testtext = text.strip()
-            #print(f'The length of testtest is {len(testtext)}')
-            if len(testtext) < 6:
-                text = get_drop(testtext)
-        if not hasinput(text):
-            loadname = request.values.get(type)
-            if loadname is not None:
-                text = get_drop(loadname)
-        if not hasinput(text) and task_iter > 0:
-            status = 2
-            message = 'Must include this location information'
+        from webapp.class8_tasks import get_drop, Review_Drop, get_terminal
+        noterminals = ['OTR', 'Box Truck', 'Transload Only', 'Transload-Deliver']
+        secterminal = ['Dray Import 2T', 'Dray Export 2T']
+        secstop = ['Import Extra Stop', 'Export Extra Stop']
+        if haultype in secterminal: secterm = 1
+        else: secterm = 0
+        if haultype in noterminals: noterm = 1
+        else: noterm = 0
+        if haultype in secstop: secst = 1
+        else: secst = 0
+
+        #print(f'In form check for dropblocks, dropblock:{type}, haultype:{haultype} secterm: {secterm} noterm: {noterm} secstop: {secst}')
+        if type == 'dropblock1' or type == 'dropblock3':
+            if not noterm:
+                #print(f'*********************starting this test for type {type} with text: {text}')
+                if hasinput(text):
+                    testtext = text.strip()
+                    #print(f'The length of testtest is {len(testtext)}')
+                    if len(testtext) < 6:
+                        text = get_drop(testtext)
+                        text = Review_Drop(text)
+                if not hasinput(text):
+                    loadname = request.values.get(type)
+                    #print(f'loadname:{loadname},type:{type},text:{text}')
+                    if loadname is not None:
+                        if type == 'dropblock3' and secstop:
+                            text = get_drop(loadname)
+                            #print(f'text from get_drop:{text}')
+                        else:
+                            text = get_terminal(loadname)
+                            #print(f'text from get_terminal:{text}')
+                if not hasinput(text) and task_iter > 0:
+                    status = 2
+                    message = 'Must include this location information'
+
+            else:
+                # print(f'*********************starting this test for type {type} with text: {text}')
+                if hasinput(text):
+                    testtext = text.strip()
+                    #print(f'The length of testtest is {len(testtext)}')
+                    if len(testtext) < 6:
+                        text = get_drop(testtext)
+                if not hasinput(text):
+                    loadname = request.values.get(type)
+                    #print(f'loadname:{loadname},type:{type},text:{text}')
+                    if loadname is not None:
+                        text = get_drop(loadname)
+                        #print(f'text:{text}')
+                if not hasinput(text) and task_iter > 0:
+                    status = 2
+                    message = 'Must include this location information'
+
+
+        else:
+
+            #print(f'*********************starting this test for type {type} with text: {text}')
+            if hasinput(text):
+                testtext = text.strip()
+                #print(f'The length of testtest is {len(testtext)}')
+                if len(testtext) < 6:
+                    text = get_drop(testtext)
+            if not hasinput(text):
+                loadname = request.values.get(type)
+                #print(f'loadname:{loadname},type:{type},text:{text}')
+                if loadname is not None:
+                    text = get_drop(loadname)
+                    #print(f'text:{text}')
+            if not hasinput(text) and task_iter > 0:
+                status = 2
+                message = 'Must include this location information'
+
+        # Check to see if need to add new drop to drop database
         if hasinput(text):
             text = Review_Drop(text)
 

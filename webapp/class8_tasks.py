@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec, Terminals
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -151,6 +151,14 @@ def get_drop(loadname):
                 dline = dline.replace('None', '')
                 return dline
 
+        return ''
+
+def get_terminal(loadname):
+    dat = Terminals.query.filter(Terminals.Name == loadname).first()
+    if dat is not None:
+        dline = f'{dat.Address}'
+        return dline
+    else:
         return ''
 
 
@@ -800,7 +808,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
             delivertime = '25:00'
 
 
-        print(f'{deliverline}: delivertime is {delivertime}')
+        #print(f'{deliverline}: delivertime is {delivertime}')
 
         user = podat.UserMod
         if user != username:
@@ -1873,11 +1881,12 @@ def get_dbdata(table_setup, tfilters):
                 if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
                 if todate is not None: query_adds.append(f'{table}.Date <= todate')
                 #print(f'This time filter applied from fromdate = {fromdate} to todate = {todate}')
-            else:
+            elif 'Date' in filteron:
                 daysback = 45
                 if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
                 if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
-        else:
+
+        elif 'Date' in filteron:
             daysback = 45
             if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
             if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
@@ -1941,7 +1950,6 @@ def get_dbdata(table_setup, tfilters):
     elif len(queery_adds) == 5:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]}) & ({query_adds[4]})).all()'
 
-    #print(table_query)
     odata = eval(table_query)
 
     # Determine color pallette to apply to table
@@ -1978,6 +1986,7 @@ def get_dbdata(table_setup, tfilters):
 
     #print(f'the rowcolors1 are {rowcolors1}')
     #print(f'the rowcolors2 are {rowcolors2}')
+
     return [data1, data1id, rowcolors1, rowcolors2, entrydata, simpler, boxchecks, boxlist], labpass
 
 def get_new_Jo(input):
@@ -2118,12 +2127,12 @@ def mask_apply(entrydata, masks, ht):
         mask_to_apply = ht
     #print(f'The final mask being applied is: {mask_to_apply}')
     list = Trucking_genre['haul_types']
-    #print(mask_to_apply)
     if mask_to_apply in list:
         #print(f'the list is {list}')
         this_index = list.index(mask_to_apply)
         #print(f'the index is {this_index}')
         for jx, entry in enumerate(entrydata):
+            #print(jx,entry[3],entry[4])
             if 'Release' in entry[1]:
                 mask = masks['release']
                 entrydata[jx][2] = mask[this_index]
@@ -2150,6 +2159,7 @@ def mask_apply(entrydata, masks, ht):
             if 'Third Location' in entry[1]:
                 mask = masks['load3']
                 entrydata[jx][2] = mask[this_index]
+                #print(f'Third Location Mask {entry[2]} mask here is:{mask} and this_index is {this_index} and overwriting entry[jx][2] as {mask[this_index]}')
             if 'Third Date' in entry[1]:
                 mask = masks['load3date']
                 entrydata[jx][2] = mask[this_index]
@@ -2175,7 +2185,7 @@ def check_appears(tablesetup, entry, htold):
     testmat = checks[testval]
     ht = request.values.get(testval)
     if ht is None: ht = htold
-    #print(f'*******************************It should appear if {testval} {ht} in {testmat}')
+    #print(f'*******************************It should appear if {testval}, {ht}, in {testmat}')
     if any(ht in x for x in testmat):
         #print('It should appear')
         colmat = checks[entry[0]]
@@ -2183,7 +2193,7 @@ def check_appears(tablesetup, entry, htold):
         if havedat is not None:
             for test in testmat:
                 if test in havedat:
-                    #print(test,havedat)
+                    #print(f'test:{test}, havedat:{havedat}, colmat:{colmat}, entry3: {entry[3]}, entry4: {entry[4]}')
                     return colmat
         return entry[3], entry[4]
     else:
@@ -2340,23 +2350,42 @@ def New_task(tablesetup, task_iter):
             elif itable == 'Interchange':
                 htold = request.values.get('Type')
                 #print(f'htold for interchange is {htold}')
-
-
             if htold is None: htold = ''
+
             entrydata = tablesetup['entry data']
             masks = tablesetup['haulmask']
+            #print(f'Entering Masks with htold: {htold}')
             if masks != []: entrydata = mask_apply(entrydata, masks, htold)
+            #print(entrydata)
             numitems = len(entrydata)
-            holdvec = [''] * numitems
+            holdvec = [''] * (numitems+1)
             failed = 0
             warned = 0
 
+            noterminals = ['OTR', 'Box Truck', 'Transload Only', 'Transload-Deliver']
+            secterminal = ['Dray Import 2T', 'Dray Export 2T']
+            secstop = ['Import Extra Stop', 'Export Extra Stop']
+            if htold in secterminal:
+                secterm = 1
+            else:
+                secterm = 0
+            if htold in noterminals:
+                noterm = 1
+            else:
+                noterm = 0
+            if htold in secstop:
+                secst = 1
+            else:
+                secst = 0
+            #print(f'In new task, htold:{htold} secterm: {secterm} noterm: {noterm} secstop: {secst}')
+            holdvec[numitems] = [secterm, noterm, secst]
+
             for jx, entry in enumerate(entrydata):
-                #print(f'Entry loop: jx"{jx}, entry:{entry}')
+                #print(f'Entry loop: jx"{jx}, entry:{entry}, htold:{htold}, entry[3]:{entry[3]}')
                 if entry[3] == 'appears_if':
                     entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                     entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
-                #print(f'form show is:{form_show}')
+                    #print(f'We have an appears_if check with entry3:{entry[3]}, entry4:{entry[4]} and entry[9]:{entry[9]} and form_show is {form_show}')
                 if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                     if entry[1] != 'hidden':
                         holdvec[jx] = request.values.get(f'{entry[0]}')
@@ -2449,6 +2478,25 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
             htold = request.values.get('Type')
             #print(f'htold edit task for interchange is {htold}')
 
+    noterminals = ['OTR', 'Box Truck', 'Transload Only', 'Transload-Deliver']
+    secterminal = ['Dray Import 2T', 'Dray Export 2T']
+    secstop = ['Import Extra Stop', 'Export Extra Stop']
+    if htold in secterminal:
+        secterm = 1
+    else:
+        secterm = 0
+    if htold in noterminals:
+        noterm = 1
+    else:
+        noterm = 0
+    if htold in secstop:
+        secst = 1
+    else:
+        secst = 0
+    #print(f'In edit task, htold:{htold} secterm: {secterm} noterm: {noterm} secstop: {secst}')
+
+
+
     masks = tablesetup['haulmask']
     #print(f'masks is {masks}')
     if masks != []:
@@ -2456,7 +2504,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         #print(f'After mask applied entrydata is: {entrydata}')
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
-    holdvec = [''] * numitems
+    holdvec = [''] * (numitems + 1)
+    holdvec[numitems] = [secterm, noterm, secst]
+    #print(f'Holdvec is: {holdvec}')
+
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -2480,7 +2531,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
             if entry[3] == 'appears_if':
                 entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
-                #print(f'Return from check_appears is {entry[3]} and {entry[4]}')
+                #print(f'We have an appears_if check with entry3:{entry[3]}, entry4:{entry[4]}, entry9:{entry[9]}, formshow:{form_show}')
             #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 # Some items are part of bringdata so do not test those - make sure entry[4] is None for those

@@ -243,7 +243,13 @@ class Quoteinput(db.Model):
     chassplit = db.Column('chassplit', db.Integer)
     owmile = db.Column('owmile', db.Integer)
     permits = db.Column('permits', db.Integer)
-    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile, permits):
+    xdray = db.Column('xdray', db.Integer)
+    xpalletxfer = db.Column('xpalletxfer', db.Integer)
+    xstopallet = db.Column('xstopallet', db.Integer)
+    xfloorunload = db.Column('xfloorunload', db.Integer)
+    xpalletization = db.Column('xpalletization', db.Integer)
+    xpalletcost = db.Column('xpalletcost', db.Integer)
+    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile, permits, xdray, xpalletxfer, xstopallet, xfloorunload, xpalletization, xpalletcost):
         self.ph_driver = ph_driver
         self.ph_insurance = ph_insurance
         self.ph_total = ph_total
@@ -273,6 +279,12 @@ class Quoteinput(db.Model):
         self.chassplit = chassplit
         self.owmile = owmile
         self.permits = permits
+        self.xdray = xdray
+        self.xpalletxfer = xpalletxfer
+        self.xstopallet = xstopallet
+        self.xfloorunload = xfloorunload
+        self.xpalletization = xpalletization
+        self.xpalletcost = xpalletcost
 
 class Chassis(db.Model):
     __tablename__ = 'chassis'
@@ -1996,3 +2008,13 @@ class Pins(db.Model):
         self.Intext = Intext
         self.Outtext = Outtext
         self.Notes = Notes
+
+class Terminals(db.Model):
+    __tablename__ = 'terminals'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Name = db.Column('Name', db.String(45))
+    Address = db.Column('Address', db.String(500))
+
+    def __init__(self, Name, Address):
+        self.Name = Name
+        self.Address = Address

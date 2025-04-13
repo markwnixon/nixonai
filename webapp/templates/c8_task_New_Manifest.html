@@ -48,6 +48,7 @@
                                     {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
                                     {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                                     {% elif entry[4] == 'delivery_types' %}{% set klist = genre_data['delivery_types'] %}
+                                    {% elif entry[4] == 'terminaldata' %}{% set klist = keydata.terminaldata %}
                                 {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
@@ -60,15 +61,15 @@
 
         {%  elif entry[3] == 'multitext' %}
             {% if entry[4] != 'text' %}
-                {% if entry[4] == 'dropblock1' %}{% set klist = keydata.dropblock1 %}{% endif %}
-                {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% endif %}
-                {% if entry[4] == 'dropblock3' %}{% set klist = keydata.dropblock3 %}{% endif %}
+                {% if entry[4] == 'dropblock1' %}{% set klist = keydata.terminaldata %}{% set que0 = 'Terminal' %}{% set que1 = 'Optional Choose Terminal' %}{% endif %}
+                {% if entry[4] == 'dropblock2' %}{% set klist = keydata.dropblock2 %}{% set que0 = 'Previous' %}{% set que1 = 'Optional Choose from Previous' %}{% endif %}
+                {% if entry[4] == 'dropblock3' %}{% set klist = keydata.dropblock3 %}{% set que0 = 'Previous' %}{% set que1 = 'Optional Choose from Previous' %}{% endif %}
                 {% if klist %}
                 <tr>
-                    <td><div class="input-group-text">Previous {{ entry[2] }}</div></td>
+                    <td><div class="input-group-text">{{ que0 }} {{ entry[2] }}</div></td>
                     <td>
                         <select class="form-control" type="text" name="{{ entry[4] }}" onchange="this.form.submit()">
-                        <option value="">Optional Choose from Previous</option>
+                        <option value="">{{ que1 }}</option>
                         {% for du in klist %}
                         <option {% if du == thisdu %} selected {% endif %} value='{{du}}'>{{du}}</option>
                         {% endfor %}
