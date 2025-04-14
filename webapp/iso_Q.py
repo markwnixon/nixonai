@@ -221,23 +221,29 @@ def add_quote_emails():
                 date_time_str = email_message["Date"]
                 date_time = parsedate_to_datetime(date_time_str)
                 #utc_offset = date_time.utcoffset()
-                utc_dt = date_time.astimezone(ZoneInfo("UTC"))
-                local_tz = get_localzone()
-                local_dt = utc_dt.astimezone(local_tz)
+                ny_tz = ZoneInfo("America/New_York")
+                #utc_dt = date_time.astimezone(ZoneInfo("UTC"))
+                #local_tz = get_localzone()
+                #local_dt = utc_dt.astimezone(local_tz)
+                local_dt = date_time.astimezone(ny_tz)
                 #print(f'DateTime: {date_time}')
                 #print(f'UTC Time: {utc_dt}')
+                #print(f'Local Time: {local_dt}')
                 #print(f'Date: {thisdate}')
                 #print(f'Time: {thistime}')
                 #local_tz = ZoneInfo(time.tzname[0])
                 #local_dt = utc_dt.astimezone(local_tz)
                 #print(f'Local Date Time: {local_dt}')
             except:
+                print('Failed to get the email date-time string')
                 date_time = today_now
-                thisdate = today
-                thistime = timenow
-                utc_dt = date_time.astimezone(ZoneInfo("UTC"))
-                local_tz = get_localzone()
-                local_dt = utc_dt.astimezone(local_tz)
+                #thisdate = today
+                #thistime = timenow
+                #utc_dt = date_time.astimezone(ZoneInfo("UTC"))
+                #local_tz = get_localzone()
+                ny_tz = ZoneInfo("America/New_York")
+                local_dt = date_time.astimezone(ny_tz)
+                #local_dt = utc_dt.astimezone(local_tz)
                 #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
 
             qdat = Quotes.query.filter(Quotes.Mid == mid).first()
@@ -1009,7 +1015,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox
 def get_body_text(qdat):
 
     mid = qdat.Mid
-    mid = mid.strip()
+    if mid is not None: mid = mid.strip()
     #print(f'this mid is {mid}')
     username = usernames['quot']
     password = passwords['quot']
@@ -1703,9 +1709,11 @@ def isoQuote():
                     emailto = request.values.get('edat2')
                     respondnow = datetime.datetime.now()
 
-                    respond_utc_dt = respondnow.astimezone(ZoneInfo("UTC"))
-                    local_tz = get_localzone()
-                    respond_local_dt = respond_utc_dt.astimezone(local_tz)
+                    #respond_utc_dt = respondnow.astimezone(ZoneInfo("UTC"))
+                    #local_tz = get_localzone()
+                    #respond_local_dt = respond_utc_dt.astimezone(local_tz)
+                    ny_tz = ZoneInfo("America/New_York")
+                    respond_local_dt = respondnow.astimezone(ny_tz)
 
                     if taskbox == 1 or taskbox == 5:
                         #print(f'Here setting qdat.start with, locfrom is: {locfrom}')
