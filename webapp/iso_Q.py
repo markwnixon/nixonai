@@ -1405,20 +1405,12 @@ def isoQuote():
 
         wareBB = request.values.get('WareBB')
         wareUD = request.values.get('WareUD')
-        if wareBB is not None or wareUD is not None:
-            #Run the warehouse cost estimator and skip the route updates
-            whouse = get_whouse_values(iter, whouse)
-
-
-
+        whouse = get_whouse_values(iter, whouse)
 
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None
-
-
-
+            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
         for jx in range(5):

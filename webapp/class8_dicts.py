@@ -784,7 +784,7 @@ Terminals_setup = {'name' : 'Terminals',
                   'simplify': [],
                   'entry data': [
                                  ['Name', 'Name', 'Name', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
-                                ['Address', 'Address', 'Address', 'multitext', 'address', 0, 'Shipper', 'll', None, 'Always']
+                                ['Address', 'Address', 'Address', 'multitext', 'text', 0, 'ok', 'll', None, 'Always']
                                  ],
                   'hidden data' : [],
                   'haulmask': [],

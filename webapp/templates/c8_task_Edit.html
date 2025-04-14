@@ -116,7 +116,10 @@
                                 </td>
                             </tr>
                 {%  endif  %}
+            {% else %}
+                {% set que2 = entry[2] %}
             {% endif %}
+
                 <tr>
                     <td> <div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}"> {{ que2 }} </div></td>
                     <td colspan="2"><textarea class="form-control {{ valdat }}" type="text" name="{{ entry[0] }}" rows="4">{% if holdvec[loop.index - 1] != 0 %}{{ holdvec[loop.index-1]}}{% endif %}</textarea></td>

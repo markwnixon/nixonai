@@ -2527,12 +2527,12 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            #print(f'Running entry {entry}')
+            print(f'Running entry {entry}')
             if entry[3] == 'appears_if':
                 entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
                 #print(f'We have an appears_if check with entry3:{entry[3]}, entry4:{entry[4]}, entry9:{entry[9]}, formshow:{form_show}')
-            #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
+            print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
                 holdvec[jx] = request.values.get(f'{entry[0]}')
