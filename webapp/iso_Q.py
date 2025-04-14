@@ -22,7 +22,10 @@ from pyzipcode import ZipCodeDatabase
 zcdb = ZipCodeDatabase()
 
 from viewfuncs import dataget_Q, nonone, numcheck
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+except:
+    from backports.zoneinfo import ZoneInfo
 import time
 from tzlocal import get_localzone
 
