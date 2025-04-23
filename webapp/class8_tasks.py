@@ -1088,7 +1088,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                         pdip[0][-1][3] = 'black-text'
                         pdip[0][-1][4] = ['Not on Viewed Schedule']
 
-    custom_order = ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder']
+    custom_order = ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder', '']
     order_map = {level: i for i, level in enumerate(custom_order)}
     for ix in range(1,6):
         for jx, io in enumerate(pdio[ix]):
@@ -1102,6 +1102,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
 
     new_day = [[],[],[],[],[],[]]
     for ix in range(1,6):
+        print(f'day sequence:{day_sequence[ix]}')
         new_day[ix] = sorted(day_sequence[ix], key=lambda x: ( x[3], order_map[x[2]]) )
 
     for ix in range(1,6):

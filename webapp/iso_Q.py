@@ -557,8 +557,19 @@ def emailonly(emailin):
     except:
         return emailin
 
-def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD):
-    sen, tbox, btype, stype, mixtype = insert_adds(tbox,expdata,takedef,distdata,multibid)
+def bodymaker(customer,cdata,bidthis,locto,tbox,expdata, takedef, distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata):
+    # Get the costs of the additional boxes checked
+
+    if multibid[0] != 'on':
+        sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox,expdata,takedef,distdata,multibid,mdistdata, 0)
+    else:
+        btype = []
+        if tbox[12]: btype.append('live')
+        if tbox[13]: btype.append('dr')
+        if tbox[14]: btype.append('dp')
+        if tbox[16]: btype.append('fsc')
+        if tbox[15]: btype.append('all-in')
+
     #print(f'btype is {btype} and wareBB is {wareBB}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     ebody = ''
@@ -607,30 +618,46 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
         loci = multibid[2]
         bids = multibid[3]
         etitle = f'{cdata[0]} (MC#{cdata[12]}) Quotes to'
-        for loc in loci:
-            if hasinput(loc): etitle = etitle + f' {loc};'
+        for kx, loc in enumerate(loci):
+            if hasinput(loc):
+                etitle = etitle + f' {loc};'
+
         etitle = etitle[:-1]
         if 'all-in' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>All-In</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
+                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix)
+                if ow:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
+                else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
+
             ebody = ebody + f'{sen}<br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
             bidtypeamount[0] = 'all-in'
             bidtypeamount[1] = bids[0]
 
         elif 'live' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b>is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
+                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix)
+                if ow:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
+                else:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
             bidtypeamount[0] = 'live'
             bidtypeamount[1] = bids[0]
 
         elif 'dr' in btype:
-            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b>is pleased to offer the following <b>Drop-Pick</b> quotes:<br><br>'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Pick</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
+                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix)
+                if ow:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
+                else:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
+
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.'
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
             bidtypeamount[0] = 'dr'
@@ -639,7 +666,12 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
         elif 'dp' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Hook</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
+                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix)
+                if ow:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
+                else:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
+
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.  A return container must be available and ready upon delivery or bobtail charges may apply.'
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
             bidtypeamount[0] = 'dp'
@@ -647,8 +679,14 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
 
         elif 'fsc' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
+
             for ix, loc in enumerate(loci):
-                ebody = ebody + f'{tabover}<b>{bids[ix]}plus {d1s(expdata[5])}% FSC</b> to {loc}<br>'
+                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix)
+                if ow:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]} plus {d1s(expdata[5])}% FSC</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
+                else:
+                    ebody = ebody + f'{tabover}<b>{bids[ix]} plus {d1s(expdata[5])}% FSC</b> to {loc}<br>'
+
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
             ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
             bidtypeamount[0] = 'fsc'
@@ -729,10 +767,12 @@ def bodymaker(customer,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibi
 
     return ebody, tbox, etitle, bidtypeamount
 
-def insert_adds(tbox, expdata, takedef, distdata, multibid):
+def insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, kx):
     sen = ''
     adds = []
     btype = []
+    owfeetot = 0
+
     if tbox[12]: btype.append('live')
     if tbox[13]: btype.append('dr')
     if tbox[14]: btype.append('dp')
@@ -744,6 +784,10 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
             #print(ix,tbox[ix])
 
     if 'all-in' not in btype:
+
+        if multibid[0] == 'on':
+            distdata = mdistdata[kx]
+
         if tbox[0]:
             adds.append(f'Standard 2-axle Chassis:  <b>${expdata[15]}/day</b>')
         if tbox[1]:
@@ -757,7 +801,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
             distloaded = float(distdata[0]) / 2
             owfee2 = round(int(float(expdata[22]) * float(distdata[0]) / 2) / 10) * 10
             owfeetot = owfee1+owfee2
-            adds.append(f'Overweight Fee:  <b>${d2s(owfeetot)}</b> ({d2s(owfee1)} + {d1s(distloaded)} OW miles)')
+            if multibid[0] != 'on': adds.append(f'Overweight Fee:  <b>${d2s(owfeetot)}</b> ({d2s(owfee1)} + {d1s(distloaded)} OW miles)')
         if tbox[5]:
             permitfee = 90.00
             adds.append(f'Permits Fee:  <b>${d2s(expdata[28])}</b>')
@@ -803,7 +847,7 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid):
     elif tbox[19]: sen = sen + f'<br><br>We have immediate capacity to execute the job quoted. '
     elif tbox[20]: sen = sen + f'<br><br>We have capacity for next week and beyond to execute the job quoted. '
 
-    return sen, tbox, btype, stype, mixtype
+    return sen, tbox, btype, stype, mixtype, owfeetot
 
 def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata):
     #print(f'miles: {miles}, hours: {hours}, lats: {lats}, lons: {lons}, dirdata: {dirdata}')
@@ -1127,161 +1171,7 @@ def go_to_next(mid, oldmid, taskbox):
         quot = 0
         return None, quot, None, None, None, None, None, None, None, taskbox, None, None, None, None
 
-def get_costs_old(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat):
 
-    #print('YES using the get costs old method')
-    # Get the currently used cost per mile and cost per hour data used in the base bids
-    ph_driver = float(qidat.ph_driver) / 100
-    fuel = float(qidat.fuelpergal) / 100
-    mpg = float(qidat.mpg) / 100
-    pm_fuel = fuel / mpg
-    ins = float(qidat.insurance_annual_truck) / 100
-    ph_insurance = ins / 1992  # based on 249 work days 8 hrs per day
-
-    newmarkup = request.values.get('optmarkup')
-    if newmarkup is not None:
-        try:
-            markupx = float(newmarkup)
-        except:
-            # print(f'Could not float convert {newmarkup}')
-            markupx = float(qidat.markup) / 100
-    else:
-        markupx = float(qidat.markup) / 100
-        newmarkup = str(markupx)
-    # print(f'The markup and newmarkup are {markup} and {newmarkup}')
-    md_toll = float(qidat.toll) / 100
-    gapct = float(qidat.ga) / 100
-    pm_repairs = float(qidat.pm_repairs) / 100
-    pm_fees = float(qidat.pm_fees) / 100
-    pm_other = float(qidat.pm_other) / 100
-    pmc = pm_fuel + pm_repairs + pm_fees + pm_other
-    phc = ph_driver + ph_insurance
-    fsc = float(qidat.FSC) / 100
-
-    # Calculate road tolls
-    tollroadlist = ['I-76', 'NJ Tpke', 'MD-200']
-    tollroadcpm = [.784, .275, .35]
-    legtolls = len(dirdata) * [0.0]
-    legcodes = len(dirdata) * ['None']
-    for lx, mi in enumerate(miles):
-        for nx, tollrd in enumerate(tollroadlist):
-            if tollrd in dirdata[lx]:
-                legtolls[lx] = tollroadcpm[nx] * mi
-                legcodes[lx] = tollrd
-
-    # Calculate plaza tolls
-    fm_tollbox = [39.267757, -76.610192, 39.261248, -76.563158]
-    bht_tollbox = [39.259962, -76.566240, 39.239063, -76.603324]
-    fsk_tollbox = [39.232770, -76.502453, 39.202279, -76.569906]
-    bay_tollbox = [39.026893, -76.417512, 38.964938, -76.290104]
-    sus_tollbox = [39.585193, -76.142883, 39.572328, -76.033975]
-    new_tollbox = [39.647121, -75.774523, 39.642613, -75.757187]  # Newark Delaware Toll Center
-    dmb_tollbox = [39.702146, -75.553479, 39.669730, -75.483284]
-    thm_tollbox = [39.565926, -76.094457, 39.557314, -76.079055]  # Rt 40 Bridge Aberdeen Thomas J Hatem Bridge
-    dtr_tollbox = [38.935600, -77.240034, 38.933741, -77.237659]  # Dulles Toll Rd Plaza
-    tollcodes = ['FM', 'BHT', 'FSK', 'BAY', 'SUS', 'NEW', 'DMB', 'TJH', 'DTR']
-    onceonly = []
-    tollboxes = [fm_tollbox, bht_tollbox, fsk_tollbox, bay_tollbox, sus_tollbox, new_tollbox, dmb_tollbox, thm_tollbox,
-                 dtr_tollbox]
-
-    for jx, lat in enumerate(lats):
-        stat1 = 'ok'
-        stat2 = 'ok'
-        stat3 = 0
-        stat4 = 0
-        tollcode = 'None'
-        la = float(lat)
-        lo = float(lons[jx])
-        for kx, tollbox in enumerate(tollboxes):
-            lah = max([tollbox[0], tollbox[2]])
-            lal = min([tollbox[0], tollbox[2]])
-            loh = max([tollbox[1], tollbox[3]])
-            lol = min([tollbox[1], tollbox[3]])
-            if la > lal and la < lah:
-                stat1 = 'toll'
-                if lo > lol and lo < loh:
-                    stat2 = 'toll'
-                    tollcode = tollcodes[kx]
-                    if tollcode not in onceonly:
-                        if tollcode == 'DTR':
-                            legtolls[jx] = 10.50
-                        else:
-                            legtolls[jx] = 24.00
-                        legcodes[jx] = tollcode
-                        onceonly.append(tollcode)
-            if jx > 0:
-                lam = (lah + lal) / 2.0
-                lom = (loh + lol) / 2.0
-                la_last = float(lats[jx - 1])
-                lo_last = float(lons[jx - 1])
-                #stat3, stat4 = checkcross(lam, la_last, la, lom, lo_last, lo)
-                tollpass = checkcross2(la_last, la, lo_last, lo, lol, lal, loh, lah)
-                if tollpass:
-                    tollcode = tollcodes[kx]
-                    if tollcode == 'DTR':
-                        legtolls[jx] = 10.50
-                    else:
-                        legtolls[jx] = md_toll
-                    legcodes[jx] = tollcode
-        ##print(lat,lons[jx],stat1, stat2, stat3, stat4, tollcode)
-
-    tot_tolls = 0.00
-    porttime = 1.4
-    loadtime = 2.0
-    triptime = tot_dura * 2.0
-    handling = .5 + triptime * .01
-    dphandling = .75 + triptime * .05
-    tottime = porttime + loadtime + triptime + handling
-    dptime = porttime + triptime + dphandling
-    timedata = [d1s(triptime), d1s(porttime), d1s(loadtime), d1s(handling), d1s(tottime)]
-
-    tripmiles = tot_dist * 2.0
-    portmiles = .4
-    glidemiles = 10 + .005 * tripmiles
-    totmiles = tripmiles + portmiles + glidemiles
-    distdata = [d1s(tripmiles), d1s(portmiles), '0.0', d1s(glidemiles), d1s(totmiles)]
-
-    newdirdata = []
-    for lx, aline in enumerate(dirdata):
-        tot_tolls += legtolls[lx]
-        aline = aline.replace('<div style="font-size:0.9em">Toll road</div>', '')
-        aline = aline.strip()
-        # print(aline)
-        # print(f'Dist:{d1s(miles[lx])}, Time:{d1s(hours[lx])}, ')
-        if legtolls[lx] < .000001:
-            newdirdata.append(f'{d1s(miles[lx])} MI {d2s(hours[lx])} HRS {aline}')
-        else:
-            newdirdata.append(
-                f'{d1s(miles[lx])} MI {d2s(hours[lx])} HRS {aline} Tolls:${d2s(legtolls[lx])}, TollCode:{legcodes[lx]}')
-
-    # Cost Analysis:
-    cost_drv = tottime * ph_driver
-    cost_fuel = totmiles * pm_fuel
-    cost_tolls = 2.0 * tot_tolls
-
-    cost_insur = tottime * ph_insurance
-    cost_rm = totmiles * pm_repairs
-    cost_misc = totmiles * (pm_fees + pm_other)
-
-    cost_direct = cost_drv + cost_fuel + cost_tolls + cost_insur + cost_rm + cost_misc
-    cost_ga = cost_direct * gapct / 100.0
-    cost_total = cost_direct + cost_ga
-    costdata = [d2s(cost_drv), d2s(cost_fuel), d2s(cost_tolls), d2s(cost_insur), d2s(cost_rm), d2s(cost_misc),
-                d2s(cost_ga), d2s(cost_direct), d2s(cost_total)]
-
-    bid = cost_total * markupx
-    dpcost = (dptime * (ph_driver + ph_insurance) + totmiles * (
-                pm_fuel + pm_repairs + pm_fees + pm_other) + cost_tolls) * (1 + gapct / 100)
-    dpbid = dpcost * markupx
-    bobtailcost = ((dptime - .25) * (ph_driver + ph_insurance) + (totmiles - 8) * (
-                pm_fuel + pm_repairs + pm_fees + pm_other)) * (1 + gapct / 100)
-    drbid = dpbid + bobtailcost * markupx
-    fuelbid = bid / (1 + fsc / 100)
-    allbid = bid + 2 * 40
-
-    biddata = [d2s(roundup(bid)), d2s(roundup(drbid)), d2s(roundup(dpbid)), d2s(roundup(fuelbid)), d2s(roundup(allbid))]
-
-    return timedata, distdata, costdata, biddata, newdirdata
 
 def get_terminal(locto):
     term = request.values.get('terminal')
@@ -1377,6 +1267,7 @@ def isoQuote():
     locto = None
     include_text = ''
     whouse = [0]*15
+    mdistdata = []
 
 
     if request.method == 'POST':
@@ -1683,6 +1574,7 @@ def isoQuote():
                     if multibid[0] == 'on':
                         # Get the bids for each location....
                         mbids = []
+                        mdistdata = []
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
                         for locto in locs:
@@ -1690,6 +1582,7 @@ def isoQuote():
                             if hasinput(locto) and locto != 'No Location Found':
                                 miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
                                 timedata, distdata, costdata, biddata, newdirdata, include_text = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata)
+                                mdistdata.append(distdata)
                                 #print(biddata)
                                 if tbox[15]: mbids.append(biddata[4])
                                 elif tbox[12]: mbids.append(biddata[0])
@@ -1787,7 +1680,7 @@ def isoQuote():
                     takedef = 0
 
                 if quotbut is not None:
-                    #Set the email data:
+                    # This section sets everything up on first pass thru
                     if wareBB or wareUD:
                         etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote for Warehouse Services from {port}'
                     else:
@@ -1807,7 +1700,7 @@ def isoQuote():
                         bidname = bidnamelist[0]
                     except:
                         bidname = ''
-                    ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD)
+                    ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD,mdistdata)
                     #print(f'The bidtypeamount here after call is {bidtypeamount} and amount in database is {qdat.Amount} for {quot}')
                     if wareBB is not None or wareUD is not None:
                         ebody = ebody + f'<br><br><em>{signoff}</em>'
@@ -1824,7 +1717,7 @@ def isoQuote():
                     db.session.commit()
                     qdat = Quotes.query.get(quot)
                 else:
-                    #Set the email data:
+                    #This for recycles in the quote...
                     if updatebid is not None or updatego is not None or wareBB is not None or wareUD is not None:
                         for ix in range(len(tbox)):
                             tbox[ix] = request.values.get(f'tbox{str(ix)}')
@@ -1833,7 +1726,7 @@ def isoQuote():
                             etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote for Warehouse Services from {port}'
                         else:
                             etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto} from {port}'
-                        ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD)
+                        ebody, tbox, etitle, bidtypeamount = bodymaker(bidname,cdata,bidthis,locto,tbox,expdata, takedef,distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD,mdistdata)
                         if wareBB is not None or wareUD is not None:
                             ebody = ebody + f'<br><br><em>{signoff}</em>'
                         else:
@@ -1886,6 +1779,7 @@ def isoQuote():
             # Get and update the cost data
             timedata = []
             distdata = []
+            mdistdata = []
 
 
     else:
@@ -1916,6 +1810,7 @@ def isoQuote():
         bidname = None
         timedata = []
         distdata = []
+        mdistdata = []
         quot=0
         # Set quotes to top of the table:
         qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()

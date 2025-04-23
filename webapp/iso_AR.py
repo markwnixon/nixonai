@@ -272,7 +272,7 @@ def get_open_sort_totals(arlist):
     lb360 = today - datetime.timedelta(360)
     cdata = []
     for cust in arlist:
-        odata = Orders.query.filter((Orders.Shipper == cust) & ((Orders.Istat>1) & (Orders.Istat<4)) & (Orders.InvoDate>lb360)).order_by(Orders.InvoDate).all()
+        odata = Orders.query.filter((Orders.Shipper == cust) & ((Orders.Istat>1) & (Orders.Istat<5)) & (Orders.InvoDate>lb360)).order_by(Orders.InvoDate).all()
         sdata = Orders.query.filter((Orders.Shipper == cust)  & ((Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.InvoDate > lb360)).order_by(Orders.InvoDate).all()
         iall, iu30, io30 = 0, 0, 0
         dolall, dolu30, dolo30 = 0.00, 0.00, 0.00
@@ -320,7 +320,7 @@ def get_open_sort_totals(arlist):
 def get_open_for_cust(this_shipper, lb_date):
     dat30 = today - datetime.timedelta(30)
 
-    odata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat>1) & (Orders.Istat<4)) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
+    odata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat>1) & (Orders.Istat<5)) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
     sodata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date3 > lb_date)).order_by(Orders.Date3).all()
     sumlist = []
     sdata = []
@@ -533,7 +533,9 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
             duedate = datei + datetime.timedelta(30)
             odr = odat.Label
             if odr is None: odr = odat.Order
-            data = [odat.Jo, odr, odat.Booking, odat.Container, f'{datei}', f'${odat.InvoTotal}', f'{duedate}']
+            abd = odat.BalDue
+            if abd is None: abd = odat.InvoTotal
+            data = [odat.Jo, odr, odat.Booking, odat.Container, f'{datei}', f'${abd}', f'{duedate}']
             datline=[]
             intable = f'{intable}<tr>'
             for jx in range(7):
@@ -1053,7 +1055,7 @@ def isoAR():
         lookbacktime = 'One Year'
 
     lb_date = today - datetime.timedelta(lookback)
-    arorders = Orders.query.filter( ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==6) |(Orders.Istat==7))) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
+    arorders = Orders.query.filter( ((Orders.Istat>1) & ((Orders.Istat<5) | (Orders.Istat==6) |(Orders.Istat==7)) ) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
     arlist = get_sorted_cust(arorders)
     arbycust = get_open_sort_totals(arlist)
     if this_shipper is None:
