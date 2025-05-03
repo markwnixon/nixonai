@@ -646,6 +646,7 @@ class Orders(db.Model):
     Ship = db.Column('Ship', db.String(45))
     Voyage = db.Column('Voyage', db.String(45))
     UserMod = db.Column('UserMod', db.String(45))
+    DelStat = db.Column('DelStat', db.Integer)
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
@@ -653,7 +654,7 @@ class Orders(db.Model):
                  Dropblock2, Commodity, Packing, Links, Hstat, Istat, Proof, Invoice, Gate, Package, Manifest,
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
                  Date4, Date5, Date6, Date7, Date8, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
-                 Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap, SSCO, Ship, Voyage, UserMod):
+                 Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap, SSCO, Ship, Voyage, UserMod, DelStat):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -738,6 +739,7 @@ class Orders(db.Model):
         self.Ship = Ship
         self.Voyage = Voyage
         self.UserMod = UserMod
+        self.DelStat = DelStat
 
 class Ships(db.Model):
     __tablename__ = 'ships'

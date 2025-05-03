@@ -28,6 +28,9 @@
 {% set ct = "font-weight-bold text-center" %}
 {% set mtxt = "font-weight-bold text-center text-white bk-success" %}
 
+{{ genre }}
+{% set klist = genre_data['haul_types'] %}
+
 <div class="row">
     <div class="col-sm-{{ cbr }} text-left">
         <div class="{{ caltop }}"> Active Jobs </div>
@@ -103,9 +106,60 @@
                     {% if jtype == 'pdio' %}
                         {% set io = pdio[ix][kx] %}
                         {% set dc = io[13] %}
+                        {% set dp = io[16] %}
+                        {% set dstat = io[17] %}
+                        {% if dp %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Drop On' %}
+                                    {% set mdtext = 'Drop Not Completed' %}
+                                    {% set premdtext = 'Mark If Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Drop At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Pick At' %}
+                                    {% set dpret = dc[9] %}
+                                {% else %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Picked On' %}
+                                    {% set mdtext2 = 'Pick Completed' %}
+                                    {% set premdtext2 = 'Unmark If Not Picked' %}
+                                    {% set dpre = 'Drop-Pick Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% else %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Deliver On' %}
+                                    {% set mdtext = 'Live Unload Not Completed' %}
+                                    {% set premdtext = 'Mark If Delivered' %}
+                                    {% set dpre = 'Live' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Delivered On' %}
+                                    {% set mdtext = 'Live Unload Completed' %}
+                                    {% set premdtext = 'Unmark If Not Delivered' %}
+                                    {% set dpre = 'Live Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% endif %}
                         <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ io[0] }}">
-                            <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ io[5] }}"> <b>{{ io[0] }} ({{ io[6] }})</b><br>{{ io[1] }}<br>{{ io[2] }}<br><i>{{ io[14] }}</i>
-                            {% if io[15] != '25:00' %}<i>{{ io[15] }}</i>{% endif %}
+                            <p class="small {{ io[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ io[5] }}">
+                                <b>{{ io[0] }} ({{ io[6] }})</b><br>{{ io[1] }}<br>{{ io[2] }}<br>
+                                {% if 'Complete' in dpre %}
+                                    {{ dpre }}
+                                {% else %}
+                                    <i>{{ io[14] }}</i>{% if dpret != '25:00' %} <i>{{ dpre }} {{ dpret }}</i>{% endif %}
+                                {% endif %}
                                 {% if io[4] != [] %}<br>{% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                             </p>
                         </button>
@@ -121,17 +175,46 @@
                                             </div>
                                             <div class="modal-body">
                                                 <table>
+                                                {% set alins = io[7] %}
+                                                    <tr><td class="{{ lmt }}">Haul Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="ht{{ io[5] }}">
+                                                            {% for du in klist %}
+                                                                <option {% if du == dc[12] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td></tr>
                                                     <tr><td class="{{ lmt }}">Import Out:</td><td class="{{ rmt }}">{{ io[0] }} ({{ io[6] }})</td></tr>
                                                     <tr><td class="{{ lmt }}">BOL:</td><td class="{{ rmt }}">{{ io[8] }}</td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver To:</td><td class="{{ rmt }}">{{ io[7] }}</td></tr>
+
+                                                    <tr><td class="{{ lmt }}">Deliver To:</td>
+                                                    <td class="{{ rmt }}">
+                                                        <table>
+                                                            {% for alin in alins %}
+                                                                <tr><td class="{{ rmt }}">{{  alin }}</td></tr>
+                                                            {% endfor %}
+                                                        </table>
+                                                    </td></tr>
+
                                                     <tr><td class="{{ lmt }}">Gate Out:</td><td class="{{ rmt }}">{{ dc[0] }}</td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ io[5] }}" value="{{ dc[1] }}"></td></tr>
+                                                    <tr>
+                                                        <td class="{{ lmt }}">{{ dtext }}:</td>
+                                                        <td class="{{ rmt }}"><input type="date" name="delv{{ io[5] }}" value="{{ dc[1] }}">
+                                                            <input type="time" id={{ dc[10] }} name="delt{{ io[5] }}" value="{{ dc[8] }}">
+                                                        </td>
+                                                    </tr>
+
+                                                <tr><td class="{{ lmt }}">{{ premdtext }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 0 %} checked {% endif %} name="dwp{{ io[5] }}"> {{ mdtext }} </td></tr>
+                                                {% if dp %}
+                                                     <tr><td class="{{ lmt }}">{{ dtext2 }}:</td><td class="{{ rmt }}"><input type="date" name="delv2{{ io[5] }}" value="{{ dc[7] }}">
+                                                         <input type="time" id={{ dc[11] }} name="pict{{ io[5] }}" value="{{ dc[9] }}"></td></tr>
+                                                     <tr><td class="{{ lmt }}">{{ premdtext2 }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 1 %} checked {% endif %} name="dwp2{{ io[5] }}"> {{ mdtext2 }} </td></tr>
+                                                {% endif %}
+
                                                     <tr><td class="{{ lmt }}">Planned Gate In:</td><td class="{{ rmt }}"><input type="date" name="gin{{ io[5] }}" value="{{ dc[2] }}"></td></tr>
                                                     <tr><td class="{{ lmt }}">Due Back By:</td><td class="{{ rmt }}">{{ dc[6] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Vessel/Voyage:</td><td class="{{ rmt }}">{{ io[11] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">JO:</td><td class="{{ rmt }}">{{ io[5] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Bill To:</td><td class="{{ rmt }}">{{ io[1] }}</td></tr>
-                                                    <tr><td class="{{ lmt }}">Mark Delivered:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" name="dwp{{ io[5] }}"> If live load delivered or drop-pick is picked</td></tr>
                                                     <tr><td class="{{ lmt }}">Warnings:</td><td class="{{ rmt }}">{% for cmt in io[4] %}{{ cmt }}<br>{% endfor %}</td></tr>
                                                     <tr><td class="{{ lmt }}">&nbsp;</td><td class="{{ rmt }}">&nbsp;</td></tr>
                                                     <tr><td class="{{ lmt }}">Add comments:</td><td class="{{ rmt }}">&nbsp;</td></tr>
@@ -151,9 +234,63 @@
                     {% if jtype == 'pdip' %}
                         {% set ip = pdip[ix][kx] %}
                         {% set dc = ip[13] %}
+                        {% set dp = ip[16] %}
+                        {% set dstat = ip[17] %}
+                        {% if dp %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Drop On' %}
+                                    {% set mdtext = 'Drop Not Completed' %}
+                                    {% set premdtext = 'Mark If Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Drop At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Pick At' %}
+                                    {% set dpret = dc[9] %}
+                                {% else %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Picked On' %}
+                                    {% set mdtext2 = 'Pick Completed' %}
+                                    {% set premdtext2 = 'Unmark If Not Picked' %}
+                                    {% set dpre = 'Drop-Pick Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% else %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Deliver On' %}
+                                    {% set mdtext = 'Live Unload Not Completed' %}
+                                    {% set premdtext = 'Mark If Delivered' %}
+                                    {% set dpre = 'Live At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Delivered On' %}
+                                    {% set mdtext = 'Live Unload Completed' %}
+                                    {% set premdtext = 'Unmark If Not Delivered' %}
+                                    {% set dpre = 'Live Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% endif %}
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ip[0] }}">
-                                    <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}"> <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br><i>{{ ip[14] }}</i>
-                                       {% if ip[15] != '25:00' %}<i>{{ ip[15] }}</i>{% endif %}
+                                    <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}">
+                                        <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br>
+                                        <i>{{ ip[14] }}</i>
+
+                                        {% if 'Complete' in dpre %}
+                                            {{ dpre }}
+                                        {% else %}
+                                            <i>{{ ip[14] }}</i>{% if dpret != '25:00' %} <i>{{ dpre }} {{ dpret }}</i>{% endif %}
+                                        {% endif %}
+
                                         {% if ip[4] != [] %}<br>{% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
@@ -169,11 +306,38 @@
                                             </div>
                                             <div class="modal-body">
                                                 <table>
+                                                {% set alins = ip[7] %}
+                                                    <tr><td class="{{ lmt }}">Haul Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="ht{{ ip[5] }}">
+                                                            {% for du in klist %}
+                                                                <option {% if du == dc[12] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td></tr>
                                                     <tr><td class="{{ lmt }}">Import in Port:</td><td class="{{ rmt }}">{{ ip[0] }} ({{ ip[6] }})</td></tr>
                                                     <tr><td class="{{ lmt }}">BOL:</td><td class="{{ rmt }}">{{ ip[8] }}</td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver To:</td><td class="{{ rmt }}">{{ ip[7] }}</td></tr>
+
+                                                    <tr><td class="{{ lmt }}">Deliver To:</td>
+                                                    <td class="{{ rmt }}">
+                                                        <table>
+                                                            {% for alin in alins %}
+                                                                <tr><td class="{{ rmt }}">{{  alin }}</td></tr>
+                                                            {% endfor %}
+                                                        </table>
+                                                    </td></tr>
+
                                                     <tr><td class="{{ lmt }}">Planned Gate Out:</td><td class="{{ rmt }}"><input type="date" name="gout{{ ip[5] }}" value="{{ dc[0] }}"></td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ ip[5] }}" value="{{ dc[1] }}"></td></tr>
+                                                    <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ ip[5] }}" value="{{ dc[1] }}">
+                                                        <input type="time" id={{ dc[10] }} name="delt{{ ip[5] }}" value="{{ dc[8] }}"></td></tr>
+
+                                                    <tr><td class="{{ lmt }}">{{ premdtext }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 0 %} checked {% endif %} name="dwp{{ ip[5] }}"> {{ mdtext }} </td></tr>
+                                                {% if dp %}
+                                                     <tr><td class="{{ lmt }}">{{ dtext2 }}:</td><td class="{{ rmt }}"><input type="date" name="delv2{{ ip[5] }}" value="{{ dc[7] }}">
+                                                         <input type="time" id={{ dc[11] }} name="pict{{ ip[5] }}" value="{{ dc[9] }}"></td></tr>
+                                                     <tr><td class="{{ lmt }}">{{ premdtext2 }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 1 %} checked {% endif %} name="dwp2{{ ip[5] }}"> {{ mdtext2 }} </td></tr>
+                                                {% endif %}
+
+
                                                     <tr><td class="{{ lmt }}">Planned Gate In:</td><td class="{{ rmt }}"><input type="date" name="gin{{ ip[5] }}" value="{{ dc[2] }}"></td></tr>
                                                     <tr><td class="{{ lmt }}">Available at Port:</td><td class="{{ rmt }}">{{ dc[3] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Last Free Day from Port:</td><td class="{{ rmt }}">{{ dc[4] }}</td></tr>
@@ -200,10 +364,63 @@
                     {% if jtype == 'pdeo' %}
                         {% set eo = pdeo[ix][kx] %}
                         {% set dc = eo[13] %}
+                        {% set dp = eo[18] %}
+                        {% set dstat = eo[19] %}
+                        {% if dp %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Drop On' %}
+                                    {% set mdtext = 'Drop Not Completed' %}
+                                    {% set premdtext = 'Mark If Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Drop At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Pick At' %}
+                                    {% set dpret = dc[9] %}
+                                {% else %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Picked On' %}
+                                    {% set mdtext2 = 'Pick Completed' %}
+                                    {% set premdtext2 = 'Unmark If Not Picked' %}
+                                    {% set dpre = 'Drop-Pick Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% else %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Deliver On' %}
+                                    {% set mdtext = 'Live Unload Not Completed' %}
+                                    {% set premdtext = 'Mark If Delivered' %}
+                                    {% set dpre = 'Live At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Delivered On' %}
+                                    {% set mdtext = 'Live Unload Completed' %}
+                                    {% set premdtext = 'Unmark If Not Delivered' %}
+                                    {% set dpre = 'Live Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% endif %}
 
                                <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ eo[8] }}">
-                                    <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}"> {{ eo[0] }} ({{ eo[6] }})<br>{{ eo[9] }}<br>{{ eo[1] }}<br>{{ eo[2] }}<br>{{ eo[15] }}<br><i>{{ eo[16] }}</i>
-                                    {% if eo[17] != '25:00' %}<i>{{ eo[17] }}</i>{% endif %}
+                                    <p class="small {{ eo[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdeovec[ix] %} checked {% endif %} name="{{ eo[5] }}">
+                                        {{ eo[0] }} ({{ eo[6] }})<br>{{ eo[9] }}<br>{{ eo[1] }}<br>{{ eo[2] }}<br>{{ eo[15] }}<br>
+
+                                        {% if 'Complete' in dpre %}
+                                            {{ dpre }}
+                                        {% else %}
+                                            <i>{{ eo[16] }}</i>{% if dpret != '25:00' %} <i>{{ dpre }} {{ dpret }}</i>{% endif %}
+                                        {% endif %}
+
                                         {% if eo[4] != [] %}<br>{% for cmt in eo[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
@@ -219,12 +436,40 @@
                                             </div>
                                             <div class="modal-body">
                                                 <table>
+                                                {% set alins = eo[7] %}
+                                                    <tr><td class="{{ lmt }}">Haul Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="ht{{ eo[5] }}">
+                                                            {% for du in klist %}
+                                                                <option {% if du == dc[12] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td></tr>
+
                                                     <tr><td class="{{ lmt }}">Export Container:</td><td class="{{ rmt }}">{{ eo[0] }} ({{ eo[6] }})</td></tr>
                                                     <tr><td class="{{ lmt }}">Pulled Booking:</td><td class="{{ rmt }}">{{ eo[8] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Return Booking:</td><td class="{{ rmt }}"><input type="text" name="book{{ eo[5] }}" value="{{ eo[9] }}"></td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver To:</td><td class="{{ rmt }}">{{ eo[7] }}</td></tr>
+
+                                                    <tr><td class="{{ lmt }}">Deliver To:</td>
+                                                    <td class="{{ rmt }}">
+                                                        <table>
+                                                            {% for alin in alins %}
+                                                                <tr><td class="{{ rmt }}">{{  alin }}</td></tr>
+                                                            {% endfor %}
+                                                        </table>
+                                                    </td></tr>
+
                                                     <tr><td class="{{ lmt }}">Gate Out:</td><td class="{{ rmt }}">{{ dc[0] }}</td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ eo[5] }}" value="{{ dc[1] }}"></td></tr>
+                                                    <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ eo[5] }}" value="{{ dc[1] }}">
+                                                        <input type="time" id={{ dc[10] }} name="delt{{ eo[5] }}" value="{{ dc[8] }}"></td></tr>
+
+                                                    <tr><td class="{{ lmt }}">{{ premdtext }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 0 %} checked {% endif %} name="dwp{{ eo[5] }}"> {{ mdtext }} </td></tr>
+                                                {% if dp %}
+                                                     <tr><td class="{{ lmt }}">{{ dtext2 }}:</td><td class="{{ rmt }}"><input type="date" name="delv2{{ eo[5] }}" value="{{ dc[7] }}">
+                                                         <input type="time" id={{ dc[11] }} name="pict{{ eo[5] }}" value="{{ dc[9] }}"></td></tr>
+                                                     <tr><td class="{{ lmt }}">{{ premdtext2 }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 1 %} checked {% endif %} name="dwp2{{ eo[5] }}"> {{ mdtext2 }} </td></tr>
+                                                {% endif %}
+
+
                                                     <tr><td class="{{ lmt }}">Planned Gate In:</td><td class="{{ rmt }}"><input type="date" name="gin{{ eo[5] }}" value="{{ dc[2] }}"></td></tr>
                                                 <tr><td class="{{ lmt }}">ERD:</td><td class="{{ rmt }}">{{ dc[3] }}</td></tr>
                                                 <tr><td class="{{ lmt }}">CUT:</td><td class="{{ rmt }}">{{ dc[4] }}</td></tr>
@@ -253,10 +498,63 @@
                     {% if jtype == 'pdep' %}
                         {% set ep = pdep[ix][kx] %}
                         {% set dc = ep[13] %}
+                        {% set dp = ep[18] %}
+                        {% set dstat = ep[19] %}
+                        {% if dp %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Drop On' %}
+                                    {% set mdtext = 'Drop Not Completed' %}
+                                    {% set premdtext = 'Mark If Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Drop At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Pick On' %}
+                                    {% set mdtext2 = 'Pick Not Completed' %}
+                                    {% set premdtext2 = 'Mark If Picked' %}
+                                    {% set dpre = 'Pick At' %}
+                                    {% set dpret = dc[9] %}
+                                {% else %}
+                                    {% set dtext = 'Dropped On' %}
+                                    {% set mdtext = 'Drop Completed' %}
+                                    {% set premdtext = 'Unmark If Not Dropped' %}
+                                    {% set dtext2 = 'Picked On' %}
+                                    {% set mdtext2 = 'Pick Completed' %}
+                                    {% set premdtext2 = 'Unmark If Not Picked' %}
+                                    {% set dpre = 'Drop-Pick Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% else %}
+                                {% if dstat == 0 %}
+                                    {% set dtext = 'Deliver On' %}
+                                    {% set mdtext = 'Live Unload Not Completed' %}
+                                    {% set premdtext = 'Mark If Delivered' %}
+                                    {% set dpre = 'Live At' %}
+                                    {% set dpret = dc[8] %}
+                                {% elif dstat == 1 %}
+                                    {% set dtext = 'Delivered On' %}
+                                    {% set mdtext = 'Live Unload Completed' %}
+                                    {% set premdtext = 'Unmark If Not Delivered' %}
+                                    {% set dpre = 'Live Complete' %}
+                                    {% set dpret = dc[8] %}
+                                {% endif %}
+                        {% endif %}
 
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ep[0] }}">
-                                    <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}"> {{ ep[0] }} ({{ ep[6] }})<br> {{ ep[1] }}<br> {{ ep[2] }}<br>{{ ep[15] }}<br><i>{{ ep[16] }}</i>
-                                        {% if ep[17] != '25:00' %}<i>{{ ep[17] }}</i>{% endif %}
+                                    <p class="small {{ ep[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdepvec[ix] %} checked {% endif %} name="{{ ep[5] }}">
+                                        {{ ep[0] }} ({{ ep[6] }})<br> {{ ep[1] }}<br> {{ ep[2] }}<br>{{ ep[15] }}<br>
+
+                                        {% if 'Complete' in dpre %}
+                                            {{ dpre }}
+                                        {% else %}
+                                            <i>{{ ep[16] }}</i>{% if dpret != '25:00' %} <i>{{ dpre }} {{ dpret }}</i>{% endif %}
+                                        {% endif %}
+
                                         {% if ep[4] != [] %}<br>{% for cmt in ep[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
                                     </p>
                                 </button>
@@ -272,10 +570,37 @@
                                             </div>
                                             <div class="modal-body">
                                                 <table>
+                                                {% set alins = ep[7] %}
+                                                    <tr><td class="{{ lmt }}">Haul Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="ht{{ ep[5] }}">
+                                                            {% for du in klist %}
+                                                                <option {% if du == dc[12] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td></tr>
                                                     <tr><td class="{{ lmt }}">Empty Out:</td><td class="{{ rmt }}">{{ ep[0] }} ({{ ep[6] }})</td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver To:</td><td class="{{ rmt }}">{{ ep[7] }}</td></tr>
+
+                                                    <tr><td class="{{ lmt }}">Deliver To:</td>
+                                                    <td class="{{ rmt }}">
+                                                        <table>
+                                                            {% for alin in alins %}
+                                                                <tr><td class="{{ rmt }}">{{  alin }}</td></tr>
+                                                            {% endfor %}
+                                                        </table>
+                                                    </td></tr>
+
                                                     <tr><td class="{{ lmt }}">Planned Gate Out:</td><td class="{{ rmt }}"><input type="date" name="gout{{ ep[5] }}" value="{{ dc[0] }}"></td></tr>
-                                                    <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ ep[5] }}" value="{{ dc[1] }}"></td></tr>
+                                                    <tr><td class="{{ lmt }}">{{ dtext }}:</td><td class="{{ rmt }}"><input type="date" name="delv{{ ep[5] }}" value="{{ dc[1] }}">
+                                                        <input type="time" id={{ dc[10] }} name="delt{{ ep[5] }}" value="{{ dc[8] }}"></td></tr>
+
+                                                    <tr><td class="{{ lmt }}">{{ premdtext }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 0 %} checked {% endif %} name="dwp{{ ep[5] }}"> {{ mdtext }} </td></tr>
+                                                {% if dp %}
+                                                     <tr><td class="{{ lmt }}">{{ dtext2 }}:</td><td class="{{ rmt }}"><input type="date" name="delv2{{ ep[5] }}" value="{{ dc[7] }}">
+                                                         <input type="time" id={{ dc[11] }} name="pict{{ ep[5] }}" value="{{ dc[9] }}"></td></tr>
+                                                     <tr><td class="{{ lmt }}">{{ premdtext2 }}:</td><td class="{{ rmt }}"><input class="align-middle" type="checkbox" {% if dstat > 1 %} checked {% endif %} name="dwp2{{ ep[5] }}"> {{ mdtext2 }} </td></tr>
+                                                {% endif %}
+
+
                                                     <tr><td class="{{ lmt }}">Planned Gate In:</td><td class="{{ rmt }}"><input type="date" name="gin{{ ep[5] }}" value="{{ dc[2] }}"></td></tr>
                                                     <tr><td class="{{ lmt }}">ERD:</td><td class="{{ rmt }}">{{ dc[3] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">LFD:</td><td class="{{ rmt }}">{{ dc[4] }}</td></tr>
@@ -314,3 +639,4 @@
        {% endfor %}
     {% endif %}
 </div>
+

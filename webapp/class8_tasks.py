@@ -788,6 +788,8 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                                                                                                             [], [], []]
     pdic, pdec, pmon = [[], [], [], [], [], []], [[], [], [], [], [], []],[[], [], [], [], [], []]
     day_sequence = [[], [], [], [], [], []]
+    complete_color = 'text-info'
+    ktime = 1
 
     for podat in podata:
         hstat = podat.Hstat
@@ -797,6 +799,8 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         order = podat.Order
         dtype = podat.Delivery
         dtime = podat.Time3
+        ptime = podat.Time2
+
         if dtype is None:
             deliverline = 'Placeholder'
         else:
@@ -807,8 +811,13 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         else:
             delivertime = '25:00'
 
+        if hasinput(ptime):
+            picktime = f'{ptime}'
+        else:
+            picktime = '25:00'
 
-        #print(f'{deliverline}: delivertime is {delivertime}')
+
+        #print(f'{deliverline}: delivertime is {delivertime} and picktime is {picktime}')
 
         user = podat.UserMod
         if user != username:
@@ -829,7 +838,9 @@ def create_cal_data(tfilters, dlist, username, resetmod):
             ht = podat.HaulType
             jo = podat.Jo
             contype = podat.Type
-            location = podat.Dropblock2
+            location = f'{podat.Dropblock2}'
+            location = location.splitlines()
+
             release = podat.Booking
             in_booking = podat.BOL
             description = podat.Description
@@ -838,14 +849,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
             notes = podat.Location
             if notes is None: notes = ''
             comment = []
-            if hstat > 1: completed = 1
-            else: completed = 0
-            # Once pulled, Need to place the container by delivery date if not delivered yet, or planned gate in if delivered
-            if hstat == 1:
-                proof = podat.Proof
-                pcache = podat.Pcache
-                if pcache is None: pcache = 0
-                if pcache > 0 or proof is not None: completed = 1
+
 
             on_alldates = 0
             on_calendar = 0
@@ -855,6 +859,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
             gatein = podat.Date2
             arrives = podat.Date6
             dueback = podat.Date7
+            pick = podat.Date8
             del_s = short_date(delivery)
             arr_s = short_date(arrives)
             due_s = short_date(dueback)
@@ -869,6 +874,15 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                 texport = 1
             else:
                 texport = 0
+
+            if 'DP' in podat.HaulType:
+                droppick = 1
+            else:
+                droppick = 0
+
+            delstat = podat.DelStat
+            if delstat is None: delstat = 0
+            #print(f'for container {container} completion is {delstat}')
 
             if hstat >= 2:
                 #Getting invoices for calendar date regardless of import or export
@@ -893,7 +907,6 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                 avail_s = short_date(avail)
                 lfd = podat.Date5
                 lfd_s = short_date(lfd)
-                datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback]
 
                 if hstat >= 1:
                     bc1 = f'{container} GO:{pulled}'
@@ -928,21 +941,36 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline, delivertime])
                     on_alldates = 1
 
-                    for ix in range(5):
-                        if completed:
-                            if gatein == caldays[ix]:
-                                colorline = 'purple-text'
-                                if gatein > dueback:
-                                    #colorline = 'red-text'
-                                    comment.append(f'Past due back {dueback}')
-                                elif gatein == dueback:
-                                    #colorline = 'text-warning'
-                                    comment.append('Due back today')
+                    datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    ktime += 2
 
-                                pdio[ix + 1].append(
-                                    [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
-                                     in_booking, description, ship, notes, datecluster, deliverline, delivertime])
-                                on_calendar = 1
+                    for ix in range(5):
+                        if delstat > 0:
+                            if droppick and delstat == 1:
+                                if pick == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Pick on {pick}')
+                                    pdio[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                         in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            elif droppick and delstat == 2:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Empty due back {dueback}')
+                                    pdio[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                         in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            else:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Empty due back {dueback}')
+                                    pdio[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                         in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
                         else:
                             if delivery == caldays[ix]:
                                 colorline = 'blue-text'
@@ -955,10 +983,11 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                                     comment = ['****']
                                     comment.append('Due back today')
 
-                                pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime])
+                                pdio[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
                                 on_calendar = 1
 
                 elif hstat < 1:
+
                     firstline = f'{container}'
                     custline = f'{shipper}'
                     dateline = f'AP:{avail_s} DV:{del_s} LFD:{lfd_s}'
@@ -966,23 +995,56 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     comment = []
                     pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline, delivertime])
                     on_alldates = 1
+
+                    datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    ktime += 2
+
                     for ix in range(5):
-                        if delivery == caldays[ix]:
-                            if lfd is not None:
-                                if lfd < delivery:
-                                    colorline = 'red-text'
-                                    comment = ['****']
-                                    comment.append('Past LFD for pull')
-                                elif lfd == delivery:
-                                    colorline = 'orange-text'
-                                    comment = ['****']
-                                    comment.append('Today LFD for pull')
+                        if delstat > 0:
+                            if droppick and delstat == 1:
+                                if pick == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Pick on {pick}')
+                                    pdip[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                         in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            elif droppick and delstat == 2:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Empty due back {dueback}')
+                                    pdip[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                         in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            else:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Empty due back {dueback}')
+                                    pdip[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location, release,
+                                         in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+
+                        else:
+                            if delivery == caldays[ix]:
+                                if lfd is not None:
+                                    if lfd < delivery:
+                                        colorline = 'red-text'
+                                        comment = ['****']
+                                        comment.append('Past LFD for pull')
+                                    elif lfd == delivery:
+                                        colorline = 'orange-text'
+                                        comment = ['****']
+                                        comment.append('Today LFD for pull')
+                                    else:
+                                        colorline = 'black-text'
                                 else:
                                     colorline = 'black-text'
-                            else:
-                                colorline = 'black-text'
-                            pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime])
-                            on_calendar = 1
+                                pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
+                                on_calendar = 1
+
 
 
             if texport:
@@ -990,7 +1052,6 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                 erd_s = short_date(erd)
                 cut = podat.Date5
                 cut_s = short_date(cut)
-                datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback]
 
                 if hstat >= 1:
                     #Breadcrumbs for Exports
@@ -1018,7 +1079,11 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     addrline = f'{address}'
                     dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
                     shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
-                    if completed:  comment.append(f'Delivery Completed')
+                    if delstat>0:  comment.append(f'Delivery Completed')
+
+                    datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    ktime += 2
 
                     if erd is not None:
                         if gatein < erd:
@@ -1039,13 +1104,37 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     on_alldates = 1
 
                     for ix in range(5):
-                        if completed:
-                            if gatein == caldays[ix]:
-                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime])
-                                on_calendar = 1
+                        if delstat>0:
+                            if droppick and delstat == 1:
+                                if pick == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Pick on {pick}')
+                                    pdeo[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location,
+                                         release, in_booking, description, ship, notes, datecluster, addrline,
+                                         shipdates, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            elif droppick and delstat == 2:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Load due back {dueback}')
+                                    pdeo[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location,
+                                         release, in_booking, description, ship, notes, datecluster, addrline,
+                                         shipdates, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            else:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Load due back {dueback}')
+                                    pdeo[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location,
+                                         release, in_booking, description, ship, notes, datecluster, addrline,
+                                         shipdates, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
                         else:
                             if delivery == caldays[ix]:
-                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime])
+                                pdeo[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime, droppick, delstat])
                                 on_calendar = 1
 
                 elif hstat < 1:
@@ -1055,6 +1144,11 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     colorline = 'black-text'
                     dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
                     shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
+
+                    datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    ktime += 2
+
                     if erd is not None:
                         if delivery < erd:
                             #colorline = 'orange-text'
@@ -1063,9 +1157,39 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     pdep[0].append([firstline, custline, dateline, colorline, comment, jo, contype, addrline, shipdates, deliverline, delivertime])
                     on_alldates = 1
                     for ix in range(5):
-                        if delivery == caldays[ix]:
-                            pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime])
-                            on_calendar = 1
+                        if delstat>0:
+                            if droppick and delstat == 1:
+                                if pick == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Pick on {pick}')
+                                    pdep[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location,
+                                         release, in_booking, description, ship, notes, datecluster, addrline,
+                                         shipdates, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            elif droppick and delstat == 2:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Load due back {dueback}')
+                                    pdep[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location,
+                                         release, in_booking, description, ship, notes, datecluster, addrline,
+                                         shipdates, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                            else:
+                                if gatein == caldays[ix]:
+                                    colorline = 'text-info'
+                                    comment.append(f'Load due back {dueback}')
+                                    pdep[ix + 1].append(
+                                        [firstline, custline, dateline, colorline, comment, jo, contype, location,
+                                         release, in_booking, description, ship, notes, datecluster, addrline,
+                                         shipdates, deliverline, delivertime, droppick, delstat])
+                                    on_calendar = 1
+                        else:
+                            if delivery == caldays[ix]:
+                                colorline = 'black-text'
+                                pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime, droppick, delstat])
+                                on_calendar = 1
 
             if on_alldates and not on_calendar:
                 if texport:
@@ -1102,12 +1226,12 @@ def create_cal_data(tfilters, dlist, username, resetmod):
 
     new_day = [[],[],[],[],[],[]]
     for ix in range(1,6):
-        print(f'day sequence:{day_sequence[ix]}')
+        #print(f'day sequence:{day_sequence[ix]}')
         new_day[ix] = sorted(day_sequence[ix], key=lambda x: ( x[3], order_map[x[2]]) )
 
-    for ix in range(1,6):
-        for day in new_day[ix]:
-            print(ix,day)
+    #for ix in range(1,6):
+        #for day in new_day[ix]:
+            #print(ix,day)
 
 
     if userlist == []: userchange = 0
@@ -1219,8 +1343,13 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
             jo = item[5]
             note = request.values.get(f'note{jo}')
             delv = request.values.get(f'delv{jo}')
+            delv2 = request.values.get(f'delv2{jo}')
+            delt = request.values.get(f'delt{jo}')
+            pict = request.values.get(f'pict{jo}')
             gin = request.values.get(f'gin{jo}')
             dwp = request.values.get(f'dwp{jo}')
+            dwp2 = request.values.get(f'dwp2{jo}')
+            ht = request.values.get(f'ht{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1231,15 +1360,46 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Date3 = delv
                     pdio[jx][ix][13][1] = delv
                     reupdate = 1
+                if delt is not None:
+                    odat.Time3 = delt
+                    pdio[jx][ix][13][8] = delt
+                    reupdate = 1
+                if pict is not None:
+                    odat.Time2 = pict
+                    pdio[jx][ix][13][9] = pict
+                    reupdate = 1
+                if delv2 is not None:
+                    odat.Date8 = delv2
+                    pdio[jx][ix][13][7] = delv2
+                    reupdate = 1
                 if gin is not None:
                     odat.Date2 = gin
                     pdio[jx][ix][13][2] = gin
                     reupdate = 1
-                if dwp is not None:
-                    odat.Pcache = 1
+
+                if ht is not None:
+                    odat.HaulType = ht
+                    pdio[jx][ix][13][12] = ht
                     reupdate = 1
+
+                if dwp == 'on':
+                    odat.DelStat = 1
+                    reupdate = 1
+                # Need delv to make sure not updating on a blank screen
+                if delv is not None and dwp is None:
+                    odat.DelStat = 0
+                    reupdate = 1
+                if dwp2 == 'on':
+                    odat.DelStat = 2
+                    reupdate = 1
+                if delv2 is not None and dwp2 is None:
+                    dstat = odat.DelStat
+                    if dstat == 2:
+                        odat.DelStat = 1
+                        reupdate = 1
+
                 db.session.commit()
-                #db.session.expire_all()
+
 
 
         for ix, item in enumerate(pdip[jx]):
@@ -1247,7 +1407,13 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
             note = request.values.get(f'note{jo}')
             gout = request.values.get(f'gout{jo}')
             delv = request.values.get(f'delv{jo}')
+            delv2 = request.values.get(f'delv2{jo}')
             gin = request.values.get(f'gin{jo}')
+            dwp = request.values.get(f'dwp{jo}')
+            dwp2 = request.values.get(f'dwp2{jo}')
+            delt = request.values.get(f'delt{jo}')
+            pict = request.values.get(f'pict{jo}')
+            ht = request.values.get(f'ht{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1258,6 +1424,18 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Date3 = delv
                     pdip[jx][ix][13][1] = delv
                     reupdate = 1
+                if delv2 is not None:
+                    odat.Date8 = delv2
+                    pdip[jx][ix][13][7] = delv2
+                    reupdate = 1
+                if delt is not None:
+                    odat.Time3 = delt
+                    pdip[jx][ix][13][8] = delt
+                    reupdate = 1
+                if pict is not None:
+                    odat.Time2 = pict
+                    pdip[jx][ix][13][9] = pict
+                    reupdate = 1
                 if gin is not None:
                     odat.Date2 = gin
                     pdip[jx][ix][13][2] = gin
@@ -1266,16 +1444,42 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Date = gout
                     pdip[jx][ix][13][0] = gout
                     reupdate = 1
+                if ht is not None:
+                    odat.HaulType = ht
+                    pdip[jx][ix][13][12] = ht
+                    reupdate = 1
+
+                if dwp == 'on':
+                    odat.DelStat = 1
+                    reupdate = 1
+                # Need delv to make sure not updating on a blank screen
+                if delv is not None and dwp is None:
+                    odat.DelStat = 0
+                    reupdate = 1
+                if dwp2 == 'on':
+                    odat.DelStat = 2
+                    reupdate = 1
+                if delv2 is not None and dwp2 is None:
+                    dstat = odat.DelStat
+                    if dstat == 2:
+                        odat.DelStat = 1
+                        reupdate = 1
+
                 db.session.commit()
-                #db.session.expire_all()
+
 
         for ix, item in enumerate(pdeo[jx]):
             jo = item[5]
             note = request.values.get(f'note{jo}')
             delv = request.values.get(f'delv{jo}')
+            delv2 = request.values.get(f'delv2{jo}')
             gin = request.values.get(f'gin{jo}')
             book = request.values.get(f'book{jo}')
             dwp = request.values.get(f'dwp{jo}')
+            dwp2 = request.values.get(f'dwp2{jo}')
+            delt = request.values.get(f'delt{jo}')
+            pict = request.values.get(f'pict{jo}')
+            ht = request.values.get(f'ht{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1286,26 +1490,63 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Date3 = delv
                     pdeo[jx][ix][13][1] = delv
                     reupdate = 1
+                if delv2 is not None:
+                    #print(f'date8 is {delv2}')
+                    odat.Date8 = delv2
+                    pdeo[jx][ix][13][7] = delv2
+                    reupdate = 1
+                if delt is not None:
+                    odat.Time3 = delt
+                    pdeo[jx][ix][13][8] = delt
+                    reupdate = 1
+                if pict is not None:
+                    odat.Time2 = pict
+                    pdeo[jx][ix][13][9] = pict
+                    reupdate = 1
                 if gin is not None:
                     odat.Date2 = gin
                     pdeo[jx][ix][13][2] = gin
+                    reupdate = 1
+                if ht is not None:
+                    odat.HaulType = ht
+                    pdeo[jx][ix][13][12] = ht
                     reupdate = 1
                 if book is not None:
                     odat.BOL = book
                     pdeo[jx][ix][9] = book
                     reupdate = 1
-                if dwp is not None:
-                    odat.Pcache = 1
+
+                if dwp == 'on':
+                    odat.DelStat = 1
                     reupdate = 1
+                # Need delv to make sure not updating on a blank screen
+                if delv is not None and dwp is None:
+                    odat.DelStat = 0
+                    reupdate = 1
+                if dwp2 == 'on':
+                    odat.DelStat = 2
+                    reupdate = 1
+                if delv2 is not None and dwp2 is None:
+                    dstat = odat.DelStat
+                    if dstat == 2:
+                        odat.DelStat = 1
+                        reupdate = 1
+
                 db.session.commit()
-                #db.session.expire_all()
+
 
         for ix, item in enumerate(pdep[jx]):
             jo = item[5]
             note = request.values.get(f'note{jo}')
             gout = request.values.get(f'gout{jo}')
             delv = request.values.get(f'delv{jo}')
+            delv2 = request.values.get(f'delv2{jo}')
             gin = request.values.get(f'gin{jo}')
+            dwp = request.values.get(f'dwp{jo}')
+            dwp2 = request.values.get(f'dwp2{jo}')
+            delt = request.values.get(f'delt{jo}')
+            pict = request.values.get(f'pict{jo}')
+            ht = request.values.get(f'ht{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1316,6 +1557,18 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Date3 = delv
                     pdep[jx][ix][13][1] = delv
                     reupdate = 1
+                if delv2 is not None:
+                    odat.Date8 = delv2
+                    pdep[jx][ix][13][7] = delv2
+                    reupdate = 1
+                if delt is not None:
+                    odat.Time3 = delt
+                    pdep[jx][ix][13][8] = delt
+                    reupdate = 1
+                if pict is not None:
+                    odat.Time2 = pict
+                    pdep[jx][ix][13][9] = pict
+                    reupdate = 1
                 if gin is not None:
                     odat.Date2 = gin
                     pdep[jx][ix][13][2] = gin
@@ -1324,6 +1577,27 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.Date = gout
                     pdep[jx][ix][13][0] = gout
                     reupdate = 1
+                if ht is not None:
+                    odat.HaulType = ht
+                    pdep[jx][ix][13][12] = ht
+                    reupdate = 1
+
+                if dwp == 'on':
+                    odat.DelStat = 1
+                    reupdate = 1
+                # Need delv to make sure not updating on a blank screen
+                if delv is not None and dwp is None:
+                    odat.DelStat = 0
+                    reupdate = 1
+                if dwp2 == 'on':
+                    odat.DelStat = 2
+                    reupdate = 1
+                if delv2 is not None and dwp2 is None:
+                    dstat = odat.DelStat
+                    if dstat == 2:
+                        odat.DelStat = 1
+                        reupdate = 1
+
                 db.session.commit()
 
     return pdio, pdip, pdeo, pdep, reupdate
@@ -2528,12 +2802,12 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         warned = 0
 
         for jx, entry in enumerate(entrydata):
-            print(f'Running entry {entry}')
+            #print(f'Running entry {entry}')
             if entry[3] == 'appears_if':
                 entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                 entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
                 #print(f'We have an appears_if check with entry3:{entry[3]}, entry4:{entry[4]}, entry9:{entry[9]}, formshow:{form_show}')
-            print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
+            #print(f'Getting values for entry4:{entry[4]} entry9:{entry[9]} formshow:{form_show}')
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
                 holdvec[jx] = request.values.get(f'{entry[0]}')
