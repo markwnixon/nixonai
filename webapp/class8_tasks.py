@@ -997,7 +997,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     on_alldates = 1
 
                     datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
-                    print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    #print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
                     for ix in range(5):
@@ -1079,7 +1079,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     addrline = f'{address}'
                     dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
                     shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
-                    if delstat>0:  comment.append(f'Delivery Completed')
+
 
                     datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
                     print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
@@ -1108,6 +1108,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                             if droppick and delstat == 1:
                                 if pick == caldays[ix]:
                                     colorline = 'text-info'
+                                    comment.append(f'Drop Completed')
                                     comment.append(f'Pick on {pick}')
                                     pdeo[ix + 1].append(
                                         [firstline, custline, dateline, colorline, comment, jo, contype, location,
@@ -1117,6 +1118,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                             elif droppick and delstat == 2:
                                 if gatein == caldays[ix]:
                                     colorline = 'text-info'
+                                    comment.append(f'Pick Completed')
                                     comment.append(f'Load due back {dueback}')
                                     pdeo[ix + 1].append(
                                         [firstline, custline, dateline, colorline, comment, jo, contype, location,
@@ -1126,6 +1128,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                             else:
                                 if gatein == caldays[ix]:
                                     colorline = 'text-info'
+                                    comment.append(f'Delivery Completed')
                                     comment.append(f'Load due back {dueback}')
                                     pdeo[ix + 1].append(
                                         [firstline, custline, dateline, colorline, comment, jo, contype, location,
