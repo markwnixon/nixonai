@@ -331,12 +331,12 @@
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ip[0] }}">
                                     <p class="small {{ ip[3] }}"><input class="align-middle" type="checkbox" {% if loop.index in pdipvec[ix] %} checked {% endif %} name="{{ ip[5] }}">
                                         <b>{{ ip[0] }}</b>({{ ip[6] }}) <br> {{ ip[1] }}<br> {{ ip[2] }}<br>
-                                        <i>{{ ip[14] }}</i>
+                                        <i>{{ ip[14] }}:</i>
 
                                         {% if 'Complete' in dpre %}
                                             {{ dpre }}
                                         {% else %}
-                                            <i>{{ ip[14] }}</i>{% if dpret != '25:00' %} <i>{{ dpre }} {{ dpret }}</i>{% endif %}
+                                            {% if dpret != '25:00' %} <i>{{ dpre }} {{ dpret }}</i>{% endif %}
                                         {% endif %}
 
                                         {% if ip[4] != [] %}<br>{% for cmt in ip[4] %}{{ cmt }}<br>{% endfor %}{% endif %}
