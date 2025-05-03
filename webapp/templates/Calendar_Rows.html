@@ -117,7 +117,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Drop At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -126,7 +130,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Pick At' %}
-                                    {% set dpret = dc[9] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[9] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% else %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -136,6 +144,11 @@
                                     {% set premdtext2 = 'Unmark If Not Picked' %}
                                     {% set dpre = 'Drop-Pick Complete' %}
                                     {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% else %}
                                 {% if dstat == 0 %}
@@ -143,13 +156,21 @@
                                     {% set mdtext = 'Live Unload Not Completed' %}
                                     {% set premdtext = 'Mark If Delivered' %}
                                     {% set dpre = 'Live' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Delivered On' %}
                                     {% set mdtext = 'Live Unload Completed' %}
                                     {% set premdtext = 'Unmark If Not Delivered' %}
                                     {% set dpre = 'Live Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% endif %}
                         <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ io[0] }}">
@@ -252,7 +273,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Drop At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -261,7 +286,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Pick At' %}
-                                    {% set dpret = dc[9] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[9] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% else %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -270,7 +299,11 @@
                                     {% set mdtext2 = 'Pick Completed' %}
                                     {% set premdtext2 = 'Unmark If Not Picked' %}
                                     {% set dpre = 'Drop-Pick Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% else %}
                                 {% if dstat == 0 %}
@@ -278,13 +311,21 @@
                                     {% set mdtext = 'Live Unload Not Completed' %}
                                     {% set premdtext = 'Mark If Delivered' %}
                                     {% set dpre = 'Live At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Delivered On' %}
                                     {% set mdtext = 'Live Unload Completed' %}
                                     {% set premdtext = 'Unmark If Not Delivered' %}
                                     {% set dpre = 'Live Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% endif %}
                                 <button type="button" class="btn mt-1 my-0 pb-0" data-toggle="modal" data-target="#m{{ ip[0] }}">
@@ -389,7 +430,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Drop At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -398,7 +443,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Pick At' %}
-                                    {% set dpret = dc[9] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[9] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% else %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -407,7 +456,11 @@
                                     {% set mdtext2 = 'Pick Completed' %}
                                     {% set premdtext2 = 'Unmark If Not Picked' %}
                                     {% set dpre = 'Drop-Pick Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% else %}
                                 {% if dstat == 0 %}
@@ -415,13 +468,21 @@
                                     {% set mdtext = 'Live Unload Not Completed' %}
                                     {% set premdtext = 'Mark If Delivered' %}
                                     {% set dpre = 'Live At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Delivered On' %}
                                     {% set mdtext = 'Live Unload Completed' %}
                                     {% set premdtext = 'Unmark If Not Delivered' %}
                                     {% set dpre = 'Live Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% endif %}
 
@@ -531,7 +592,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Drop At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -540,7 +605,11 @@
                                     {% set mdtext2 = 'Pick Not Completed' %}
                                     {% set premdtext2 = 'Mark If Picked' %}
                                     {% set dpre = 'Pick At' %}
-                                    {% set dpret = dc[9] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[9] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% else %}
                                     {% set dtext = 'Dropped On' %}
                                     {% set mdtext = 'Drop Completed' %}
@@ -549,7 +618,11 @@
                                     {% set mdtext2 = 'Pick Completed' %}
                                     {% set premdtext2 = 'Unmark If Not Picked' %}
                                     {% set dpre = 'Drop-Pick Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% else %}
                                 {% if dstat == 0 %}
@@ -557,13 +630,21 @@
                                     {% set mdtext = 'Live Unload Not Completed' %}
                                     {% set premdtext = 'Mark If Delivered' %}
                                     {% set dpre = 'Live At' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% elif dstat == 1 %}
                                     {% set dtext = 'Delivered On' %}
                                     {% set mdtext = 'Live Unload Completed' %}
                                     {% set premdtext = 'Unmark If Not Delivered' %}
                                     {% set dpre = 'Live Complete' %}
-                                    {% set dpret = dc[8] %}
+                                    {% if 'Time' in dc[13] %}
+                                        {% set dpret = dc[8] %}
+                                    {% else %}
+                                        {% set dpret = '25:00' %}
+                                    {% endif %}
                                 {% endif %}
                         {% endif %}
 
