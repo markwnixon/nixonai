@@ -29,6 +29,7 @@
 {% set mtxt = "font-weight-bold text-center text-white bk-success" %}
 
 {% set klist = genre_data['haul_types'] %}
+{% set dlist = genre_data['delivery_types'] %}
 
 <div class="row">
     <div class="col-sm-{{ cbr }} text-left">
@@ -193,6 +194,13 @@
                                                             {% endfor %}
                                                         </table>
                                                     </td></tr>
+                                                    <tr><td class="{{ lmt }}">Delivery Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="dt{{ io[5] }}">
+                                                            {% for du in dlist %}
+                                                                <option {% if du == dc[13] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td></tr>
 
                                                     <tr><td class="{{ lmt }}">Gate Out:</td><td class="{{ rmt }}">{{ dc[0] }}</td></tr>
                                                     <tr>
@@ -323,6 +331,13 @@
                                                                 <tr><td class="{{ rmt }}">{{  alin }}</td></tr>
                                                             {% endfor %}
                                                         </table>
+                                                    </td></tr>
+                                                    <tr><td class="{{ lmt }}">Delivery Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="dt{{ ip[5] }}">
+                                                            {% for du in dlist %}
+                                                                <option {% if du == dc[13] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
                                                     </td></tr>
 
                                                     <tr><td class="{{ lmt }}">Planned Gate Out:</td><td class="{{ rmt }}"><input type="date" name="gout{{ ip[5] }}" value="{{ dc[0] }}"></td></tr>
@@ -457,6 +472,14 @@
                                                         </table>
                                                     </td></tr>
 
+                                                    <tr><td class="{{ lmt }}">Delivery Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="dt{{ eo[5] }}">
+                                                            {% for du in dlist %}
+                                                                <option {% if du == dc[13] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td></tr>
+
                                                     <tr><td class="{{ lmt }}">Gate Out:</td><td class="{{ rmt }}">{{ dc[0] }}</td></tr>
                                                     <tr><td class="{{ lmt }}">Deliver On:</td><td class="{{ rmt }}"><input type="date" name="delv{{ eo[5] }}" value="{{ dc[1] }}">
                                                         <input type="time" id={{ dc[10] }} name="delt{{ eo[5] }}" value="{{ dc[8] }}"></td></tr>
@@ -586,6 +609,14 @@
                                                                 <tr><td class="{{ rmt }}">{{  alin }}</td></tr>
                                                             {% endfor %}
                                                         </table>
+                                                    </td></tr>
+
+                                                    <tr><td class="{{ lmt }}">Delivery Type:</td><td class="{{ rmt }}">
+                                                        <select class="form-control form-control-sm" type="text" name="dt{{ ep[5] }}">
+                                                            {% for du in dlist %}
+                                                                <option {% if du == dc[13] %} selected {% endif %} value='{{du}}'>{{du}}</option>
+                                                            {% endfor %}
+                                                        </select>
                                                     </td></tr>
 
                                                     <tr><td class="{{ lmt }}">Planned Gate Out:</td><td class="{{ rmt }}"><input type="date" name="gout{{ ep[5] }}" value="{{ dc[0] }}"></td></tr>

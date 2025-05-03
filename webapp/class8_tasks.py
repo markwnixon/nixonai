@@ -941,7 +941,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     pdio[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline, delivertime])
                     on_alldates = 1
 
-                    datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht, dtype]
                     print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
@@ -996,7 +996,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     pdip[0].append([firstline, custline, dateline, colorline, comment, jo, contype, deliverline, delivertime])
                     on_alldates = 1
 
-                    datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht, dtype]
                     #print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
@@ -1030,16 +1030,17 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                         else:
                             if delivery == caldays[ix]:
                                 if lfd is not None:
-                                    if lfd < delivery:
+                                    if lfd < gateout:
                                         colorline = 'red-text'
                                         comment = ['****']
                                         comment.append('Past LFD for pull')
-                                    elif lfd == delivery:
+                                    elif lfd == gateout:
                                         colorline = 'orange-text'
                                         comment = ['****']
-                                        comment.append('Today LFD for pull')
+                                        comment.append(f'Today LFD for pull')
                                     else:
                                         colorline = 'black-text'
+                                        comment.append(f'Pull on {pulled}')
                                 else:
                                     colorline = 'black-text'
                                 pdip[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, deliverline, delivertime, droppick, delstat])
@@ -1081,8 +1082,8 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     shipdates = f'DB:{due_s} ER:{erd_s} CO:{cut_s}'
 
 
-                    datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
-                    print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht, dtype]
+                    #print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
                     if erd is not None:
@@ -1148,7 +1149,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     dateline = f'GO:{pulled} DV:{del_s} GI:{ret_s}'
                     shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
 
-                    datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht]
+                    datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht, dtype]
                     print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
@@ -1191,6 +1192,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                         else:
                             if delivery == caldays[ix]:
                                 colorline = 'black-text'
+                                comment.append(f'Pull on {pulled}')
                                 pdep[ix + 1].append([firstline, custline, dateline, colorline, comment, jo, contype, location, release, in_booking, description, ship, notes, datecluster, addrline, shipdates, deliverline, delivertime, droppick, delstat])
                                 on_calendar = 1
 
@@ -1353,6 +1355,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
             dwp = request.values.get(f'dwp{jo}')
             dwp2 = request.values.get(f'dwp2{jo}')
             ht = request.values.get(f'ht{jo}')
+            dt = request.values.get(f'dt{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1384,6 +1387,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.HaulType = ht
                     pdio[jx][ix][13][12] = ht
                     reupdate = 1
+                if dt is not None:
+                    odat.Delivery = dt
+                    pdio[jx][ix][13][13] = dt
+                    if 'Time' not in dt:
+                        odat.Time3 = None
+                        odat.Time2 = None
+                    reupdate = 1
+
 
                 if dwp == 'on':
                     odat.DelStat = 1
@@ -1417,6 +1428,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
             delt = request.values.get(f'delt{jo}')
             pict = request.values.get(f'pict{jo}')
             ht = request.values.get(f'ht{jo}')
+            dt = request.values.get(f'dt{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1451,6 +1463,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.HaulType = ht
                     pdip[jx][ix][13][12] = ht
                     reupdate = 1
+                if dt is not None:
+                    odat.Delivery = dt
+                    pdip[jx][ix][13][13] = dt
+                    if 'Time' not in dt:
+                        odat.Time3 = None
+                        odat.Time2 = None
+                    reupdate = 1
+
 
                 if dwp == 'on':
                     odat.DelStat = 1
@@ -1483,6 +1503,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
             delt = request.values.get(f'delt{jo}')
             pict = request.values.get(f'pict{jo}')
             ht = request.values.get(f'ht{jo}')
+            dt = request.values.get(f'dt{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1514,6 +1535,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     odat.HaulType = ht
                     pdeo[jx][ix][13][12] = ht
                     reupdate = 1
+                if dt is not None:
+                    odat.Delivery = dt
+                    pdeo[jx][ix][13][13] = dt
+                    if 'Time' not in dt:
+                        odat.Time3 = None
+                        odat.Time2 = None
+                    reupdate = 1
+
                 if book is not None:
                     odat.BOL = book
                     pdeo[jx][ix][9] = book
@@ -1550,6 +1579,7 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
             delt = request.values.get(f'delt{jo}')
             pict = request.values.get(f'pict{jo}')
             ht = request.values.get(f'ht{jo}')
+            dt = request.values.get(f'dt{jo}')
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 if note is not None:
@@ -1583,6 +1613,13 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                 if ht is not None:
                     odat.HaulType = ht
                     pdep[jx][ix][13][12] = ht
+                    reupdate = 1
+                if dt is not None:
+                    odat.Delivery = dt
+                    pdep[jx][ix][13][13] = dt
+                    if 'Time' not in dt:
+                        odat.Time3 = None
+                        odat.Time2 = None
                     reupdate = 1
 
                 if dwp == 'on':
