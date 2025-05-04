@@ -475,7 +475,7 @@ Interchange_setup = {'name' : 'Interchange Ticket',
                                     ['Status', 'Status', 'Status', 'text', 'text', 0, 'ok', 'cc', None, 'Extras'],
                                     ['Other', 'Notes', 'Other', 'text', 'text', 0, 'ok', 'cc', None, 'Extras'],
                                     ['TimeExit', 'Exit Time', 'TExit', 'text', 'text', 0, 'ok', 'cc', None, 'Extras'],
-                                    ['PortHours', 'Port Minutes', 'Port Minutes', 'text', 'text', 0, 'ok', 'cc', None, 'Extras']
+                                    ['PortHours', 'Port Minutes', 'Port Minutes', 'text', 'integer', 0, 'ok', 'cc', None, 'Extras']
                                     ],
                      'hidden data' : [],
                      'haulmask' : [],
