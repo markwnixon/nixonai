@@ -827,13 +827,14 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                 podat.UserMod = username
                 db.session.commit()
 
-        if shipper == 'Global Business Link' and 'outside' not in order:
+        if shipper == 'Global Business Link' and 'Outside' not in order:
             #Create special block to show loads in and empties out
-            #print(f'Skipping Global Drop-Hook Runs for Calendar')
+            print(f'Skipping Global Drop-Hook Runs for Calendar')
             globalrun = 1
 
         else:
 
+            if shipper == 'Global Business Link': shipper = podat.Order
             if len(shipper) > 25: shipper = shipper[0:25]
             ht = podat.HaulType
             jo = podat.Jo
@@ -1375,8 +1376,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdio[jx][ix][13][9] = pict
                     reupdate = 1
                 if delv2 is not None:
-                    odat.Date8 = delv2
-                    pdio[jx][ix][13][7] = delv2
+                    drop_date = odat.Date3
+                    # In case the default is set too far away make the pick date at least equal drop
+                    if delv2 < drop_date:
+                        odat.Date8 = drop_date
+                        pdio[jx][ix][13][7] = drop_date
+                    else:
+                        odat.Date8 = delv2
+                        pdio[jx][ix][13][7] = delv2
                     reupdate = 1
                 if gin is not None:
                     odat.Date2 = gin
@@ -1440,8 +1447,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdip[jx][ix][13][1] = delv
                     reupdate = 1
                 if delv2 is not None:
-                    odat.Date8 = delv2
-                    pdip[jx][ix][13][7] = delv2
+                    drop_date = odat.Date3
+                    # In case the default is set too far away make the pick date at least equal drop
+                    if delv2 < drop_date:
+                        odat.Date8 = drop_date
+                        pdip[jx][ix][13][7] = drop_date
+                    else:
+                        odat.Date8 = delv2
+                        pdip[jx][ix][13][7] = delv2
                     reupdate = 1
                 if delt is not None:
                     odat.Time3 = delt
@@ -1516,8 +1529,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     reupdate = 1
                 if delv2 is not None:
                     #print(f'date8 is {delv2}')
-                    odat.Date8 = delv2
-                    pdeo[jx][ix][13][7] = delv2
+                    drop_date = odat.Date3
+                    # In case the default is set too far away make the pick date at least equal drop
+                    if delv2 < drop_date:
+                        odat.Date8 = drop_date
+                        pdeo[jx][ix][13][7] = drop_date
+                    else:
+                        odat.Date8 = delv2
+                        pdeo[jx][ix][13][7] = delv2
                     reupdate = 1
                 if delt is not None:
                     odat.Time3 = delt
@@ -1591,8 +1610,14 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
                     pdep[jx][ix][13][1] = delv
                     reupdate = 1
                 if delv2 is not None:
-                    odat.Date8 = delv2
-                    pdep[jx][ix][13][7] = delv2
+                    drop_date = odat.Date3
+                    # In case the default is set too far away make the pick date at least equal drop
+                    if delv2 < drop_date:
+                        odat.Date8 = drop_date
+                        pdep[jx][ix][13][7] = drop_date
+                    else:
+                        odat.Date8 = delv2
+                        pdep[jx][ix][13][7] = delv2
                     reupdate = 1
                 if delt is not None:
                     odat.Time3 = delt
