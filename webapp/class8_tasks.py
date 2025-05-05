@@ -835,7 +835,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
         else:
 
             if shipper == 'Global Business Link': shipper = f'GBL-{order}'
-            if shipper == 'FEL Ocean': shipper = f'FEL-{order}'
+            if shipper == 'FEL Ocean Div': shipper = f'FEL-{order}'
             if len(shipper) > 25: shipper = shipper[0:25]
             ht = podat.HaulType
             jo = podat.Jo
