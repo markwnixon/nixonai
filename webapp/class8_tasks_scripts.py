@@ -36,7 +36,7 @@ def ticket_copy(tick):
                         Date=myi.Date, Release=myi.Release, GrossWt=myi.GrossWt,
                         Seals=myi.Seals, ConType=myi.ConType, CargoWt=myi.CargoWt,
                         Time=myi.Time, Status='AAAAAA', Source=' ', Path=' ', Type=newtype, Jo=myi.Jo,
-                        Company=myi.Company, Other=str(tick))
+                        Company=myi.Company, Other=str(tick), TimeExit='', PortHours=None)
     db.session.add(input)
     db.session.commit()
     myo = Interchange.query.filter(Interchange.Other==str(tick)).first()
@@ -155,6 +155,13 @@ def Street_Turn_task(err, holdvec, iter):
         if booking is not None: booking=booking.strip()
 
         tdat = StreetTurns.query.filter(StreetTurns.Container==container).first()
+        if tdat is not None:
+            #Check to see if previously failed and Status is still set to zero
+            if tdat.Status == 0:
+                print(f'Street Turn Already Exists, but did not complete previously')
+                StreetTurns.query.filter(StreetTurns.Container==container).delete()
+                db.session.commit()
+                tdat = StreetTurns.query.filter(StreetTurns.Container == container).first()
         if tdat is None:
             #print(f'Adding street turn for {container} to {booking} on {dateturn}')
             input = StreetTurns(Container=container, BookingTo=booking, Date=dateturn, Status=0)
@@ -191,7 +198,7 @@ def Street_Turn_task(err, holdvec, iter):
                                             Date=dt, Release=bk, GrossWt=myi.GrossWt,
                                             Seals=myi.Seals, ConType=myi.ConType, CargoWt=myi.CargoWt,
                                             Time=myi.Time, Status='AAAAAA', Source=' ', Path=' ', Type='Empty Out', Jo=None,
-                                            Company=None, Other=None)
+                                            Company=None, Other=None, TimeExit=None, PortHours=None)
                         db.session.add(input)
 
                     odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lookback)).first()
@@ -239,6 +246,9 @@ def Street_Turn_task(err, holdvec, iter):
 
             else:
                 print(f'Could not find  {container} to {booking} on {dateturn}')
+
+        else:
+            print(f'Street Turn Already Exists')
 
     return completed, err, holdvec
 
