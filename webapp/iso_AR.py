@@ -182,7 +182,7 @@ def extract_for_code(data):
     return text
 
 def get_body_text(qdat):
-
+    #print('Getting body text')
     mid = qdat.Mid
     #print(f'this mid is {mid}')
     username = usernames['quot']
@@ -209,6 +209,7 @@ def get_body_text(qdat):
 
     # extract the email content as a string
     if email_message.is_multipart():
+        #print('multipart')
         for part in email_message.walk():
             if part.get_content_type() == 'text/plain':
                 try:
@@ -224,6 +225,7 @@ def get_body_text(qdat):
                 soup = BeautifulSoup(html_content, "html.parser")
                 plain_text_content = soup.get_text()
     else:
+        #print('Not multipart')
         try:
             plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
         except:
@@ -361,7 +363,7 @@ def read_tboxes():
     tboxes = [0]*30
     for ix in range(30):
         tboxes[ix] = request.values.get(f'tbox{ix}')
-    print(f'the tboxes here are {tboxes}')
+    #print(f'the tboxes here are {tboxes}')
     return tboxes
 
 def attach_rename_inv(odat, name):
@@ -1009,7 +1011,7 @@ def isoAR():
             lookback = 728
         elif lookbacktime == 'Three Years':
             lookback = 1092
-        print(f'Lookbacktime: {lookbacktime}')
+        #print(f'Lookbacktime: {lookbacktime}')
 
 
         #print(f'Values are {exitnow} {analysis} {emailgo} {exitnow}')
@@ -1079,7 +1081,7 @@ def isoAR():
             for ix, odat in enumerate(odata):
                 if odat.InvoDate <= dat30: boxes[ix] = 'on'
             for ix, sdat in enumerate(sdata):
-                print(f'For {sdat.Si} detecting if {sdat.Date} is less than {dat30}')
+                #print(f'For {sdat.Si} detecting if {sdat.Date} is less than {dat30}')
                 if sdat.Date <= dat30: sboxes[ix] = 'on'
         else:
             for ix, odat in enumerate(odata):

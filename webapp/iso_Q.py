@@ -80,10 +80,14 @@ def get_subject(data):
     mid = 'none'
     for response_part in data:
         if isinstance(response_part, tuple):
-            part = response_part[1].decode('utf-8')
-            msg = email.message_from_string(part)
-            subject=msg['Subject']
-            mid = msg['Message-ID']
+            try:
+                part = response_part[1].decode('utf-8')
+                msg = email.message_from_string(part)
+                subject=msg['Subject']
+                mid = msg['Message-ID']
+            except:
+                subject='Cannot Parse'
+                mid=None
     return subject, mid
 
 def get_from(data):
@@ -235,7 +239,7 @@ def add_quote_emails():
                 #local_dt = utc_dt.astimezone(local_tz)
                 #print(f'Local Date Time: {local_dt}')
             except:
-                print('Failed to get the email date-time string')
+                #print('Failed to get the email date-time string')
                 date_time = today_now
                 #thisdate = today
                 #thistime = timenow
@@ -1108,9 +1112,11 @@ def get_body_text(qdat):
             plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
         except:
             plain_text_content = 'Could not decode payload'
-
-    #print('Returning from get_body_text with plain text', plain_text_content)
-    #print('Returning from get_body_text with html', html_content)
+    try:
+        print('Returning from get_body_text with plain text', plain_text_content)
+        #print('Returning from get_body_text with html', html_content)
+    except:
+        plain_text_content = 'Could not decode payload'
     return plain_text_content, html_content
 
 def go_to_next(mid, oldmid, taskbox):
@@ -1458,6 +1464,7 @@ def isoQuote():
             mid = qdat.Mid
             if mid != oldmid:
                 plaintext, htmltext = get_body_text(qdat)
+                #print(f'1465 plaintext: {plaintext}')
 
         if returnhit is not None:
             taskbox = 0
@@ -1471,6 +1478,7 @@ def isoQuote():
             #Now moving to the next email on the list.....
             qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
             #print(f'locto from email is {locto}')
+            #print(f'1479 plaintext: {plaintext}')
 
 
         #If no radio button selected then go with generic
@@ -1511,6 +1519,7 @@ def isoQuote():
                 mid = qdat.Mid
                 #print(f'Getting body_text because we just refreshed the emails')
                 plaintext, htmltext = get_body_text(qdat)
+                #print(f'1520 plaintext: {plaintext}')
 
         if taskbox == 1 or taskbox == 5:
             if qdat is None:
@@ -1523,6 +1532,7 @@ def isoQuote():
                 if mid != oldmid:
                     #print(f'Getting body_text because this is a new mid: {mid} not oldmid {oldmid}')
                     plaintext, htmltext = get_body_text(qdat)
+                    #print(f'1533 plaintext: {plaintext}')
                 if multibid[0] == 'off' and locto is None:
                     #print('Getting new locations because multibid is off and locto is None ')
                     locto, loci = get_place(qdat.Subject, plaintext, multibid)
@@ -1634,6 +1644,7 @@ def isoQuote():
                         db.session.commit()
                     # Now moving to the next email on the list.....
                     qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
+                    #print(f'1645 plaintext: {plaintext}')
 
 
                 #print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
@@ -1754,6 +1765,7 @@ def isoQuote():
                 qdat = Quotes.query.get(quot)
                 #print(f'Getting body_text because this is not a post so we are getting new values')
                 plaintext, htmltext = get_body_text(qdat)
+                #print(f'1766 plaintext: {plaintext}')
                 if htmltext is None:
                     showtext = plaintext
                 else:
@@ -1819,6 +1831,7 @@ def isoQuote():
             quotbut = qdat.id
             #print(f'Getting body_text because this is not a post and we set pointer to top of table')
             plaintext, htmltext = get_body_text(qdat)
+            #print(f'1832 plaintext: {plaintext}')
         else:
             add_quote_emails()
         thismuch = '6'
@@ -1838,6 +1851,7 @@ def isoQuote():
     os.environ[uiter] = str(iter)
     if plaintext is None: plaintext = ''
     if htmltext is None: htmltext = ''
+    #print(f'plaintext: {plaintext}')
     os.environ[utext] = plaintext
     os.environ[uhtml] = htmltext
     os.environ[umid] = mid
