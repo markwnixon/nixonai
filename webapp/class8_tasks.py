@@ -4276,7 +4276,16 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
     today = datetime.date.today()
     today_str = today.strftime('%Y-%m-%d')
-    stopdate = today-datetime.timedelta(days=300)
+    lookbacktime = request.values.get('lookbacktime')
+    if lookbacktime is None or lookbacktime == 'One Year':
+        lookbacktime = 'One Year'
+        lookback = 364
+    elif lookbacktime == 'Two Years':
+        lookback = 728
+    elif lookbacktime == 'Three Years':
+        lookback = 1092
+    holdvec[20] = lookbacktime
+    stopdate = today-datetime.timedelta(days=lookback)
     err=[]
 
     #Determine unique shippers:

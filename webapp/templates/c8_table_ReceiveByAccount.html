@@ -14,7 +14,18 @@
 {% set readygo = holdvec[13] %}
 {% set paymeth = holdvec[14] %}
 {% set paymeths = ['Cash', 'Check', 'Credit Card', 'Direct Deposit'] %}
-Receive Payments for Account: {{ co }}
+{% set time_options = ['One Year', 'Two Years', 'Three Years'] %}
+{% set lookbacktime = holdvec[20] %}
+
+Receive Payments for Account: {{ co }} &nbsp; &nbsp;
+        Filter back:
+        <select id="lookbacktime" name="lookbacktime" onchange="this.form.submit()">
+                {% for option in time_options %}
+                    <option value="{{ option }}" {% if option == lookbacktime %}selected{% endif %} >{{ option }}</option>
+                {% endfor %}
+        </select>
+
+
 
 {% if readygo == 1 %}
     {% set atc = 'btn btn-group-small btn-green my-small-btn' %}
