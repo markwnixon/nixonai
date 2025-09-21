@@ -3808,7 +3808,8 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
             #localpath = f'/home/mark/Documents/{fname}'
             localpath = f'{computer_name}Documents/{fname}'
-            serverpath = addpath(tpath(f'manifest', docref))
+            spath=addpath(tpath(f'manifest', docref))
+            serverpath = f'nixonai@ssh.pythonanywhere.com:{spath}'
             command = ['scp',serverpath,localpath]
             #print(f'Will try to copy from {viewport[2]} to {localpath}')
             #print(f'The command to execute is: {command}')
