@@ -43,7 +43,7 @@ def container_check(num):
 
 def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
     #print(' ')
-    ###print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req} task_iter: {task_iter}')
+    #*#print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req} task_iter: {task_iter}')
     status = 0
     message = ''
     if type == 'disabled':
@@ -138,7 +138,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
             #if not hasinput(text) and req: text = 'Missing'
             if text is not None: text = text.strip()
             else: text = ''
-            ###print(f'****************************Entering concheck with text {text}')
+            print(f'****************************Entering concheck with text {text} and haultype {haultype}')
             if hasinput(text): char1 = text[0]
             else: char1 = ''
             if char1 == '*':
@@ -168,7 +168,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
                             lenck = len(text)
                             if lenck == 11:
                                 status, message = container_check(text)
-                                #print(f'Container status check: {status} {message}')
+                                print(f'Container status check: {status} {message}')
                             else:
                                 if lenck > 0:
                                     status = 2
@@ -337,9 +337,9 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
                         text = Review_Drop(text)
                 if not hasinput(text):
                     loadname = request.values.get(type)
-                    #print(f'loadname:{loadname},type:{type},text:{text}')
+                    #print(f'loadname:{loadname},type:{type},text:{text},secstop{secstop}')
                     if loadname is not None:
-                        if type == 'dropblock3' and secstop:
+                        if type == 'dropblock3' and secst:
                             text = get_drop(loadname)
                             #print(f'text from get_drop:{text}')
                         else:
@@ -450,7 +450,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
         message = 'Not a Required Input'
         if not hasinput(text): text = ''
 
-    ###print(f'At conclusion of input for input:{input} type: {type} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
+    #*#print(f'At conclusion of input for input:{input} type: {type} text:{text} task:{task} required:{req};;;;status: {status} and message:{message}')
 
     return text, status, message
 

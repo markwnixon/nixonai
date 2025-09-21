@@ -1,11 +1,14 @@
 <br>
+{% set mylocalpath = holdvec[199] %}
 <div class="card">
 <div class="card-header">
     <div class="d-flex justify-content-around align-items-center">
         <div class="p-0">Edit Manifest Information as Needed</div>
         <div class="p-0">
-            <button type="submit" class="btn btn-md btn-green" name="Update Manifest">Update Manifest</button>
+            <button type="submit" class="btn btn-md btn-green" name="Update Manifest">Update</button>
+            <button type="submit" class="btn btn-md btn-green" name="Download">Download</button>
             <button type="submit" class="btn btn-md btn-elegant" name="Finished">&nbsp; Finished </button>
+            <br> Will download to {{ mylocalpath }}
         </div>
     </div>
 </div>

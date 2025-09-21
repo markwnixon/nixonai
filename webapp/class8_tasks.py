@@ -829,7 +829,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
 
         if shipper == 'Global Business Link' and 'Outside' not in order:
             #Create special block to show loads in and empties out
-            print(f'Skipping Global Drop-Hook Runs for Calendar')
+            #print(f'Skipping Global Drop-Hook Runs for Calendar')
             globalrun = 1
 
         else:
@@ -944,7 +944,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     on_alldates = 1
 
                     datecluster = [gateout, delivery, gatein, avail, lfd, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht, dtype]
-                    print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    #print(f'Import container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
                     for ix in range(5):
@@ -1152,7 +1152,7 @@ def create_cal_data(tfilters, dlist, username, resetmod):
                     shipdates = f'AR:{arr_s} ER:{erd_s} CO:{cut_s}'
 
                     datecluster = [gateout, delivery, gatein, erd, cut, arrives, dueback, pick, dtime, ptime, f'timepicker{ktime}', f'timepicker{ktime + 1}', ht, dtype]
-                    print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
+                    #print(f'Export booking:{podat.Booking} container: {container} timepicker{ktime} timepicker{ktime + 1}')
                     ktime += 2
 
                     if erd is not None:
@@ -2538,7 +2538,8 @@ def check_appears(tablesetup, entry, htold):
                     return colmat
         return entry[3], entry[4]
     else:
-        return None, None
+        #Reset to original table data
+        return entry[3], entry[4]
 
 def UpdatePlanner_task(tablesetup, task_iter):
     completed = True
@@ -2722,19 +2723,22 @@ def New_task(tablesetup, task_iter):
             holdvec[numitems] = [secterm, noterm, secst]
 
             for jx, entry in enumerate(entrydata):
-                #print(f'Entry loop: jx"{jx}, entry:{entry}, htold:{htold}, entry[3]:{entry[3]}')
+                #print(f'Entry loop: jx"{jx}, entry[0]:{entry[0]}, htold:{htold}, entry[3]:{entry[3]}, entry[4]:{entry[4]}')
+
                 if entry[3] == 'appears_if':
+                    #print(f'We have an appears_if check for entry[0] = {entry[0]} with entry3:{entry[3]}, entry4:{entry[4]} and entry[9]:{entry[9]} and form_show is {form_show} and htold={htold}')
                     entry[3], entry[4] = check_appears(tablesetup, entry, htold)
                     entrydata[jx][3],entrydata[jx][4] = entry[3], entry[4]
-                    #print(f'We have an appears_if check with entry3:{entry[3]}, entry4:{entry[4]} and entry[9]:{entry[9]} and form_show is {form_show}')
+                    #print(f'On return from check appears: entry[3]={entry[3]} and entry[4]={entry[4]}')
+
                 if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                     if entry[1] != 'hidden':
                         holdvec[jx] = request.values.get(f'{entry[0]}')
                         if entry[0] in form_checks: required = True
                         else: required = False
-                        ###print(entry[0], form_checks, required)
+                        #print(f'New Task entry[0]={entry[0]}, {entry[1]}, {entry[4]}, holdvec[jx] = {holdvec[jx]}')
                         holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'New', required, task_iter, htold,0, itable)
-                        #print(entry[0], holdvec[jx], entry[4])
+                        #print(f'After call to form_check: holdvec[jx] = {holdvec[jx]}, entry[5]={entry[5]} and entry[6]={entry[6]}')
                         if entry[5] > 1: failed = failed + 1
                         if entry[5] == 1: warned = warned + 1
 
@@ -2788,7 +2792,7 @@ def New_task(tablesetup, task_iter):
                 if entry[0] in form_checks: required = True
                 else: required = False
                 holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold, 0, itable)
-                #print(f'Entry loop: jx"{jx}, entry:{entry[0]} {entry[5]} {entry[6]} {required}')
+                #*#print(f'Entry loop: jx"{jx}, entry:{entry[0]} {entry[5]} {entry[6]} {required}')
 
 
     return holdvec, entrydata, err, completed
@@ -2811,6 +2815,8 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     except:
         htold = ''
 
+    #print(f'htold is {htold}')
+
     if task_iter > 0:
         if itable == 'Orders':
             htold = request.values.get('HaulType')
@@ -2826,6 +2832,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         secterm = 1
     else:
         secterm = 0
+    #print(f'sectorm is {secterm}')
     if htold in noterminals:
         noterm = 1
     else:
@@ -2879,9 +2886,11 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 holdvec[jx] = request.values.get(f'{entry[0]}')
                 if entry[0] in form_checks: required = True
                 else: required = False
+                #print(f'holdvec[jx] going in is {holdvec[jx]}')
                 holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Edit', required, task_iter, htold, sid, itable)
                 if entry[5] > 1: failed = failed + 1
                 if entry[5] == 1: warned = warned + 1
+                #print(f'Entry[0] is {entry[0]} and value is {holdvec[jx]} and entry[4] is {entry[4]}')
 
         if 'bring data' in tablesetup:
             for bring in tablesetup['bring data']:
@@ -3571,7 +3580,7 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
     try:
-        defaults = tablesetup['defaults']
+        defaults = tablesetup['ncdefaults']
     except:
         defaults = False
 
@@ -3646,6 +3655,8 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
     err = [f"Running Manifest task with task_iter {task_iter} using {tablesetup['table']}"]
     completed = False
     viewport = ['0'] * 6
+    container = ''
+    city = 'Baltimore'
 
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -3660,7 +3671,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
 
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
-    holdvec = [''] * numitems
+    holdvec = [''] * 200
     masks = tablesetup['haulmask']
     if masks != []: entrydata = mask_apply(entrydata, masks, htold)
 
@@ -3693,6 +3704,14 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                     holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid, itable)
                     if entry[5] > 1: failed = failed + 1
                     if entry[5] == 1: warned = warned + 1
+
+                    if entry[0] == 'Container':  container = holdvec[jx]
+                    if entry[0] == 'Dropblock2':
+                        adata, backup = get_address_details(holdvec[jx])
+                        try:
+                            city = adata['city']
+                        except:
+                            city = backup
 
             if 'bring data' in tablesetup:
                 for bring in tablesetup['bring data']:
@@ -3752,6 +3771,14 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 else: required = False
                 holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], 'Manifest', required, task_iter, htold, sid, itable)
 
+                if entry[0] == 'Container':  container = holdvec[jx]
+                if entry[0] == 'Dropblock2':
+                    adata, backup = get_address_details(holdvec[jx])
+                    try:
+                        city = adata['city']
+                    except:
+                        city = backup
+
         docref = makemanifest(modata, tablesetup)
         try:
             modata.Mcache = int(modata.Mcache) + 1
@@ -3760,12 +3787,42 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
             modata.Mcache = 1
             modata.Manifest = ntpath.basename(docref)
         db.session.commit()
+
+
         viewport[0] = 'show_doc_left'
         viewport[2] = '/' + tpath(f'manifest', docref)
         #print('viewport=', viewport)
 
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
+        # The base name for the manifest is stored permanently, but a copy is created with a familiar name for the driver:
+
+        if container is not None:
+            if 'COMPUTERNAME' in os.environ:
+                computer_name = os.environ['COMPUTERNAME']
+                print(f"Computer name using os.environ['COMPUTERNAME']: {computer_name}")
+            else:
+                print("COMPUTERNAME environment variable not found (likely not a Windows system).")
+            fname=f'{container}_{city}.pdf'
+
+            #localpath = f'/home/mark/Documents/{fname}'
+            localpath = f'{computer_name}Documents/{fname}'
+            serverpath = addpath(tpath(f'manifest', docref))
+            command = ['scp',serverpath,localpath]
+            #print(f'Will try to copy from {viewport[2]} to {localpath}')
+            #print(f'The command to execute is: {command}')
+            holdvec[199] = localpath
+            err.append(f'Will copy from {serverpath}')
+            err.append(f'Will copy to {localpath}')
+
+        download = request.values.get('Download')
+        if download is not None:
+            try:
+                result = subprocess.run(command, capture_output=True, text=True, check=True)
+                print("SCP successful:", result.stdout)
+            except subprocess.CalledProcessError as e:
+                print('SCP fail:',e.stderr)
+
         finished = request.values.get('Finished')
         if finished is not None: completed = True
 
