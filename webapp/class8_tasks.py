@@ -3820,9 +3820,9 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
         if download is not None:
             try:
                 result = subprocess.run(command, capture_output=True, text=True, check=True)
-                print("SCP successful:", result.stdout)
+                err.append(f'SCP successful: {result.stdout}')
             except subprocess.CalledProcessError as e:
-                print('SCP fail:',e.stderr)
+                err.append(f'SCP fail: {e.stderr}')
 
         finished = request.values.get('Finished')
         if finished is not None: completed = True
