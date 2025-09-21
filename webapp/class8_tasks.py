@@ -3803,7 +3803,7 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
                 print(f"Computer name using os.environ['COMPUTERNAME']: {computer_name}")
             else:
                 print("COMPUTERNAME environment variable not found (likely not a Windows system).")
-                computer_name = '/home/mark'
+                computer_name = '/home/mark/'
             fname=f'{container}_{city}.pdf'
 
             #localpath = f'/home/mark/Documents/{fname}'
