@@ -138,7 +138,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
             #if not hasinput(text) and req: text = 'Missing'
             if text is not None: text = text.strip()
             else: text = ''
-            print(f'****************************Entering concheck with text {text} and haultype {haultype}')
+            #print(f'****************************Entering concheck with text {text} and haultype {haultype}')
             if hasinput(text): char1 = text[0]
             else: char1 = ''
             if char1 == '*':
@@ -168,7 +168,7 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
                             lenck = len(text)
                             if lenck == 11:
                                 status, message = container_check(text)
-                                print(f'Container status check: {status} {message}')
+                                #print(f'Container status check: {status} {message}')
                             else:
                                 if lenck > 0:
                                     status = 2

@@ -3798,32 +3798,18 @@ def New_Manifest_task(genre, task_iter, tablesetup, task_focus, checked_data, th
         # The base name for the manifest is stored permanently, but a copy is created with a familiar name for the driver:
 
         if container is not None:
-            if 'COMPUTERNAME' in os.environ:
-                computer_name = os.environ['COMPUTERNAME']
-                print(f"Computer name using os.environ['COMPUTERNAME']: {computer_name}")
-            else:
-                print("COMPUTERNAME environment variable not found (likely not a Windows system).")
-                computer_name = '/home/mark/'
             fname=f'{container}_{city}.pdf'
+            servercopy = addpath(viewport[2])
+            tempview = f'/static/{scac}/data/vManifest/{fname}'
+            tempcopy = addpath(tempview)
+            holdvec[199] = fname
+            #print(f'Will copy from {servercopy}')
+            #print(f'Will copy to {tempcopy}')
 
-            #localpath = f'/home/mark/Documents/{fname}'
-            localpath = f'{computer_name}Documents/{fname}'
-            spath=addpath(tpath(f'manifest', docref))
-            serverpath = f'nixonai@ssh.pythonanywhere.com:{spath}'
-            command = ['scp',serverpath,localpath]
-            #print(f'Will try to copy from {viewport[2]} to {localpath}')
-            #print(f'The command to execute is: {command}')
-            holdvec[199] = localpath
-            err.append(f'Will copy from {serverpath}')
-            err.append(f'Will copy to {localpath}')
-
-        download = request.values.get('Download')
-        if download is not None:
-            try:
-                result = subprocess.run(command, capture_output=True, text=True, check=True)
-                err.append(f'SCP successful: {result.stdout}')
-            except subprocess.CalledProcessError as e:
-                err.append(f'SCP fail: {e.stderr}')
+        convert = request.values.get('Convert')
+        if convert is not None:
+            shutil.copy(servercopy,tempcopy)
+            viewport[2] = tempview
 
         finished = request.values.get('Finished')
         if finished is not None: completed = True
