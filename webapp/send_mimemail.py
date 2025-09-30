@@ -68,11 +68,43 @@ def send_mimemail(emaildata,emailsender):
         part.add_header('Content-Disposition', "attachment; filename= %s" % newfile)
         msg.attach(part)
 
-    #print('username=',username,password)
-    server = smtplib.SMTP(ourserver)
-    server.starttls()
-    server.login(username,password)
-    server.sendmail(emailfrom, emailto, msg.as_string())
-    server.quit()
+    #print('username=',username,password,ourserver)
+    [host, port] = ourserver.split(':')
+    #print(host)
+    #print(port)
+    #server = smtplib.SMTP('smtppro.zoho.com')
+    try:
+        # Attempt to create the SMTP object and connect
+        server = smtplib.SMTP(host, port)
+        #server = smtplib.SMTP(smtp_server, smtp_port)
+        print("Successfully connected to the SMTP server.")
+        # Further actions with the server object (e.g., starttls, login, sendmail)
+        server.starttls()
+        print("Started TTLS")
+        server.login(username, password)
+        print("Server logged in")
+        server.sendmail(emailfrom, emailto, msg.as_string())
+        print("Sent the email")
+        server.quit()
+
+    except smtplib.SMTPConnectError as e:
+        print(f"SMTP connection error: {e}")
+        print("Possible causes: Incorrect server address or port, firewall issues, server not reachable.")
+    except socket.gaierror as e:
+        print(f"Address resolution error: {e}")
+        print("Possible causes: Incorrect hostname, no internet connection, DNS issues.")
+    except smtplib.SMTPServerDisconnected as e:
+        print(f"SMTP server disconnected prematurely: {e}")
+        print("Possible causes: Server issues, connection timeout.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+
+
+
+    #server.starttls()
+    #server.login(username,password)
+    #server.sendmail(emailfrom, emailto, msg.as_string())
+    #server.quit()
 
     return emailin1

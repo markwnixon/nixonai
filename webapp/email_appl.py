@@ -265,8 +265,9 @@ def email_app_exporter(pdata):
     #part.add_header('Content-Disposition', "attachment; filename= %s" % fileToSend)
  
     #msg.attach(part)
-    
-    server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
+    #server = smtplib.SMTP(ourserver)
     #server.starttls()
     server.login(username,password)
     emailto = [emailto, emailcc1, emailcc2]
@@ -333,7 +334,9 @@ def email_app(pdat):
  
     #msg.attach(part)
     
-    server = smtplib.SMTP(ourserver)
+    #server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
     #server.starttls()
     server.login(username,password)
     emailto = [emailto, emailcc1, emailcc2]

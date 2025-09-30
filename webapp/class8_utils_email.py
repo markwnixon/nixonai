@@ -507,8 +507,9 @@ def email_app_exporter(pdata):
     #part.add_header('Content-Disposition', "attachment; filename= %s" % fileToSend)
  
     #msg.attach(part)
-    
-    server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
+    #server = smtplib.SMTP(ourserver)
     #server.starttls()
     server.login(username,password)
     emailto = [emailto, emailcc1, emailcc2]
@@ -573,8 +574,9 @@ def email_app(pdat):
     #part.add_header('Content-Disposition', "attachment; filename= %s" % fileToSend)
  
     #msg.attach(part)
-    
-    server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
+    #server = smtplib.SMTP(ourserver)
     #server.starttls()
     server.login(username,password)
     emailto = [emailto, emailcc1, emailcc2]
@@ -689,7 +691,9 @@ def invoice_mimemail(docref, err, lastpath, sids):
         #attachment.close()
         os.remove(newfile)
 
-    server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
+    #server = smtplib.SMTP(ourserver)
     server.starttls()
     code, check = server.login(username,password)
     #print('check', code, check.decode("utf-8"))
@@ -769,7 +773,9 @@ def info_mimemail(emaildata, sids):
 
     msg.attach(MIMEText(ebody, 'html'))
 
-    server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
+    #server = smtplib.SMTP(ourserver)
     server.starttls()
     code, check = server.login(username,password)
     #print('check', code, check.decode("utf-8"))
@@ -856,8 +862,9 @@ def html_mimemail(emaildata):
 
     msg.attach(MIMEText(ebody, 'html'))
     #msg.attach(MIMEText(signature, 'html'))
-
-    server = smtplib.SMTP(ourserver)
+    [host, port] = ourserver.split(':')
+    server = smtplib.SMTP(host, port)
+    #server = smtplib.SMTP(ourserver)
     server.starttls()
     #print(f'logging in as {username} and {password}')
     code, check = server.login(username,password)

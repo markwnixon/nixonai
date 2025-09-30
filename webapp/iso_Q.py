@@ -1113,7 +1113,7 @@ def get_body_text(qdat):
         except:
             plain_text_content = 'Could not decode payload'
     try:
-        print('Returning from get_body_text with plain text', plain_text_content)
+        print('Returning from get_body_text with plain text')
         #print('Returning from get_body_text with html', html_content)
     except:
         plain_text_content = 'Could not decode payload'
