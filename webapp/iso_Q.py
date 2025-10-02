@@ -215,7 +215,11 @@ def add_quote_emails():
             mid = mid.strip()
             fromp = extract_for_code(email_message["From"])
             #print(fromp)
-            if '@' not in fromp: fromp = 'Invalid Email'
+            try:
+                if '@' not in fromp: fromp = 'Invalid Email'
+            except:
+                fromp = 'Invalid Email'
+
             #print(f'Message ID: {mid}')
             #print(f'Subject: {subject}')
             #print(f'From: {fromp}')
