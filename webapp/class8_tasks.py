@@ -1959,6 +1959,7 @@ def Table_maker(genre):
     holdvec[98] = checkcol
     holdvec[99] = labpassvec
     holdvec[97] = f'/static/{scac}/data/v'
+    timedata = ['06:00-07:00', '07:00-08:00', '08:00-09:00', '09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:30']
     #print(f"holdvec is {holdvec} and session variable is {session['table_defaults']}")
     #print(f"The session variables for tables Default {session['table_defaults']} and Removed {session['table_removed']}")
 
@@ -2020,7 +2021,8 @@ def Table_maker(genre):
                     pdat.OutChas = chas
 
                 if timeslot is not None:
-                    pdat.Timeslot = int(timeslot)
+                    #pdat.Timeslot = int(timeslot)
+                    pdat.Timeslot = timeslot
 
                 if driver is not None and unit is not None and chas is not None:
                     pdat.Notes = f'Will get pin for {driver} in unit {unit} using chassis {chas}'
@@ -2052,7 +2054,7 @@ def Table_maker(genre):
                 pdat.Date = pdat.Date + timedelta(1)
                 db.session.commit()
 
-        holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
+        holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all(), timedata])
 
     if (putbuff is not None or anyamber) and 'Orders' in tables_on:
         holdvec[96] = []
@@ -2097,7 +2099,7 @@ def Table_maker(genre):
                 err.append('Too many selections for paste buffer task')
         for idate in range(4):
             movedate = thisdate + timedelta(idate)
-            holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all()])
+            holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all(), timedata])
         else:
             err.append('No selection made for paste buffer task')
     leftcheck = tfilters['Viewer']

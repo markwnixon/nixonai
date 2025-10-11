@@ -48,6 +48,7 @@
         {% set thisdate = setdata[0] %}
         {% set but = setdata[1] %}
         {% set pdata = setdata[2] %}
+        {% set timedata = setdata[3] %}
         {% set drvdata = holdvec[94][0] %}
         {% set trkdata = holdvec[94][1] %}
                 <br>
@@ -88,7 +89,7 @@
                           {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
                           {% if pdat.OutPin == '0' %}
                                 {% if pdat.Driver %}{% set col1 = 'green-text font-weight-bold' %}{% else %}{% set col1 = 'black-text' %}{% endif %}
-                              {% if pdat.Timeslot == 0 %} {% set col1 = 'amber-text font-weight-bold' %}{% endif %}
+                              {% if pdat.Timeslot == 'Hold Getting' %} {% set col1 = 'amber-text font-weight-bold' %}{% endif %}
                           {% else %}
                                 {% set col1 = 'blue-text font-weight-bold' %}
                           {% endif %}
@@ -107,11 +108,10 @@
                                             {% endfor %}
                                         </select>
                                      <select class="mdb-select md-form" name="slot{{ but }}{{ loop.index-1 }}">
-                                            <option {% if pdat.Timeslot == 0 %} selected {% endif %} value="0" >Hold Getting</option>
-                                            <option {% if pdat.Timeslot == 1 %} selected {% endif %} value="1" >Current Time Slot </option>
-                                            <option {% if pdat.Timeslot == 2 %} selected {% endif %} value="2">Next Time Slot  </option>
-                                            <option {% if pdat.Timeslot == 3 %} selected {% endif %} value="3">2x Next Time Slot</option>
-                                            <option {% if pdat.Timeslot == 4 %} selected {% endif %} value="4">Last Time Slot</option>
+                                            <option {% if pdat.Timeslot == "Hold Getting" %} selected {% endif %} value="Hold Getting" >Hold Getting</option>
+                                            {% for td in timedata %}
+                                                <option {% if pdat.Timeslot == td %} selected {% endif %} value="{{ td }}"  >{{ td }}</option>
+                                            {% endfor %}
                                      </select>
 
                                      <input class="mdb-select md-form-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
