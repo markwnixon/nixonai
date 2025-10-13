@@ -1,10 +1,11 @@
 from flask import Flask
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
 #from flask_sqlalchemy import SQLAlchemy
 #from flask_bcrypt import Bcrypt
 #from flask_login import LoginManager
 from webapp.CCC_system_setup import scac, machine, statpath, dbp
 
-from webapp.extensions import db, bcrypt, login_manager
+from webapp.extensions import db, bcrypt, login_manager, jwt
 from webapp.routes import main
 from webapp.authenticate.routes import authenticate
 
@@ -31,12 +32,14 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["DEBUG"] = False
     app.config["SECRET_KEY"] = dbp[5]
+    app.config["JWT_SECRET_KEY"] = dbp[5]
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_recycle': 280, 'pool_timeout': 60, 'pool_pre_ping': True}
     #app.secret_key = dbp[5]
 
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
+    jwt.init_app(app)
 
     app.register_blueprint(authenticate)
     app.register_blueprint(main)

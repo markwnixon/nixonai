@@ -1,10 +1,10 @@
 from flask import render_template, flash, redirect, url_for, session, logging, request, jsonify
 from flask import Blueprint
 
-from webapp.extensions import db
-from webapp.models import Orders, People
+from webapp.extensions import db, bcrypt, jwt
+from webapp.models import Orders, People, users, Vehicles, Pins, Drivers
 #from webapp.forms import TruckingFormNew
-from webapp.class8_tasks import Table_maker
+from webapp.class8_tasks import Table_maker, get_address_details
 from webapp.revenues import get_revenues
 from flask_login import login_required
 
@@ -32,6 +32,7 @@ from webapp.class8_utils_email import email_template, info_mimemail, check_perso
 from webapp.class8_utils import *
 from webapp.class8_api_call import api_call
 import ast
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, create_refresh_token, JWTManager
 
 today = datetime.datetime.today()
 year = str(today.year)
@@ -46,11 +47,236 @@ cmpdata = companydata()
 
 main = Blueprint('main',__name__)
 
+@main.route('/api_login', methods=['POST'])
+def api_login():
+    if request.method == 'POST':
+        print('This is a post')
+        data = request.get_json()
+        print("Data received successfully:", data)
+        user = data['username']
+        password = data['password']
+        print(f'user: {user} and password: {password}')
 
-@main.route('/get_api_data', methods=['GET', 'POST'])
+        thisuser = users.query.filter_by(username=user).first()
+        if thisuser is not None:
+            print(f'user: {user} found')
+            passhash = thisuser.password
+            #Commented out....only needed for startup if no superuser in database
+            #hashed_pw = bcrypt.generate_password_hash(thisuser.password).decode('utf-8')
+            #print(hashed_pw)
+            passcheck = bcrypt.check_password_hash(passhash, password)
+            print(passcheck)
+            if passcheck:
+                access_token = create_access_token(identity=user)
+                refresh_token = create_refresh_token(identity=user)
+                #return jsonify({"access_token": token})
+                return jsonify(access_token=access_token, refresh_token=refresh_token)
+
+        return jsonify({"message": "Invalid credentials"}), 401
+
+@main.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    identity = get_jwt_identity()
+    new_access_token = create_access_token(identity=identity)
+    return jsonify(access_token=new_access_token)
+
+
+@main.route("/api_logout", methods=["POST"])
+#@jwt_required()
+def logout():
+    jti = get_jwt_identity()  # Get unique token ID
+    print(f'logout: token revoked is {jti}')
+    return jsonify({"message": "Token revoked"}), 200
+
+@main.route('/get_api_data', methods=['GET', 'PUT', 'POST'])
+@jwt_required()
 def handle_data():
+    current_user = get_jwt_identity()
+    print(f'user: {current_user}')
+
+    if request.method == 'POST':
+        print('This is a POST')
+        data_needed = request.args.get('data_needed')
+        print(f'data_needed: {data_needed}')
+        data = request.get_json()
+        print(f'data: {data}')
+
+        lb_days = 60
+        today = now.date()
+        lbdate = today - timedelta(days=lb_days)
+        active_date = today + timedelta(days=10)
+
+        driver = data['driver']
+        unit = data['truck']
+        ingate = data['ingate']
+        outgate = data['outgate']
+        pintime = data['pintime']
+        vdat = Vehicles.query.filter(Vehicles.Unit == unit).first()
+        if vdat is not None:
+            tag = vdat.Plate
+        ddat = Drivers.query.filter(Drivers.Name == driver).first()
+        if ddat is not None:
+            phone = ddat.Phone
+        indat = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Container == ingate)).first()
+        if indat is not None:
+            incon = indat.Container
+            inchas = indat.Chassis
+            contype = indat.Type
+
+            ht = indat.HaulType
+            ctext = ''
+            if '45' in contype and '9' in contype: ctext = '45HC'
+            if '40' in contype and '9' in contype: ctext = '40HC'
+            if '40' in contype and '8' in contype: ctext = '40STD'
+            if '45' in contype and '8' in contype: ctext = '45STD'
+            if '20' in contype: ctext = '20'
+            if 'R' in contype: ctext = ctext + ' Reefer'
+            if 'U' in contype: ctext = ctext + ' OpenTop'
+
+            address = indat.Dropblock2
+            adata, backup = get_address_details(address)
+            try:
+                city = adata['city']
+            except:
+                city = backup
+
+            if city == 'Baltimore':
+                citiline = indat.Shipper
+                citiline = citiline.split()
+                city = citiline[0]
+
+            if not hasinput(city):
+                citiline = indat.Shipper
+                citiline = citiline.split()
+                city = citiline[0]
+
+            if 'Export' in ht:
+                if hasinput(indat.BOL):
+                    inbook = indat.BOL
+                else:
+                    inbook = indat.Booking
+                inbook = inbook.split('-', 1)[0]
+                intext = f'Load In: *{inbook}  {incon}* ({ctext} {city})'
+            if 'Import' in ht:
+                intext = f'Empty In: *{incon}* ({ctext} {city})'
+
+        else:
+            incon = None
+            inbook = None
+            inchas = None
+            intext = 'Bare Chassis In'
+
+        outdat = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Container == outgate)).first()
+        if outdat is not None:
+            outcon = outdat.Container
+            outbook = outdat.Booking
+        else:
+            #Try matching on booking, cust be an empty out
+            outdat = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Booking == outgate)).first()
+            if outdat is not None:
+                outcon = outdat.Container
+                outbook = outdat.Booking
+            else:
+                outcon = None
+                outbook = None
+        if outdat is not None:
+            outchas = indat.Chassis
+            contype = outdat.Type
+
+            ht = outdat.HaulType
+            ctext = ''
+            if '45' in contype and '9' in contype: ctext = '45HC'
+            if '40' in contype and '9' in contype: ctext = '40HC'
+            if '40' in contype and '8' in contype: ctext = '40STD'
+            if '45' in contype and '8' in contype: ctext = '45STD'
+            if '20' in contype: ctext = '20'
+            if 'R' in contype: ctext = ctext + ' Reefer'
+            if 'U' in contype: ctext = ctext + ' OpenTop'
+
+            address = outdat.Dropblock2
+            adata, backup = get_address_details(address)
+            try:
+                city = adata['city']
+            except:
+                city = backup
+
+            if city == 'Baltimore':
+                citiline = indat.Shipper
+                citiline = citiline.split()
+                city = citiline[0]
+
+            if not hasinput(city):
+                citiline = indat.Shipper
+                citiline = citiline.split()
+                city = citiline[0]
+
+            if 'Export' in ht:
+                outbook = outdat.Booking
+                outbook = outbook.split('-', 1)[0]
+                outtext = f'Empty Out: *{outbook}* ({ctext} {city})'
+            if 'Import' in ht:
+                try:
+                    rel4 = outdat.Booking[-4:]
+                except:
+                    rel4 = outdat.Booking
+                outtext = f'Load Out: *{rel4}  {outcon}* ({ctext} {city})'
+
+        else:
+            outcon = None
+            outbook = None
+            outchas = inchase
+            outtext = 'Nothing Out'
+        #Add this data to the pin database for today:
+        today = now.date()
+        inpin = '0'
+        outpin = '0'
+        # Now get the intext and outtext:
+
+        input = Pins(Date=today, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
+                     OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone,
+                     Timeslot=0, Intext=intext, Outtext=outtext, Notes=None)
+        db.session.add(input)
+        db.session.commit()
+
+    if request.method == 'PUT':
+        print('This is a put')
+        data_needed = request.args.get('data_needed')
+        print(f'data_needed: {data_needed}')
+
+        if 'test1' in data_needed:
+            print('made it to test1')
+            data = request.get_json()
+            print("Data received successfully:", data)
+            old_data = [{'id':1,'container':'CAAU8649700','shipper':'one'},
+                        {'id':2,'container':'XXXX8649700','shipper':'two'}]
+            # Update the changes
+            print(data['id'])
+            if data:
+                changeid = data['id']
+                old_match = [item for item in old_data if item['id'] == changeid]
+                con1 = old_match[0]['container']
+                con2 = data['container']
+                ship1 = old_match[0]['shipper']
+                ship2 = data['shipper']
+                print(con1, con2, ship1, ship2)
+                if con1 == con2:
+                    print('no update for containers')
+                if ship1 == ship2:
+                    print('no update for shipper')
+                else:
+                    print(f'Updating database for shipper from {ship1} to {ship2}')
+
+
+            if not data:
+                return jsonify({'error':'No data received'}), 400
+
+            return jsonify({'message': 'Data received', 'data':data}), 200
+
+
     if request.method == 'GET':
         data_needed = request.args.get('data_needed')
+        #data_needed = 'api_test_two'
         print(f'This is a get request for data_needed:{data_needed}:')
 
         arglist = request.args.get('arglist')
@@ -59,22 +285,55 @@ def handle_data():
         if data_needed == 'test0':
             return jsonify({'container':'CAAU8649700'})
 
-        elif data_needed == 'test1':
+        elif data_needed == 'api_test_two':
+            return jsonify([{'id':1,'container':'CAAU8649700','name':'one'},
+                            {'id':2,'container':'XXXX8649700','name':'two'}])
+
+        elif data_needed == 'api_test_three':
             return jsonify([{'id':1,'container':'CAAU8649700','shipper':'one'},
                             {'id':2,'container':'XXXX8649700','shipper':'two'}])
 
+        # api_test_five works with all below, test1 to test 4
+        elif data_needed == 'test1':
+            if request.method == 'GET':
+                return jsonify([{'id': 1, 'container': 'CAAU8649700', 'shipper': 'one', 'status':'Still Out'},
+                                {'id': 2, 'container': 'XXXX8649700', 'shipper': 'two', 'status':'Returned'}])
+
         elif data_needed == 'test2':
-            return jsonify([{'id':1,'day':'Monday','item':'Empty Pickup'},
-                            {'id':2,'day':'Tuesday','item':'Load In'},
-                            {'id':3, 'day':'Wednesday','item':'Load In'}])
+            return jsonify([{'id':1,'day':'Monday','item':'Empty Pickup', 'date':'2025-03-04'},
+                            {'id':2,'day':'Tuesday','item':'Load In', 'date':'2025-03-04'},
+                            {'id':3, 'day':'Wednesday','item':'Load In', 'date':'2025-03-04'}])
 
         elif data_needed == 'test3':
-            return jsonify([{'id':1,'day':'Thursday','Amount':'10,023.43'},
-                            {'id':2,'day':'Friday','Amount':'9,230.44'}])
+            if request.method == 'GET':
+                return jsonify([{'id':1,'day':'Thursday','amount':'10,023.43'},
+                                {'id':2,'day':'Friday','amount':'9,230.44'}])
+
 
         elif data_needed == 'test4':
-            return jsonify([{'id':1,'driver':'John Doe','CDL':'CDX-001'},
-                            {'id':2,'driver':'Sam Spade','CDL':'CRJ-0033'}])
+            return jsonify([{'id':1,'driver':'John Doe','cdl':'CDX-001'},
+                            {'id':2,'driver':'Sam Spade','cdl':'CRJ-0033'}])
+
+        # Getting these tests compatible with api_test_six
+
+        elif data_needed == 'active_containersxx':
+            return jsonify([{'id': 1, 'container': 'CAAU8649700', 'shipper': 'one', 'status': 'Still Out'},
+                            {'id': 2, 'container': 'XXXX8649700', 'shipper': 'two', 'status': 'Returned'}])
+
+        elif data_needed == 'test2':
+            return jsonify([{'id': 1, 'day': 'Monday', 'item': 'Empty Pickup', 'date': '2025-03-04'},
+                            {'id': 2, 'day': 'Tuesday', 'item': 'Load In', 'date': '2025-03-04'},
+                            {'id': 3, 'day': 'Wednesday', 'item': 'Load In', 'date': '2025-03-04'}])
+
+        elif data_needed == 'test3':
+            if request.method == 'GET':
+                return jsonify([{'id': 1, 'day': 'Thursday', 'amount': '10,023.43'},
+                                {'id': 2, 'day': 'Friday', 'amount': '9,230.44'}])
+
+
+        elif data_needed == 'test4':
+            return jsonify([{'id': 1, 'driver': 'John Doe', 'cdl': 'CDX-001'},
+                            {'id': 2, 'driver': 'Sam Spade', 'cdl': 'CRJ-0033'}])
 
         else:
             data_return = api_call(scac, now, data_needed, arglist)
@@ -82,8 +341,6 @@ def handle_data():
 
     else:
         return []
-
-
 
 
 

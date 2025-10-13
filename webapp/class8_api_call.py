@@ -1,11 +1,12 @@
 from webapp import db
-from webapp.models import OverSeas, Orders, People, Interchange, Bookings
+from webapp.models import OverSeas, Orders, People, Interchange, Bookings, Openi, Drivers, Vehicles
 from flask import session, request
 from webapp.viewfuncs import d2s, stat_update, hasinput
-import datetime
+#import datetime
 import pytz
-from datetime import timedelta
+from datetime import datetime, time, timedelta, date
 import ast
+from webapp.revenues import intdol
 
 def api_call(scac, now, data_needed, arglist):
     print(f'Inside api_call with data_needed={data_needed}, arglist={arglist}')
@@ -29,6 +30,7 @@ def api_call(scac, now, data_needed, arglist):
         for odat in odata:
             ret_data.append({'id': odat.id, 'JO': odat.Jo, 'SCAC': scac, 'Shipper': odat.Shipper,
                               'Container': odat.Container, 'Hstat': odat.Hstat})
+
 
         return ret_data
 
@@ -55,27 +57,27 @@ def api_call(scac, now, data_needed, arglist):
                 del_address = odat.Dropblock2
 
                 #Must return dates in a valid date format or the api readers will fail
-                if isinstance(odat.Date, datetime.date):
+                if isinstance(odat.Date, date):
                     gateout = f'{odat.Date}'
                 else:
                     gateout = fd
-                if isinstance(odat.Date2, datetime.date):
+                if isinstance(odat.Date2, date):
                     gatein = f'{odat.Date2}'
                 else:
                     gatein = fd
-                if isinstance(odat.Date3, datetime.date):
+                if isinstance(odat.Date3, date):
                     delivery = f'{odat.Date3}'
                 else:
                     delivery = fd
-                if isinstance(odat.Date4, datetime.date):
+                if isinstance(odat.Date4, date):
                     port_early = f'{odat.Date4}'
                 else:
                     port_early = fd
-                if isinstance(odat.Date5, datetime.date):
+                if isinstance(odat.Date5, date):
                     port_late = f'{odat.Date5}'
                 else:
                     port_late = fd
-                if isinstance(odat.Date6, datetime.date):
+                if isinstance(odat.Date6, date):
                     dueback = f'{odat.Date6}'
                 else:
                     dueback = fd
@@ -99,8 +101,9 @@ def api_call(scac, now, data_needed, arglist):
                                   'gateOut': gateout, 'gateIn': gatein, 'delivery': delivery,
                                   'portEarly': port_early, 'portLate': port_late, 'dueBack':dueback
                                  })
-
+        print(ret_data)
         return ret_data
+
 
     elif data_needed == 'calendar':
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
@@ -142,7 +145,7 @@ def api_call(scac, now, data_needed, arglist):
                 gout = odat.Date
                 gin = odat.Date2
                 deliv = odat.Date3
-                if isinstance(gout, datetime.date) and isinstance(gin, datetime.date) and isinstance(deliv, datetime.date):
+                if isinstance(gout, date) and isinstance(gin, date) and isinstance(deliv, date):
                     print('We have three good dates')
                     #We have three good dates to use and compare
                     cal_message = []
@@ -178,25 +181,25 @@ def api_call(scac, now, data_needed, arglist):
                     gatein = f'{gin}'
                     delivery = f'{deliv}'
 
-                    if isinstance(odat.Date4, datetime.date):
+                    if isinstance(odat.Date4, date):
                         port_early = f'{odat.Date4}'
                     else:
                         port_early = fd
-                    if isinstance(odat.Date5, datetime.date):
+                    if isinstance(odat.Date5, date):
                         port_late = f'{odat.Date5}'
                     else:
                         port_late = fd
-                    if isinstance(odat.Date6, datetime.date):
+                    if isinstance(odat.Date6, date):
                         dueback = f'{odat.Date6}'
                     else:
                         dueback = fd
 
-                    if isinstance(earliest, datetime.date):
+                    if isinstance(earliest, date):
                         earliest_str = f'{earliest}'
                     else:
                         earliest_str = fd
 
-                    if isinstance(latest, datetime.date):
+                    if isinstance(latest, date):
                         latest_str = f'{latest}'
                     else:
                         latest_str = fd
@@ -235,9 +238,6 @@ def api_call(scac, now, data_needed, arglist):
 
 
 
-
-
-
     elif data_needed == 'active_shippers':
 
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_customers&arglist=[]
@@ -253,6 +253,132 @@ def api_call(scac, now, data_needed, arglist):
             if shipper not in shippers: shippers.append(shipper)
         for ix, shipper in enumerate(shippers):
             ret_data.append({'id': ix+1, 'Shipper': shipper})
+
+        return ret_data
+
+    elif data_needed == 'drivers':
+        info_id = 0
+        ret_data = []
+        odata = Drivers.query.filter(Drivers.Active==1).all()
+        for odat in odata:
+            info_id += 1
+            name = odat.Name
+            phone = odat.Phone
+            email = odat.Email
+            cdl = odat.CDLnum
+            if name is None: name = 'xxx'
+            if phone is None: phone = 'xxx'
+            if email is None: email = 'xxx'
+            if cdl is None: cdl = 'xxx'
+            ret_data.append({'id': info_id, 'name': name, 'phone': phone, 'email': email, 'cdl': cdl})
+
+        print(ret_data)
+        return ret_data
+
+    elif data_needed == 'pindrivers':
+        info_id = 0
+        ret_data = []
+        odata = Drivers.query.filter(Drivers.Active == 1).all()
+        for odat in odata:
+            info_id += 1
+            name = odat.Name
+            if name is None: name = 'xxx'
+            ret_data.append({'id': info_id, 'name': name})
+
+        print(ret_data)
+
+        return ret_data
+
+    elif data_needed == 'pintrucks':
+        info_id = 0
+        ret_data = []
+        odata = Vehicles.query.filter(Vehicles.Active == 1).all()
+        for odat in odata:
+            info_id += 1
+            unit = odat.Unit
+            if unit is None: unit = 'xxx'
+            ret_data.append({'id': info_id, 'unit': unit})
+
+        print(ret_data)
+
+        return ret_data
+
+    elif data_needed == 'piningates':
+        lb_days = 60
+        today = now.date()
+        lbdate = today - timedelta(days=lb_days)
+        info_id = 0
+        ret_data = []
+        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat == 1)).order_by(Orders.Date).all()
+        for odat in odata:
+            info_id += 1
+            unit = odat.Container
+            if unit is None: unit = 'xxx'
+            ret_data.append({'id': info_id, 'unit': unit})
+
+        print(ret_data)
+
+        return ret_data
+
+    elif data_needed == 'pinoutgates':
+        lb_days = 60
+        today = now.date()
+        lbdate = today - timedelta(days=lb_days)
+        info_id = 0
+        ret_data = []
+        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 1)).order_by(Orders.Date).all()
+        for odat in odata:
+            info_id += 1
+            unit = odat.Container
+            if not hasinput(unit):
+                unit = odat.Booking
+            if not hasinput(unit):
+                unit = 'xxx'
+            ret_data.append({'id': info_id, 'unit': unit})
+
+        print(ret_data)
+
+        return ret_data
+
+    elif data_needed == 'pintimes':
+        timenow = now.time()
+        print(f'Current is: {timenow}')
+        info_id = 0
+        ret_data = []
+        timedata = [time(hour=7, minute=0, second=0, microsecond=0), time(hour=8, minute=0, second=0, microsecond=0),
+                    time(hour=9, minute=0, second=0, microsecond=0), time(hour=10, minute=0, second=0, microsecond=0),
+                    time(hour=11, minute=0, second=0, microsecond=0), time(hour=12, minute=0, second=0, microsecond=0),
+                    time(hour=13, minute=0, second=0, microsecond=0), time(hour=14, minute=0, second=0, microsecond=0),
+                    time(hour=15, minute=0, second=0, microsecond=0), time(hour=16, minute=30, second=0, microsecond=0)]
+
+        odata = ['6:00-7:00', '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:30']
+        for jx, odat in enumerate(odata):
+            timetest = timedata[jx]
+            dt1 = datetime.combine(datetime.today(), timenow)
+            dt2 = datetime.combine(datetime.today(), timetest)
+            timedeltamin = dt2 - dt1
+            timedeltamin = timedeltamin.total_seconds() / 60
+            print(f'Current time is: {timenow} back time range is: {timetest} and timedelta is: {timedeltamin}')
+            if timedeltamin >= 15:
+                info_id += 1
+                ret_data.append({'id': info_id, 'name': odat})
+
+        print(ret_data)
+
+        return ret_data
+
+    elif data_needed == 'financials':
+        fin_id = 0
+        ret_data = []
+        odata = Openi.query.order_by(Openi.Open.desc()).all()
+        for odat in odata:
+            fin_id += 1
+            if odat.Company == 'TOTAL':
+                lastitem = [fin_id, odat.Company, intdol(odat.Open)]
+            else:
+                ret_data.append({'id': fin_id, 'company': odat.Company, 'ototal': intdol(odat.Open), 'duenow': intdol(odat.U30)})
+
+        print(ret_data)
 
         return ret_data
 
