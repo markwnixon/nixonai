@@ -1,3 +1,5 @@
+from operator import truediv
+
 from webapp import db
 from webapp.models import OverSeas, Orders, People, Interchange, Bookings, Openi, Drivers, Vehicles
 from flask import session, request
@@ -140,6 +142,18 @@ def api_call(scac, now, data_needed, arglist):
                 booking = odat.Booking
                 htype = odat.HaulType
                 del_address = odat.Dropblock2
+                if 'DP' in htype:
+                    droppick=True
+                else:
+                    droppick=False
+                if 'Import' in htype:
+                    importj=True
+                else:
+                    importj=False
+                if 'Export' in htype:
+                    exportj=True
+                else:
+                    exportj=False
 
                 # Determine how many calendar entries we have for each job based on the gatein, gateout, and delivery dates
                 gout = odat.Date
@@ -152,29 +166,117 @@ def api_call(scac, now, data_needed, arglist):
                     cal_dates = []
                     if gout == deliv and gout == gin:
                         #Plan is to pull deliv and return same day
-                        cal_message.append('Pull, deliver, and return same day')
-                        cal_dates.append(gout)
-                        dtype = 'All same day'
+                        if droppick:
+                            if exportj:
+                                cal_message.append('Pull empty, deliver, and return load same day')
+                                cal_dates.append(gout)
+                                dtype = 'All same day'
+                            if importj:
+                                cal_message.append('Pull load, deliver, and return empty same day')
+                                cal_dates.append(gout)
+                                dtype = 'All same day'
+                        else:
+                            if exportj:
+                                cal_message.append('Pull and drop empty')
+                                cal_dates.append(gout)
+                                dtype = 'All same day'
+                            if importj:
+                                cal_message.append('Pull and drop load')
+                                cal_dates.append(gout)
+                                dtype = 'All same day'
                     elif gout == deliv and gout != gin:
-                        cal_message.append('Pull and deliver today')
-                        cal_message.append(f'Return container still out from {deliv}')
-                        cal_dates.append(gout)
-                        cal_dates.append(gin)
-                        dtype = 'Pull and deliver not return'
+                        if droppick:
+                            if exportj:
+                                cal_message.append('Pull empty and drop today')
+                                cal_message.append(f'Return now-loaded container dropped on {deliv}')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Pull and deliver not return'
+                            if importj:
+                                cal_message.append('Pull load and drop today')
+                                cal_message.append(f'Return now-empty container dropped on {deliv}')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Pull and deliver not return'
+                        else:
+                            if exportj:
+                                cal_message.append('Pull empty and deliver today')
+                                cal_message.append(f'Return now loaded container still out from {deliv}')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Pull and deliver not return'
+                            if importj:
+                                cal_message.append('Pull load and deliver today')
+                                cal_message.append(f'Return container still out from {deliv}')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Pull and deliver not return'
+
                     elif gout != deliv and deliv == gin:
-                        cal_message.append(f'Pull container today, deliver {deliv}')
-                        cal_message.append(f'Deliver container and return')
-                        cal_dates.append(gout)
-                        cal_dates.append(gin)
-                        dtype = 'Prepull then deliver and return'
+                        if droppick:
+                            if exportj:
+                                cal_message.append(f'Prepull empty container today, drop {deliv}')
+                                cal_message.append(f'Pick loaded container and return')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull then deliver and return'
+                            if importj:
+                                cal_message.append(f'Prepull loaded container today, drop {deliv}')
+                                cal_message.append(f'Pick empty container and return')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull then deliver and return'
+                        else:
+                            if exportj:
+                                cal_message.append(f'Prepull empty container today, deliver {deliv}')
+                                cal_message.append(f'Deliver container and return load')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull then deliver and return'
+                            if importj:
+                                cal_message.append(f'Prepull container today, deliver {deliv}')
+                                cal_message.append(f'Deliver container and return empty')
+                                cal_dates.append(gout)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull then deliver and return'
+
+
                     elif gout != deliv and deliv != gin:
-                        cal_message.append(f'Pull container today, deliver {deliv}')
-                        cal_message.append(f'Deliver container today but return {gout}')
-                        cal_message.append(f'Return container today')
-                        cal_dates.append(gout)
-                        cal_dates.append(deliv)
-                        cal_dates.append(gin)
-                        dtype = 'Prepull, then deliver, then return'
+                        if droppick:
+                            if exportj:
+                                cal_message.append(f'Prepull empty container for drop {deliv}')
+                                cal_message.append(f'Drop empty container for loading')
+                                cal_message.append(f'Pick now-loaded container for port entry')
+                                cal_dates.append(gout)
+                                cal_dates.append(deliv)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull, then deliver, then return'
+                            if importj:
+                                cal_message.append(f'Prepull loaded container for drop {deliv}')
+                                cal_message.append(f'Drop loaded container')
+                                cal_message.append(f'Return now-empty container')
+                                cal_dates.append(gout)
+                                cal_dates.append(deliv)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull, then deliver, then return'
+                        else:
+                            if exportj:
+                                cal_message.append(f'Prepull empty container today, deliver {deliv}')
+                                cal_message.append(f'Deliver container today but return {gout}')
+                                cal_message.append(f'Return now-loaded container to port')
+                                cal_dates.append(gout)
+                                cal_dates.append(deliv)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull, then deliver, then return'
+                            if importj:
+                                cal_message.append(f'Prepull loaded container today, deliver {deliv}')
+                                cal_message.append(f'Deliver container today but return {gout}')
+                                cal_message.append(f'Return now-empty container to port')
+                                cal_dates.append(gout)
+                                cal_dates.append(deliv)
+                                cal_dates.append(gin)
+                                dtype = 'Prepull, then deliver, then return'
+
 
                     #Must return dates in a valid date format or the api readers will fail
                     gateout = f'{gout}'
