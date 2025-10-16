@@ -370,7 +370,7 @@ def Exports_Returned_task(err, holdvec, task_iter):
     expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
 
     ts = request.values.get('timeslot')
-    if ts is None: ts=1
+    if ts is None: ts=0
     else: ts = int(ts)
 
     stopdate = today-datetime.timedelta(days=ts)
@@ -429,10 +429,10 @@ def Exports_Returned_task(err, holdvec, task_iter):
     holdvec[5] = expcon
     holdvec[6] = expdrv
 
-    err.append('Exports Load-In History')
+    err.append(f'Exports Load-In History for {stopdate}')
 
     completed = False
-    err.append('Exports Returned run Successful')
+    err.append(f'Exports Returned run Successful on {today}')
     return completed, err, holdvec
 
 def Exports_Bk_Diff_task(err, holdvec, task_iter):
