@@ -306,11 +306,12 @@ def Exports_Pulled_task(err, holdvec, task_iter):
     expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
 
     ts = request.values.get('timeslot')
-    if ts is None: ts=1
+    if ts is None: ts=0
     else: ts = int(ts)
 
     stopdate = today-datetime.timedelta(days=ts)
     comps = []
+    #print(f'{stopdate}')
     if ts == 7: tjobs = Orders.query.filter( (Orders.Date >= stopdate) & (Orders.HaulType.contains('Export')) ).all()
     else: tjobs = Orders.query.filter( (Orders.Date == stopdate) & (Orders.HaulType.contains('Export')) ).all()
     for job in tjobs:
@@ -319,9 +320,10 @@ def Exports_Pulled_task(err, holdvec, task_iter):
         if hstat is None:
             hstat = 0
             job.Hstat = 0
+            db.session.commit()
         if hstat >= 1 and com not in comps:
             comps.append(com)
-    db.session.commit()
+
 
     if len(comps) >= 1:
         for com in comps:
@@ -337,11 +339,12 @@ def Exports_Pulled_task(err, holdvec, task_iter):
                 else:
                     time = ''
                     driver = ''
-                date = f'{job.Date} {time}'
+                datejob = f'{job.Date} {time}'
+                #print(f' The date is:  {datejob}')
                 expco.append(com)
                 expbk.append(bk)
                 expcon.append(con)
-                expdt.append(date)
+                expdt.append(datejob)
                 expdrv.append(driver)
 
     if  expdt:
@@ -355,10 +358,10 @@ def Exports_Pulled_task(err, holdvec, task_iter):
     holdvec[5] = expcon
     holdvec[6] = expdrv
 
-    err.append('Exports Pulled History')
+    err.append(f'Exports Pulled History for {stopdate}')
 
     completed = False
-    err.append('Exports Pulled run Successful')
+    err.append(f'Exports Pulled run Successful on {today}')
     return completed, err, holdvec
 
 def Exports_Returned_task(err, holdvec, task_iter):
