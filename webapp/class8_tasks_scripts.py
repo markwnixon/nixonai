@@ -1,11 +1,24 @@
 from webapp import db
 from webapp.models import Orders, Interchange, StreetTurns, Vehicles, Drivers, DriverAssign
 import datetime
+import pytz
 from flask import request
 from webapp.class8_utils import *
 from webapp.utils import *
 
-today=datetime.date.today()
+desired_timezone = pytz.timezone('America/New_York')
+
+# Get the current UTC time and localize it to your desired timezone
+now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+now_local = now_utc.astimezone(desired_timezone)
+
+# Get today's date in your desired local timezone
+today = now_local.date()
+timeofday = now_local.time()
+
+print(f"Today's date in local timezone: {today} at {timeofday}")
+
+#today=datetime.date.today()
 
 def checkon(con,bk):
     if not hasinput(con): con = ''
@@ -361,7 +374,7 @@ def Exports_Pulled_task(err, holdvec, task_iter):
     err.append(f'Exports Pulled History for {stopdate}')
 
     completed = False
-    err.append(f'Exports Pulled run Successful on {today}')
+    err.append(f'Exports Pulled run Successful on {today} at {timeofday}')
     return completed, err, holdvec
 
 def Exports_Returned_task(err, holdvec, task_iter):
@@ -432,7 +445,7 @@ def Exports_Returned_task(err, holdvec, task_iter):
     err.append(f'Exports Load-In History for {stopdate}')
 
     completed = False
-    err.append(f'Exports Returned run Successful on {today}')
+    err.append(f'Exports Returned run Successful on {today} at {timeofday}')
     return completed, err, holdvec
 
 def Exports_Bk_Diff_task(err, holdvec, task_iter):
