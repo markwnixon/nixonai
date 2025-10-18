@@ -17,6 +17,7 @@ from random import sample
 import datetime
 from datetime import timedelta
 import os
+import shutil
 import json
 
 
@@ -88,6 +89,27 @@ def logout():
     jti = get_jwt_identity()  # Get unique token ID
     print(f'logout: token revoked is {jti}')
     return jsonify({"message": "Token revoked"}), 200
+
+@main.route("/upload_pdf", methods=["POST"])
+#@jwt_required()
+def pdf_upload():
+    container_number = request.form.get("container_number")
+    file = request.files.get("file")
+
+    if not container_number or not file:
+        return jsonify({"error": "Missing container number or file"}), 400
+
+    os.makedirs("uploads", exist_ok=True)
+    filename = f"uploads/{container_number}.pdf"
+
+    file.save(filename)
+
+    return jsonify({
+        "message": "Uploaded successfully",
+        "file": filename
+    })
+
+
 
 @main.route('/get_api_data', methods=['GET', 'PUT', 'POST'])
 @jwt_required()
