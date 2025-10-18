@@ -6,16 +6,14 @@ from flask import request
 from webapp.class8_utils import *
 from webapp.utils import *
 
-desired_timezone = pytz.timezone('America/New_York')
 
+desired_timezone = pytz.timezone('America/New_York')
 # Get the current UTC time and localize it to your desired timezone
 now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
 now_local = now_utc.astimezone(desired_timezone)
-
 # Get today's date in your desired local timezone
 today = now_local.date()
 timeofday = now_local.time()
-
 print(f"Today's date in local timezone: {today} at {timeofday}")
 
 #today=datetime.date.today()

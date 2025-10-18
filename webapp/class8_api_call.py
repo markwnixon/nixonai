@@ -36,6 +36,21 @@ def api_call(scac, now, data_needed, arglist):
 
         return ret_data
 
+    elif data_needed == 'out_containers':
+        #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
+        lb_days = 60
+        today = now.date()
+        lbdate = today - timedelta(days=lb_days)
+        print(f'Looking back to this date: {lbdate}')
+        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat == 1)).order_by(Orders.Date).all()
+        ret_data = []
+        for odat in odata:
+            container = odat.Container
+            ret_data.append({'id': odat.id, 'containerNumber': container)
+
+        print(ret_data)
+        return ret_data
+
     elif data_needed == 'active_containers':
 
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
