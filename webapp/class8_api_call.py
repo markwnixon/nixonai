@@ -46,7 +46,7 @@ def api_call(scac, now, data_needed, arglist):
         ret_data = []
         for odat in odata:
             container = odat.Container
-            ret_data.append({'id': odat.id, 'containerNumber': container)
+            ret_data.append({'id': odat.id, 'containerNumber': container})
 
         print(ret_data)
         return ret_data
