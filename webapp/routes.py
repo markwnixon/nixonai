@@ -110,6 +110,7 @@ def pdf_upload():
         odat.Proof = filename
         db.session.commit()
         file.save(outputpath)
+        print(f'Saving file: {file} as {outputpath}')
         return jsonify({
             "message": "Uploaded successfully",
             "file": filename
