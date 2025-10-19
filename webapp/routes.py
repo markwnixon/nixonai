@@ -99,15 +99,29 @@ def pdf_upload():
     if not container_number or not file:
         return jsonify({"error": "Missing container number or file"}), 400
 
-    os.makedirs("uploads", exist_ok=True)
-    filename = f"uploads/{container_number}.pdf"
 
-    file.save(filename)
+    odat = Orders.query.filter(Orders.Container == container_number).order_by(Orders.id.desc()).first()
+    if odat is not None:
+        pcache = odat.Pcache
+        jo = odat.Jo
+        filename = f'Proof_{jo}_c{str(pcache)}.pdf'
+        outputpath = addpath(tpath('poof', filename))
+        odat.Pcache = pcache + 1
+        odat.Proof = filename
+        db.session.commit()
+        file.save(outputpath)
+        return jsonify({
+            "message": "Uploaded successfully",
+            "file": filename
+        })
 
-    return jsonify({
-        "message": "Uploaded successfully",
-        "file": filename
-    })
+    else:
+        return jsonify({"error": "Container not found in database"}), 400
+
+
+
+
+
 
 
 

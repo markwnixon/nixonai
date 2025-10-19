@@ -462,11 +462,11 @@ def api_call(scac, now, data_needed, arglist):
         print(f'Current is: {timenow}')
         info_id = 0
         ret_data = []
-        timedata = [time(hour=7, minute=0, second=0, microsecond=0), time(hour=8, minute=0, second=0, microsecond=0),
-                    time(hour=9, minute=0, second=0, microsecond=0), time(hour=10, minute=0, second=0, microsecond=0),
-                    time(hour=11, minute=0, second=0, microsecond=0), time(hour=12, minute=0, second=0, microsecond=0),
-                    time(hour=13, minute=0, second=0, microsecond=0), time(hour=14, minute=0, second=0, microsecond=0),
-                    time(hour=15, minute=0, second=0, microsecond=0), time(hour=16, minute=30, second=0, microsecond=0)]
+        #timedata = [time(hour=7, minute=0, second=0, microsecond=0), time(hour=8, minute=0, second=0, microsecond=0),
+         #           time(hour=9, minute=0, second=0, microsecond=0), time(hour=10, minute=0, second=0, microsecond=0),
+          #          time(hour=11, minute=0, second=0, microsecond=0), time(hour=12, minute=0, second=0, microsecond=0),
+           #         time(hour=13, minute=0, second=0, microsecond=0), time(hour=14, minute=0, second=0, microsecond=0),
+            #        time(hour=15, minute=0, second=0, microsecond=0), time(hour=16, minute=30, second=0, microsecond=0)]
 
         odata = ['6:00-7:00', '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:30']
         for jx, odat in enumerate(odata):
