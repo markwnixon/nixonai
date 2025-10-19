@@ -105,7 +105,7 @@ def pdf_upload():
         pcache = odat.Pcache
         jo = odat.Jo
         filename = f'Proof_{jo}_c{str(pcache)}.pdf'
-        outputpath = addpath(tpath('poof', filename))
+        outputpath = addpath(tpath('Orders-Proof', filename))
         odat.Pcache = pcache + 1
         odat.Proof = filename
         db.session.commit()
