@@ -470,15 +470,15 @@ def api_call(scac, now, data_needed, arglist):
 
         odata = ['6:00-7:00', '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:30']
         for jx, odat in enumerate(odata):
-            timetest = timedata[jx]
-            dt1 = datetime.combine(datetime.today(), timenow)
-            dt2 = datetime.combine(datetime.today(), timetest)
-            timedeltamin = dt2 - dt1
-            timedeltamin = timedeltamin.total_seconds() / 60
-            print(f'Current time is: {timenow} back time range is: {timetest} and timedelta is: {timedeltamin}')
-            if timedeltamin >= 15:
-                info_id += 1
-                ret_data.append({'id': info_id, 'name': odat})
+            #timetest = timedata[jx]
+            #dt1 = datetime.combine(datetime.today(), timenow)
+            #dt2 = datetime.combine(datetime.today(), timetest)
+            #timedeltamin = dt2 - dt1
+            #timedeltamin = timedeltamin.total_seconds() / 60
+            #print(f'Current time is: {timenow} back time range is: {timetest} and timedelta is: {timedeltamin}')
+            #if timedeltamin >= 15:
+            info_id += 1
+            ret_data.append({'id': info_id, 'name': odat})
 
         print(ret_data)
 
