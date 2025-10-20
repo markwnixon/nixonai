@@ -269,6 +269,14 @@ def Unpulled_Containers_task(err, holdvec, task_iter):
     impco,impcon,impbol,expco,expbk = [], [], [], [], []
     bol = request.values.get('BOL')
 
+    desired_timezone = pytz.timezone('America/New_York')
+    # Get the current UTC time and localize it to your desired timezone
+    now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+    now_local = now_utc.astimezone(desired_timezone)
+    # Get today's date in your desired local timezone
+    today = now_local.date()
+    timeofday = now_local.time()
+
     stopdate = today-datetime.timedelta(days=20)
     comps = []
     tjobs = Orders.query.filter(Orders.Date > stopdate).all()
@@ -312,6 +320,15 @@ def Unpulled_Containers_task(err, holdvec, task_iter):
     return completed, err, holdvec
 
 def Exports_Pulled_task(err, holdvec, task_iter):
+    desired_timezone = pytz.timezone('America/New_York')
+    # Get the current UTC time and localize it to your desired timezone
+    now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+    now_local = now_utc.astimezone(desired_timezone)
+    # Get today's date in your desired local timezone
+    today = now_local.date()
+    timeofday = now_local.time()
+    #print(f"Today's date in local timezone: {today} at {timeofday}")
+
     holdvec = ['']*30
     #print(f'Running Exports Pulled task')
     expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
@@ -379,6 +396,15 @@ def Exports_Returned_task(err, holdvec, task_iter):
     holdvec = ['']*30
     #print(f'Running Exports Returned task')
     expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
+
+    desired_timezone = pytz.timezone('America/New_York')
+    # Get the current UTC time and localize it to your desired timezone
+    now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+    now_local = now_utc.astimezone(desired_timezone)
+    # Get today's date in your desired local timezone
+    today = now_local.date()
+    timeofday = now_local.time()
+
 
     ts = request.values.get('timeslot')
     if ts is None: ts=0
@@ -450,6 +476,14 @@ def Exports_Bk_Diff_task(err, holdvec, task_iter):
     holdvec = ['']*30
     #print(f'Running Exports With Bk Diff task')
     expco, expcon, expbk, expdt, expdrv = [], [], [], [], []
+
+    desired_timezone = pytz.timezone('America/New_York')
+    # Get the current UTC time and localize it to your desired timezone
+    now_utc = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+    now_local = now_utc.astimezone(desired_timezone)
+    # Get today's date in your desired local timezone
+    today = now_local.date()
+    timeofday = now_local.time()
 
     ts = request.values.get('timeslot')
     if ts is None: ts=7
