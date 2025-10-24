@@ -44,6 +44,7 @@ def container_check(num):
 def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
     #print(' ')
     #*#print(f'Checking input for input:{input} text:{text} haultype:{haultype}, type:{type} task:{task} required:{req} task_iter: {task_iter}')
+    today = datetime.datetime.today()
     status = 0
     message = ''
     if type == 'disabled':
