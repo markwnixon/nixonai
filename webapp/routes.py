@@ -103,6 +103,7 @@ def pdf_upload():
     odat = Orders.query.filter(Orders.Container == container_number).order_by(Orders.id.desc()).first()
     if odat is not None:
         pcache = odat.Pcache
+        if not hasinput(pcache): pcache = 1
         jo = odat.Jo
         filename = f'Proof_{jo}_c{str(pcache)}.pdf'
         outputpath = addpath(tpath('Orders-Proof', filename))
