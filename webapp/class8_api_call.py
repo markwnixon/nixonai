@@ -42,7 +42,7 @@ def api_call(scac, now, data_needed, arglist):
         today = now.date()
         lbdate = today - timedelta(days=lb_days)
         print(f'Looking back to this date: {lbdate}')
-        odataout = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat == 1)).order_by(Orders.Date).all()
+        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat == 1)).order_by(Orders.Date).all()
         ret_data = []
         containers = []
         for odat in odata:
