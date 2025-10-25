@@ -1,4 +1,4 @@
-from flask import render_template, flash, redirect, url_for, session, logging, request, jsonify
+from flask import render_template, flash, redirect, url_for, session, logging, request, jsonify, send_file
 from flask import Blueprint
 
 from webapp.extensions import db, bcrypt, jwt
@@ -122,7 +122,34 @@ def pdf_upload():
 
 
 
+@main.route("/get_pdf_for_container", methods=["GET"])
+@jwt_required()
+def pdf_download():
+    container_number = request.form.get("container_number")
+    #file = request.files.get("file")
+    print(f'Getting pdf files for container {container_number}')
 
+    if not container_number:
+        return jsonify({"error": "Missing container number or file"}), 400
+
+
+    odat = Orders.query.filter(Orders.Container == container_number).order_by(Orders.id.desc()).first()
+    if odat is not None:
+        fileM = odat.Manifest
+        if not fileM:
+            print('There is no Manifest')
+            filename = odat.Source
+            outputpath = addpath(tpath('Orders-Source', filename))
+        else:
+            print('Using the Manifest')
+            filename = odat.Manifest
+            outputpath = addpath(tpath('Orders-Manifest', filename))
+
+        return send_file(outputpath, mimetype="application/pdf")
+
+
+    else:
+        return jsonify({"error": "Container not found in database"}), 400
 
 
 
