@@ -123,9 +123,9 @@ def pdf_upload():
 
 
 @main.route("/get_pdf_for_container", methods=["GET"])
-@jwt_required()
+#@jwt_required()
 def pdf_download():
-    container_number = request.form.get("container_number")
+    container_number = request.args.get("container_number")
     #file = request.files.get("file")
     print(f'Getting pdf files for container {container_number}')
 
