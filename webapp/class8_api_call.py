@@ -55,14 +55,14 @@ def api_call(scac, now, data_needed, arglist):
             if hasinput(container):
                 if container not in containers:
                     containers.append(container)
-                    ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'Unpulled'})
+                    ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'UnP'})
         odata2 = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat > 1)).order_by(Orders.Date).all()
         for odat in odata2:
             container = odat.Container
             if hasinput(container):
                 if container not in containers:
                     containers.append(container)
-                    ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'Returned'})
+                    ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'Ret'})
 
         print(ret_data)
         return ret_data
