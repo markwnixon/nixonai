@@ -38,15 +38,31 @@ def api_call(scac, now, data_needed, arglist):
 
     elif data_needed == 'out_containers':
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
-        lb_days = 60
+        lb_days = 15
         today = now.date()
         lbdate = today - timedelta(days=lb_days)
         print(f'Looking back to this date: {lbdate}')
-        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat == 1)).order_by(Orders.Date).all()
+        odataout = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat == 1)).order_by(Orders.Date).all()
         ret_data = []
+        containers = []
         for odat in odata:
             container = odat.Container
-            ret_data.append({'id': odat.id, 'containerNumber': container})
+            containers.append(container)
+            ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'Out'})
+        odata0 = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 1)).order_by(Orders.Date).all()
+        for odat in odata0:
+            container = odat.Container
+            if hasinput(container):
+                if container not in containers:
+                    containers.append(container)
+                    ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'Unpulled'})
+        odata2 = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat > 1)).order_by(Orders.Date).all()
+        for odat in odata2:
+            container = odat.Container
+            if hasinput(container):
+                if container not in containers:
+                    containers.append(container)
+                    ret_data.append({'id': odat.id, 'containerNumber': container, 'status': 'Returned'})
 
         print(ret_data)
         return ret_data
