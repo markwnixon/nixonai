@@ -276,7 +276,7 @@ def handle_data():
         db.session.add(input)
         db.session.commit()
 
-    if request.method == 'PUT':
+    elif request.method == 'PUT':
         print('This is a put')
         data_needed = request.args.get('data_needed')
         print(f'data_needed: {data_needed}')
@@ -311,7 +311,7 @@ def handle_data():
             return jsonify({'message': 'Data received', 'data':data}), 200
 
 
-    if request.method == 'GET':
+    elif request.method == 'GET':
         data_needed = request.args.get('data_needed')
         #data_needed = 'api_test_two'
         print(f'This is a get request for data_needed:{data_needed}:')
@@ -319,62 +319,8 @@ def handle_data():
         arglist = request.args.get('arglist')
         print(f'Was able to get the payload data for arglist:{arglist}:')
 
-        if data_needed == 'test0':
-            return jsonify({'container':'CAAU8649700'})
-
-        elif data_needed == 'api_test_two':
-            return jsonify([{'id':1,'container':'CAAU8649700','name':'one'},
-                            {'id':2,'container':'XXXX8649700','name':'two'}])
-
-        elif data_needed == 'api_test_three':
-            return jsonify([{'id':1,'container':'CAAU8649700','shipper':'one'},
-                            {'id':2,'container':'XXXX8649700','shipper':'two'}])
-
-        # api_test_five works with all below, test1 to test 4
-        elif data_needed == 'test1':
-            if request.method == 'GET':
-                return jsonify([{'id': 1, 'container': 'CAAU8649700', 'shipper': 'one', 'status':'Still Out'},
-                                {'id': 2, 'container': 'XXXX8649700', 'shipper': 'two', 'status':'Returned'}])
-
-        elif data_needed == 'test2':
-            return jsonify([{'id':1,'day':'Monday','item':'Empty Pickup', 'date':'2025-03-04'},
-                            {'id':2,'day':'Tuesday','item':'Load In', 'date':'2025-03-04'},
-                            {'id':3, 'day':'Wednesday','item':'Load In', 'date':'2025-03-04'}])
-
-        elif data_needed == 'test3':
-            if request.method == 'GET':
-                return jsonify([{'id':1,'day':'Thursday','amount':'10,023.43'},
-                                {'id':2,'day':'Friday','amount':'9,230.44'}])
-
-
-        elif data_needed == 'test4':
-            return jsonify([{'id':1,'driver':'John Doe','cdl':'CDX-001'},
-                            {'id':2,'driver':'Sam Spade','cdl':'CRJ-0033'}])
-
-        # Getting these tests compatible with api_test_six
-
-        elif data_needed == 'active_containersxx':
-            return jsonify([{'id': 1, 'container': 'CAAU8649700', 'shipper': 'one', 'status': 'Still Out'},
-                            {'id': 2, 'container': 'XXXX8649700', 'shipper': 'two', 'status': 'Returned'}])
-
-        elif data_needed == 'test2':
-            return jsonify([{'id': 1, 'day': 'Monday', 'item': 'Empty Pickup', 'date': '2025-03-04'},
-                            {'id': 2, 'day': 'Tuesday', 'item': 'Load In', 'date': '2025-03-04'},
-                            {'id': 3, 'day': 'Wednesday', 'item': 'Load In', 'date': '2025-03-04'}])
-
-        elif data_needed == 'test3':
-            if request.method == 'GET':
-                return jsonify([{'id': 1, 'day': 'Thursday', 'amount': '10,023.43'},
-                                {'id': 2, 'day': 'Friday', 'amount': '9,230.44'}])
-
-
-        elif data_needed == 'test4':
-            return jsonify([{'id': 1, 'driver': 'John Doe', 'cdl': 'CDX-001'},
-                            {'id': 2, 'driver': 'Sam Spade', 'cdl': 'CRJ-0033'}])
-
-        else:
-            data_return = api_call(scac, now, data_needed, arglist)
-            return jsonify(data_return)
+        data_return = api_call(scac, now, data_needed, arglist)
+        return jsonify(data_return)
 
     else:
         return []
