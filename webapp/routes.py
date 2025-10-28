@@ -34,6 +34,7 @@ from webapp.class8_utils import *
 from webapp.class8_api_call import api_call
 import ast
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, create_refresh_token, JWTManager
+import paramiko
 
 today = datetime.datetime.today()
 year = str(today.year)
@@ -120,7 +121,26 @@ def pdf_upload():
     else:
         return jsonify({"error": "Container not found in database"}), 400
 
+@main.route("/getpinsnow", methods=["GET", "POST"])
+def getpinsnow():
+    import paramiko
 
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect('172.233.199.180', username='mark', key_filename='/home/mark/.ssh/id_rsa')
+
+    stdin, stdout, stderr = ssh.exec_command('fgate.sh oslm &')  # & makes it non-blocking
+    exit_status = stdout.channel.recv_exit_status()  # Waits for command to finish
+    output = stdout.read().decode()
+    errors = stderr.read().decode()
+    ssh.close()
+
+    if exit_status == 0:
+        print("✅ Success:", output)
+        return {"status": "success", "output": output}
+    else:
+        print("❌ Error:", errors)
+        return {"status": "error", "error": errors}
 
 @main.route("/get_pdf_for_container", methods=["GET"])
 #@jwt_required()
@@ -749,6 +769,10 @@ def Class8Main(genre):
     if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)
 
     rightsize = 12 - leftsize
+    runpins = request.values.get('RunPins')
+    if runpins is not None:
+        return redirect(url_for('main.getpinsnow'))
+
     return render_template('Class8.html',cmpdata=cmpdata, scac=scac,  genre_data = genre_data, table_data=table_data, err=err, checked_data = checked_data,
                            leftsize=leftsize, rightsize=rightsize, tabletitle=tabletitle, table_filters = table_filters,task_boxes = task_boxes, tfilters=tfilters, tboxes=tboxes, dt1 = jscripts,
                            taskon=taskon, task_focus=task_focus, task_iter=task_iter, tasktype=tasktype, holdvec=holdvec, keydata = keydata, entrydata = entrydata, username=username, genre=genre, viewport=viewport, tablesetup=tablesetup)

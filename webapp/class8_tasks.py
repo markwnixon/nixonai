@@ -1693,6 +1693,8 @@ def Table_maker(genre):
     resetmod = request.values.get('ResetMod')
 
 
+
+
     if request.method == 'POST' and resethit is None and resetmod is None:
 
         # See if a task is active and ongoing
@@ -2127,6 +2129,7 @@ def Table_maker(genre):
         #print(f'Holdvec[100] = {holdvec[100]}')
 
     #print(checked_data)
+
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
