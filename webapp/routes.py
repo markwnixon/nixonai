@@ -127,7 +127,8 @@ def getpinsnow():
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect('172.233.199.180', username='mark', key_filename='/home/mark/.ssh/id_rsa')
+    #ssh.connect('172.233.199.180', username='mark', key_filename='/home/mark/.ssh/id_rsa')
+    ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
 
     stdin, stdout, stderr = ssh.exec_command('fgate.sh oslm &')  # & makes it non-blocking
     exit_status = stdout.channel.recv_exit_status()  # Waits for command to finish
