@@ -1668,6 +1668,207 @@ def update_calendar_form(pdio, pdip, pdeo, pdep):
 
     return pdio, pdip, pdeo, pdep, reupdate
 
+def run_driver_upload(checked_data, upload):
+    cancel = request.values.get('cancel')
+    viewport = ['0'] * 6
+    holdvec = [''] * 150
+    holdvec[140] = upload
+    entrydata = []
+    sid = None
+    task_iter = 1
+    #table = tablesetup['table']
+    #print(f'checked data is: {checked_data}')
+    for ck in checked_data:
+        table = ck[0]
+        nc = ck[1]
+        if table == 'Drivers' and nc == 1:
+            sid = ck[2][0]
+            print(table, nc, sid)
+    if sid is None:
+        err = ['No Driver Table Data Selected']
+        holdvec[140] = ''
+        return holdvec, entrydata, err, viewport, True
+
+
+
+    if cancel is not None:
+        completed=True
+        err = ['Upload has been cancelled']
+    else:
+        completed = False
+        err = [f'Running Upload task for {upload}']
+
+
+        if task_iter == 1:
+            viewport[0] = 'upload_doc_right'
+        else:
+            viewport[0] = request.values.get('viewport0')
+            viewport[2] = request.values.get('viewport2')
+
+        dat = Drivers.query.get(sid)
+
+        try:
+            getattr(dat, f'{upload}')
+        except:
+            err.append(f'{thistable} has no attribute {task_focus}')
+            completed = True
+
+        if not completed:
+
+            viewport[3] = str(sid)
+            viewport[4] = f'Trucking Drivers Item'
+            uploadnow = request.values.get('uploadnow')
+
+            if uploadnow is not None:
+                viewport[0] = 'show_doc_right'
+                file = request.files['docupload']
+                if file.filename == '':
+                    err.append('No file selected for uploading')
+
+                driver = dat.Name
+                name, exto = os.path.splitext(file.filename)
+                ext = exto.lower()
+                if upload == 'CDLpdf':
+                    sname = 'Ccache'
+                elif upload == 'MEDpdf':
+                    sname = 'Mcache'
+                elif upload == 'TWICpdf':
+                    sname = 'Tcache'
+
+                sn = getattr(dat, sname)
+                try:
+                    sn = int(sn)
+                    bn = sn+1
+                except:
+                    sn = 0
+                    bn = 0
+
+                if upload == 'CDLpdf':
+                    filename1 = f'{driver}_CDL_c{str(bn)}{ext}'
+                    output1 = addpath(tpath(f'Drivers-CDL', filename1))
+                elif upload == 'MEDpdf':
+                    filename1 = f'{driver}_MED_c{str(bn)}{ext}'
+                    output1 = addpath(tpath(f'Drivers-MED', filename1))
+                elif upload == 'TWICpdf':
+                    filename1 = f'{driver}_TWIC_c{str(bn)}{ext}'
+                    output1 = addpath(tpath(f'Drivers-TWIC', filename1))
+
+                #print(f'output1 = {output1}')
+
+                file.save(output1)
+                viewport[2] = '/'+tpath(f'Drivers-Compliance', filename1)
+
+                setattr(dat, upload, filename1)
+                setattr(dat, sname, bn)
+                db.session.commit()
+                err.append(f'Viewing {filename1}')
+                err.append('Hit Return to End Viewing and Return to Table View')
+                #returnhit = request.values.get('Return')
+                #if returnhit is not None: completed = True
+                completed = True
+                #viewport = ['0'] * 6
+                holdvec[140] = ''
+
+    return holdvec, entrydata, err, viewport, completed
+
+def run_truck_upload(checked_data, upload):
+    cancel = request.values.get('cancel')
+    viewport = ['0'] * 6
+    holdvec = [''] * 150
+    holdvec[141] = upload
+    entrydata = []
+    sid = None
+    task_iter = 1
+    #table = tablesetup['table']
+    print(f'checked data is: {checked_data}')
+    for ck in checked_data:
+        table = ck[0]
+        nc = ck[1]
+        if table == 'Trucks' and nc == 1:
+            sid = ck[2][0]
+            print(table, nc, sid)
+    if sid is None:
+        err = ['No Truck Table Data Selected']
+        holdvec[141] = ''
+        return holdvec, entrydata, err, viewport, True
+
+
+
+    if cancel is not None:
+        completed=True
+        err = ['Upload has been cancelled']
+    else:
+        completed = False
+        err = [f'Running Upload task for {upload}']
+
+
+        if task_iter == 1:
+            viewport[0] = 'upload_doc_right'
+        else:
+            viewport[0] = request.values.get('viewport0')
+            viewport[2] = request.values.get('viewport2')
+
+        dat = Vehicles.query.get(sid)
+
+        try:
+            getattr(dat, f'{upload}')
+        except:
+            err.append(f'Vehicles Table has no attribute {upload}')
+            completed = True
+
+        if not completed:
+
+            viewport[3] = str(sid)
+            viewport[4] = f'Trucking Drivers Item'
+            uploadnow = request.values.get('uploadnow')
+
+            if uploadnow is not None:
+                viewport[0] = 'show_doc_right'
+                file = request.files['docupload']
+                if file.filename == '':
+                    err.append('No file selected for uploading')
+
+                unit = f'Unit_{dat.Unit}'
+                name, exto = os.path.splitext(file.filename)
+                ext = exto.lower()
+                if upload == 'Regpdf':
+                    sname = 'Rcache'
+                elif upload == 'Titpdf':
+                    sname = 'Tcache'
+
+                sn = getattr(dat, sname)
+                try:
+                    sn = int(sn)
+                    bn = sn+1
+                except:
+                    sn = 0
+                    bn = 0
+
+                if upload == 'Regpdf':
+                    filename1 = f'{unit}_Reg_c{str(bn)}{ext}'
+                    output1 = addpath(tpath(f'Trucks-Reg', filename1))
+                elif upload == 'Titpdf':
+                    filename1 = f'{unit}_Title_c{str(bn)}{ext}'
+                    output1 = addpath(tpath(f'Trucks-Tit', filename1))
+                #print(f'output1 = {output1}')
+
+                file.save(output1)
+                viewport[2] = '/'+tpath(f'Drivers-Compliance', filename1)
+
+                setattr(dat, upload, filename1)
+                setattr(dat, sname, bn)
+                db.session.commit()
+                err.append(f'Viewing {filename1}')
+                err.append('Hit Return to End Viewing and Return to Table View')
+                #returnhit = request.values.get('Return')
+                #if returnhit is not None: completed = True
+                completed = True
+                #viewport = ['0'] * 6
+                holdvec[141] = ''
+
+    return holdvec, entrydata, err, viewport, completed
+
+
 
 def Table_maker(genre):
     username = session['username'].capitalize()
@@ -1688,6 +1889,8 @@ def Table_maker(genre):
     viewport = ['tables'] + ['0']*5
     tfilters, tboxes = {}, {}
     returnhit = None
+    driver_upload = None
+    truck_upload = None
     resethit = request.values.get('Reset')
     invoicehit = request.values.get('InvoiceSet')
     resetmod = request.values.get('ResetMod')
@@ -1702,6 +1905,12 @@ def Table_maker(genre):
         taskon = nononestr(request.values.get('taskon'))
         task_focus = nononestr(request.values.get('task_focus'))
         task_iter = nonone(request.values.get('task_iter'))
+
+        driver_upload = request.values.get('driveruploads')
+        truck_upload = request.values.get('truckuploads')
+        print(f'driver upload at top is {driver_upload}')
+        print(f'taskon at top is {taskon}')
+
         if genre == 'Planning':
             for filter in table_filters:
                 for key, value in filter.items():
@@ -1936,10 +2145,43 @@ def Table_maker(genre):
         else:
             #print(f'On task_iter {task_iter} keydata is {keydata}')
             task_iter = int(task_iter) + 1
+
+
+
+
             # Need to pick up some of the keydata after table build
             if checked_data != [] and checked_data is not None:
                 if checked_data[0][0] == 'Orders':
                     keydata = get_Orders_keydata(keydata, checked_data)
+
+    elif driver_upload is not None:
+        print(f'driver upload is: {driver_upload}')
+        tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
+        holdvec, entrydata, err, viewport, completed = run_driver_upload(checked_data, driver_upload)
+        taskon = None
+        task_iter = 1
+        tasktype = ''
+        #holdvec = [''] * 150
+        #print(f'labpassvec is {labpassvec}')
+        #entrydata = []
+        #err = ['All is well']
+        tablesetup = None
+        print(viewport)
+
+    elif truck_upload is not None:
+        print(f'Truck upload is: {truck_upload}')
+        tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
+        holdvec, entrydata, err, viewport, completed = run_truck_upload(checked_data, truck_upload)
+        taskon = None
+        task_iter = 1
+        tasktype = ''
+        #holdvec = [''] * 150
+        #print(f'labpassvec is {labpassvec}')
+        #entrydata = []
+        #err = ['All is well']
+        tablesetup = None
+        print(viewport)
+
 
     else:
         taskon = None
@@ -2395,7 +2637,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
@@ -3236,12 +3478,14 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
 
                     db.session.commit()
 
-                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'DocsNotSource' or task_focus == 'xProof' or task_focus == 'yProof' or task_focus == 'xRateCon'):
+                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'DocsNotSource' or task_focus == 'xProof' or task_focus == 'yProof' or task_focus == 'xRateCon' or task_focus == 'xDrvProof' or task_focus == 'xDrvSeal'):
                     rstring = f'{table}.query.get({sid})'
                     odat = eval(rstring)
                     source = addpath(tpath(f'{thistable}-Source',odat.Source))
                     proof = addpath(tpath(f'{thistable}-Proof',odat.Proof))
                     proof2 = addpath(tpath(f'{thistable}-Proof', odat.Proof2))
+                    drvproof = addpath(tpath(f'{thistable}-Proof', odat.DrvProof))
+                    drvseal = addpath(tpath(f'{thistable}-Proof', odat.DrvSeal))
                     ratecon = addpath(tpath(f'{thistable}-RateCon', odat.RateCon))
                     manifest = addpath(tpath(f'{thistable}-Manifest',odat.Manifest))
                     gate = addpath(tpath(f'{thistable}-Gate',odat.Gate))
@@ -3272,6 +3516,24 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                             err.append(f'File {odat.RateCon} not found')
                         #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
                         odat.RateCon = None
+                        db.session.commit()
+
+                    elif task_focus == 'xDrvProof':
+                        try:
+                            os.remove(drvproof)
+                        except:
+                            err.append(f'File {odat.DrvProof} not found')
+                        #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
+                        odat.DrvProof = None
+                        db.session.commit()
+
+                    elif task_focus == 'xDrvSeal':
+                        try:
+                            os.remove(drvseal)
+                        except:
+                            err.append(f'File {odat.DrvSeal} not found')
+                        #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
+                        odat.DrvSeal = None
                         db.session.commit()
 
                     else:
@@ -3311,6 +3573,16 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         except:
                             err.append(f'File {odat.Package} not found')
 
+                        try:
+                            os.remove(drvproof)
+                        except:
+                            err.append(f'File {odat.DrvProof} not found')
+
+                        try:
+                            os.remove(drvseal)
+                        except:
+                            err.append(f'File {odat.DrvSeal} not found')
+
                         if task_focus == 'Docs':  odat.Source = None
                         odat.Proof = None
                         odat.Manifest = None
@@ -3319,6 +3591,8 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         odat.Invoice = None
                         odat.Package = None
                         odat.Proof2 = None
+                        odat.DrvProof = None
+                        odat.DrvSeal = None
                         db.session.commit()
 
 

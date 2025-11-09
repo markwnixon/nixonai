@@ -26,7 +26,28 @@
 
 
                             <div class="row">
-                                  <div class="col-sm-12" align="center" style="font-weight:bold"> {{ thistable }} </div>
+                                  <div class="col-sm-12" align="center" style="font-weight:bold"> {{ thistable }}
+                                      {% if thistable == 'Drivers' %}
+                                          {% set sval = holdvec[140] %}
+                                          &nbsp
+                                          <select class="mdb-select md-form" name="driveruploads" onchange="this.form.submit()">
+                                                <option value="" disabled selected>Adding</option>
+                                                <option {% if sval == 'CDLpdf'%} selected {% endif %} value='CDLpdf'>Upload CDL</option>
+                                                <option {% if sval == 'MEDpdf'%} selected {% endif %} value='MEDpdf'>Upload MED</option>
+                                                <option {% if sval == 'TWICpdf'%} selected {% endif %} value='TWICpdf'>Upload TWIC</option>
+                                            </select>
+                                      {% endif %}
+                                      {% if thistable == 'Trucks' %}
+                                          {% set sval = holdvec[141] %}
+                                          &nbsp
+                                          <select class="mdb-select md-form" name="truckuploads" onchange="this.form.submit()">
+                                                <option value="" disabled selected>Adding</option>
+                                                <option {% if sval == 'Regpdf'%} selected {% endif %} value='Regpdf'>Upload Registration</option>
+                                                <option {% if sval == 'Titpdf'%} selected {% endif %} value='Titpdf'>Upload Title</option>
+                                            </select>
+                                      {% endif %}
+
+                                  </div>
                             </div>
                             {% set buttonlabels = holdvec[99] %}
                             {% set thisbutton = buttonlabels[most_outer_loop.index-1] %}

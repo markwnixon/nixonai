@@ -75,7 +75,7 @@
              </div>
             </div>
             <div class="row">
-                    {% if taskon %}
+                    {% if taskon or viewport[4] == 'Trucking Drivers Item' %}
                         <div class="col-sm-6" align = "center">
                              {% set taskfile = taskon | replace(" ","_") %}
                              {% include 'includes/_controlpanelheader.html' %}
@@ -113,10 +113,15 @@
             <div class="col-sm-{{rightsize}}" align = "left">
               <div class="row">
                 <div class="col-sm-12" align= "center">
-                    {% if taskon %}
-                        {% set taskfile = taskon | replace(" ","_") %}
-                        {% include 'includes/_controlpanelheader.html' %}
-                        {% include 'c8_task_'+taskfile+'.html' %}
+                    {% if taskon or viewport[4] == 'Trucking Drivers Item' %}
+                        {% if taskon %}
+                            {% set taskfile = taskon | replace(" ","_") %}
+                            {% include 'includes/_controlpanelheader.html' %}
+                            {% include 'c8_task_'+taskfile+'.html' %}
+                        {%  else %}
+                            {% include 'includes/_controlpanelheader.html' %}
+                            {% include 'c8_task_Upload.html' %}
+                        {% endif %}
                     {% else %}
                         {% include 'includes/_controlpanelheader.html' %}
                         {% if showit == 'on' %}
