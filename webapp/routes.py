@@ -98,7 +98,7 @@ def pdf_upload():
     container_number = request.form.get("container_number")
     file = request.files.get("file")
 
-    print(f'The user uploading this file is: {username} for container {container_number}')
+    print(f'The user uploading this file is: {username} for container {container_number} and file is {file}')
 
 
     if not container_number or not file:
