@@ -94,8 +94,12 @@ def logout():
 @main.route("/upload_pdf", methods=["POST"])
 #@jwt_required()
 def pdf_upload():
+    username = request.form.get("username")
     container_number = request.form.get("container_number")
     file = request.files.get("file")
+
+    print(f'The user uploading this file is: {username} for container {container_number}')
+
 
     if not container_number or not file:
         return jsonify({"error": "Missing container number or file"}), 400
