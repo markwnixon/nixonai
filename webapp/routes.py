@@ -104,7 +104,7 @@ def pdf_upload():
     if not username or not container_number or not file:
         return jsonify({"error": "Missing username, container number, or file"}), 400
 
-    udat = Users.query.filter(Users.username == username).first()
+    udat = users.query.filter(users.username == username).first()
     if udat is not None:
         utype = udat.authority
     else:
@@ -118,7 +118,7 @@ def pdf_upload():
         outputpath = addpath(tpath('Orders-DrvProof', filename))
         odat.D1cache = pcache + 1
         odat.DrvProof = filename
-        if utype == 'Driver':
+        if utype == 'driver':
             odat.Driver = udat.name
         db.session.commit()
         file.save(outputpath)

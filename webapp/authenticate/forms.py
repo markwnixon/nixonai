@@ -10,7 +10,7 @@ class RegistrationForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=4, max=10)])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), Length(min=4, max=10), EqualTo('password')])
-    authority = SelectField(label='Authority', choices = [('superuser','superuser'),('admin','admin'),('user','user'),('temp','temp')], default='user')
+    authority = SelectField(label='Authority', choices = [('superuser','superuser'),('admin','admin'),('user','user'),('driver', 'driver'),('temp','temp')], default='user')
     submit = SubmitField('Create New User')
 
     def validate_authority(self, authority):
