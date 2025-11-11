@@ -1725,7 +1725,7 @@ def run_driver_upload(checked_data, upload):
                 if file.filename == '':
                     err.append('No file selected for uploading')
 
-                driver = dat.Name
+
                 name, exto = os.path.splitext(file.filename)
                 ext = exto.lower()
                 if upload == 'CDLpdf':
@@ -1743,19 +1743,31 @@ def run_driver_upload(checked_data, upload):
                     sn = 0
                     bn = 0
 
+                driver = dat.Name
+                driver = driver.replace(" ","")
+
                 if upload == 'CDLpdf':
                     filename1 = f'{driver}_CDL_c{str(bn)}{ext}'
+                    filename2 = f'{driver}_CDL{ext}'
                     output1 = addpath(tpath(f'Drivers-CDL', filename1))
+                    output2 = addpath(tpath(f'Drivers-CDL', filename2))
                 elif upload == 'MEDpdf':
                     filename1 = f'{driver}_MED_c{str(bn)}{ext}'
+                    filename2 = f'{driver}_MED{ext}'
                     output1 = addpath(tpath(f'Drivers-MED', filename1))
+                    output2 = addpath(tpath(f'Drivers-CDL', filename2))
                 elif upload == 'TWICpdf':
                     filename1 = f'{driver}_TWIC_c{str(bn)}{ext}'
+                    filename2 = f'{driver}_TWIC{ext}'
                     output1 = addpath(tpath(f'Drivers-TWIC', filename1))
+                    output2 = addpath(tpath(f'Drivers-CDL', filename2))
 
                 #print(f'output1 = {output1}')
+                # filename1 is for browser display which must maintain new file names to overcome caching
+                # filename2 is for the api display which need to avoid the caching suffix
 
                 file.save(output1)
+                file.save(output2)
                 viewport[2] = '/'+tpath(f'Drivers-Compliance', filename1)
 
                 setattr(dat, upload, filename1)
@@ -1908,8 +1920,8 @@ def Table_maker(genre):
 
         driver_upload = request.values.get('driveruploads')
         truck_upload = request.values.get('truckuploads')
-        print(f'driver upload at top is {driver_upload}')
-        print(f'taskon at top is {taskon}')
+        #print(f'driver upload at top is {driver_upload}')
+        #print(f'taskon at top is {taskon}')
 
         if genre == 'Planning':
             for filter in table_filters:
