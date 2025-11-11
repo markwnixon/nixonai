@@ -101,19 +101,19 @@ def pdf_upload():
     print(f'The user uploading this file is: {username} for container {container_number} and file is {file}')
 
 
-    if not container_number or not file:
-        return jsonify({"error": "Missing container number or file"}), 400
+    if not username or not container_number or not file:
+        return jsonify({"error": "Missing username, container number, or file"}), 400
 
 
     odat = Orders.query.filter(Orders.Container == container_number).order_by(Orders.id.desc()).first()
     if odat is not None:
-        pcache = odat.Pcache
+        pcache = odat.D1cache
         if not hasinput(pcache): pcache = 1
         jo = odat.Jo
-        filename = f'Proof_{jo}_c{str(pcache)}.pdf'
-        outputpath = addpath(tpath('Orders-Proof', filename))
-        odat.Pcache = pcache + 1
-        odat.Proof = filename
+        filename = f'Proof_{jo}_{container_number}_c{str(pcache)}.pdf'
+        outputpath = addpath(tpath('Orders-DrvProof', filename))
+        odat.D1cache = pcache + 1
+        odat.DrvProof = filename
         db.session.commit()
         file.save(outputpath)
         print(f'Saving file: {file} as {outputpath}')
