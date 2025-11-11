@@ -15,8 +15,8 @@ class RegistrationForm(FlaskForm):
 
     def validate_authority(self, authority):
         print('authority check is:',authority.data)
-        if authority.data not in ['superuser', 'admin', 'user', 'temp']:
-            raise ValidationError('Must be superuser, admin, user, or temp')
+        if authority.data not in ['superuser', 'admin', 'user', 'temp', 'driver']:
+            raise ValidationError('Must be superuser, admin, user, driver, or temp')
 
     def validate_username(self, username):
         thisuser = users.query.filter_by(username=username.data).first()
