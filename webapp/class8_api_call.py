@@ -191,6 +191,8 @@ def api_call(scac, now, data_needed, arglist):
         for odat in odata:
             hstat = odat.Hstat
             container = odat.Container
+            release = odat.Booking
+
             if hstat >= 2 and odat.Date2 < active_date:
                 print(f'Container {container} returned before the active date of {active_date}')
             else:
@@ -270,20 +272,20 @@ def api_call(scac, now, data_needed, arglist):
                     elif gout != deliv and deliv == gin:
                         if droppick:
                             if exportj:
-                                cal_message.append(f'Prepull empty container today, drop {deliv}')
+                                cal_message.append(f'Prepull empty container, drop {deliv}')
                                 cal_message.append(f'Pick loaded container and return')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Prepull then deliver and return'
                             if importj:
-                                cal_message.append(f'Prepull loaded container today, drop {deliv}')
+                                cal_message.append(f'Prepull loaded container, drop {deliv}')
                                 cal_message.append(f'Pick empty container and return')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Prepull then deliver and return'
                         else:
                             if exportj:
-                                cal_message.append(f'Prepull empty container today, deliver {deliv}')
+                                cal_message.append(f'Prepull empty container, deliver {deliv}')
                                 cal_message.append(f'Deliver container and return load')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
