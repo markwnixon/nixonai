@@ -10,6 +10,18 @@ from datetime import datetime, time, timedelta, date
 import ast
 from webapp.revenues import intdol
 
+def repair_dates(odata):
+    for odat in odata:
+        gout = odat.Date
+        gin = odat.Date2
+        deliv = odat.Date3
+        if isinstance(gout, date) and isinstance(gin, date) and isinstance(deliv, date):
+            if gout > deliv: odat.Date = deliv
+            if gin < deliv: odat.Date2 = deliv
+        db.session.commit()
+    return
+
+
 def api_call(scac, now, data_needed, arglist):
     print(f'Inside api_call with data_needed={data_needed}, arglist={arglist}')
     if data_needed == 'shipper_containers_out':
@@ -147,6 +159,8 @@ def api_call(scac, now, data_needed, arglist):
         fd = '1900-01-01'
         print(f'Looking back to this date: {lbdate}')
         odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
+        repair_dates(odata)
+        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
         ret_data = []
         earliest = None
         latest = None
@@ -162,6 +176,7 @@ def api_call(scac, now, data_needed, arglist):
 
         print(f'The min date is {earliest}')
         print(f'The max date is {latest}')
+     # Repair any obviously wrong dates
 
 
         for odat in odata:
@@ -197,7 +212,7 @@ def api_call(scac, now, data_needed, arglist):
                     cal_dates = []
                     if gout == deliv and gout == gin:
                         #Plan is to pull deliv and return same day
-                        if droppick:
+                        if not droppick:
                             if exportj:
                                 cal_message.append('Pull empty, deliver, and return load same day')
                                 cal_dates.append(gout)
@@ -218,26 +233,26 @@ def api_call(scac, now, data_needed, arglist):
                     elif gout == deliv and gout != gin:
                         if droppick:
                             if exportj:
-                                cal_message.append('Pull empty and drop today')
+                                cal_message.append('Pull empty and drop')
                                 cal_message.append(f'Return now-loaded container dropped on {deliv}')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Pull and deliver not return'
                             if importj:
-                                cal_message.append('Pull load and drop today')
+                                cal_message.append('Pull load and drop')
                                 cal_message.append(f'Return now-empty container dropped on {deliv}')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Pull and deliver not return'
                         else:
                             if exportj:
-                                cal_message.append('Pull empty and deliver today')
+                                cal_message.append('Pull empty and deliver')
                                 cal_message.append(f'Return now loaded container still out from {deliv}')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Pull and deliver not return'
                             if importj:
-                                cal_message.append('Pull load and deliver today')
+                                cal_message.append('Pull load and deliver')
                                 cal_message.append(f'Return container still out from {deliv}')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)

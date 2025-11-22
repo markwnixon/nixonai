@@ -1755,19 +1755,32 @@ def run_driver_upload(checked_data, upload):
                     filename1 = f'{driver}_MED_c{str(bn)}{ext}'
                     filename2 = f'{driver}_MED{ext}'
                     output1 = addpath(tpath(f'Drivers-MED', filename1))
-                    output2 = addpath(tpath(f'Drivers-CDL', filename2))
+                    output2 = addpath(tpath(f'Drivers-MED', filename2))
                 elif upload == 'TWICpdf':
                     filename1 = f'{driver}_TWIC_c{str(bn)}{ext}'
                     filename2 = f'{driver}_TWIC{ext}'
                     output1 = addpath(tpath(f'Drivers-TWIC', filename1))
-                    output2 = addpath(tpath(f'Drivers-CDL', filename2))
+                    output2 = addpath(tpath(f'Drivers-TWIC', filename2))
 
-                #print(f'output1 = {output1}')
+
+
+                print(f'output1 = {output1}')
+                print(f'output1 = {output2}')
+
                 # filename1 is for browser display which must maintain new file names to overcome caching
                 # filename2 is for the api display which need to avoid the caching suffix
 
-                file.save(output1)
-                file.save(output2)
+                # Assuming 'file' is your uploaded file object
+                file_data = file.read()  # read the uploaded file content
+
+                # Save first copy
+                with open(output1, 'wb') as f1:
+                    f1.write(file_data)
+
+                # Save second copy
+                with open(output2, 'wb') as f2:
+                    f2.write(file_data)
+
                 viewport[2] = '/'+tpath(f'Drivers-Compliance', filename1)
 
                 setattr(dat, upload, filename1)
