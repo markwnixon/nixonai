@@ -15,10 +15,19 @@ def repair_dates(odata):
         gout = odat.Date
         gin = odat.Date2
         deliv = odat.Date3
+        hstat = odat.Hstat
         if isinstance(gout, date) and isinstance(gin, date) and isinstance(deliv, date):
-            if gout > deliv: odat.Date = deliv
-            if gin < deliv: odat.Date2 = deliv
-        db.session.commit()
+            if hstat == 1:
+                #If it is pulled already the gateout is the gateout, dont change it.  Then delivery cannot occur before
+                if gout > deliv:
+                    odat.Date3 = gout
+            if hstat < 1:
+                #If not pulled yet then assume delivery date correct and gout cannot be greater
+                if gout > deliv:
+                    odat.Date = deliv
+            if gin < deliv:
+                odat.Date2 = deliv
+    db.session.commit()
     return
 
 
@@ -308,7 +317,7 @@ def api_call(scac, now, data_needed, arglist):
                         else:
                             if exportj:
                                 cal_message.append(f'Prepull empty container today, deliver {deliv}')
-                                cal_message.append(f'Deliver container today but return {gout}')
+                                cal_message.append(f'Deliver container today but return {gin}')
                                 cal_message.append(f'Return now-loaded container to port')
                                 cal_dates.append(gout)
                                 cal_dates.append(deliv)
@@ -316,7 +325,7 @@ def api_call(scac, now, data_needed, arglist):
                                 dtype = 'Prepull, then deliver, then return'
                             if importj:
                                 cal_message.append(f'Prepull loaded container today, deliver {deliv}')
-                                cal_message.append(f'Deliver container today but return {gout}')
+                                cal_message.append(f'Deliver container today but return {gin}')
                                 cal_message.append(f'Return now-empty container to port')
                                 cal_dates.append(gout)
                                 cal_dates.append(deliv)
