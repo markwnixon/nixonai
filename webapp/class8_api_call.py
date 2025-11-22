@@ -227,6 +227,7 @@ def api_call(scac, now, data_needed, arglist):
                         delmess = f' {deltime}'
                     else:
                         delmess = ''
+                    print(f'delmess is {delmess}')
                     if gout == deliv and gout == gin:
                         #Plan is to pull deliv and return same day
                         if not droppick:
@@ -292,13 +293,13 @@ def api_call(scac, now, data_needed, arglist):
                         else:
                             if exportj:
                                 cal_message.append(f'Prepull empty container, deliver {deliv}')
-                                cal_message.append(f'Deliver container and return load')
+                                cal_message.append(f'Deliver container{delmess} and return load')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Prepull then deliver and return'
                             if importj:
                                 cal_message.append(f'Prepull loaded container, deliver {deliv}')
-                                cal_message.append(f'Deliver container and return empty')
+                                cal_message.append(f'Deliver container{delmess} and return empty')
                                 cal_dates.append(gout)
                                 cal_dates.append(gin)
                                 dtype = 'Prepull then deliver and return'
@@ -308,7 +309,7 @@ def api_call(scac, now, data_needed, arglist):
                         if droppick:
                             if exportj:
                                 cal_message.append(f'Prepull empty container for drop {deliv}')
-                                cal_message.append(f'Drop empty container for loading')
+                                cal_message.append(f'Drop empty container{delmess} for loading')
                                 cal_message.append(f'Pick now-loaded container for port entry')
                                 cal_dates.append(gout)
                                 cal_dates.append(deliv)
@@ -316,7 +317,7 @@ def api_call(scac, now, data_needed, arglist):
                                 dtype = 'Prepull, then deliver, then return'
                             if importj:
                                 cal_message.append(f'Prepull loaded container for drop {deliv}')
-                                cal_message.append(f'Drop loaded container')
+                                cal_message.append(f'Drop loaded container{delmess}')
                                 cal_message.append(f'Return now-empty container')
                                 cal_dates.append(gout)
                                 cal_dates.append(deliv)
