@@ -255,8 +255,10 @@ def handle_data():
                     inbook = indat.Booking
                 inbook = inbook.split('-', 1)[0]
                 intext = f'Load In: *{inbook}  {incon}* ({ctext} {city})'
+
             if 'Import' in ht:
                 intext = f'Empty In: *{incon}* ({ctext} {city})'
+                inbook = None
 
         else:
             incon = None
@@ -312,6 +314,7 @@ def handle_data():
                 outbook = outdat.Booking
                 outbook = outbook.split('-', 1)[0]
                 outtext = f'Empty Out: *{outbook}* ({ctext} {city})'
+
             if 'Import' in ht:
                 try:
                     rel4 = outdat.Booking[-4:]
