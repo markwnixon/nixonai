@@ -263,7 +263,7 @@ def make_pin_data():
         else:
             incon = None
             inbook = None
-            inchas = None
+            inchas = 'OSLM'
             intext = 'Bare Chassis In'
 
         outdat = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Container == outgate)).first()
@@ -332,14 +332,16 @@ def make_pin_data():
         inpin = '0'
         outpin = '0'
         # Now get the intext and outtext:
+        if driver is not None and unit is not None and inchas is not None:
+            note = f'Will get pin for {driver} in unit {unit} using chassis {inchas}'
 
         input = Pins(Date=today, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
                      OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone,
-                     Timeslot=pintime, Intext=intext, Outtext=outtext, Notes=None, Active=0, Maker='API')
+                     Timeslot=pintime, Intext=intext, Outtext=outtext, Notes=note, Active=0, Maker='API')
         db.session.add(input)
         db.session.commit()
 
-        return jsonify({'message': 'Pin Created'}), 200
+        return jsonify({'message': 'Pin Created', 'intext': intext, 'outtext' : outtext, 'note': note}), 200
 
     else:
         return jsonify({'error': 'No data received'}), 400
