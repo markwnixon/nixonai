@@ -206,7 +206,12 @@ def get_existing_pins():
         pdata = Pins.query.filter(Pins.Maker == maker).all()
         ret_data = []
         for pdat in pdata:
-            ret_data.append({'message': 'Good','pinid': pdat.id, 'intext': pdat.Intext, 'outtext' : pdat.Outtext, 'note': pdat.Notes})
+            havepin = pdat.OutPin
+            if havepin == '0':
+                mess = 'NeedPin'
+            else:
+                mess = 'HavPin'
+            ret_data.append({'message': mess,'pinid': pdat.id, 'intext': pdat.Intext, 'outtext' : pdat.Outtext, 'note': pdat.Notes})
         print(f'return data is: {ret_data}')
         return ret_data
 
