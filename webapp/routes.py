@@ -131,17 +131,20 @@ def pdf_upload():
     else:
         return jsonify({"error": "Container not found in database"}), 400
 
-@main.route("/getpinsnow", methods=["GET", "POST"])
+@main.route("/get_pins_now", methods=["GET", "POST"])
 def getpinsnow():
     import paramiko
 
-    print(f'Getting pins for scac {scac}')
+    pinid = request.args.get('pinid')
+    print(f'pinid to get is: {pinid}')
+
+    print(f'Getting pins for scac {scac} and pinid {pinid}')
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect('172.233.199.180', username='mark', key_filename='/home/mark/.ssh/id_rsa')
     #ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
 
-    stdin, stdout, stderr = ssh.exec_command(f'getpin2.sh {scac} &')  # & makes it non-blocking
+    stdin, stdout, stderr = ssh.exec_command(f'getpin2.sh {scac} {pinid} &')  # & makes it non-blocking
     exit_status = stdout.channel.recv_exit_status()  # Waits for command to finish
     output = stdout.read().decode()
     errors = stderr.read().decode()
