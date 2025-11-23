@@ -192,10 +192,10 @@ def get_existing_pins():
 
     if request.method == 'GET':
         print(f'This is a GET of the existing pins for maker {maker}')
-        data_needed = request.args.get('data_needed')
-        print(f'data_needed: {data_needed}')
-        data = request.get_json()
-        print(f'data: {data}')
+        #data_needed = request.args.get('data_needed')
+        #print(f'data_needed: {data_needed}')
+        #data = request.get_json()
+        #print(f'data: {data}')
 
         lb_days = 60
         today = now.date()
@@ -206,8 +206,8 @@ def get_existing_pins():
         pdata = Pins.query.filter(Pins.Maker == maker).all()
         ret_data = []
         for pdat in pdata:
-            ret_data.append({'message': 'Good','pinid': pdaat.id, 'intext': pdat.Intext, 'outtext' : pdat.Outtext, 'note': pdat.Note})
-        print(ret_data)
+            ret_data.append({'message': 'Good','pinid': pdat.id, 'intext': pdat.Intext, 'outtext' : pdat.Outtext, 'note': pdat.Notes})
+        print(f'return data is: {ret_data}')
         return ret_data
 
 
