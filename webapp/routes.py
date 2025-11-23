@@ -183,7 +183,32 @@ def pdf_download():
     else:
         return jsonify({"error": "Container not found in database"}), 400
 
+@main.route('/get_existing_pins', methods=['GET', 'PUT', 'POST'])
+@jwt_required()
+def get_existing_pins():
+    current_user = get_jwt_identity()
+    print(f'user: {current_user}')
+    maker = f'API-{current_user}'
 
+    if request.method == 'GET':
+        print(f'This is a GET of the existing pins for maker {maker}')
+        data_needed = request.args.get('data_needed')
+        print(f'data_needed: {data_needed}')
+        data = request.get_json()
+        print(f'data: {data}')
+
+        lb_days = 60
+        today = now.date()
+        lbdate = today - timedelta(days=lb_days)
+        active_date = today + timedelta(days=10)
+        fd = '1900-01-01'
+        print(f'Looking back to this date: {lbdate}')
+        pdata = Pins.query.filter(Pins.Maker == maker).all()
+        ret_data = []
+        for pdat in pdata:
+            ret_data.append({'message': 'Good','pinid': pdaat.id, 'intext': pdat.Intext, 'outtext' : pdat.Outtext, 'note': pdat.Note})
+        print(ret_data)
+        return ret_data
 
 
 @main.route('/make_pin_data', methods=['GET', 'PUT', 'POST'])
@@ -344,7 +369,7 @@ def make_pin_data():
         pdat = Pins.query.filter(Pins.InCon == incon).first()
         pinid = pdat.id
 
-        return jsonify({'message': 'Pin Created', 'pinid': pinid, 'intext': intext, 'outtext' : outtext, 'note': note}), 200
+        return jsonify({'message': 'Pin Assignment Added', 'pinid': pinid, 'intext': intext, 'outtext' : outtext, 'note': note}), 200
 
     else:
         return jsonify({'error': 'No data received'}), 400
