@@ -186,9 +186,9 @@ def pdf_download():
 
 
 
-@main.route('/get_api_data', methods=['GET', 'PUT', 'POST'])
+@main.route('/make_pin_data', methods=['GET', 'PUT', 'POST'])
 @jwt_required()
-def handle_data():
+def make_pin_data():
     current_user = get_jwt_identity()
     print(f'user: {current_user}')
 
@@ -339,7 +339,20 @@ def handle_data():
         db.session.add(input)
         db.session.commit()
 
-    elif request.method == 'PUT':
+        return jsonify({'message': 'Pin Created'}), 200
+
+    else:
+        return jsonify({'error': 'No data received'}), 400
+
+
+
+@main.route('/get_api_data', methods=['GET', 'PUT', 'POST'])
+@jwt_required()
+def handle_data():
+    current_user = get_jwt_identity()
+    print(f'user: {current_user}')
+
+    if request.method == 'PUT':
         print('This is a put')
         data_needed = request.args.get('data_needed')
         print(f'data_needed: {data_needed}')
