@@ -335,7 +335,7 @@ def make_pin_data():
 
         input = Pins(Date=today, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
                      OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone,
-                     Timeslot=0, Intext=intext, Outtext=outtext, Notes=None)
+                     Timeslot=pintime, Intext=intext, Outtext=outtext, Notes=None, Active=0, Maker='API')
         db.session.add(input)
         db.session.commit()
 

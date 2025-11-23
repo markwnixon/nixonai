@@ -695,7 +695,8 @@ def addtopins(thisdate, opair):
                     intext = f'Empty In: *{odat.Container}* ({ctext} {city})'
 
 
-    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone, Timeslot=0, Intext=intext, Outtext=outtext, Notes=None)
+    input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas = inchas, InPin=inpin, OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone,
+                 Timeslot=0, Intext=intext, Outtext=outtext, Notes=None, Active=0, Maker='WEB')
     db.session.add(input)
     db.session.commit()
 
@@ -2247,8 +2248,12 @@ def Table_maker(genre):
         delthis = request.values.get(f'del{idate}')
         moveup = request.values.get(f'moveup{idate}')
         movedn = request.values.get(f'movedn{idate}')
+        activatethis = request.values.get(f'activate{idate}')
         movedate = thisdate + timedelta(idate)
-        if modnow is not None or delthis is not None or moveup is not None or movedn is not None or addnow is not None:
+
+        if activatethis is not None: print(f'Activating pin movedate is {movedate}')
+
+        if modnow is not None or delthis is not None or moveup is not None or movedn is not None or addnow is not None or activatethis is not None:
             anyamber = 1
             default_unit = None
             pdata = Pins.query.filter(Pins.Date == movedate).all()
@@ -2262,7 +2267,7 @@ def Table_maker(genre):
                 #print(f'this time slot is read as {timeslot}')
                 if box == 'on':
                     boxid.append(pdat.id)
-                #print(f'box is {box} {boxid}')
+                print(f'box is {box} {boxid}')
 
                 if driver is not None:
                     #print(f'The selected driver is {driver}')
@@ -2290,8 +2295,10 @@ def Table_maker(genre):
                     pdat.OutChas = chas
 
                 if timeslot is not None:
-                    #pdat.Timeslot = int(timeslot)
                     pdat.Timeslot = timeslot
+                    # If turn off the timeslot then also deadtivate the pin
+                    if timeslot == 'Hold Getting':
+                        pdat.Active = 0
 
                 if driver is not None and unit is not None and chas is not None:
                     pdat.Notes = f'Will get pin for {driver} in unit {unit} using chassis {chas}'
@@ -2309,8 +2316,9 @@ def Table_maker(genre):
                     holdvec[95] = f'{itext}\n{otext}\n{note}'
 
         #Perform moveup or movedn actions
+        print(f'boxid is {boxid}')
         for tid in boxid:
-            #print(f'Performing action on id= {tid}')
+            print(f'Performing action on id= {tid}')
             if delthis is not None:
                 Pins.query.filter(Pins.id == tid).delete()
                 db.session.commit()
@@ -2322,6 +2330,14 @@ def Table_maker(genre):
                 pdat = Pins.query.get(tid)
                 pdat.Date = pdat.Date + timedelta(1)
                 db.session.commit()
+            if activatethis is not None:
+                pdat = Pins.query.get(tid)
+                if pdat.Timeslot != 'Hold Getting':
+                    pdat.Active = 1
+                    db.session.commit()
+                else:
+                    err.append('Cannot Activate Until Timeslot Selected')
+
 
         holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all(), timedata])
 

@@ -75,8 +75,8 @@
                                     data-toggle="tooltip" title="Add dispatch to schedule for today">Add For<br>Date</button>
                                 <button type="submit" class="btn btn-group-small btn-black my-small-btn" name="mod{{ but }}"
                                     data-toggle="tooltip" title="Update schedule for selected driver/truck">Update<br>Driver/Trk</button>
-                                    <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="hold{{ but }}"
-                                    data-toggle="tooltip" title="Place getting pin on hold until released">Hold<br>Toggle</button>
+                                    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="activate{{ but }}"
+                                    data-toggle="tooltip" title="Activate pin set for getting pins">Activate<br>This</button>
                                     <button type="submit" class="btn btn-group-small btn-red my-small-btn" name="del{{ but }}"
                                     data-toggle="tooltip" title="Delete selected dispatch">Delete<br>Selected</button>
                                     <button type="submit" class="btn btn-group-small btn-amber my-small-btn" name="moveup{{ but }}"
@@ -92,8 +92,8 @@
                       {% for pdat in pdata %}
                           {% if pdat.OutPin == '0' %}{% set lk = 0 %}{% else %}{% set lk = 1 %}{% endif %}
                           {% if pdat.OutPin == '0' %}
-                                {% if pdat.Driver %}{% set col1 = 'green-text font-weight-bold' %}{% else %}{% set col1 = 'black-text' %}{% endif %}
-                              {% if pdat.Timeslot == 'Hold Getting' %} {% set col1 = 'amber-text font-weight-bold' %}{% endif %}
+                                {% if pdat.Driver %}{% set col1 = 'amber-text font-weight-bold' %}{% else %}{% set col1 = 'black-text' %}{% endif %}
+                              {% if pdat.Active == 1 and pdat.Timeslot != 'Hold Getting'%} {% set col1 = 'green-text font-weight-bold' %}{% endif %}
                           {% else %}
                                 {% set col1 = 'blue-text font-weight-bold' %}
                           {% endif %}
@@ -119,6 +119,7 @@
                                      </select>
 
                                      <input class="mdb-select md-form-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
+                                     {{ pdat.Active }} &nbsp {{ pdat.Maker }}
                                      <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="copy{{ but }}{{ loop.index-1 }}">Copy</button>
                           <br>
                              {% if pdat.Intext and pdat.Outtext %}
