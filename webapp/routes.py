@@ -213,7 +213,7 @@ def get_existing_pins():
             if havepin == '0':
                 mess = 'NeedPin'
             else:
-                mess = 'HavPin'
+                mess = 'HavePin'
             ret_data.append({'message': mess,'pinid': pdat.id, 'intext': pdat.Intext, 'outtext' : pdat.Outtext, 'note': pdat.Notes})
         print(f'return data is: {ret_data}')
         return ret_data
@@ -377,7 +377,7 @@ def make_pin_data():
         pdat = Pins.query.filter(Pins.InCon == incon).first()
         pinid = pdat.id
 
-        return jsonify({'message': 'Pin Assignment Added', 'pinid': pinid, 'intext': intext, 'outtext' : outtext, 'note': note}), 200
+        return jsonify({'message': 'NeedPin', 'pinid': pinid, 'intext': intext, 'outtext' : outtext, 'note': note}), 200
 
     else:
         return jsonify({'error': 'No data received'}), 400
