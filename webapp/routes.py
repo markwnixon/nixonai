@@ -36,6 +36,9 @@ import ast
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, create_refresh_token, JWTManager
 import paramiko
 
+import uuid, threading
+TASKS = {}
+
 today = datetime.datetime.today()
 year = str(today.year)
 day = str(today.day)
@@ -131,7 +134,88 @@ def pdf_upload():
     else:
         return jsonify({"error": "Container not found in database"}), 400
 
-@main.route("/get_pins_now", methods=["GET", "POST"])
+
+@main.route("/get_pins_now", methods=["GET"])
+def getpinsnow():
+    import paramiko
+
+    pinid = request.args.get('pinid')
+    #scac = request.args.get('scac')  # <= add this if needed
+    domain = request.args.get("domain")
+
+    print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}")
+
+    # Create a unique task id
+    task_id = str(uuid.uuid4())
+
+    # Store initial task state
+    TASKS[task_id] = {
+        "status": "starting",
+        "result": None,
+        "pinid": pinid,
+        "scac": scac,
+        "domain": domain
+    }
+
+    # Background worker to run SSH task
+    def run_remote():
+        TASKS[task_id]["status"] = "running"
+
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                '172.233.199.180',
+                username='mark',
+                key_filename='/home/nixonai/.ssh/id_rsa'
+            )
+
+            # Non-blocking, detached remote script
+            cmd = (
+                f"nohup getpin2.sh {scac} {pinid} {task_id} {domain} "
+                f">/tmp/pinout_{task_id}.log 2>&1 &"
+            )
+
+            ssh.exec_command(cmd)
+            ssh.close()
+
+            TASKS[task_id]["status"] = "waiting_for_callback"
+
+        except Exception as e:
+            TASKS[task_id]["status"] = "error"
+            TASKS[task_id]["result"] = str(e)
+
+    # Launch SSH in background thread
+    threading.Thread(target=run_remote, daemon=True).start()
+
+    # Respond instantly → no broken pipes
+    return {"task_id": task_id, "status": "started"}
+
+@main.route("/task_status")
+def task_status():
+    task_id = request.args.get("task_id")
+    info = TASKS.get(task_id)
+    if not info:
+        return {"error": "invalid task_id"}, 404
+    return info
+
+@main.route("/pin_callback", methods=["POST"])
+def pin_callback():
+    data = request.json
+    task_id = data.get("task_id")
+    result = data.get("result")
+
+    if task_id not in TASKS:
+        return {"error": "unknown task_id"}, 400
+
+    TASKS[task_id]["status"] = "complete"
+    TASKS[task_id]["result"] = result
+
+    return {"ok": True}
+
+
+
+@main.route("/get_pins_now_old", methods=["GET", "POST"])
 def getpinsnow():
     import paramiko
 
@@ -145,9 +229,9 @@ def getpinsnow():
     ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
 
     stdin, stdout, stderr = ssh.exec_command(f'getpin2.sh {scac} {pinid} &')  # & makes it non-blocking
-    exit_status = stdout.channel.recv_exit_status()  # Waits for command to finish
-    output = stdout.read().decode()
-    errors = stderr.read().decode()
+    #exit_status = stdout.channel.recv_exit_status()  # Waits for command to finish
+    #output = stdout.read().decode()
+    #errors = stderr.read().decode()
     ssh.close()
 
     if exit_status == 0:
@@ -156,6 +240,9 @@ def getpinsnow():
     else:
         print("❌ Error:", errors)
         return {"status": "error", "error": errors}
+
+
+
 
 @main.route("/get_pdf_for_container", methods=["GET"])
 #@jwt_required()
