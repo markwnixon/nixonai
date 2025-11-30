@@ -142,6 +142,7 @@ def getpinsnow():
     pinid = request.args.get('pinid')
     #scac = request.args.get('scac')  # <= add this if needed
     domain = request.args.get("domain")
+    mode = 'all'
 
     print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}")
 
@@ -172,7 +173,7 @@ def getpinsnow():
 
             # Non-blocking, detached remote script
             cmd = (
-                f"nohup getpin2.sh {scac} {pinid} {task_id} {domain} "
+                f"nohup getpin2.sh {scac} {pinid} {mode} {task_id} {domain} "
                 f">/tmp/pinout_{task_id}.log 2>&1 &"
             )
 
