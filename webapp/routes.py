@@ -217,7 +217,7 @@ def pin_callback():
 
 
 @main.route("/get_pins_now_old", methods=["GET", "POST"])
-def getpinsnow():
+def getpinsnowold():
     import paramiko
 
     pinid = request.args.get('pinid')
