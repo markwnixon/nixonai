@@ -144,7 +144,7 @@ def getpinsnow():
     domain = request.args.get("domain")
     mode = 'all'
 
-    print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}")
+    print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}, domain={domain}, mode={mode}")
 
     # Create a unique task id
     task_id = str(uuid.uuid4())
@@ -192,8 +192,8 @@ def getpinsnow():
     # Respond instantly → no broken pipes
     return {"task_id": task_id, "status": "started"}
 
-@main.route("/task_status")
-def task_status():
+@main.route("/pin_task_status")
+def pin_task_status():
     task_id = request.args.get("task_id")
     info = TASKS.get(task_id)
     if not info:
