@@ -35,6 +35,7 @@ from webapp.class8_api_call import api_call
 import ast
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, create_refresh_token, JWTManager
 import paramiko
+import traceback
 
 import uuid, threading
 TASKS = {}
@@ -137,7 +138,6 @@ def pdf_upload():
 
 @main.route("/get_pins_now", methods=["GET"])
 def getpinsnow():
-    import paramiko
 
     pinid = request.args.get('pinid')
     #scac = request.args.get('scac')  # <= add this if needed
@@ -159,43 +159,53 @@ def getpinsnow():
     }
 
     # Background worker to run SSH task
-    def run_remote():
-        TASKS[task_id]["status"] = "running"
-
+    def run_remote(task_id, scac, pinid, mode, domain):
         try:
+            TASKS[task_id]["status"] = "running"
+
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
-
-            print(f'Running nohup getpin2.sh with scac:{scac} pinid:{pinid} mode:{mode} task_id:{task_id} domain:{domain}')
-            # Non-blocking, detached remote script
-            cmd = (
-                f"nohup getpin2.sh {scac} {pinid} {mode} {task_id} {domain} "
-                f">/tmp/pinout_{task_id}.log 2>&1 &"
+            ssh.connect(
+                '172.233.199.180',
+                username='mark',
+                key_filename='/home/nixonai/.ssh/id_rsa'
             )
 
-            #ssh.exec_command(cmd)
+            # Make sure absolute path to script
+            remote_script = "/home/mark/flask/agents/getpin2.sh"
+            log_file = f"/tmp/pinout_{task_id}.log"
+
+            cmd = f"nohup bash {remote_script} {scac} {pinid} {mode} {task_id} {domain} > {log_file} 2>&1 & echo $!"
+
+            print(f"Executing remote command: {cmd}")
+
             stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
-            print(stdout.read().decode())
-            print(stderr.read().decode())
+
+            # Read any immediate output or errors
+            out = stdout.read().decode()
+            err = stderr.read().decode()
+            if out:
+                print(f"Remote stdout: {out}")
+            if err:
+                print(f"Remote stderr: {err}")
+
             ssh.close()
-
             TASKS[task_id]["status"] = "waiting_for_callback"
-
-            print('ssh call is successful')
 
         except Exception as e:
             TASKS[task_id]["status"] = "error"
             TASKS[task_id]["result"] = str(e)
-            print(f'ssh error: {e}')
-            import traceback
-            print("Exception in run_remote thread:")
+            print(f"Exception in run_remote thread for task {task_id}:")
             traceback.print_exc()
 
-    # Launch SSH in background thread
-    threading.Thread(target=run_remote, daemon=True).start()
 
-    # Respond instantly → no broken pipes
+    # 🔹 Launch the background thread
+    threading.Thread(
+        target=run_remote,
+        args=(task_id, scac, pinid, mode, domain),
+        daemon=True
+    ).start()
+
     return {"task_id": task_id, "status": "started"}
 
 @main.route("/pin_task_status")
