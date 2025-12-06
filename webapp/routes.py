@@ -162,15 +162,12 @@ def getpinsnow():
     def run_remote():
         TASKS[task_id]["status"] = "running"
 
-        try:
+        if 1 == 1:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                '172.233.199.180',
-                username='mark',
-                key_filename='/home/nixonai/.ssh/id_rsa'
-            )
+            ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
 
+            print(f'Running nohup getpin2.sh with scac:{scac} pinid:{pinid} mode:{mode} task_id:{task_id} domain:{domain}')
             # Non-blocking, detached remote script
             cmd = (
                 f"nohup getpin2.sh {scac} {pinid} {mode} {task_id} {domain} "
@@ -183,8 +180,8 @@ def getpinsnow():
             TASKS[task_id]["status"] = "waiting_for_callback"
 
             print('ssh call is successful')
-
-        except Exception as e:
+        else:
+        #except Exception as e:
             TASKS[task_id]["status"] = "error"
             TASKS[task_id]["result"] = str(e)
             print(f'ssh error: {e}')
@@ -197,7 +194,9 @@ def getpinsnow():
 
 @main.route("/pin_task_status")
 def pin_task_status():
+
     task_id = request.args.get("task_id")
+    print(f'taskid is {task_id}')
     info = TASKS.get(task_id)
 
     if not info:
