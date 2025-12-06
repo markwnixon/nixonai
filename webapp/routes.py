@@ -182,9 +182,12 @@ def getpinsnow():
 
             TASKS[task_id]["status"] = "waiting_for_callback"
 
+            print('ssh call is successful')
+
         except Exception as e:
             TASKS[task_id]["status"] = "error"
             TASKS[task_id]["result"] = str(e)
+            print(f'ssh error: {e}')
 
     # Launch SSH in background thread
     threading.Thread(target=run_remote, daemon=True).start()
@@ -196,12 +199,15 @@ def getpinsnow():
 def pin_task_status():
     task_id = request.args.get("task_id")
     info = TASKS.get(task_id)
+
     if not info:
         return {"error": "invalid task_id"}, 404
+    print(f'info: {info}')
     return info
 
 @main.route("/pin_callback", methods=["POST"])
 def pin_callback():
+    print('pin_callback has started')
     data = request.json
     task_id = data.get("task_id")
     result = data.get("result")
