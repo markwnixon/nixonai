@@ -174,7 +174,10 @@ def getpinsnow():
                 f">/tmp/pinout_{task_id}.log 2>&1 &"
             )
 
-            ssh.exec_command(cmd)
+            #ssh.exec_command(cmd)
+            stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
+            print(stdout.read().decode())
+            print(stderr.read().decode())
             ssh.close()
 
             TASKS[task_id]["status"] = "waiting_for_callback"
