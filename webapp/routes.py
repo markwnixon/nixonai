@@ -162,7 +162,7 @@ def getpinsnow():
     def run_remote():
         TASKS[task_id]["status"] = "running"
 
-        if 1 == 1:
+        try:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
@@ -183,11 +183,14 @@ def getpinsnow():
             TASKS[task_id]["status"] = "waiting_for_callback"
 
             print('ssh call is successful')
-        else:
-        #except Exception as e:
+
+        except Exception as e:
             TASKS[task_id]["status"] = "error"
             TASKS[task_id]["result"] = str(e)
             print(f'ssh error: {e}')
+            import traceback
+            print("Exception in run_remote thread:")
+            traceback.print_exc()
 
     # Launch SSH in background thread
     threading.Thread(target=run_remote, daemon=True).start()
