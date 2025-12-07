@@ -144,29 +144,28 @@ def get_pins_now():
     domain = request.args.get("domain", "localhost")
     mode = request.args.get("mode", "all")
 
-    return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
+    #return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 
-    if 1 == 2:
-        if domain == 'localhost' or domain == '127.0.0.1':
-            QUEUE_FILE = "/Users/marknixon/PycharmProjects/nixonai/tasks/task_queue.txt"
-        else:
-            QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
+    if domain == 'localhost' or domain == '127.0.0.1:5000':
+        QUEUE_FILE = "/Users/marknixon/PycharmProjects/nixonai/tasks/task_queue.txt"
+    else:
+        QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
 
-        # Job format: pinid|scac|domain|mode
-        job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
+    # Job format: pinid|scac|domain|mode
+    job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
 
-        print(f'job_line: {job_line}')
+    print(f'job_line: {job_line}')
 
-        try:
-            # Ensure the queue file exists
-            os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
-            with open(QUEUE_FILE, "a") as f:
-                f.write(job_line)
+    try:
+        # Ensure the queue file exists
+        os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
+        with open(QUEUE_FILE, "a") as f:
+            f.write(job_line)
 
-            return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
+        return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @main.route("/pin_task_status", methods=["GET"])
