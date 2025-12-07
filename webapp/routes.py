@@ -143,7 +143,7 @@ def getpinsnow():
         Add a PIN fetching job to the queue for the always-on worker.
         Expects query parameters: pinid, scac (optional), domain (optional), mode (optional)
         """
-
+        QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
         pinid = request.args.get("pinid")
         if not pinid:
             return jsonify({"error": "Missing 'pinid' parameter"}), 400
