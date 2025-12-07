@@ -176,7 +176,7 @@ def getpinsnow():
             )
 
             # Absolute paths
-            remote_script = "/home/mark/flask/agents/getpin2.sh"
+            remote_script = "/home/mark/flask/agents/shellscripts/getpin2.sh"
             log_file = f"/home/mark/pinout_{task_id}.log"
 
             # Ensure the script exists
