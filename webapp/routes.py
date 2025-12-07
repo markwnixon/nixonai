@@ -137,35 +137,32 @@ def pdf_upload():
 
 @main.route("/get_pins_now", methods=["GET"])
 def getpinsnow():
+    @main.route("/get_pins_now", methods=["GET"])
+    def get_pins_now():
+        """
+        Add a PIN fetching job to the queue for the always-on worker.
+        Expects query parameters: pinid, scac (optional), domain (optional), mode (optional)
+        """
 
-    pinid = request.args.get('pinid')
-    #scac = request.args.get('scac')  # <= add this if needed
-    domain = request.args.get("domain")
-    mode = 'all'
+        pinid = request.args.get("pinid")
+        if not pinid:
+            return jsonify({"error": "Missing 'pinid' parameter"}), 400
+        domain = request.args.get("domain", "localhost")
+        mode = request.args.get("mode", "all")
 
-    # Create a unique task id
-    task_id = str(uuid.uuid4())
+        # Job format: pinid|scac|domain|mode
+        job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
 
-    print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}, taskid={task_id}, domain={domain}, mode={mode}")
+        try:
+            # Ensure the queue file exists
+            os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
+            with open(QUEUE_FILE, "a") as f:
+                f.write(job_line)
 
-    TASK_DIR = "/home/nixonai/tasks"
+            return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 
-    task_data = {
-        "status": "starting",
-        "scac": scac,
-        "pinid": pinid,
-        "mode": mode,
-        "domain": domain,
-        "result": None
-    }
-
-    task_file = os.path.join(TASK_DIR, f"{task_id}.json")
-    with open(task_file, "w") as f:
-        json.dump(task_data, f)
-
-    print(f"Created task {task_id}: SCAC={scac}, PINID={pinid}")
-
-    return {"task_id": task_id, "status": "started"}
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @main.route("/pin_task_status", methods=["GET"])
