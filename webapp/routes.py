@@ -146,7 +146,7 @@ def get_pins_now():
 
     #return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 
-    if domain == 'localhost' or domain == '127.0.0.1:5000':
+    if '127' in domain:
         QUEUE_FILE = "/Users/marknixon/PycharmProjects/nixonai/tasks/task_queue.txt"
     else:
         QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
