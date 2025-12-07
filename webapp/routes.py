@@ -141,6 +141,8 @@ def get_pins_now():
     Add a PIN fetching job to the queue for the always-on worker.
     Expects query parameters: pinid, scac (optional), domain (optional), mode (optional)
     """
+    print('Running get_pins_now')
+
     QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
     pinid = request.args.get("pinid")
     if not pinid:
@@ -150,6 +152,8 @@ def get_pins_now():
 
     # Job format: pinid|scac|domain|mode
     job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
+
+    print(f'job_line: {job_line}')
 
     try:
         # Ensure the queue file exists
