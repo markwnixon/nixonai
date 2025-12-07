@@ -143,12 +143,17 @@ def get_pins_now():
     """
     print('Running get_pins_now')
 
-    QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
+
     pinid = request.args.get("pinid")
     if not pinid:
         return jsonify({"error": "Missing 'pinid' parameter"}), 400
     domain = request.args.get("domain", "localhost")
     mode = request.args.get("mode", "all")
+
+    if domain == 'localhost' or domain == '127.0.0.1':
+        QUEUE_FILE = "/Users/marknixon/PycharmProjects/nixonai/tasks/task_queue.txt"
+    else:
+        QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
 
     # Job format: pinid|scac|domain|mode
     job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
