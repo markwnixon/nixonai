@@ -168,134 +168,44 @@ def getpinsnow():
     return {"task_id": task_id, "status": "started"}
 
 
-@main.route("/get_pins_now_old2", methods=["GET"])
-def getpinsnowold2():
-
-    pinid = request.args.get('pinid')
-    #scac = request.args.get('scac')  # <= add this if needed
-    domain = request.args.get("domain")
-    mode = 'all'
-
-    print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}, domain={domain}, mode={mode}")
-
-    # Create a unique task id
-    task_id = str(uuid.uuid4())
-
-    # Store initial task state
-    TASKS[task_id] = {
-        "status": "starting",
-        "result": None,
-        "pinid": pinid,
-        "scac": scac,
-        "domain": domain
-    }
-
-    # Background worker to run SSH task
-    def run_remote(task_id, scac, pinid, mode, domain):
-        try:
-            TASKS[task_id]["status"] = "running"
-
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                '172.233.199.180',
-                username='mark',
-                key_filename='/home/nixonai/.ssh/id_rsa'
-            )
-
-            # Make sure absolute path to script
-            remote_script = "/home/mark/flask/agents/getpin2.sh"
-            log_file = f"/tmp/pinout_{task_id}.log"
-
-            cmd = f"nohup bash {remote_script} {scac} {pinid} {mode} {task_id} {domain} > {log_file} 2>&1 & echo $!"
-
-            print(f"Executing remote command: {cmd}")
-
-            stdin, stdout, stderr = ssh.exec_command(cmd, get_pty=True)
-
-            # Read any immediate output or errors
-            out = stdout.read().decode()
-            err = stderr.read().decode()
-            if out:
-                print(f"Remote stdout: {out}")
-            if err:
-                print(f"Remote stderr: {err}")
-
-            ssh.close()
-            TASKS[task_id]["status"] = "waiting_for_callback"
-
-        except Exception as e:
-            TASKS[task_id]["status"] = "error"
-            TASKS[task_id]["result"] = str(e)
-            print(f"Exception in run_remote thread for task {task_id}:")
-            traceback.print_exc()
-
-
-    # 🔹 Launch the background thread
-    threading.Thread(
-        target=run_remote,
-        args=(task_id, scac, pinid, mode, domain),
-        daemon=True
-    ).start()
-
-    return {"task_id": task_id, "status": "started"}
-
-@main.route("/pin_task_status")
+@main.route("/pin_task_status", methods=["GET"])
 def pin_task_status():
-
     task_id = request.args.get("task_id")
-    print(f'taskid is {task_id}')
-    info = TASKS.get(task_id)
+    if not task_id:
+        return jsonify({"status": "error", "message": "Missing task_id"}), 400
 
-    if not info:
-        return {"error": "invalid task_id"}, 404
-    print(f'info: {info}')
-    return info
+    task_file = f"/home/nixonai/worker/task_{task_id}.json"
+
+    if not os.path.exists(task_file):
+        return jsonify({"status": "error", "message": "Task not found"}), 404
+
+    try:
+        with open(task_file, "r") as f:
+            task_data = json.load(f)
+        return jsonify(task_data)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @main.route("/pin_callback", methods=["POST"])
 def pin_callback():
-    print('pin_callback has started')
     data = request.json
     task_id = data.get("task_id")
-    result = data.get("result")
+    pin_result = data.get("result")
 
-    if task_id not in TASKS:
-        return {"error": "unknown task_id"}, 400
+    if not task_id or not pin_result:
+        return jsonify({"status": "error", "message": "Missing task_id or result"}), 400
 
-    TASKS[task_id]["status"] = "complete"
-    TASKS[task_id]["result"] = result
-
-    return {"ok": True}
-
-
-
-@main.route("/get_pins_now_old", methods=["GET", "POST"])
-def getpinsnowold():
-    import paramiko
-
-    pinid = request.args.get('pinid')
-    print(f'pinid to get is: {pinid}')
-
-    print(f'Getting pins for scac {scac} and pinid {pinid}')
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    #ssh.connect('172.233.199.180', username='mark', key_filename='/home/mark/.ssh/id_rsa')
-    ssh.connect('172.233.199.180', username='mark', key_filename='/home/nixonai/.ssh/id_rsa')
-
-    stdin, stdout, stderr = ssh.exec_command(f'getpin2.sh {scac} {pinid} &')  # & makes it non-blocking
-    #exit_status = stdout.channel.recv_exit_status()  # Waits for command to finish
-    #output = stdout.read().decode()
-    #errors = stderr.read().decode()
-    ssh.close()
-
-    if exit_status == 0:
-        print("✅ Success:", output)
-        return {"status": "success", "output": output}
-    else:
-        print("❌ Error:", errors)
-        return {"status": "error", "error": errors}
-
-
+    task_file = f"/home/nixonai/worker/task_{task_id}.json"
+    try:
+        task_data = {
+            "status": "waiting_for_callback",
+            "result": pin_result
+        }
+        with open(task_file, "w") as f:
+            json.dump(task_data, f)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @main.route("/get_pdf_for_container", methods=["GET"])
