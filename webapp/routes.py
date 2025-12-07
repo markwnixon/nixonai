@@ -136,7 +136,7 @@ def pdf_upload():
         return jsonify({"error": "Container not found in database"}), 400
 
 @main.route("/get_pins_now", methods=["GET"])
-@jwt_required(refresh=True)
+#@jwt_required(refresh=True)
 def get_pins_now():
 
     print('Running get_pins_now')
