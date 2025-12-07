@@ -136,33 +136,31 @@ def pdf_upload():
         return jsonify({"error": "Container not found in database"}), 400
 
 @main.route("/get_pins_now", methods=["GET"])
-def getpinsnow():
-    @main.route("/get_pins_now", methods=["GET"])
-    def get_pins_now():
-        """
-        Add a PIN fetching job to the queue for the always-on worker.
-        Expects query parameters: pinid, scac (optional), domain (optional), mode (optional)
-        """
-        QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
-        pinid = request.args.get("pinid")
-        if not pinid:
-            return jsonify({"error": "Missing 'pinid' parameter"}), 400
-        domain = request.args.get("domain", "localhost")
-        mode = request.args.get("mode", "all")
+def get_pins_now():
+    """
+    Add a PIN fetching job to the queue for the always-on worker.
+    Expects query parameters: pinid, scac (optional), domain (optional), mode (optional)
+    """
+    QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
+    pinid = request.args.get("pinid")
+    if not pinid:
+        return jsonify({"error": "Missing 'pinid' parameter"}), 400
+    domain = request.args.get("domain", "localhost")
+    mode = request.args.get("mode", "all")
 
-        # Job format: pinid|scac|domain|mode
-        job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
+    # Job format: pinid|scac|domain|mode
+    job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
 
-        try:
-            # Ensure the queue file exists
-            os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
-            with open(QUEUE_FILE, "a") as f:
-                f.write(job_line)
+    try:
+        # Ensure the queue file exists
+        os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
+        with open(QUEUE_FILE, "a") as f:
+            f.write(job_line)
 
-            return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
+        return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @main.route("/pin_task_status", methods=["GET"])
