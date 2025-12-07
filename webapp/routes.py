@@ -135,9 +135,87 @@ def pdf_upload():
     else:
         return jsonify({"error": "Container not found in database"}), 400
 
-
 @main.route("/get_pins_now", methods=["GET"])
 def getpinsnow():
+    import paramiko
+    import traceback
+    import uuid
+    import threading
+
+    # Extract parameters
+    pinid = request.args.get('pinid')
+    #scac = request.args.get('scac', 'TEST')  # optional default for testing
+    domain = request.args.get('domain', 'localhost')
+    mode = 'all'
+
+    print(f"Starting pin fetch for SCAC={scac}, PINID={pinid}, domain={domain}, mode={mode}")
+
+    # Create unique task ID
+    task_id = str(uuid.uuid4())
+
+    # Store initial task state
+    TASKS[task_id] = {
+        "status": "starting",
+        "result": None,
+        "pinid": pinid,
+        "scac": scac,
+        "domain": domain
+    }
+
+    # Background worker
+    def run_remote(task_id, scac, pinid, mode, domain):
+        try:
+            TASKS[task_id]["status"] = "running"
+
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                '172.233.199.180',
+                username='mark',
+                key_filename='/home/nixonai/.ssh/id_rsa'
+            )
+
+            # Absolute paths
+            remote_script = "/home/mark/flask/agents/getpin2.sh"
+            log_file = f"/home/mark/pinout_{task_id}.log"
+
+            # Ensure the script exists
+            cmd_check = f"test -x {remote_script} || echo 'SCRIPT NOT FOUND' > {log_file}"
+            ssh.exec_command(cmd_check)
+
+            # Run the script with nohup, redirect output to log_file
+            cmd_run = f"nohup /bin/bash {remote_script} {scac} {pinid} {mode} {task_id} {domain} > {log_file} 2>&1 &"
+            print(f"Executing remote command: {cmd_run}")
+
+            stdin, stdout, stderr = ssh.exec_command(cmd_run)
+            out = stdout.read().decode()
+            err = stderr.read().decode()
+            if out: print(f"Remote stdout: {out}")
+            if err: print(f"Remote stderr: {err}")
+
+            ssh.close()
+            TASKS[task_id]["status"] = "waiting_for_callback"
+            print(f"Task {task_id} launched successfully. Log file: {log_file}")
+
+        except Exception as e:
+            TASKS[task_id]["status"] = "error"
+            TASKS[task_id]["result"] = str(e)
+            print(f"Exception in run_remote thread for task {task_id}:")
+            traceback.print_exc()
+
+    # Start the background thread
+    threading.Thread(
+        target=run_remote,
+        args=(task_id, scac, pinid, mode, domain),
+        daemon=True
+    ).start()
+
+    # Respond immediately
+    return {"task_id": task_id, "status": "started"}
+
+
+@main.route("/get_pins_now_old2", methods=["GET"])
+def getpinsnowold2():
 
     pinid = request.args.get('pinid')
     #scac = request.args.get('scac')  # <= add this if needed
