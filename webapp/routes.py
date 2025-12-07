@@ -145,10 +145,10 @@ def get_pins_now():
 
 
     pinid = request.args.get("pinid")
-    if not pinid:
-        return jsonify({"error": "Missing 'pinid' parameter"}), 400
     domain = request.args.get("domain", "localhost")
     mode = request.args.get("mode", "all")
+
+    return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 
     if domain == 'localhost' or domain == '127.0.0.1':
         QUEUE_FILE = "/Users/marknixon/PycharmProjects/nixonai/tasks/task_queue.txt"
