@@ -51,7 +51,7 @@ from webapp.CCC_system_setup import companydata, statpath, addpath, scac, tpath
 cmpdata = companydata()
 
 
-main = Blueprint('main',__name__)
+#main = Blueprint('main',__name__)
 
 @main.route('/api_login', methods=['POST'])
 def api_login():
