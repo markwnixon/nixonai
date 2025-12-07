@@ -6,7 +6,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from webapp.CCC_system_setup import scac, machine, statpath, dbp
 
 from webapp.extensions import db, bcrypt, login_manager, jwt
-from webapp.routes import main
+
 from webapp.authenticate.routes import authenticate
 
 ####################################################################
@@ -41,7 +41,9 @@ def create_app():
     login_manager.init_app(app)
     jwt.init_app(app)
 
+
     app.register_blueprint(authenticate)
+    from webapp.routes import main
     app.register_blueprint(main)
 
     return app
