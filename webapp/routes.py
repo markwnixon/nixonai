@@ -154,13 +154,14 @@ def get_pins_now():
     # Job format: pinid|scac|domain|mode
     job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
 
-    print(f'job_line: {job_line}')
 
     try:
         # Ensure the queue file exists
         os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
         with open(QUEUE_FILE, "a") as f:
             f.write(job_line)
+
+        print(f"[API] Queued job: {job_line.strip()}")
 
         return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
 

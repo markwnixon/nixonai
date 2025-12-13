@@ -16,7 +16,7 @@ from webapp.utils import *
 from webapp.class8_tasks_gledger import gledger_write, get_company
 
 import usaddress
-from datetime import timedelta
+from datetime import timedelta, date
 
 def addr2break(adv):
     ai = ''
@@ -250,6 +250,7 @@ def initialize_invoice(myo, err):
     # First time through: have an order to invoice
     shipper = myo.Shipper
     jo = myo.Jo
+    today = date.today()
 
 
     ldat = Invoices.query.filter(Invoices.Jo == jo).first()
@@ -458,6 +459,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     invoicetypes = [key for key, value in invoicetypes_allowed.items()]
     holdvec[3] = invoicetypes
     returnhit = request.values.get('Finished')
+    today = date.today()
 
     if returnhit is not None:
         completed = True
@@ -638,6 +640,7 @@ def make_default_invoice(odat, tablesetup):
     sid = odat.id
     jo = odat.Jo
     pid = odat.Bid
+    today = date.today()
 
     amt = odat.Amount
     input = Invoices(Jo=jo,SubJo=None,Pid=pid,Service='Line Haul',Description='Drayage to Seagirt',Ea=f'{amt}',Qty=1.00,Amount=f'{amt}',Total=f'{amt}',Date=today,Original=None,Status='New')
@@ -754,7 +757,7 @@ def MakeSummary_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         jovec = []
         datevec = []
         cache_start = 0
-        invodate = datetime.datetime.today()
+        invodate = date.today()
 
         sids = get_all_sids(sids)
 

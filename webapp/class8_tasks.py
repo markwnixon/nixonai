@@ -2316,7 +2316,7 @@ def Table_maker(genre):
                     holdvec[95] = f'{itext}\n{otext}\n{note}'
 
         #Perform moveup or movedn actions
-        print(f'boxid is {boxid}')
+        #print(f'boxid is {boxid}')
         for tid in boxid:
             print(f'Performing action on id= {tid}')
             if delthis is not None:
@@ -3855,7 +3855,7 @@ def BlendGate_task(genre, task_iter, tablesetup, task_focus, checked_data, thist
                 note1 = idata[0].Other
                 note2 = idata[1].Other
                 if os.path.isfile(g1) and os.path.isfile(g2):
-                    if note1 is not None or note2 is not None:
+                    if note1 == 'File Upload Manually' or note2 == 'File Upload Manually':
                         combine_ticks(g1, g2, addpath(newdoc))
                     else:
                         blendticks(g1, g2, addpath(newdoc))
