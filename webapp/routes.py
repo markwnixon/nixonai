@@ -409,10 +409,12 @@ def make_pin_data():
         outpin = '0'
         if inchas == None: inchas = 'OSLM007'
         # Now get the intext and outtext:
+        add_day = 2 # Need to make this an api argument
+        thisdate = today + timedelta(days=add_day)
         if driver is not None and unit is not None and inchas is not None:
             note = f'Will get pin for {driver} in unit {unit} using chassis {inchas}'
 
-        input = Pins(Date=today, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
+        input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
                      OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone,
                      Timeslot=pintime, Intext=intext, Outtext=outtext, Notes=note, Active=0, Maker=f'API-{current_user}')
         db.session.add(input)
