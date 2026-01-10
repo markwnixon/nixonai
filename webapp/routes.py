@@ -407,6 +407,7 @@ def make_pin_data():
         today = now.date()
         inpin = '0'
         outpin = '0'
+        if inchas == None: inchas = 'OSLM007'
         # Now get the intext and outtext:
         if driver is not None and unit is not None and inchas is not None:
             note = f'Will get pin for {driver} in unit {unit} using chassis {inchas}'
