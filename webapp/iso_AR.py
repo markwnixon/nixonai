@@ -287,6 +287,8 @@ def get_open_sort_totals(arlist):
             sjo.append(jo)
         for sin in slist:
             sidat = SumInv.query.filter(SumInv.Si == sin).first()
+            if sidat is None:
+                print(f'There is no data for sin of {sin}')
             invodate = sidat.Date
             invototal = sidat.Total
             if invodate is not None and invototal is not None:

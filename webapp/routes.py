@@ -137,36 +137,27 @@ def pdf_upload():
 
 @main.route("/get_pins_now", methods=["GET"])
 #@jwt_required(refresh=True)
-def get_pins_now():
-
-    print('Running get_pins_now')
+def getpinsnow():
     pinid = request.args.get("pinid")
-    domain = request.args.get("domain", "localhost")
-    mode = request.args.get("mode", "all")
+    #scac = request.args.get("scac")
 
-    #return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
+    if not pinid or not scac:
+        return {"error": "Missing scac or pinid"}, 400
 
-    if '127' in domain:
-        QUEUE_FILE = "/Users/marknixon/PycharmProjects/nixonai/tasks/task_queue.txt"
-    else:
-        QUEUE_FILE = "/home/nixonai/tasks/task_queue.txt"
+    queue_dir = "/home/nixonai/tasks"
+    queue_file = f"{queue_dir}/task_queue.txt"
+    os.makedirs(queue_dir, exist_ok=True)
 
-    # Job format: pinid|scac|domain|mode
-    job_line = f"{pinid}|{scac}|{domain}|{mode}\n"
+    job_line = f"{scac}|{pinid}\n"
 
+    with open(queue_file, "a") as f:
+        f.write(job_line)
 
-    try:
-        # Ensure the queue file exists
-        os.makedirs(os.path.dirname(QUEUE_FILE), exist_ok=True)
-        with open(QUEUE_FILE, "a") as f:
-            f.write(job_line)
-
-        print(f"[API] Queued job: {job_line.strip()}")
-
-        return jsonify({"status": "queued", "pinid": pinid, "scac": scac, "domain": domain, "mode": mode})
-
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    return {
+        "status": "queued",
+        "scac": scac,
+        "pinid": pinid
+    }
 
 
 @main.route("/pin_task_status", methods=["GET"])
