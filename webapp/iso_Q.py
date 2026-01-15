@@ -1851,11 +1851,15 @@ def isoQuote():
         showtext = plaintext
     else:
         showtext = htmltext
-    #print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
-    #print(f'mutlibid on exit is {multibid[0]} and {multibid[1]}')
+    print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
+    print(f'mutlibid on exit is {multibid[0]} and {multibid[1]} and uiter is {uiter} and iter is {iter}')
     #Save all the session variables that may have been updated...
     iter = iter + 1
     os.environ[uiter] = str(iter)
+    try:
+        os.environ[utext] = plaintext
+    except:
+        plaintext = ''
     if plaintext is None: plaintext = ''
     if htmltext is None: htmltext = ''
     #print(f'plaintext: {plaintext}')
