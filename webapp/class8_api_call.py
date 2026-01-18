@@ -543,7 +543,7 @@ def api_call(scac, now, data_needed, arglist):
         while len(weekdays) < 3:
             # weekday(): Monday=0 ... Sunday=6
             if current.weekday() < 5:
-                display = current.strftime("%b %d, %Y")
+                display = current.strftime("%a %b %d")
                 weekdays.append({'id': info_id, 'date': f'{current}', 'display': display})
                 info_id += 1
             current += timedelta(days=1)
