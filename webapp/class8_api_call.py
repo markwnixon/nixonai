@@ -534,10 +534,12 @@ def api_call(scac, now, data_needed, arglist):
         return ret_data
 
     elif data_needed == 'pindates':
+        print('entering pindates')
         start_date = date.today()
         weekdays = []
         current = start_date
         info_id = 1
+        print(f'the current data is {current}')
         while len(weekdays) < 3:
             # weekday(): Monday=0 ... Sunday=6
             if current.weekday() < 5:
