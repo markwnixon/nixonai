@@ -533,6 +533,23 @@ def api_call(scac, now, data_needed, arglist):
 
         return ret_data
 
+    elif data_needed == 'pindates':
+        start_date = date.today()
+        weekdays = []
+        current = start_date
+        info_id = 1
+        while len(weekdays) < 3:
+            # weekday(): Monday=0 ... Sunday=6
+            if current.weekday() < 5:
+                display = current.strftime("%b %d, %Y")
+                weekdays.append({'id': info_id, 'date': f'{current}', 'display': display})
+                info_id += 1
+            current += timedelta(days=1)
+
+        print(weekdays)
+
+        return weekdays
+
     elif data_needed == 'financials':
         fin_id = 0
         ret_data = []
