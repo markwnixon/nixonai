@@ -119,7 +119,7 @@
                                      </select>
 
                                      <input class="mdb-select md-form-sm" type="text" value={{pdat.InChas}} name="chas{{ but }}{{ loop.index-1 }}" {% if lk %}disabled{% endif %}>
-                                     {{ pdat.Active }} &nbsp {{ pdat.Maker }}
+                                     {{ pdat.id }} &nbsp {{ pdat.Maker }}
                                      <button type="submit" class="btn btn-group-small btn-blue my-small-btn" name="copy{{ but }}{{ loop.index-1 }}">Copy</button>
                           <br>
                              {% if pdat.Intext and pdat.Outtext %}
