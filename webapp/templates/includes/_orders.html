@@ -132,6 +132,7 @@
                                  {% if pdat.Notes %}
                                      {% set col2 = 'black-text' %}
                                      {% if '**Warning' in pdat.Notes %}{% set col2 = 'red-text' %}{% endif %}
+                                     {% if 'Error' in pdat.Notes %}{% set col2 = 'red-text' %}{% endif %}
                                       <span class="{{ col2 }}">
                                        <br>{{ pdat.Notes }}
                                     </span>
