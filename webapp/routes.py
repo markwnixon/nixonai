@@ -278,7 +278,9 @@ def delete_pin():
             db.session.commit()
             return 'Success', 200
         else:
-            return 'Failed', 400
+            return 'Already Deleted', 200
+
+    return 'Failed', 400
 
 
 
