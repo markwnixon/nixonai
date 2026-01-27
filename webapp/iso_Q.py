@@ -200,6 +200,7 @@ def add_quote_emails():
     N = 50
     #for i in range(messages, messages - N, -1):
     for i in range(messages - N + 1, messages + 1):
+        decode_error = 0
         # fetch the email message by ID
         #res, msg = imap.fetch(str(i), "(RFC822)")
         # Insert the GPTChat solution
@@ -208,11 +209,14 @@ def add_quote_emails():
         #print(f'Result for email {i} is {result}')
         if result == 'OK':
             email_message = email.message_from_bytes(email_data[0][1])
-
-            # extract the subject of the email
-            subject = extract_for_code(email_message["Subject"])
-            mid = extract_for_code(email_message["Message-ID"])
-            mid = mid.strip()
+            try:
+                # extract the subject of the email
+                subject = extract_for_code(email_message["Subject"])
+                mid = extract_for_code(email_message["Message-ID"])
+                mid = mid.strip()
+            except:
+                subject = 'Could not Decode Message'
+                decode_error = 1
             try:
                 fromp = extract_for_code(email_message["From"])
             except:
@@ -257,15 +261,16 @@ def add_quote_emails():
                 #local_dt = utc_dt.astimezone(local_tz)
                 #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
 
-            qdat = Quotes.query.filter(Quotes.Mid == mid).first()
-            if qdat is None:
-                try:
-                    input = Quotes(Date=local_dt, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
-                                   Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD', Markup=None)
-                    db.session.add(input)
-                    db.session.commit()
-                except:
-                    print(f'Could not input the body of the email with subject {subject}')
+            if not decode_error:
+                qdat = Quotes.query.filter(Quotes.Mid == mid).first()
+                if qdat is None:
+                    try:
+                        input = Quotes(Date=local_dt, From=fromp, Subject=subject, Mid=mid, Person=None, Emailto=None, Subjectsend=None,
+                                       Response=None, Amount=None, Location=None, Status=0, Responder=None, RespDate=None, Start='Seagirt Marine Terminal, Baltimore, MD', Markup=None)
+                        db.session.add(input)
+                        db.session.commit()
+                    except:
+                        print(f'Could not input the body of the email with subject {subject}')
 
     # close the connection and logout
     imap.close()
