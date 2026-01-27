@@ -272,16 +272,13 @@ def delete_pin():
         pinid = request.args.get('pinid')
         print(f'pinid: {pinid}')
         pinid = int(pinid)
-        #data = request.get_json()
-        #print(f'data: {data}')
-        #pinid = data.get("pinid")
         pin = db.session.get(Pins, pinid)
         if pin:
             db.session.delete(pin)
             db.session.commit()
-            return 200
+            return 'Success', 200
         else:
-            return 400
+            return 'Failed', 400
 
 
 
