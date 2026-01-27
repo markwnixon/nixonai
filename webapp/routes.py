@@ -361,7 +361,7 @@ def make_pin_data():
                 outcon = None
                 outbook = None
         if outdat is not None:
-            outchas = indat.Chassis
+            outchas = inchas
             contype = outdat.Type
 
             ht = outdat.HaulType
@@ -406,7 +406,7 @@ def make_pin_data():
         else:
             outcon = None
             outbook = None
-            outchas = inchase
+            outchas = inchas
             outtext = 'Nothing Out'
         #Add this data to the pin database for today:
         today = now.date()
