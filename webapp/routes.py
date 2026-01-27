@@ -269,11 +269,12 @@ def delete_pin():
 
     if request.method == 'POST':
         print('This is a POST')
-        data_needed = request.args.get('data_needed')
-        print(f'data_needed: {data_needed}')
-        data = request.get_json()
-        print(f'data: {data}')
-        pinid = data.get("pinid")
+        pinid = request.args.get('pinid')
+        print(f'pinid: {pinid}')
+        pinid = int(pinid)
+        #data = request.get_json()
+        #print(f'data: {data}')
+        #pinid = data.get("pinid")
         pin = db.session.get(Pins, pinid)
         if pin:
             db.session.delete(pin)
