@@ -261,6 +261,29 @@ def get_existing_pins():
         print(f'return data is: {ret_data}')
         return ret_data
 
+@main.route('/delete_pin', methods=['GET', 'PUT', 'POST'])
+@jwt_required()
+def delete_pin():
+    current_user = get_jwt_identity()
+    print(f'user: {current_user}')
+
+    if request.method == 'POST':
+        print('This is a POST')
+        data_needed = request.args.get('data_needed')
+        print(f'data_needed: {data_needed}')
+        data = request.get_json()
+        print(f'data: {data}')
+        pinid = data.get("pinid")
+        pin = db.session.get(Pins, pinid)
+        if pin:
+            db.session.delete(pin)
+            db.session.commit()
+            return 200
+        else:
+            return 400
+
+
+
 
 @main.route('/make_pin_data', methods=['GET', 'PUT', 'POST'])
 @jwt_required()
