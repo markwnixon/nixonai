@@ -382,12 +382,12 @@ def make_pin_data():
                 city = backup
 
             if city == 'Baltimore':
-                citiline = indat.Shipper
+                citiline = outdat.Shipper
                 citiline = citiline.split()
                 city = citiline[0]
 
             if not hasinput(city):
-                citiline = indat.Shipper
+                citiline = outdat.Shipper
                 citiline = citiline.split()
                 city = citiline[0]
 
