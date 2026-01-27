@@ -285,6 +285,11 @@ def make_pin_data():
         ingate = data['ingate']
         outgate = data['outgate']
         pintime = data['pintime']
+        try:
+            chassis = data['chassis']
+        except:
+            chassis = ''
+
         vdat = Vehicles.query.filter(Vehicles.Unit == unit).first()
         if vdat is not None:
             tag = vdat.Plate
@@ -339,7 +344,7 @@ def make_pin_data():
         else:
             incon = None
             inbook = None
-            inchas = 'OSLM'
+            inchas = chassis
             intext = 'Bare Chassis In'
 
         outdat = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Container == outgate)).first()
