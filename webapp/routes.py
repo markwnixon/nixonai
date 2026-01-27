@@ -424,11 +424,14 @@ def make_pin_data():
                      Timeslot=pintime, Intext=intext, Outtext=outtext, Notes=note, Active=0, Maker=f'API-{current_user}')
         db.session.add(input)
         db.session.commit()
+        print(f'The new row has id {input.id}')
 
-        pdat = Pins.query.filter(Pins.InCon == incon).first()
-        pinid = pdat.id
+        #pdat = Pins.query.get(input.id)
 
-        return jsonify({'message': 'NeedPin', 'pinid': pinid, 'intext': intext, 'outtext' : outtext, 'note': note}), 200
+        #pdat = Pins.query.filter(Pins.InCon == incon).first()
+        #pinid = pdat.id
+
+        return jsonify({'message': 'NeedPin', 'pinid': input.id, 'intext': intext, 'outtext' : outtext, 'note': note}), 200
 
     else:
         return jsonify({'error': 'No data received'}), 400
