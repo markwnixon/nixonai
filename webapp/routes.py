@@ -286,6 +286,10 @@ def make_pin_data():
         ingate = data['ingate']
         outgate = data['outgate']
         pintime = data['pintime']
+        pindate = data['pindate']
+
+        print(f' The pin date requested is {pindate}')
+
         try:
             chassis = data['chassis']
         except:
