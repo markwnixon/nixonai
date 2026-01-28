@@ -160,44 +160,20 @@ def getpinsnow():
     }
 
 
-@main.route("/pin_task_status", methods=["GET"])
+@main.route("/pin_task_status", methods=["GET", "POST"])
 def pin_task_status():
-    task_id = request.args.get("task_id")
-    if not task_id:
-        return jsonify({"status": "error", "message": "Missing task_id"}), 400
+    pinid = request.args.get("pinid")
+    print(f'Reviewing Status for pinid {pinid}')
+    pinid = int(pinid)
+    pin = db.session.get(Pins, pinid)
 
-    task_file = f"/home/nixonai/worker/task_{task_id}.json"
+    if pin is not None:
+        return_note = pin.Notes
+        return jsonify({"status": "success", "message": "NeedPin", "note": return_note}), 200
 
-    if not os.path.exists(task_file):
-        return jsonify({"status": "error", "message": "Task not found"}), 404
+    else:
+        return jsonify({"status": "error", "message": "Missing task_id", "note": "Pin Not in Database"}), 400
 
-    try:
-        with open(task_file, "r") as f:
-            task_data = json.load(f)
-        return jsonify(task_data)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@main.route("/pin_callback", methods=["POST"])
-def pin_callback():
-    data = request.json
-    task_id = data.get("task_id")
-    pin_result = data.get("result")
-
-    if not task_id or not pin_result:
-        return jsonify({"status": "error", "message": "Missing task_id or result"}), 400
-
-    task_file = f"/home/nixonai/worker/task_{task_id}.json"
-    try:
-        task_data = {
-            "status": "waiting_for_callback",
-            "result": pin_result
-        }
-        with open(task_file, "w") as f:
-            json.dump(task_data, f)
-        return jsonify({"status": "ok"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @main.route("/get_pdf_for_container", methods=["GET"])
