@@ -289,7 +289,7 @@ def make_pin_data():
         pindate = data['pindate']
 
         print(f' The pin date requested is {pindate} and timeslot {pintime}')
-        pindate_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+        pindate_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
         print(f' The pin date object requested is {pindate_obj}')
 
         try:
