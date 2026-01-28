@@ -169,10 +169,12 @@ def pin_task_status():
 
     if pin is not None:
         return_note = pin.Notes
-        return jsonify({"status": "success", "message": "NeedPin", "note": return_note}), 200
-
+        if 'Error' in return_note or 'Pin made' in return_note:
+            return jsonify({"pinid": pinid, "message": "Completed", "note": return_note}), 200
+        else:
+            return jsonify({"pinid": pinid, "message": "NeedPin", "note": return_note}), 200
     else:
-        return jsonify({"status": "error", "message": "Missing task_id", "note": "Pin Not in Database"}), 400
+        return jsonify({"pinid": pinid, "message": "Missing task_id", "note": "Pin Not in Database"}), 400
 
 
 
