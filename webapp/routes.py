@@ -288,7 +288,9 @@ def make_pin_data():
         pintime = data['pintime']
         pindate = data['pindate']
 
-        print(f' The pin date requested is {pindate}')
+        print(f' The pin date requested is {pindate} and timeslot {pintime}')
+        pindate_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+        print(f' The pin date object requested is {pindate_obj}')
 
         try:
             chassis = data['chassis']
@@ -414,17 +416,17 @@ def make_pin_data():
             outchas = inchas
             outtext = 'Nothing Out'
         #Add this data to the pin database for today:
-        today = now.date()
+        #today = now.date()
         inpin = '0'
         outpin = '0'
         if inchas == None: inchas = 'OSLM007'
         # Now get the intext and outtext:
-        add_day = 2 # Need to make this an api argument
-        thisdate = today + timedelta(days=add_day)
+        #add_day = 2 # Need to make this an api argument
+        #thisdate = today + timedelta(days=add_day)
         if driver is not None and unit is not None and inchas is not None:
-            note = f'Will get pin for {driver} in unit {unit} using chassis {inchas}'
+            note = f'Will get pin for {driver} in unit {unit} using chassis {inchas} for {pindate_obj} {pintime}'
 
-        input = Pins(Date=thisdate, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
+        input = Pins(Date=pindate_obj, Driver=driver, InBook=inbook, InCon=incon, InChas=inchas, InPin=inpin,
                      OutBook=outbook, OutCon=outcon, OutChas=outchas, OutPin=outpin, Unit=unit, Tag=tag, Phone=phone,
                      Timeslot=pintime, Intext=intext, Outtext=outtext, Notes=note, Active=0, Maker=f'API-{current_user}')
         db.session.add(input)
