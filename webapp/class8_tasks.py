@@ -2582,6 +2582,7 @@ def get_dbdata(table_setup, tfilters):
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]})).all()'
     elif len(queery_adds) == 5:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]}) & ({query_adds[4]})).all()'
+    print(table_query)
 
     odata = eval(table_query)
 
@@ -4925,6 +4926,13 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     #postdata2 is summary of bill data with same company
     record_item = request.values.get('Record Item')
     locked = request.values.get('locked')
+    cancel = request.values.get('Cancel')
+    if cancel is not None:
+        completed = True
+        holdvec = []
+        entrydata = []
+        viewport = []
+        return holdvec, entrydata, err, viewport, completed
 
     #Get preliminary setup data based on first sid (want all the bills that match company and baccount
     nextquery = f"{table}.query.get({sids[0]})"

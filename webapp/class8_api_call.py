@@ -109,10 +109,10 @@ def api_call(scac, now, data_needed, arglist):
     elif data_needed == 'active_containers':
 
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
-        lb_days = 7
+        lb_days = 10
         today = now.date()
         lbdate = today - timedelta(days=lb_days)
-        active_date = today + timedelta(days=7)
+        active_date = today + timedelta(days=10)
         fd = '1900-01-01'
         print(f'Looking back to this date: {lbdate}')
         odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
@@ -179,7 +179,7 @@ def api_call(scac, now, data_needed, arglist):
 
     elif data_needed == 'calendar':
         #postman api test call is: http://127.0.0.1:5000/get_api_data?data_needed=active_containers&arglist=[]
-        lb_days = 60
+        lb_days = 10
         today = now.date()
         lbdate = today - timedelta(days=lb_days)
         active_date = today + timedelta(days=10)
