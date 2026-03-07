@@ -1468,13 +1468,13 @@ Exports_setup = {'name' : 'Exports',
 
 billcode = co[10] + 'B'
 Billing_genre =   {'table': 'Bills',
-                  'genre_tables': ['Bills', 'Vendors'],
-                  'genre_tables_on': ['on', 'off'],
+                  'genre_tables': ['Bills', 'Vendors', 'Accounts'],
+                  'genre_tables_on': ['on', 'off', 'off'],
                   'quick_buttons': ['New Bill', 'Edit Item', 'Pay Bill'],
                   'table_filters': [{'Date Filter': ['Last 90 Days', 'Last 180 Days', 'Last 360 Days', 'Last Year', 'This Year', 'Show All']},
                                     {'Pay Filter': ['Unpaid', 'Show All']},
                                     {'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
-                  'task_boxes': [{'Adding': ['New Bill', 'New Vendor', 'Upload Bill', 'Upload Payment']},
+                  'task_boxes': [{'Adding': ['New Bill', 'New Vendor', 'New Account', 'Upload Bill', 'Upload Payment']},
                                  {'Editing': ['Edit Item', 'Match']},
                                  {'View Docs': ['Bill Source', 'Receipt', 'Pay Record']},
                                  {'Undo': ['Delete Item', 'Undo Payment']},
@@ -1492,6 +1492,9 @@ Billing_genre =   {'table': 'Bills',
                                         'Completed IPSG' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
                                       },
                   'paymethods': ['Cash', 'Check', 'Credit Card', 'Epay-App', 'Epay-Web', 'PayCargo', 'Wire'],
+                  'acctcategories': ['Direct', 'Indirect', 'G-A'],
+                  'acctsubcats': ['Trucking', 'Freight Fwd', 'General'],
+                  'taxrollups' : ['Wages:Non-Owner W-2', 'Wages:Owner W-2', 'Admin Contractor', 'Driver Contractor', 'Other Contractor', 'Common Business Expense', 'Vehicle Expenses', 'Other Expenses'],
                   'image_stamps': {
                       'X': ['x.png', 'stamps', .2],
                       'Check': ['check.png', 'stamps', .5],
@@ -1514,6 +1517,7 @@ Billing_genre =   {'table': 'Bills',
                                         {
                                          'New Bill': ['Table_Selected', 'New', 'Bills'],
                                          'New Vendor' : ['Table_Selected', 'New', 'Vendors'],
+                                         'New Account' : ['Table_Selected', 'New', 'Accounts'],
                                          'Upload Bill' : ['Single_Item_Selection', 'Upload', 'Source'],
                                          'Upload Payment' : ['Single_Item_Selection', 'Upload', 'Proof']
                                          },
@@ -1588,7 +1592,7 @@ Bills_setup = {'name' : 'Billing',
                               {'expdata': ['Accounts', [['Co', 'get_Co'],['Type','Expense']], 'Name']},
                               {'codata': ['Divisions', [['Name', 'All']], 'Co']}
                               ],
-                'default values': {'get_Co': 'N'},
+                'default values': {'get_Co': 'K'},
                 'form checks': {
                        'New': ['Date', 'dDate', 'Company', 'bAmount', 'Co', 'bAccount'],
                        'Edit': ['Date', 'dDate', 'Company', 'bAmount', 'Co', 'bAccount'],
@@ -1650,11 +1654,53 @@ Vendors_setup = {'name' : 'Vendor',
                         'Edit': []
                     },
                     'form checks': {
+                        'New': ['Name'],
+                        'Edit': ['Name']
+                    },
+                    'jscript': 'dtHorizontalVerticalExample3',
+                    'documents': ['Source'],
+                    'sourcenaming': [None, None, 'Company'],
+                    'copyswaps': {}
+                    }
+
+Accounts_setup = {'name' : 'Account',
+                   'table': 'Accounts',
+                   'filter': None,
+                   'filterval': None,
+                   'filter logic': '==',
+                   'button flip': None,
+                   'checklocation': 1,
+                   'creators': [],
+                   'ukey' : 'Name',
+                   'simplify': [],
+                   'entry data': [['Name', 'Account Name', 'Account Name', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Balance', 'Balance', 'Balance', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['AcctNumber', 'AcctNumber', 'AcctNumber', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Type', 'Acct Type', 'Select Type', 'select', 'accttypes', 0, 'ok', 'cc', None, 'Always'],
+                                  ['Description', 'Description', 'Description', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Category', 'Category', 'Select Category', 'select', 'acctcategories', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Subcategory', 'Subcategory', 'Select Subcategory', 'select', 'acctsubcats', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Taxrollup', 'Taxrollup', 'Select Tax Line', 'select', 'taxrollups', 0, 'ok', 'cc', None, 'Always'],
+                                  ['Co', 'Co', 'Select Co', 'select', 'codata', 0, 'ok', 'cc', None, 'Always']],
+                   'hidden data' : [],
+                   'haulmask': [],
+                   'haulmask': [],
+                   'colorfilter': None,
+                    'filteron': [],
+                    'side data': [{'accttypes': ['Accttypes', [['Name', 'All']], 'Name']},
+                                  {'codata': ['Divisions', [['Name', 'All']], 'Co']}
+                              ],
+                    'default values': {'get_Shipper': 'Fill This Later'},
+                    'form show': {
+                        'New': [],
+                        'Edit': []
+                    },
+                    'form checks': {
                         'New': ['Company'],
                         'Edit': ['Company']
                     },
                     'jscript': 'dtHorizontalVerticalExample3',
                     'documents': ['Source'],
-                    'sourcenaming': [None, None, 'Company'],
+                    'sourcenaming': [None, None, 'Name'],
                     'copyswaps': {}
                     }

@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec, Terminals
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec, Terminals, Accttypes
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -1684,7 +1684,7 @@ def run_driver_upload(checked_data, upload):
         nc = ck[1]
         if table == 'Drivers' and nc == 1:
             sid = ck[2][0]
-            print(table, nc, sid)
+            #print(table, nc, sid)
     if sid is None:
         err = ['No Driver Table Data Selected']
         holdvec[140] = ''
@@ -1765,8 +1765,8 @@ def run_driver_upload(checked_data, upload):
 
 
 
-                print(f'output1 = {output1}')
-                print(f'output1 = {output2}')
+                #print(f'output1 = {output1}')
+                #print(f'output1 = {output2}')
 
                 # filename1 is for browser display which must maintain new file names to overcome caching
                 # filename2 is for the api display which need to avoid the caching suffix
@@ -1806,13 +1806,13 @@ def run_truck_upload(checked_data, upload):
     sid = None
     task_iter = 1
     #table = tablesetup['table']
-    print(f'checked data is: {checked_data}')
+    #print(f'checked data is: {checked_data}')
     for ck in checked_data:
         table = ck[0]
         nc = ck[1]
         if table == 'Trucks' and nc == 1:
             sid = ck[2][0]
-            print(table, nc, sid)
+            #print(table, nc, sid)
     if sid is None:
         err = ['No Truck Table Data Selected']
         holdvec[141] = ''
@@ -2181,7 +2181,7 @@ def Table_maker(genre):
                     keydata = get_Orders_keydata(keydata, checked_data)
 
     elif driver_upload is not None:
-        print(f'driver upload is: {driver_upload}')
+        #print(f'driver upload is: {driver_upload}')
         tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         holdvec, entrydata, err, viewport, completed = run_driver_upload(checked_data, driver_upload)
         taskon = None
@@ -2192,10 +2192,10 @@ def Table_maker(genre):
         #entrydata = []
         #err = ['All is well']
         tablesetup = None
-        print(viewport)
+        #print(viewport)
 
     elif truck_upload is not None:
-        print(f'Truck upload is: {truck_upload}')
+        #print(f'Truck upload is: {truck_upload}')
         tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         holdvec, entrydata, err, viewport, completed = run_truck_upload(checked_data, truck_upload)
         taskon = None
@@ -2206,7 +2206,7 @@ def Table_maker(genre):
         #entrydata = []
         #err = ['All is well']
         tablesetup = None
-        print(viewport)
+        #print(viewport)
 
 
     else:
@@ -2267,7 +2267,7 @@ def Table_maker(genre):
                 #print(f'this time slot is read as {timeslot}')
                 if box == 'on':
                     boxid.append(pdat.id)
-                print(f'box is {box} {boxid}')
+                #print(f'box is {box} {boxid}')
 
                 if driver is not None:
                     #print(f'The selected driver is {driver}')
@@ -2322,7 +2322,7 @@ def Table_maker(genre):
         #Perform moveup or movedn actions
         #print(f'boxid is {boxid}')
         for tid in boxid:
-            print(f'Performing action on id= {tid}')
+            #print(f'Performing action on id= {tid}')
             if delthis is not None:
                 Pins.query.filter(Pins.id == tid).delete()
                 db.session.commit()
@@ -2582,7 +2582,7 @@ def get_dbdata(table_setup, tfilters):
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]})).all()'
     elif len(queery_adds) == 5:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]}) & ({query_adds[4]})).all()'
-    print(table_query)
+    #print(table_query)
 
     odata = eval(table_query)
 
@@ -2683,7 +2683,7 @@ def make_new_entry(tablesetup,holdvec):
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')
-    print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
+    #print('class8_tasks.py 338 make_new_entry() Making new database entry using phrase:',dbnew)
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
@@ -2716,6 +2716,7 @@ def make_new_entry(tablesetup,holdvec):
         #err.append(f"Updated entry in {tablesetup['table']}")
 
         if sourcekeys is not None:
+            #print(sourcekeys)
             nextquery = f"{table}.query.get({id})"
             dat = eval(nextquery)
             #print('Check to see if we need to save a source document:')
