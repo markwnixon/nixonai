@@ -249,7 +249,12 @@ class Quoteinput(db.Model):
     xfloorunload = db.Column('xfloorunload', db.Integer)
     xpalletization = db.Column('xpalletization', db.Integer)
     xpalletcost = db.Column('xpalletcost', db.Integer)
-    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile, permits, xdray, xpalletxfer, xstopallet, xfloorunload, xpalletization, xpalletcost):
+    idlefuel = db.Column('idlefuel', db.Integer)
+    fuel2 = db.Column('fuel2', db.Integer)
+    avgporttime = db.Column('avgporttime', db.Integer)
+    avgportdist = db.Column('avgportdist', db.Integer)
+    deviation = db.Column('deviation', db.String(45))
+    def __init__(self, ph_driver, ph_insurance, ph_total, pm_fuel, pm_repairs, pm_other, pm_fees, pm_total, toll, fuelpergal, insurance_annual_truck, ga, mpg, markup, FSC,chassis2,chassis3,prepull, store, detention, extrastop, overweight, reefer, scale, residential, congestion, chassplit, owmile, permits, xdray, xpalletxfer, xstopallet, xfloorunload, xpalletization, xpalletcost, idlefuel, fuel2, avgporttime, avgportdist, deviation):
         self.ph_driver = ph_driver
         self.ph_insurance = ph_insurance
         self.ph_total = ph_total
@@ -285,6 +290,11 @@ class Quoteinput(db.Model):
         self.xfloorunload = xfloorunload
         self.xpalletization = xpalletization
         self.xpalletcost = xpalletcost
+        self.idlefuel = idlefuel
+        self.fuel2 = fuel2
+        self.avgporttime = avgporttime
+        self.avgportdist = avgportdist
+        self.deviation = deviation
 
 class Chassis(db.Model):
     __tablename__ = 'chassis'
