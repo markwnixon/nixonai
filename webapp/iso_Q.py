@@ -583,7 +583,7 @@ def surcharge_bid(doit, sc, oldbid):
 def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes):
     # Get the costs of the additional boxes checked
     if multibid[0] != 'on':
-        sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox,expdata,takedef,distdata,multibid,mdistdata, 0, costdata)
+        sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox,expdata,takedef,distdata,multibid,mdistdata, 0, costdata)
     else:
         btype = []
         if tbox[17]: btype.append('live')
@@ -639,6 +639,8 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
 
     bidtypeamount = [None, None]
     print(f'the multibid is: {multibid}')
+
+    # This section is active only if multiple locations is active, not if multiple bid types are needed for same location
     if multibid[0] == 'on':
         loci = multibid[2]
         bids = multibid[3]
@@ -651,54 +653,67 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
         if 'all-in-1d' in btype:
             ebody = f'Hello {customer}, <br><br>We can cover this move. <br<br>Rate:'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
 
-            ebody = ebody + f'{sen}<br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'all-in-1d'
             bidtypeamount[1] = bids[0]
 
         elif 'live' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                print(f'sen is {sen} for loc {loc}')
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'live'
             bidtypeamount[1] = bids[0]
 
         elif 'dr' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Pick</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
 
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'dr'
             bidtypeamount[1] = bids[0]
 
         elif 'dp' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Hook</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
 
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.  A return container must be available and ready upon delivery or bobtail charges may apply.'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'dp'
             bidtypeamount[1] = bids[0]
 
@@ -706,14 +721,17 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
 
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]} plus {d1s(expdata[14])}% FSC</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]} plus {d1s(expdata[14])}% FSC</b> to {loc}<br>'
 
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'fsc'
             bidtypeamount[1] = bids[0]
 
@@ -726,7 +744,8 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
             box = '40HC'
             if tbox[14]: box = '45HC'
             if tbox[15]: box = '20STD'
-            qty = 1
+            equip = f'1 x {box}'
+            if tbox[24]: equip = '40HC and 20STD'
             com = 'General Freight'
             if sboxes[2] == 'com1':
                 com = 'General Non-Haz'
@@ -737,7 +756,8 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
             if sboxes[2] == 'com4':
                 com = sboxes[3]
             if sboxes[2] == 'com5':
-                qty = sboxes[3]
+                com = 'General Freight Legal Weight'
+                equip = sboxes[3]
 
             if 'all-in-1d' in btype:
                 chassis = ''
@@ -745,7 +765,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
                 if tbox[1]: chassis = f'(Additional days of triax <b>${expdata[16]}/day</b>)'
                 ebody = f'Hello {customer}, '
                 if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
-                ebody = ebody + f'<br><br>Rate: <b>${bidthis[5]}</b> All-In\n<br>Lane: {port} to {locto}\n<br>Equipment: {qty} x {box}'
+                ebody = ebody + f'<br><br>Rate: <b>${bidthis[5]}</b> All-In\n<br>Lane: {port} to {locto}\n<br>Equipment: {equip}'
                 if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
                 ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls\n<br>{smallto}Fuel\n<br>{smallto}1 Day of Chassis {chassis}\n<br>{smallto}2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter)'
                 if tbox[2]: ebody = ebody + f'\n<br>{smallto}Prepull'
@@ -762,7 +782,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
 
 
                 if sboxes[1] == 'include':
-                    ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
                 else:
                     ebody = ebody + f'{sen}'
 
@@ -775,7 +795,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
                 if tbox[1]: chassis = f'(Additional days of triax <b>${expdata[16]}/day</b>)'
                 ebody = f'Hello {customer}, '
                 if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
-                ebody = ebody + f'<br><br>Rate: <b>${bidthis[4]}</b> All-In\n<br>Lane: {port} to {locto}\n<br>Equipment: {qty} x {box}'
+                ebody = ebody + f'<br><br>Rate: <b>${bidthis[4]}</b> All-In\n<br>Lane: {port} to {locto}\n<br>Equipment: {equip}'
                 if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
                 ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls\n<br>{smallto}Fuel\n<br>{smallto}2 Days of Chassis {chassis}\n<br>{smallto}2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter)'
 
@@ -792,65 +812,66 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
                 if tbox[12]: ebody = ebody + f'\n<br>{smallto}Chassis Split'
 
                 if sboxes[1] == 'include':
-                    ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
                 else:
                     ebody = ebody + f'{sen}'
 
                 bidtypeamount[0] = 'all-in-2d'
                 bidtypeamount[1] = bidthis[4]
 
-            elif len(btype) == 1:
+            elif len(btype) == 1: #This the one bid only section###################################################################################################
 
                 if 'live' in btype:
                     bid = surcharge_bid(tbox[13], costdata[7], bidthis[0])
-                    ebody = f'Hello {customer}, '
-                    if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
-                    ebody = ebody + f'<br><br>Rate: <b>${bid}</b> Live-Load\n<br>Lane: {port} to {locto}\n<br>Equipment: {qty} x {box}'
-                    if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
-                    ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls\n<br>{smallto}Fuel\n<br>{smallto}2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter)'
+                    bidtype = 'Live-Load'
                     bidtypeamount[0] = 'live'
                     bidtypeamount[1] = bidthis[0]
-
                 if 'dr' in btype:
                     bid = surcharge_bid(tbox[13], costdata[7], bidthis[1])
-                    ebody = f'Hello {customer}, '
-                    if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
-                    ebody = ebody + f'<br><br>Rate: <b>${bid}</b> Drop-Pick\n<br>Lane: {port} to {locto}\n<br>Equipment: {qty} x {box}'
-                    if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
-                    ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls\n<br>{smallto}Fuel\n<br>{smallto}Two bobtails to delivery site'
+                    bidtype = 'Drop-Pick'
                     bidtypeamount[0] = 'dr'
                     bidtypeamount[1] = bidthis[1]
-
                 if 'dp' in btype:
                     bid = surcharge_bid(tbox[13], costdata[7], bidthis[2])
-                    ebody = f'Hello {customer}, '
-                    if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
-                    ebody = ebody + f'<br><br>Rate: <b>${bid}</b> Drop-Hook\n<br>Lane: {port} to {locto}\n<br>Equipment: {qty} x {box}'
-                    if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
-                    ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls\n<br>{smallto}Fuel'
+                    bidtype = 'Drop-Hook'
                     bidtypeamount[0] = 'dp'
                     bidtypeamount[1] = bidthis[2]
-
                 if 'fsc' in btype:
-                    ebody = f'Hello {customer}, '
-                    if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
-                    ebody = ebody + f'<br><br>Rate: <b>${bidthis[3]} plus {d1s(expdata[14])}% FSC</b> Live Load\n<br>Lane: {port} to {locto}\n<br>Equipment: {qty} x {box}'
-                    if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
-                    ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls\n<br>{smallto}Fuel\n<br>{smallto}2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter)'
+                    bid = surcharge_bid(tbox[13], costdata[7], bidthis[3])
+                    bidtype = f'plus {d1s(expdata[14])}% FSC</b>'
                     bidtypeamount[0] = 'fsc'
                     bidtypeamount[1] = bidthis[3]
 
+                ebody = f'Hello {customer}, '
+
+                if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
+
+                if tbox[0]: ebody = ebody + f'<br><br>Rate: <b>${bid}</b> {bidtype} + chassis <b>${expdata[15]}/day</b>'
+                elif tbox[1]: ebody = ebody + f'<br><br>Rate: <b>${bid}</b> {bidtype} + triax chassis <b>${expdata[16]}/day</b>'
+                else: ebody = ebody + f'<br><br>Rate: <b>${bid}</b> {bidtype}'
+
+                ebody = ebody + f'\n<br>Lane: {port} to {locto}\n<br>Equipment: {equip}'
+                if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
+
+                ebody = ebody + f'\n\n<br><br>The rate includes:\n<br>{smallto}Tolls and Fuel'
+                if bidtypeamount[0] == 'live' or bidtypeamount[0] == 'fsc':
+                    ebody = ebody + f'\n<br>{smallto}2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter'
+                if not tbox[2]: ebody = ebody + f'\n<br>{smallto}Prepull and Storage for next day delivery'
+
                 if sboxes[1] == 'include':
-                    ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
                 else:
                     ebody = ebody + f'{sen}'
 
-
+            # This is the section for one location, but several bid types on same quote
             elif len(btype) > 1:
-                if mixtype == 'mix':
-                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto} from {port}, which apply to both 20ft and 40ft containers.<br><br>'
-                else:
-                    ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer these quotes for loads to {locto} from {port}.<br><br>'
+                ebody = f'Hello {customer}, '
+
+                if tbox[25]: ebody = ebody + f'\n\n<br><br>We have immediate capacity to execute this move.'
+
+                ebody = ebody + f'<br><br>Here are rate options for {port}->{locto}\n<br>Equipment: {equip}'
+                if tbox[16]: ebody = ebody + f'\n<br>Commodity: {com}'
+                ebody = ebody + '<br><br>'
 
                 if 'live' in btype:
                     ebody =  ebody + f'<b>${bidthis[0]}</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
@@ -864,9 +885,12 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
                 if 'fsc' in btype:
                     ebody = ebody + f'<b>${bidthis[3]} plus {d1s(expdata[14])}% FSC</b> for a live load which includes 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).<br>'
 
+                ebody = ebody + f'<br>The quotes are inclusive of all tolls and fuel costs.  No pre-pull or storage for next day delivery.<br>'
 
-                ebody = ebody + f'<br>The quotes are inclusive of all tolls and fuel costs.'
-                ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+                if tbox[0]:
+                    ebody = ebody + f'Add Chassis <b>${expdata[15]}/day</b>'
+                elif tbox[1]:
+                    ebody = ebody + f'Add Triax Chassis <b>${expdata[16]}/day</b>'
 
     if len(btype) == 1 and stype == 'ml':
         ebody = ebody.replace('this','each of these').replace('load', 'loads').replace('move','moves')
@@ -880,10 +904,103 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
 
     return ebody, tbox, etitle, bidtypeamount
 
+def direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, kx, costdata):
+    sen = ''
+    adds = []
+    btype = []
+    owfeetot = 0
+    smallto = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\u2022'
+
+    if tbox[17]: btype.append('live')
+    if tbox[18]: btype.append('dr')
+    if tbox[19]: btype.append('dp')
+    if tbox[22]: btype.append('fsc')
+    if tbox[20]: btype.append('all-in-1d')
+    if tbox[21]: btype.append('all-in-2d')
+    if not takedef:
+        for ix in range(len(tbox)):
+            tbox[ix] = request.values.get(f'tbox{str(ix)}')
+            #print(ix,tbox[ix])
+
+    if 'all-in-1d' not in btype and 'all-in-2d' not in btype:
+
+        if multibid[0] == 'on':
+            distdata = mdistdata[kx]
+            if tbox[0]: adds.append(f'Standard Chassis: <b>${expdata[15]}/day</b>')
+            if tbox[1]: adds.append(f'Triax Chassis: <b>${expdata[16]}/day</b>')
+
+        if tbox[2]:
+            adds.append(f'Pre-pull Fee: <b>${expdata[17]}</b> (includes one day of yard storage)')
+        if tbox[3]:
+            adds.append(f'Yard Storage: <b>${expdata[18]}/day</b>')
+        if tbox[4]:
+            owfee1 = round(int(float(expdata[21])))
+            try:
+                distloaded = float(distdata[0]) / 2
+                owfee2 = round(int(float(expdata[22]) * float(distdata[0]) / 2) / 10) * 10
+                owfeetot = owfee1+owfee2
+            except:
+                distloaded = 0
+                owfee1=0
+                owfee2=0
+                owfeetot=0
+            if multibid[0] != 'on': adds.append(f'Overweight Fee:  <b>${d2s(owfeetot)}</b>')
+        if tbox[5]:
+            permitfee = 90.00
+            adds.append(f'Permits Fee:  <b>${d2s(expdata[28])}</b>')
+        if tbox[6]:
+            adds.append(f'Extra Stop Fee: <b>${expdata[20]}</b>')
+        if tbox[7]:
+            adds.append(f'Reefer Fee:  <b>${expdata[23]}</b>')
+        if tbox[8]:
+            adds.append(f'Scale Ticket Set:  <b>${expdata[24]}</b>')
+        if tbox[9]:
+            adds.append(f'Residential Fee:  <b>${expdata[25]}</b>')
+        if tbox[10]:
+            adds.append(f'Urban Fee:  <b>${expdata[25]}</b>')
+        if tbox[11]:
+            adds.append(f'Port Congestion:  <b>${expdata[26]}$/hr over 2 hrs</b>')
+        if tbox[12]:
+            adds.append(f'Chassis Split:  <b>${expdata[27]}</b>')
+        if tbox[13]:
+            adds.append(f'Fuel Surcharge:  <b>${costdata[7]}</b>')
+    num_items = len(adds)
+
+    print(f'bype:{btype}, multibid:{multibid}')
+    if len(btype) == 1:
+        if multibid[0] == 'on':
+            if num_items == 1:
+                sen = '<br><br>Required addition: '
+            elif num_items > 1:
+                sen = '<br><br>Required additions: '
+        else:
+            if num_items == 1: sen = '<br><br>Other charges that apply for this move: '
+            if num_items > 1: sen = '<br><br>Other charges that apply for this move: '
+    if len(btype) > 1:
+        if num_items == 1: sen = '<br><br>'
+        elif num_items > 1: sen = '<br><br>Added charges to these quotes will include: '
+    for ix, add in enumerate(adds):
+        if ix == 0: sen = sen + f'<br>{smallto}' + add
+        elif ix == num_items-1: sen = sen + f'<br>{smallto}' + add
+        else: sen = sen + f'<br>{smallto}' + add
+    if num_items>0: sen = sen + '.  '
+    stype = 'reg'
+    mixtype = 'none'
+    if tbox[23]: stype = 'ml'
+    if tbox[24]:
+        mixtype = 'mix'
+        stype = 'ml'
+
+    #if tbox[25] and tbox[26]:  sen = sen + f'<br><br>We have immediate capacity and capacity into next week to execute the job quoted. '
+    #elif tbox[25]: sen = sen + f'<br><br>We have immediate capacity to execute the job quoted. '
+    #elif tbox[26]: sen = sen + f'<br><br>We have capacity for next week and beyond to execute the job quoted. '
+
+    return sen, tbox, btype, stype, mixtype, owfeetot
+
 def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes):
     # Get the costs of the additional boxes checked
     if multibid[0] != 'on':
-        sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox,expdata,takedef,distdata,multibid,mdistdata, 0, costdata)
+        sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox,expdata,takedef,distdata,multibid,mdistdata, 0, costdata)
     else:
         btype = []
         if tbox[17]: btype.append('live')
@@ -950,54 +1067,66 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
         if 'all-in-1d' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>All-In</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
 
-            ebody = ebody + f'{sen}<br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'all-in-1d'
             bidtypeamount[1] = bids[0]
 
         elif 'live' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'live'
             bidtypeamount[1] = bids[0]
 
         elif 'dr' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Pick</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
 
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'dr'
             bidtypeamount[1] = bids[0]
 
         elif 'dp' in btype:
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Drop-Hook</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> to {loc}<br>'
 
             ebody = ebody + f'<br>These quotes are inclusive of tolls and fuel.  A return container must be available and ready upon delivery or bobtail charges may apply.'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'dp'
             bidtypeamount[1] = bids[0]
 
@@ -1005,14 +1134,17 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
 
             for ix, loc in enumerate(loci):
-                sen, tbox, btype, stype, mixtype, ow = insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
+                sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]} plus {d1s(expdata[14])}% FSC</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
                     ebody = ebody + f'{tabover}<b>{bids[ix]} plus {d1s(expdata[14])}% FSC</b> to {loc}<br>'
 
             ebody = ebody + f'<br>These quotes are inclusive of tolls, fuel, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-            ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply if circumstances warrant.'
+            if sboxes[1] == 'include':
+                ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+            else:
+                ebody = ebody + f'{sen}'
             bidtypeamount[0] = 'fsc'
             bidtypeamount[1] = bids[0]
 
@@ -1026,14 +1158,20 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
                 include_text = include_text.replace('2-days', '1-day')
                 ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[5]} All-In</b> for this load to {locto} from {port}.' \
                         f'\nThe quote is inclusive of {include_text}, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-                ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+                if sboxes[1] == 'include':
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+                else:
+                    ebody = ebody + f'{sen}'
                 bidtypeamount[0] = 'all-in-1d'
                 bidtypeamount[1] = bidthis[5]
 
             elif 'all-in-2d' in btype:
                 ebody = f'Hello {customer}, \n\n<br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer a quote of <b>${bidthis[4]} All-In</b> for this load to {locto} from {port}.' \
                         f'\nThe quote is inclusive of {include_text}, and 2 hrs free load time (<b>${expdata[19]}/hr</b> thereafter).'
-                ebody = ebody + f'{sen}<br><br>The {cdata[0]} full accessorial table is shown below.  Some accessorial charges from this table may apply if circumstances warrant.'
+                if sboxes[1] == 'include':
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+                else:
+                    ebody = ebody + f'{sen}'
                 bidtypeamount[0] = 'all-in-2d'
                 bidtypeamount[1] = bidthis[4]
 
@@ -1066,8 +1204,10 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
                     bidtypeamount[0] = 'fsc'
                     bidtypeamount[1] = bidthis[3]
 
-                ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
-
+                if sboxes[1] == 'include':
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+                else:
+                    ebody = ebody + f'{sen}'
 
             elif len(btype) > 1:
                 if mixtype == 'mix':
@@ -1089,7 +1229,10 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
 
 
                 ebody = ebody + f'<br>The quotes are inclusive of all tolls and fuel costs.'
-                ebody = ebody + f'{sen}<br><br>Added charges are based on the full accessorial table shown below.  Additional accessorial charges from this table may apply as circumstances warrant.'
+                if sboxes[1] == 'include':
+                    ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
+                else:
+                    ebody = ebody + f'{sen}'
 
     if len(btype) == 1 and stype == 'ml':
         ebody = ebody.replace('this','each of these').replace('load', 'loads')
@@ -1103,7 +1246,9 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
 
     return ebody, tbox, etitle, bidtypeamount
 
-def insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, kx, costdata):
+
+
+def classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, kx, costdata):
     sen = ''
     adds = []
     btype = []
@@ -1170,14 +1315,14 @@ def insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, kx, costd
     if len(btype) == 1:
         if multibid[0] == 'on':
             if num_items == 1:
-                sen = '<br><br>An added charge to these quotes will include: '
+                sen = '<br><br>Required addition: '
             elif num_items > 1:
-                sen = '<br><br>Added charges to these quotes will include: '
+                sen = '<br><br>Required additions: '
         else:
-            if num_items == 1: sen = '<br><br>An added charge to this quote will include: '
-            if num_items > 1: sen = '<br><br>Added charges to this quote will include: '
+            if num_items == 1: sen = '<br><br>Also required for this move: '
+            if num_items > 1: sen = '<br><br>Also required for this move: '
     if len(btype) > 1:
-        if num_items == 1: sen = '<br><br>An added charge to these quotes will include: '
+        if num_items == 1: sen = '<br><br>'
         elif num_items > 1: sen = '<br><br>Added charges to these quotes will include: '
     for ix, add in enumerate(adds):
         if ix == 0: sen = sen + f'<br>{smallto}' + add
