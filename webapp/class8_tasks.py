@@ -2429,7 +2429,7 @@ def Table_maker(genre):
             company = request.values.get('Company')
             co = request.values.get('Co')
             bacct = request.values.get('bAccount')
-            print(company, co, bacct)
+            #print(company, co, bacct)
             if company is not None and company != 'Choose Later' and co == 'Choose Later'and bacct == 'Choose Later':
                 # Get information for the last bill entered:
                 bdat = Bills.query.filter(Bills.Company == company).order_by(Bills.id.desc()).first()
@@ -2440,8 +2440,8 @@ def Table_maker(genre):
             return None
 
         def get_expense_accts():
-            adata = Accounts.query.filter(Accounts.Type == 'Expense').all()
-            bdata = Accounts.query.filter(Accounts.Type == 'Current Asset').all()
+            adata = Accounts.query.filter(Accounts.Type == 'Expense').order_by(Accounts.Name).all()
+            bdata = Accounts.query.filter(Accounts.Category == 'Holding').all()
             mylist = []
             for adat in adata:
                 mylist.append(adat.Name)
@@ -2449,18 +2449,21 @@ def Table_maker(genre):
                 mylist.append(bdat.Name)
             return mylist
 
-        def add_holding_accts(vendordata):
+        def add_holding_accts(inputdata):
             hdata = Accounts.query.filter(Accounts.Category == 'Holding').all()
             for hdat in hdata:
-                vendordata.append(hdat.Name)
-            return vendordata
+                #print(hdat.Name)
+                inputdata.append(hdat.Name)
+            return inputdata
 
         holdvec[100] = expense_totals()
-        holdvec.extend([None] * 5)
+        holdvec.extend([None] * 6)
         holdvec[101] = get_vendor_fills()
         holdvec[102] = get_expense_accts()
+        #print(keydata)
         if keydata.get('vendordata'):
             holdvec[103] = add_holding_accts(keydata['vendordata'])
+            #print(holdvec[103])
         holdvec[104] = holding_totals()
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
