@@ -348,7 +348,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
             co = get_company(pid)
 
             acctdb = 'Accounts Payable'
-           #print(acctcr,cc)
+            print(f'the acctcr is {acctcr} and the cc is {cc}')
 
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first() #the expense account
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first() #the asset account

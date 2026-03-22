@@ -33,6 +33,7 @@
                 {%  set valdat = 'is-invalid' %}
         {% endif %}
         {% if entry[3] == 'select' %}
+
                 <tr>
                     <td><div class="input-group-text {{ colortext }}" data-toggle="tooltip" title="{{ entry[6] }}">{{  entry[2] }}</div></td>
 
@@ -48,14 +49,14 @@
                                 {% elif entry[4] == 'pickupdata' %}{% set klist = genre_data['pickupdata'] %}
                                 {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
                                 {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
-                                {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
+                                {% elif entry[4] == 'vendordata' %} {% set klist = holdvec[103] %}
                                 {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
                                 {% elif entry[4] == 'accttypes' %} {% set klist = keydata.accttypes %}
                                 {% elif entry[4] == 'acctcategories' %} {% set klist = genre_data['acctcategories'] %}
                                 {% elif entry[4] == 'acctsubcats' %} {% set klist = genre_data['acctsubcats'] %}
-                                {% elif entry[4] == 'taxrollups' %} {% set klist = genre_data['taxrollups'] %}
+                                {% elif entry[4] == 'taxdata' %} {% set klist = keydata.taxdata %}
                                 {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
-                                {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
+                                {% elif entry[4] == 'expdata' %}{% set klist = holdvec[102] %}
                                 {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                                 {% elif entry[4] == 'shipdata' %}{% set klist = keydata.shipdata %}
                                 {% elif entry[4] == 'delivery_types' %}{% set klist = genre_data['delivery_types'] %}
@@ -65,6 +66,15 @@
                                 {% endif %}
 
                             {% set htest = holdvec[loop.index-1] %}
+
+                            {% if genre == 'Billing' %}
+                                {% set defaults = holdvec[101] %}
+                                {% if defaults is not none %}
+                                        {% if entry[0] == 'Co' %}{% set htest = defaults[1] %}{% endif %}
+                                {% if entry[0] == 'bAccount' %}{% set htest = defaults[2] %}{% endif %}
+                                {% endif %}
+                            {% endif %}
+
                             {% if klist %}
                                 {% for kdata in klist %}
                                     <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>

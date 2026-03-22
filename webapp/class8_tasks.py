@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec, Terminals, Accttypes
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -31,7 +31,7 @@ import numbers
 #Python functions that require database access
 from webapp.class8_utils import *
 from webapp.utils import *
-from webapp.viewfuncs import newjo
+from webapp.viewfuncs import newjo, expense_totals, holding_totals
 import uuid
 
 def Add_New_Drop(dropblock):
@@ -340,8 +340,16 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                     if ix == 0:
                         if isinstance(select_value, str):
                             # Output of the get_ could be string or integer, but have to start with string to test get_
+                            #print(f'the select value is {select_value}')
+                            #print(f'the defaults are: {defaults}')
                             if 'get_' in select_value:
-                                default_val = defaults[f'{select_value}']
+                                try:
+                                    default_val = next(
+                                        (list(d.values())[0] for d in defaults if select_value in d),
+                                        None
+                                    )
+                                except:
+                                    default_val = defaults[f'{select_value}']
                                 find = select_value.replace('get_', '')
                                 select_value = request.values.get(find)
                                 if select_value is None:
@@ -352,6 +360,7 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                             if select_value == 'All':
                                 filters = f"{ktable}.query.order_by({ktable}.{keyon}).all()"
                             else:
+                                #print(f'the ktable 361 is {ktable}')
                                 filters = f"{ktable}.query.filter(({ktable}.{col}=='{select_value}')"
                         elif isinstance(select_value, int):
                             filters = f"{ktable}.query.filter(({ktable}.{col}=={select_value})"
@@ -386,9 +395,10 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                 #print(f'For the key {key} in keydata[key] is {keydata[key]} and select_value is {select_value}')
                 if keydata[key] == []:
                     def_list = get_default_list(key, select_value)
-                    #print(def_list)
+                    #print(f'The default list is: {def_list}')
                     keydata.update({key: def_list})
             #print(f'Final for the key {key} in keydata[key] is {keydata[key]}')
+            #print(f'Exiting with all keydata: {keydata}')
     return tabletitle, table_data, checked_data, jscripts, keydata, labpassvec
 
 def reset_state_soft(task_boxes):
@@ -1921,9 +1931,6 @@ def Table_maker(genre):
     invoicehit = request.values.get('InvoiceSet')
     resetmod = request.values.get('ResetMod')
 
-
-
-
     if request.method == 'POST' and resethit is None and resetmod is None:
 
         # See if a task is active and ongoing
@@ -2416,7 +2423,45 @@ def Table_maker(genre):
         #print(f'Holdvec[100] = {holdvec[100]}')
 
     #print(checked_data)
+    if genre == 'Billing':
+        # Get all expense data for current year to present at the panel
+        def get_vendor_fills():
+            company = request.values.get('Company')
+            co = request.values.get('Co')
+            bacct = request.values.get('bAccount')
+            print(company, co, bacct)
+            if company is not None and company != 'Choose Later' and co == 'Choose Later'and bacct == 'Choose Later':
+                # Get information for the last bill entered:
+                bdat = Bills.query.filter(Bills.Company == company).order_by(Bills.id.desc()).first()
+                if bdat is not None:
+                    return [company, bdat.Co, bdat.bAccount]
+                else:
+                    return None
+            return None
 
+        def get_expense_accts():
+            adata = Accounts.query.filter(Accounts.Type == 'Expense').all()
+            bdata = Accounts.query.filter(Accounts.Type == 'Current Asset').all()
+            mylist = []
+            for adat in adata:
+                mylist.append(adat.Name)
+            for bdat in bdata:
+                mylist.append(bdat.Name)
+            return mylist
+
+        def add_holding_accts(vendordata):
+            hdata = Accounts.query.filter(Accounts.Category == 'Holding').all()
+            for hdat in hdata:
+                vendordata.append(hdat.Name)
+            return vendordata
+
+        holdvec[100] = expense_totals()
+        holdvec.extend([None] * 5)
+        holdvec[101] = get_vendor_fills()
+        holdvec[102] = get_expense_accts()
+        if keydata.get('vendordata'):
+            holdvec[103] = add_holding_accts(keydata['vendordata'])
+        holdvec[104] = holding_totals()
 
     return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
@@ -4940,7 +4985,10 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     bdat = eval(nextquery)
     pdat = People.query.get(bdat.Pid)
     #print(f'data trouble {bdat.id} {pdat.id} {bdat.bAccount}')
-    bdata = Bills.query.filter(Bills.Pid == pdat.id).all()
+    if pdat is None:
+        bdata = Bills.query.filter(Bills.id== bdat.id).all()
+    else:
+        bdata = Bills.query.filter(Bills.Pid == pdat.id).all()
     #This prelinary data provides all similar bills to the ones being referred
     if task_iter > 0:
         # Now can alter the mutli-bill check to include other bills of similar nature and remove as well per selections
@@ -5130,6 +5178,8 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 for sid in sids:
                     nextquery = f"{table}.query.get({sid})"
                     each_bdat = eval(nextquery)
+                    #print(nextquery)
+                    #print(each_bdat)
                     err = gledger_write(['paybill'], each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount, 0)
                     err.append(f'Ledger paid {each_bdat.Jo} to {each_bdat.bAccount} from {each_bdat.pAccount}')
                     each_bdat.Check = docref

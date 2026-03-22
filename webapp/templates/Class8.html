@@ -128,6 +128,50 @@
                             {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
                             {%  if genre == 'Planning' %} {% include 'includes/_plancolorcode.html' %} {% endif %}
                         {%  endif %}
+                        {% if genre == 'Billing' %}
+                        <br>
+                            <h3>Year-to-Date Expense Summary</h3>
+                        <table style="border-collapse: collapse; width: 400px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left; padding:4px;">Expense</th>
+                                    <th style="text-align:center; padding:4px;">Count</th>
+                                    <th style="text-align:right; padding:4px;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set exps = holdvec[100] %}
+                                {% for exp in exps %}
+                                <tr>
+                                    <td style="padding:4px;">{{ exp[0] }}</td>
+                                    <td style="text-align:center; padding:4px;">{{ exp[1] }}</td>
+                                    <td style="text-align:right; padding:4px;">{{ exp[2] }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <br><br>
+                        <table style="border-collapse: collapse; width: 400px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left; padding:4px;">Holding</th>
+                                    <th style="text-align:center; padding:4px;">Count</th>
+                                    <th style="text-align:right; padding:4px;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set exps = holdvec[104] %}
+                                {% for exp in exps %}
+                                <tr>
+                                    <td style="padding:4px;">{{ exp[0] }}</td>
+                                    <td style="text-align:center; padding:4px;">{{ exp[1] }}</td>
+                                    <td style="text-align:right; padding:4px;">{{ exp[2] }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        {% endif %}
                         {% for db_data in table_data %}
                             {% set thistable = tabletitle[loop.index - 1] %}
                             <br>
@@ -138,6 +182,7 @@
                     {% endif %}
                 </div>
             </div>
+          {%  if genre == 'Trucking' %}
                 <div class="col-sm-12">
                     <br>
                     Instructions for Quote Shorthand:<br>
@@ -154,6 +199,7 @@
                     then will add a line item for driver detention (time start 1:25pm and time end 5:51pm),<br>
                     then will add a line item for per diem at $1500
                 </div>
+          {% endif %}
             <div class="row">
                 <div class="col-sm-12">
                     <br><br><br><br><br><br>

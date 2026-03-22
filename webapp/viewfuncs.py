@@ -2561,6 +2561,52 @@ def check_multi_line(jo):
     db.session.commit()
     return err, total, nbills
 
+def expense_totals():
+    # Get all expense data for current year to present at the panel
+    first_day = datetime.date(datetime.date.today().year, 1, 1)
+    print(first_day)
+    from sqlalchemy import func, cast, Float
+
+    expense_totals = (
+        db.session.query(
+            Bills.bAccount,
+            func.count(Bills.id).label("count"),
+            func.sum(cast(Bills.pAmount, Float)).label("total")
+        )
+        .filter(Bills.Date >= first_day, Bills.bType == 'Expense')
+        .group_by(Bills.bAccount)
+        .all()
+    )
+    display_expenses = [
+        (acct, count, d2s(total))
+        for acct, count, total in expense_totals
+    ]
+    #display_totals = [(acct, d2s(total)) for acct, total in expense_totals]
+    #print(display_expenses)
+    return display_expenses
+
+def holding_totals():
+    # Get all expense data for current year to present at the panel
+    first_day = datetime.date(datetime.date.today().year, 1, 1)
+    print(first_day)
+    from sqlalchemy import func, cast, Float
+
+    holding_totals = (
+        db.session.query(
+            Bills.bAccount,
+            func.count(Bills.id).label("count"),
+            func.sum(cast(Bills.pAmount, Float)).label("total")
+        )
+        .filter(Bills.Date >= first_day, Bills.bCat == 'Holding')
+        .group_by(Bills.bAccount)
+        .all()
+    )
+    display_expenses = [
+        (acct, count, d2s(total))
+        for acct, count, total in holding_totals
+    ]
+    return display_expenses
+
 def check_inputs(bill_list):
     err = []
     bill = bill_list[0]

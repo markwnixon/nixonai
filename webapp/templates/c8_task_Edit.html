@@ -49,15 +49,14 @@
                             {% elif entry[4] == 'pickupdata' %}{% set klist = genre_data['pickupdata'] %}
                             {% elif entry[4] == 'load_types' %}{% set klist = genre_data['load_types'] %}
                             {% elif entry[4] == 'haul_types' %}{% set klist = genre_data['haul_types'] %}
-                            {% elif entry[4] == 'vendordata' %} {% set klist = keydata.vendordata %}
+                            {% elif entry[4] == 'vendordata' %} {% set klist = holdvec[103] %}
                             {% elif entry[4] == 'acctdata' %} {% set klist = keydata.acctdata %}
-                                {% elif entry[4] == 'expdata' %} {% set klist = keydata.expdata %}
                                 {% elif entry[4] == 'accttypes' %} {% set klist = keydata.accttypes %}
                                 {% elif entry[4] == 'acctcategories' %} {% set klist = genre_data['acctcategories'] %}
                                 {% elif entry[4] == 'acctsubcats' %} {% set klist = genre_data['acctsubcats'] %}
-                                {% elif entry[4] == 'taxrollups' %} {% set klist = genre_data['taxrollups'] %}
+                                {% elif entry[4] == 'taxdata' %} {% set klist = keydata.taxdata %}
                             {% elif entry[4] == 'paymethods' %}{% set klist = genre_data['paymethods'] %}
-                            {% elif entry[4] == 'expdata' %}{% set klist = keydata.expdata %}
+                            {% elif entry[4] == 'expdata' %}{% set klist = holdvec[102] %}
                             {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                             {% elif entry[4] == 'shipdata' %}{% set klist = keydata.shipdata %}
                             {% elif entry[4] == 'emaildata' %}{% set klist = keydata.emaildata %}
