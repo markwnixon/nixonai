@@ -68,6 +68,7 @@
                 <a class="dropdown-item" href="{{ url_for('main.Class8Main',genre='General') }}">General Information</a>
                 {% if session['authority'] == 'superuser' %}
                     <a class="dropdown-item" href="{{ url_for('authenticate.register') }}">Create New User</a>
+                    <a class="dropdown-item" href="{{ url_for('authenticate.register_bot') }}">Create New Bot Client</a>
                 {% endif %}
 
             </div>

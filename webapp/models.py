@@ -29,6 +29,21 @@ class users(db.Model, UserMixin):
     def __repr__(self):
         return f"user('{self.name}','{self.username}', '{self.email}')"
 
+class BotClient(db.Model):
+    __tablename__ = 'bot_clients'
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    client_secret = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(100), nullable=True)
+    platform = db.Column(db.String(50), nullable=True)
+    scopes = db.Column(db.String(255), nullable=False, default='')
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    register_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    authority = db.Column(db.String(20), nullable=False, default='bot')
+
+    def __repr__(self):
+        return f"BotClient('{self.name}', '{self.client_id}', '{self.platform}')"
+
 
 class KeyInfo(db.Model):
     __tablename__ = 'keyinformation'
@@ -47,7 +62,6 @@ class KeyInfo(db.Model):
         self.Person = Person
         self.Phone = Phone
         self.Email = Email
-
 
 class ChalkBoard(db.Model):
     __tablename__ = 'chalkboard'

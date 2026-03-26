@@ -194,16 +194,23 @@ def add_quote_emails():
     imap.login(username, password)
     status, messages = imap.select('INBOX')
     # total number of emails
-    messages = int(messages[0])
-    #print(f'Total number of messages in inbox is {messages}')
+    imessages = int(messages[0])
+    #print(f'Total number of messages in inbox is {imessages}')
+    #print(f'username is {username}, password is {password}')
+    #print(f'imap_url is {imap_url}')
+    #print(f'status is {status}')
 
-    N = 50
+    if imessages >= 50:
+        N = 50
+    else:
+        N = imessages - 1
     #for i in range(messages, messages - N, -1):
-    for i in range(messages - N + 1, messages + 1):
+    for i in range(imessages - N , imessages + 1):
         decode_error = 0
         # fetch the email message by ID
         #res, msg = imap.fetch(str(i), "(RFC822)")
         # Insert the GPTChat solution
+        #print(f'Attempting to get message {i}')
         result, email_data = imap.fetch(str(i), "(RFC822)")
         # convert the email message data into an email object
         #print(f'Result for email {i} is {result}')
@@ -212,6 +219,7 @@ def add_quote_emails():
             try:
                 # extract the subject of the email
                 subject = extract_for_code(email_message["Subject"])
+                #print(f'For message number {i} th Subject is {subject}')
                 mid = extract_for_code(email_message["Message-ID"])
                 mid = mid.strip()
             except:
@@ -593,7 +601,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
         if tbox[20]: btype.append('all-in-1d')
         if tbox[21]: btype.append('all-in-2d')
 
-    print(f'btype is {btype} and wareBB is {wareBB}')
+    #print(f'btype is {btype} and wareBB is {wareBB}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     smallto = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\u2022'
     ebody = ''
@@ -638,7 +646,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
 
 
     bidtypeamount = [None, None]
-    print(f'the multibid is: {multibid}')
+    #print(f'the multibid is: {multibid}')
 
     # This section is active only if multiple locations is active, not if multiple bid types are needed for same location
     if multibid[0] == 'on':
@@ -670,7 +678,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, takedef, di
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>Live-Load</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
-                print(f'sen is {sen} for loc {loc}')
+                #print(f'sen is {sen} for loc {loc}')
                 if ow:
                     ebody = ebody + f'{tabover}<b>{bids[ix]}</b> plus an OW fee of <b>${d2s(ow)}</b> to {loc}<br>'
                 else:
@@ -966,7 +974,7 @@ def direct_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, kx
             adds.append(f'Fuel Surcharge:  <b>${costdata[7]}</b>')
     num_items = len(adds)
 
-    print(f'bype:{btype}, multibid:{multibid}')
+    #print(f'bype:{btype}, multibid:{multibid}')
     if len(btype) == 1:
         if multibid[0] == 'on':
             if num_items == 1:
@@ -1010,7 +1018,7 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
         if tbox[20]: btype.append('all-in-1d')
         if tbox[21]: btype.append('all-in-2d')
 
-    print(f'btype is {btype} and wareBB is {wareBB}')
+    #print(f'btype is {btype} and wareBB is {wareBB}')
     tabover = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
     smallto = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp'
     ebody = ''
@@ -1054,7 +1062,7 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
 
 
     bidtypeamount = [None, None]
-    print(f'the multibid is: {multibid}')
+    #print(f'the multibid is: {multibid}')
     if multibid[0] == 'on':
         loci = multibid[2]
         bids = multibid[3]
@@ -1365,7 +1373,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox
     porttime = float(qidat.avgporttime) / 100
     portmiles = float(qidat.avgportdist) / 100
     deviation = qidat.deviation
-    print(f'deviation is {deviation}')
+    #print(f'deviation is {deviation}')
     pm_fuel2 = fuel2 / mpg
 
 
@@ -1490,7 +1498,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox
     cost_fuel = totmiles * pm_fuel + idletime * idlefuel * fuel
     cost_fuel2 = totmiles * pm_fuel2 + idletime * idlefuel * fuel2
     fuel_surcharge = roundup(cost_fuel - cost_fuel2)
-    print(f'fuel_surcharge is: {fuel_surcharge}')
+    #print(f'fuel_surcharge is: {fuel_surcharge}')
     cost_tolls = 2.0 * tot_tolls
 
     cost_insur = tottime * ph_insurance
@@ -1537,7 +1545,7 @@ def get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox
         allbid2 += store
         include_text = f'{include_text}, 1-day storage'
     if tbox[4]:
-        print('Making the OW calsulations')
+        #print('Making the OW calsulations')
         owfee1 = round(int(float(expdata[21])))
         owfee2 = round(int(float(expdata[22]) * float(distdata[0]) / 2) / 10) * 10
         owfeetot = owfee1 + owfee2
@@ -2053,9 +2061,9 @@ def isoQuote():
                 quot = qdat.id
                 quotbut = qdat.id
                 mid = qdat.Mid
-                #print(f'Getting body_text because we just refreshed the emails')
+                print(f'Getting body_text because we just refreshed the emails')
                 plaintext, htmltext = get_body_text(qdat)
-                #print(f'1520 plaintext: {plaintext}')
+                print(f'1520 plaintext: {plaintext}')
 
         if taskbox == 1 or taskbox == 5:
             if qdat is None:

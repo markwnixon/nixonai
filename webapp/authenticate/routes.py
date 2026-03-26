@@ -4,8 +4,8 @@ from flask import render_template, flash, redirect, url_for, session, Blueprint
 from webapp.extensions import db, bcrypt
 #from webapp import app, bcrypt
 
-from webapp.models import users
-from webapp.authenticate.forms import RegistrationForm, LoginForm
+from webapp.models import users, BotClient
+from webapp.authenticate.forms import RegistrationForm, LoginForm, BotClientForm
 from flask_login import login_user, current_user, logout_user, login_required
 from webapp.CCC_system_setup import companydata, scac
 cmpdata = companydata()
@@ -64,4 +64,49 @@ def register():
         return render_template('authenticate/register.html', title='Register', form=form, cmpdata=cmpdata, scac=scac)
     else:
         flash(f'Do not have authority to register new users', 'danger')
+        return redirect(url_for('main.EasyStart'))
+
+
+@authenticate.route('/register_bot', methods=['GET', 'POST'])
+@login_required
+def register_bot():
+    if session['authority'] == 'superuser':
+        print('user is', session['username'])
+        print('authority is', session['authority'])
+
+        form = BotClientForm()
+
+        if form.validate_on_submit():
+            flash(f'New Bot Client Created for {form.name.data}', 'success')
+
+            hashed_secret = bcrypt.generate_password_hash(
+                form.client_secret.data
+            ).decode('utf-8')
+
+            input_row = BotClient(
+                name=form.name.data,
+                client_id=form.client_id.data,
+                client_secret=hashed_secret,
+                register_date=None,
+                authority=form.authority.data,
+                active=form.active.data,
+                platform=form.platform.data,
+                scopes=form.scopes.data.strip()
+            )
+
+            db.session.add(input_row)
+            db.session.commit()
+
+            flash('Save the raw client secret now. It cannot be recovered later.', 'warning')
+            return redirect(url_for('main.EasyStart'))
+
+        return render_template(
+            'authenticate/register_bot.html',
+            title='Register Bot',
+            form=form,
+            cmpdata=cmpdata,
+            scac=scac
+        )
+    else:
+        flash('Do not have authority to register new bot clients', 'danger')
         return redirect(url_for('main.EasyStart'))
