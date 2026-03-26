@@ -1843,7 +1843,7 @@ def isoQuote():
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None
+            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
         for jx in range(6):
