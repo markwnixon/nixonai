@@ -14,9 +14,15 @@ from webapp.class8_tasks import next_business_day, Order_Addresses_Update, Add_N
 import os
 from sqlalchemy import func
 
+# adds for new bidding api
+from webapp.iso_Q import tbox_from_flags, calculate_and_build_quote_api
+
 bot_bp = Blueprint('bot_bp', __name__)
 
 now = datetime.now()
+
+
+
 
 def save_order_upload_file(order_row, uploaded_file, filetype):
 
@@ -69,6 +75,76 @@ def save_order_upload_file(order_row, uploaded_file, filetype):
     setattr(order_row, sname, bn)
 
     return filename1, None
+
+@bot_bp.route('/api/bot/build_quote', methods=['POST'])
+def api_build_quote():
+    try:
+        payload = request.get_json(force=True) or {}
+
+        # Required inputs
+        locto = payload.get('locto')
+        customer = payload.get('customer')
+
+        if not locto:
+            return jsonify({
+                'ok': False,
+                'error': 'Missing required field: locto'
+            }), 400
+
+        if not customer:
+            customer = 'Customer'
+
+        # Optional inputs
+        term = payload.get('term')
+        start_address = payload.get('start_address')
+        newmarkup = payload.get('newmarkup')
+
+        include_accessorial_table = bool(payload.get('include_accessorial_table', False))
+
+        # Build tbox from clean named flags
+        flags = payload.get('flags', {})
+        tbox = tbox_from_flags(flags)
+
+        # Company data
+        cdata = companydata()
+
+        # Optional direct-body settings
+        sboxes = payload.get('sboxes')
+        multibid = payload.get('multibid')
+        whouse = payload.get('whouse')
+        wareBB = payload.get('wareBB')
+        wareUD = payload.get('wareUD')
+        etitle = payload.get('etitle')
+
+        result = calculate_and_build_quote_api(
+            locto=locto,
+            customer=customer,
+            cdata=cdata,
+            term=term,
+            start_address=start_address,
+            tbox=tbox,
+            newmarkup=newmarkup,
+            include_accessorial_table=include_accessorial_table,
+            sboxes=sboxes,
+            multibid=multibid,
+            whouse=whouse,
+            wareBB=wareBB,
+            wareUD=wareUD,
+            etitle=etitle
+        )
+
+        return jsonify({
+            'ok': True,
+            'result': result
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'ok': False,
+            'error': str(e)
+        }), 500
+
+
 
 
 @bot_bp.route('/bot/get_api_data', methods=['GET'])

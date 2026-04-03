@@ -1,0 +1,637 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<form action="{{ url_for ('main.QuoteMaker') }}" method="post">
+<div class="table-responsive">
+<div class="row">
+
+{% set etype = 'Quote' %}
+{% set emailin1=emaildata[2] %}
+{% if emailin1 %}
+    {% if '@' not in emailin1 %}
+        {% set emailin1 = 'Invalid Email' %}
+    {% endif %}
+{% endif %}
+{% set showcosts = whouse[0] %}
+{% set showfees = whouse[1] %}
+{% set showhouse = whouse[2] %}
+{% set wdray = whouse[3] %}
+{% set palletxfer = whouse[4] %}
+{% set stopallet = whouse[5] %}
+{% set floorunload = whouse[6] %}
+{% set palletization = whouse[7] %}
+{% set palletcost = whouse[8] %}
+{% set quotestyle = sboxes[0] %}
+{% set atable = sboxes[1] %}
+{% set commodity = sboxes[2] %}
+{% set comtext = sboxes[3] %}
+
+{% if taskbox == 1 or taskbox == 5%}
+        <div class="col-sm-4" align="left">
+            {% include 'includes/emailprep.html' %}
+
+            <div class="card" align=""left">
+                <div class = "card-header">
+                    Preview
+                </div>
+                <div class="card-body">
+                {{ emaildata[1]|safe }}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-4" align="left">
+        <br>
+
+            {% if expdata %}
+                <div class="card">
+                  <div class="card-header">
+                    Experienced-Based Cost Rates <button type="submit" class="btn btn-elegant btn-sm" name="newcosts" {% if not showcosts %}disabled{% endif %} >Update Costs</button><button type="submit" class="btn btn-blue btn-sm" name="oldcosts" {% if not showcosts %}disabled{% endif %}>Return to Default</button>
+                      <div class="custom-control custom-checkbox custom-control-inline">
+                          <input type="checkbox" class="custom-control-input" id="showcosts" {% if showcosts=='on' %} checked {% endif %} name="showcosts">
+                          <label class="custom-control-label" for="showcosts">Show Cost Rates</label>
+                      </div>
+                  </div>
+                  {% if showcosts %}
+                        <div class="card-body">
+                        <table class="table table-condensed">
+                            <tbody>
+                              <tr>
+                                  <td><b>Driver Rate</b></td><td><b>Current Fuel</b></td><td><b>MPG</b></td><td><b>Truck Insurance</b></td><td><b>Mark-Up</b></td>
+                              </tr>
+                                  <td>$/hr(full burden)</td><td>$/gal</td><td>miles/gal</td><td>$/year each truck</td><td>xcost factor</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='driver' value={{ expdata[0] }}></td>
+                                  <td><input class="form-control" type="text" name='fuel' value={{ expdata[1] }}></td>
+                                  <td><input class="form-control" type="text" name='mpg' value={{ expdata[2] }}></td>
+                                  <td><input class="form-control" type="text" name='insurance' value={{ expdata[3] }}></td>
+                                  <td><input class="form-control" type="text" name='markup' value={{ expdata[4] }}></td>
+                              </tr>
+
+                              <tr>
+                                  </td><td><b>Toll Rate</b></td><td><b>G&A Rate</b></td><td><b>R&M Rate</b></td><td><b>LicFeeReg Rate</b></td><td><b>Other</b></td>
+                              </tr>
+                                  <td>5-axle rate</td><td>%</td><td>$/mile</td><td>$/mile</td><td>$/mile</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='toll' value={{ expdata[5] }}></td>
+                                  <td><input class="form-control" type="text" name='gapct' value={{ expdata[6] }}></td>
+                                  <td><input class="form-control" type="text" name='rm' value={{ expdata[7] }}></td>
+                                  <td><input class="form-control" type="text" name='fees' value={{ expdata[8] }}></td>
+                                  <td><input class="form-control" type="text" name='other' value={{ expdata[9] }}></td>
+                              </tr>
+
+                                                            <tr>
+                                  </td><td><b>Idle Burn</b></td><td><b>Historical Fuel</b></td><td><b>Avg Port Time</b></td><td><b>Avg Port Dist</b></td><td><b>Deviation Miles</b></td>
+                              </tr>
+                                  <td>gal/hr</td><td>$/gal</td><td>hrs</td><td>mile</td><td>mile+%tot</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='idlefuel' value={{ expdata[35] }}></td>
+                                  <td><input class="form-control" type="text" name='fuel2' value={{ expdata[36] }}></td>
+                                  <td><input class="form-control" type="text" name='avgporttime' value={{ expdata[37] }}></td>
+                                  <td><input class="form-control" type="text" name='avgportdist' value={{ expdata[38] }}></td>
+                                  <td><input class="form-control" type="text" name='deviation' value={{ expdata[39] }}></td>
+                              </tr>
+
+                              <tr>
+                                  <td><b>Fuel Rate</b></td><td><b>Insur Rate</b></td><td><b>Total per Mile</b></td><td><b>Total per Hour</b></td><td>&nbsp</td>
+                              </tr>
+                              <tr>
+                                  <td>$/mile</td><td>$/hr</td><td>$/mile</td><td>$/hour</td><td>&nbsp</td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[10] }} disabled></td>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[11] }} disabled></td>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[12] }} disabled></td>
+                                  <td><input class="form-control" type="text" placeholder={{ expdata[13] }} disabled></td>
+                                  <td><td>&nbsp</td></td>
+                              </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                  {% endif %}
+                </div>
+
+
+                <div class="card">
+                    <div class="card-header">
+                        Accessorial Fees <button type="submit" class="btn btn-elegant btn-sm" name="newfees" {% if not showfees %}disabled{% endif %}>Update Fees</button>
+                        <div class="custom-control custom-checkbox custom-control-inline">
+                            <input type="checkbox" class="custom-control-input" id="showfees" {% if showfees=='on' %} checked {% endif %} name="showfees">
+                            <label class="custom-control-label" for="showfees">Show Accessorial Fees</label>
+                        </div>
+                    </div>
+
+                    {% if showfees %}
+                    <div class="card-body">
+                        <table class="table table-condensed table-hover">
+                            <tbody>
+                              <tr>
+                                  <td><b>FSC %</b></td><td><b>Tandem Chas</b></td><td><b>Triaxle Chas</b></td><td><b>Prepull Fee</b></td><td><b>Yard Stor</b></td>
+                              </tr>
+                              <tr>
+                                  <td><input class="form-control" type="text" name='fsc' value={{ expdata[14] }}></td>
+                                  <td><input class="form-control" type="text" name='chassis2' value={{ expdata[15] }}></td>
+                                  <td><input class="form-control" type="text" name='chassis3' value={{ expdata[16] }}></td>
+                                  <td><input class="form-control" type="text" name='prepull' value={{ expdata[17] }}></td>
+                                  <td><input class="form-control" type="text" name='store' value={{ expdata[18] }}></td>
+                             </tr>
+                             <tr>
+                                  <td><b>Driver Det</b></td><td><b>Extra Stop</b></td><td><b>Overwt Base</b></td><td><b>OW per mile</b></td><td><b>Reefer</b></td>
+                             <tr>
+                                  <td><input class="form-control" type="text" name='detention' value={{ expdata[19] }}></td>
+                                  <td><input class="form-control" type="text" name='extrastop' value={{ expdata[20] }}></td>
+                                  <td><input class="form-control" type="text" name='overweight' value={{ expdata[21] }}></td>
+                                  <td><input class="form-control" type="text" name='owmile' value={{ expdata[22] }}></td>
+                                  <td><input class="form-control" type="text" name='reefer' value={{ expdata[23] }}></td>
+                             </tr>
+                              <tr>
+                                  <td><b>Scale Tick</b></td><td><b>Residential</b></td><td><b>Port Congest</b></td><td><b>Chass Splt</b></td><td><b>Permits</b></td>
+                              <tr>
+                             <tr>
+                                  <td><input class="form-control" type="text" name='scale' value={{ expdata[24] }}></td>
+                                  <td><input class="form-control" type="text" name='residential' value={{ expdata[25] }}></td>
+                                  <td><input class="form-control" type="text" name='congestion' value={{ expdata[26] }}></td>
+                                  <td><input class="form-control" type="text" name='chassplit' value={{ expdata[27] }}></td>
+                                  <td><input class="form-control" type="text" name='permits' value={{ expdata[28] }}></td>
+                             </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                      <div class="card-header">
+                            Warehouse Fees <button type="submit" class="btn btn-elegant btn-sm" name="updatehousefees" {% if not showhouse %}disabled{% endif %}>Update Warehouse Fees</button>
+                            <div class="custom-control custom-checkbox custom-control-inline">
+                                  <input type="checkbox" class="custom-control-input" id="showhouse" {% if showhouse=='on' %} checked {% endif %} name="showhouse">
+                                  <label class="custom-control-label" for="showhouse">Show Warehouse Fees</label>
+                            </div>
+                      </div>
+
+                      {% if showhouse %}
+                      <div class="card-body">
+                            <table class="table table-condensed table-hover">
+                                <tbody>
+                                  <tr>
+                                      <td><b>Drayage</b></td><td><b>Pallet Xfer Each Way</b></td><td><b>Pallet Storage</b></td><td><b>Floor Loaded</b></td><td><b>Palletization</b></td>
+                                  </tr>
+                                  <tr>
+                                      <td><input class="form-control" type="text" name='xdray' value={{ expdata[29] }}></td>
+                                      <td><input class="form-control" type="text" name='xpalletxfer' value={{ expdata[30] }}></td>
+                                      <td><input class="form-control" type="text" name='xstopallet' value={{ expdata[31] }}></td>
+                                      <td><input class="form-control" type="text" name='xfloorunload' value={{ expdata[32] }}></td>
+                                      <td><input class="form-control" type="text" name='xpalletization' value={{ expdata[33] }}></td>
+                                 </tr>
+                                  <tr>
+                                      <td><b>Pallet Cost</b></td><td><b>Future</b></td><td><b>Future</b></td><td><b>Future</b></td><td><b>Future</b></td>
+                                  </tr>
+                                  <tr>
+                                      <td><input class="form-control" type="text" name='xpalletcost' value={{ expdata[34] }}></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                 </tr>
+                                </tbody>
+                            </table>
+                      </div>
+                      {% endif %}
+                </div>
+
+            {% endif %}
+
+
+
+
+
+
+
+
+        <br>
+        {% if timedata %}
+            <div class="card">
+              <div class="card-header">
+                Time and Distance Calculations for Load Quote
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                    <tbody>
+                  <tr>
+                      <td> </td><td><b>Round Trip</b></td><td><b>Port</b></td><td><b>Load</b></td><td><b>Deviations</b></td><td><b>Total</b></td>
+                  </tr>
+                  <tr>
+                      <td>Time (hours)</td><td>{{ timedata[0] }}</td><td>{{ timedata[1] }}</td><td>{{ timedata[2] }}</td><td>{{ timedata[3] }}</td><td>{{ timedata[4] }}</td>
+                 </tr><tr>
+                      <td>Dist (miles)</td><td>{{ distdata[0] }}</td><td>{{ distdata[1] }}</td><td>{{ distdata[2] }}</td><td>{{ distdata[3] }}</td><td>{{ distdata[4] }}</td>
+                 </tr>
+                </tbody>
+            </table>
+             </div></div>
+        {% endif %}
+        <br>
+        {% if costdata %}
+                <div class="card">
+              <div class="card-header">
+                Cost Component Calculations for Load Quote
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                    <tbody>
+                  <tr>
+                      <td><b>Driver Cost</b></td><td><b>Fuel Cost</b></td><td><b>Toll Cost</b></td><td><b>Insurance</b></td><td><b>R&M Cost</b></td><td><b>Fees/Other Cost</b></td><td><b>G&A Cost</b></td><td><b>Fuel Surcharge</b></td>
+                  </tr>
+                      <td>{{ costdata[0] }}</td><td>{{ costdata[1] }}</td><td>{{ costdata[2] }}</td><td>{{ costdata[3] }}</td><td>{{ costdata[4] }}</td><td>{{ costdata[5] }}</td><td>{{ costdata[6] }}</td><td>{{ costdata[7] }}</td>
+                 </tr>
+                 <tr>
+                </tbody>
+            </table> </div></div>
+        {% endif %}
+        <br>
+        {% if biddata %}
+                <div class="card">
+              <div class="card-header">
+                Total Cost and Bids
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                <tbody>
+
+                  <tr>
+                      <td><font size = "0"><b>Total Cost</b></font></td><td><font size = "0"><b>Bid (Live Load)</b></font></td><td><font size = "0"><b>Bid (Drop-Pick)</b></font></td>
+                      <td><font size = "0"><b>Bid (Drop-Hook)</b></font></td><td><font size = "0"><b>Bid+{{ expdata[14] }}% FSC</b></font></td><td><font size = "0"><b>All-In-2D</b></font></td><td><b>All-In-1D</b></font></td>
+                  </tr>
+                  <td><font size = "+1"><b>{{ costdata[9] }}</b></font></td><td><font size = "+1"><b>{{ biddata[0] }}</b></font></td><td><font size = "+1"><b>{{ biddata[1] }}</b></font></td>
+                  <td><font size = "+1"><b>{{ biddata[2] }}</b></font></td><td><font size = "+1"><b>{{ biddata[3] }}</b></font></td> <td><font size = "+1"><b>{{ biddata[4] }}</b></font></td><td><font size = "+1"><b>{{ biddata[5] }}</b></font></td>
+                 </tr>
+                 <tr>
+
+                </tbody>
+            </table> </div></div>
+        {% endif %}
+        {% if dirdata %}
+                <div class="card">
+              <div class="card-header">
+               Detailed Directions
+              </div>
+            <div class="card-body">
+            <table class="table table-condensed table-hover">
+                <tbody>
+                {% for dirline in dirdata %}
+                    {% if 'Toll' in dirline %}
+                     {% set atc1="amber" %}
+                    {% else %}
+                    {% set atc1 = "white" %}
+                    {% endif %}
+                  <tr>
+                    <td class="{{atc1}}">{{ dirline | safe }}</td>
+                 </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div></div>
+        {% endif %}
+        </div>
+{% else %}
+    <div class="col-sm-8" align="center">
+        {% include 'Quotes_Table.html' %}
+    </div>
+
+{% endif %}
+
+{% if taskbox != 1 and taskbox != 5  %}
+    <br>
+    <div class="col-sm-4" align="left">
+    <br><br>
+        <div class="card" align=""left">
+            <div class = "card-header">
+                Quick Preview
+            </div>
+            <div class="card-body">
+                {% if qdat %}
+                    From:  {{ qdat.From|safe }}<br>
+                    Subject:  {{ qdat.Subject|safe }}<br><br>
+                    Body: {{ ebodytxt|safe }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% else %}
+    {% set ncit = multibid[1]|int %}
+    {% set term = multibid[4] %}
+    {% set terminals = multibid[5] %}
+    <div class="col-sm-4" align="left">
+    <br>
+        <div class="card">
+          <div class="card-header">
+            Enter Data for Quote
+          </div>
+        <div class="card-body">
+            <div class="custom-control custom-checkbox custom-control-inline">
+                Number of Cities in Bid:&nbsp;&nbsp;
+                <select class="form-select" aria-label="Default select example" name="numcit" onchange="this.form.submit()">
+                      <option {% if ncit == 0 %} selected {% endif %}>Number of Cities</option>
+                      <option {% if ncit == 1 %} selected {% endif %} value=1>One</option>
+                      <option {% if ncit == 2 %} selected {% endif %} value=2>Two</option>
+                      <option {% if ncit == 3 %} selected {% endif %} value=3>Three</option>
+                      <option {% if ncit == 4 %} selected {% endif %} value=4>Four</option>
+                      <option {% if ncit == 5 %} selected {% endif %} value=5>Five</option>
+                      <option {% if ncit == 6 %} selected {% endif %} value=6>Six</option>
+                </select>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+                From Terminal:&nbsp;&nbsp;
+                <select class="form-select" aria-label="Default select example" name="terminal" onchange="this.form.submit()">
+                    {% for terminal in terminals %}
+                      <option {% if term == terminal.Name %} selected {% endif %} value='{{ terminal.Name }}'>{{ terminal.Name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% if multibid[0] == 'on' %}
+            {% set loci = multibid[2] %}
+            {% set mbids = multibid[3] %}
+            <table>
+                <tr>
+                      <td align="right"> <b>Terminal Start: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
+
+                </tr>
+                {% for ix in range(ncit) %}
+                    <tr>
+                      <td align="right"> <b>To Location: &nbsp{{ ix+1 }}</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="locto{{ ix }}" rows="2">{{loci[ix]}}</textarea></td>
+                      <td colspan="1"><textarea class="form-control" type="text" name="bidto{{ ix }}" rows="1">{{mbids[ix]}}</textarea></td>
+                    </tr>
+                {% endfor %}
+                <tr>
+                      <td align="right">
+                          <b>Override Costs Mark-Up: &nbsp</b>
+                      </td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="optmarkup" rows="1">{{newmarkup}}</textarea></td>
+                </tr>
+                <tr>
+                      <td align="right"> <b>Salutation Name/Override: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
+                 </tr>
+
+            </table>
+        {% else %}
+
+            <table>
+                  <tr>
+                      <td align="right"> <b>To: &nbsp</b></td>
+                      <td colspan="5"><textarea class="form-control" type="text" name="locto" rows="2">{{locto}}</textarea></td>
+                      <td colspan="6"><textarea class="form-control" type="text" name="locfrom" rows="2">{{locfrom}}</textarea></td>
+                 </tr>
+                {% set types = [' Live', ' Drop-Pick', ' Drop-Hook', ' FSC Live'] %}
+                 {%  for jx in range(1,5) %}
+                     {% if tbox[11+loop.index]=='on' %}
+                      <tr>
+                          <td align="right"> <b>O.R. Bid{{ types[loop.index-1] }}: &nbsp</b></td>
+                          <td colspan="3"><textarea class="form-control" type="text" name="bidthis{{ loop.index-1 }}" rows="1">{{bidthis[jx-1]}}</textarea></td>
+
+                     {% endif %}
+                 {% endfor %}
+
+                          <td align="right">
+                              <b>O.R. Markup: &nbsp</b>
+                          </td>
+                          <td colspan="3"><textarea class="form-control" type="text" name="optmarkup" rows="1">{{newmarkup}}</textarea></td>
+
+                      <td align="right"> <b>O.R. Name: &nbsp</b></td>
+                      <td colspan="3"><textarea class="form-control" type="text" name="bidname" rows="1">{{bidname}}</textarea></td>
+                      <td></td>
+                      <td></td>
+                 </tr>
+            </table>
+        {% endif %}
+
+
+
+           <br>
+            Check accessorial items that apply:<br>
+
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box0" {% if tbox[0]=='on' %} checked {% endif %} name="tbox0">
+              <label class="custom-control-label" for="box0">Chassis 2-axle</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box1" {% if tbox[1]=='on' %} checked {% endif %} name="tbox1">
+              <label class="custom-control-label" for="box1">Chassis 3-axle</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box2" {% if tbox[2]=='on' %} checked {% endif %} name="tbox2">
+              <label class="custom-control-label" for="box2">Prepull</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box3" {% if tbox[3]=='on' %} checked {% endif %} name="tbox3">
+              <label class="custom-control-label" for="box3">Yard Storage</label>
+            </div>
+        <br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box4" {% if tbox[4]=='on' %} checked {% endif %} name="tbox4">
+              <label class="custom-control-label" for="box4">Overweight</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box5" {% if tbox[5]=='on' %} checked {% endif %} name="tbox5">
+              <label class="custom-control-label" for="box5">Permits</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box6" {% if tbox[6]=='on' %} checked {% endif %} name="tbox6">
+              <label class="custom-control-label" for="box6">Extra Stop</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box7" {% if tbox[7]=='on' %} checked {% endif %} name="tbox7">
+              <label class="custom-control-label" for="box7">Reefer</label>
+            </div>
+         <br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box8" {% if tbox[8]=='on' %} checked {% endif %} name="tbox8">
+              <label class="custom-control-label" for="box8">Scale Tickets</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box9" {% if tbox[9]=='on' %} checked {% endif %} name="tbox9">
+              <label class="custom-control-label" for="box9">Residential</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box10" {% if tbox[10]=='on' %} checked {% endif %} name="tbox10">
+              <label class="custom-control-label" for="box10">Urban</label>
+            </div>
+             <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box11" {% if tbox[11]=='on' %} checked {% endif %} name="tbox11">
+              <label class="custom-control-label" for="box11">Congestion</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box12" {% if tbox[12]=='on' %} checked {% endif %} name="tbox12">
+              <label class="custom-control-label" for="box12">Chas-Splt</label>
+            </div>
+                 <br>
+           <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box13" {% if tbox[13]=='on' %} checked {% endif %} name="tbox13">
+              <label class="custom-control-label" for="box13">Fuel Surcharge</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box14" {% if tbox[14]=='on' %} checked {% endif %} name="tbox14">
+              <label class="custom-control-label" for="box14">Is 45</label>
+            </div>
+             <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box15" {% if tbox[15]=='on' %} checked {% endif %} name="tbox15">
+              <label class="custom-control-label" for="box15">Is 20</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box16" {% if tbox[16]=='on' %} checked {% endif %} name="tbox16">
+              <label class="custom-control-label" for="box16">Include Commodity</label>
+            </div>
+
+         <br><br>
+
+        Check bid type to set up email (defaults to live):<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box17" {% if tbox[17]=='on' %} checked {% endif %} name="tbox17">
+              <label class="custom-control-label" for="box17">Live</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box18" {% if tbox[18]=='on' %} checked {% endif %} name="tbox18">
+              <label class="custom-control-label" for="box18">Drop-Pick</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box19" {% if tbox[19]=='on' %} checked {% endif %} name="tbox19">
+              <label class="custom-control-label" for="box19">Drop-Hook</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box20" {% if tbox[20]=='on' %} checked {% endif %} name="tbox20">
+              <label class="custom-control-label" for="box20">All-In+1D-Ch</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box21" {% if tbox[21]=='on' %} checked {% endif %} name="tbox21">
+              <label class="custom-control-label" for="box21">All-In+2D-Ch</label>
+            </div>
+        <br>
+
+           <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box22" {% if tbox[22]=='on' %} checked {% endif %} name="tbox22">
+              <label class="custom-control-label" for="box22">FSC Live</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box23" {% if tbox[23]=='on' %} checked {% endif %} name="tbox23">
+              <label class="custom-control-label" for="box23">Multiple Loads</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box24" {% if tbox[24]=='on' %} checked {% endif %} name="tbox24">
+              <label class="custom-control-label" for="box24">Mix 20-40</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box25" {% if tbox[25]=='on' %} checked {% endif %} name="tbox25">
+              <label class="custom-control-label" for="box25">Immediate</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="box26" {% if tbox[26]=='on' %} checked {% endif %} name="tbox26">
+              <label class="custom-control-label" for="box26">Next Week</label>
+            </div>
+
+            <br><br>
+
+<div class="form-group d-flex align-items-center">
+  <!-- First dropdown -->
+  <div class="mr-3">
+    <label for="quotestyle" class="mr-2">Quote Style</label>
+    <select class="form-control" id="quotestyle" name="quotestyle">
+      <option value="direct" {% if quotestyle=='direct' %} selected {% endif %}>Direct</option>
+      <option value="classic" {% if quotestyle=='classic' %} selected {% endif %}>Classic</option>
+      <option value="superdirect" {% if quotestyle=='superdirect' %} selected {% endif %}>Super Direct</option>
+    </select>
+  </div>
+
+  <!-- Second dropdown -->
+  <div class="mr-3">
+    <label for="atable" class="mr-2">Accessorial Table</label>
+    <select class="form-control" id="atable" name="atable">
+      <option value="include" {% if atable =='include' %} selected {% endif %}>Include</option>
+      <option value="exclude" {% if atable=='exclude' %} selected {% endif %}>Exclude</option>
+      <option value="link" {% if atable=='link' %} selected {% endif %}>Add Link</option>
+    </select>
+  </div>
+
+  <!-- Third dropdown -->
+  <div>
+    <label for="commodity" class="mr-2">Commodity or Equipment</label>
+    <select class="form-control" id="commodity" name="commodity">
+      <option value="com1" {% if commodity == 'com1' %} selected {% endif %}>General Non-Haz</option>
+      <option value="com2" {% if commodity == 'com2'  %} selected {% endif %}>Unspecified Non_Haz</option>
+      <option value="com3" {% if commodity == 'com3'  %} selected {% endif %}>Wine</option>
+      <option value="com4" {% if commodity == 'com4'  %} selected {% endif %}>Use Text for Commodity</option>
+      <option value="com5" {% if commodity == 'com5'  %} selected {% endif %}>Use Text for Equip</option>
+    </select>
+  </div>
+  <!-- Input text box -->
+  <div>
+    <label for="comtext" class="mr-2">Text Input</label>
+    <input type="text" class="form-control" id="comtext" name="comtext" value="{{ comtext or '' }}" style="width: 200px;">
+  </div>
+</div>
+
+        <br><br>
+                Warehouse Selections:<br>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="wdray" {% if wdray == 'on' %} checked {% endif %} name="wdray">
+              <label class="custom-control-label" for="wdray">Drayage</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="palletxfer" {% if palletxfer=='on' %} checked {% endif %} name="palletxfer">
+              <label class="custom-control-label" for="palletxfer">Pallets On/Off</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="stopallet" {% if stopallet=='on' %} checked {% endif %} name="stopallet">
+              <label class="custom-control-label" for="stopallet">Store Pallets</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="floorunload" {% if floorunload=='on' %} checked {% endif %} name="floorunload">
+              <label class="custom-control-label" for="floorunload">Floor Unload</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="palletization" {% if palletization=='on' %} checked {% endif %} name="palletization">
+              <label class="custom-control-label" for="palletization">Palletization</label>
+            </div>
+            <div class="custom-control custom-checkbox custom-control-inline">
+              <input type="checkbox" class="custom-control-input" id="palletcost" {% if palletcost=='on' %} checked {% endif %} name="palletcost">
+              <label class="custom-control-label" for="palletcost">Pallet Cost</label>
+            </div>
+            <br><br>
+             <button type="submit" class="btn btn-elegant btn-sm" name="GetQuote">Update<br>Quote</button>
+             <button type="submit" class="btn btn-elegant btn-sm" name="Update">Override<br>Bid/Name</button>
+             <button type="submit" class="btn btn-green btn-sm" name="UpdateE">Override<br>Email</button>
+             <button type="submit" class="btn btn-green btn-sm" name="Email" {% if locto == 'No Location Found' or emailin1 == 'Invalid Email'%}disabled{% endif %}>Email Qte<br>& Next</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="Return">Return To<br>Table</button>
+             <button type="submit" class="btn btn-red btn-sm" name="RemoveGo">Remove &<br>Next</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="Ware">&nbsp;&nbsp;Mark&nbsp;&nbsp;<br>as WH</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="WareBB">&nbsp;WH FAST&nbsp;<br>BID</button>
+             <button type="submit" class="btn btn-blue btn-sm" name="WareUD">&nbsp;&nbsp;WH&nbsp;&nbsp;<br>Update</button>
+
+        </div></div>
+
+
+        <div class="card" align="left">
+            <div class = "card-header">
+                Email Request
+                <input type = "hidden" name ="quotpass" value= "{{quot}}">
+                <input type = "hidden" name ="thismuch" value= "{{thismuch}}">
+                <input type = "hidden" name ="taskbox" value= "{{taskbox}}">
+                <input type = "hidden" name ="datelast" value= "{{qdat.Date}}">
+            </div>
+            <div class="card-body" align=""left">
+                {% if qdat %}
+                    From:  {{ qdat.From|safe }}<br>
+                    Subject:  {{ qdat.Subject|safe }}<br>
+                    Date: {{ qdat.Date|safe }}<br><br>
+                    {{ ebodytxt|safe }}
+                {% endif %}
+
+            </div>
+        </div>
+{% endif %}
+
+</form>
+{% endblock %}

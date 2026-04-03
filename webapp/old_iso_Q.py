@@ -1,5 +1,3 @@
-import requests
-
 from webapp import db
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from requests import get
@@ -14,12 +12,12 @@ from email.header import decode_header
 import webbrowser
 import os
 from email.utils import parsedate_tz, mktime_tz
-from email.utils import parsedate_to_datetime, parseaddr
+from email.utils import parsedate_to_datetime
 from bs4 import BeautifulSoup
 
 import datetime
 from webapp.models import Quotes, Quoteinput, Terminals
-from webapp.send_mimemail import send_replymail
+from send_mimemail import send_mimemail
 from pyzipcode import ZipCodeDatabase
 zcdb = ZipCodeDatabase()
 
@@ -29,10 +27,7 @@ try:
 except:
     from backports.zoneinfo import ZoneInfo
 import time
-from contextlib import contextmanager
 from tzlocal import get_localzone
-
-from html import escape
 
 API_KEY_GEO = apikeys['gkey']
 API_KEY_DIS = apikeys['dkey']
@@ -44,218 +39,6 @@ today_now = datetime.datetime.now()
 today = today_now.date()
 timenow = today_now.time()
 include_text = ''
-EMAIL_BODY_CACHE = {}
-EMAIL_BODY_CACHE_MAX = 50
-
-# Adding helper functions to cache the email text
-def get_cache_key_for_qdat(qdat):
-    if qdat is None:
-        return None
-    return str(qdat.id)
-
-
-def get_cached_body_text(qdat, force_refresh=False):
-    """
-    Server-side in-memory cache.
-    Avoids storing large email bodies in Flask session cookies.
-    """
-    global EMAIL_BODY_CACHE
-
-    if qdat is None:
-        return '', None
-
-    cache_key = get_cache_key_for_qdat(qdat)
-    if cache_key is None:
-        return '', None
-
-    if not force_refresh and cache_key in EMAIL_BODY_CACHE:
-        print(f"[CACHE HIT] body text for qdat {qdat.id}", flush=True)
-        item = EMAIL_BODY_CACHE[cache_key]
-        return item.get('plaintext', ''), item.get('htmltext')
-
-    print(f"[CACHE MISS] body text for qdat {qdat.id}", flush=True)
-    plaintext, htmltext = get_body_text(qdat)
-
-    EMAIL_BODY_CACHE[cache_key] = {
-        'plaintext': plaintext,
-        'htmltext': htmltext,
-    }
-
-    # trim cache if too large
-    if len(EMAIL_BODY_CACHE) > EMAIL_BODY_CACHE_MAX:
-        first_key = next(iter(EMAIL_BODY_CACHE))
-        EMAIL_BODY_CACHE.pop(first_key, None)
-
-    return plaintext, htmltext
-
-
-def clear_cached_body_text(qdat=None):
-    global EMAIL_BODY_CACHE
-
-    if qdat is None:
-        EMAIL_BODY_CACHE.clear()
-        return
-
-    cache_key = get_cache_key_for_qdat(qdat)
-    if cache_key in EMAIL_BODY_CACHE:
-        EMAIL_BODY_CACHE.pop(cache_key, None)
-
-#Helper function for the equipment:
-def get_equipment_text():
-    text = ''
-    def to_int(val):
-        try:
-            return int(val)
-        except (TypeError, ValueError):
-            return 0
-    num40 = to_int(request.values.get('num40'))
-    num20 = to_int(request.values.get('num20'))
-    num45 = to_int(request.values.get('num45'))
-    num40s = to_int(request.values.get('num40s'))
-    if num40>0: text = f'{text} {num40} x 40HC,'
-    if num20>0: text = f'{text} {num20} x 20ST,'
-    if num45>0: text = f'{text} {num45} x 45HC,'
-    if num40s>0: text = f'{text} {num40s} x 40ST,'
-    #Remove trailing comma
-    text = text.rstrip(',')
-    if text == '': text = '1 x 40HC'
-    return text
-
-#Adding helper function to test time to perform various tasks
-@contextmanager
-def step_timer(label):
-    t0 = time.perf_counter()
-    try:
-        yield
-    finally:
-        dt = time.perf_counter() - t0
-        print(f"[TIMING] {label}: {dt:.3f}s", flush=True)
-
-
-# Helper functions to avoid calling google api every update unless the locfrom or locto changes
-def normalize_loc(s):
-    return (s or '').strip().lower()
-
-def make_route_key(locfrom, locto):
-    return f"{normalize_loc(locfrom)}|||{normalize_loc(locto)}"
-
-
-
-# Define new helper functions for conversion to send emails as replys
-def html_to_text_for_preview(htmltext):
-    """
-    Convert HTML to readable plain text for safe in-page preview.
-    """
-    if not htmltext:
-        return ''
-
-    try:
-        soup = BeautifulSoup(htmltext, 'html.parser')
-        for tag in soup(['script', 'style', 'noscript']):
-            tag.decompose()
-        text = soup.get_text('\n')
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        return text.strip()
-    except Exception:
-        return htmltext
-
-
-def normalize_send_options(req):
-    """
-    Read new send controls from Aquotemaker.html.
-    """
-    send_mode = req.values.get('send_mode', 'reply')
-    if send_mode not in ('direct', 'reply'):
-        send_mode = 'reply'
-
-    reply_style = req.values.get('reply_style', 'quoted')
-    if reply_style not in ('clean', 'quoted'):
-        reply_style = 'quoted'
-
-    save_sent = req.values.get('save_sent') == 'on'
-
-    return send_mode, reply_style, save_sent
-
-
-def get_original_message_meta(qdat):
-    """
-    Reload the original message by Message-ID and pull headers needed for reply threading.
-    """
-    if qdat is None or not qdat.Mid:
-        return {}
-
-    username = usernames['quot']
-    password = passwords['quot']
-    mid = qdat.Mid.strip()
-
-    imap = imaplib.IMAP4_SSL(imap_url)
-    imap.login(username, password)
-
-    try:
-        imap.select('INBOX')
-        result, data = imap.search(None, f'HEADER Message-ID "{mid}"')
-        if result != 'OK' or not data or not data[0]:
-            return {}
-
-        msg_ids = data[0].split()
-        if not msg_ids:
-            return {}
-
-        result, fetched = imap.fetch(msg_ids[0], '(RFC822)')
-        if result != 'OK':
-            return {}
-
-        email_message = email.message_from_bytes(fetched[0][1])
-
-        from_header = email_message.get('From', '')
-        reply_to_header = email_message.get('Reply-To', '')
-        reply_to_email = parseaddr(reply_to_header)[1] or parseaddr(from_header)[1]
-
-        return {
-            'message_id': email_message.get('Message-ID', ''),
-            'references': email_message.get('References', ''),
-            'subject': email_message.get('Subject', qdat.Subject or ''),
-            'from': from_header,
-            'date': email_message.get('Date', ''),
-            'reply_to_email': reply_to_email,
-        }
-    finally:
-        try:
-            imap.close()
-        except Exception:
-            pass
-        imap.logout()
-
-
-def build_quoted_reply_html(new_html, original_meta, original_html=None, original_text=None):
-    """
-    Build a reply body that includes the original message below the new quote.
-    """
-    header = (
-        '<br><br><hr>'
-        f'<div style="font-family:Arial,sans-serif;font-size:13px;color:#555;">'
-        f'<b>From:</b> {escape(original_meta.get("from", ""))}<br>'
-        f'<b>Date:</b> {escape(original_meta.get("date", ""))}<br>'
-        f'<b>Subject:</b> {escape(original_meta.get("subject", ""))}'
-        f'</div><br>'
-    )
-
-    if original_html:
-        quoted = (
-            '<blockquote style="margin:0;padding-left:12px;border-left:3px solid #ccc;">'
-            f'{original_html}'
-            '</blockquote>'
-        )
-    else:
-        safe_text = escape(original_text or '').replace('\n', '<br>')
-        quoted = (
-            '<blockquote style="margin:0;padding-left:12px;border-left:3px solid #ccc;'
-            'font-family:Arial,sans-serif;font-size:14px;">'
-            f'{safe_text}'
-            '</blockquote>'
-        )
-
-    return f'{new_html}{header}{quoted}'
 
 # Begin new functions to support conveting webapp to api also
 
@@ -365,18 +148,6 @@ def normalize_markup(newmarkup, qidat):
 
 ################end of api helper functions
 
-def make_reply_subject(original_subject):
-    subject = (original_subject or '').strip()
-    if not subject:
-        return 'Re:'
-    if subject.lower().startswith('re:'):
-        return subject
-    return f'Re: {subject}'
-
-def safe_db_text(val):
-    if val is None:
-        return ''
-    return ''.join(ch for ch in val if ord(ch) <= 0xFFFF)
 
 def roundup(x):
     return int(math.ceil(x / 10.0)) * 10
@@ -738,119 +509,22 @@ def maketable(expdata):
 
     return bdata
 
-def make_emaildata_list(subject, body_html, to_1, to_2, cc_1, cc_2, from_addr=None):
-    return [
-        subject or '',
-        body_html or '',
-        to_1 or '',
-        to_2 or '',
-        cc_1 or '',
-        cc_2 or '',
-        from_addr or usernames['quot'],
-    ]
-
 
 def sendquote():
-    """
-    Send either:
-      - direct standalone email
-      - threaded reply to original email
-
-    Requires the updated Aquotemaker.html fields:
-      qid, mid, send_mode, reply_style, save_sent
-    """
-
     error = 0
-
-    qid = request.values.get('qid')
-    send_mode, reply_style, save_sent = normalize_send_options(request)
-
     etitle = request.values.get('edat0')
     ebody = request.values.get('edat1')
     emailin1 = request.values.get('edat2')
     emailin2 = request.values.get('edat3')
     emailcc1 = request.values.get('edat4')
     emailcc2 = request.values.get('edat5')
-    preview_subject = etitle
-
-    qdat = None
-    if qid:
-        try:
-            qdat = Quotes.query.get(int(qid))
-        except Exception:
-            qdat = None
-
-    original_meta = {}
-    original_plaintext = ''
-    original_html = ''
-    preview_subject = etitle
-
-    if send_mode == 'reply' and qdat is not None:
-        original_meta = get_original_message_meta(qdat)
-        preview_subject = make_reply_subject(original_meta.get('subject') or qdat.Subject)
-        try:
-            with step_timer("get_body_text at top of sendquote"):
-                original_plaintext, original_html = get_cached_body_text(qdat)
-        except Exception:
-            original_plaintext, original_html = '', ''
-
-        # If no explicit To entered, default to reply-to / from
-        if (not emailin1 or '@' not in emailin1) and original_meta.get('reply_to_email'):
-            emailin1 = original_meta['reply_to_email']
-
-        etitle = make_reply_subject(original_meta.get('subject') or qdat.Subject)
-
-        if reply_style == 'quoted':
-            ebody = build_quoted_reply_html(
-                new_html=ebody,
-                original_meta=original_meta,
-                original_html=original_html,
-                original_text=original_plaintext
-            )
-
-
-    if '@' not in (emailin1 or ''):
+    if '@' not in emailin1:
+        #print('Cannot Send this Email')
         error = 1
-
-    emaildata = {
-        'subject': etitle,
-        'body_html': ebody,
-        'to_1': emailin1,
-        'to_2': emailin2,
-        'cc_1': emailcc1,
-        'cc_2': emailcc2,
-        'from_addr': usernames['quot'],
-        'send_mode': send_mode,
-        'reply_style': reply_style,
-        'save_sent': save_sent,
-        'quote_id': qid,
-        'original_message_id': original_meta.get('message_id', ''),
-        'references': original_meta.get('references', ''),
-        'original_subject': original_meta.get('subject', ''),
-        'original_from': original_meta.get('from', ''),
-        'original_date': original_meta.get('date', ''),
-    }
-
+    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
     if error == 0:
-        #send_result = send_mimemail(emaildata, 'qsnd')
-        with step_timer("send_result"):
-            send_result = send_replymail(emaildata, 'qsnd')
-
-        # Optional bookkeeping
-        if qdat is not None:
-            try:
-                qdat.Emailto = emailin1
-                qdat.Subjectsend = etitle
-                qdat.Response = safe_db_text(ebody)
-                qdat.Responder = session.get('username')
-                qdat.RespDate = datetime.datetime.now(ZoneInfo("America/New_York"))
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-
-        return emaildata, send_result
-
-    return emaildata, None
+        send_mimemail(emaildata,'qsnd')
+    return emaildata
 
 
 
@@ -1184,7 +858,10 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, distdata, m
             bidtypeamount[0] = 'live'
             bidtypeamount[1] = 0.00
         else:
-            equip = get_equipment_text()
+            box = '40HC'
+            if tbox[14]: box = '45HC'
+            if tbox[15]: box = '20STD'
+            equip = f'1 x {box}'
             if tbox[24]: equip = '40HC and 20STD'
             com = 'General Freight'
             if sboxes[2] == 'com1':
@@ -2466,89 +2143,67 @@ def calculate_and_build_quote_api(
 
 
 def get_body_text(qdat):
-    """
-    Reload original email by Message-ID.
-    Returns:
-        plaintext_for_page_preview
-        htmltext_for_iframe_preview
-    """
-    if qdat is None or not qdat.Mid:
-        return '', ''
 
+    mid = qdat.Mid
+    if mid is not None: mid = mid.strip()
+    #print(f'this mid is {mid}')
     username = usernames['quot']
     password = passwords['quot']
-    mid = qdat.Mid.strip()
-
     imap = imaplib.IMAP4_SSL(imap_url)
     imap.login(username, password)
-
-    plaintext = ''
-    htmltext = ''
+    status, messages = imap.select('INBOX')
+    search_criteria = f'HEADER Message-ID {mid}'
+    try:
+        result, data = imap.search(None, search_criteria)
+    except:
+        #print('Could not locate this email header')
+        return 'Email ID not found', None
 
     try:
-        imap.select('INBOX')
-        result, data = imap.search(None, f'HEADER Message-ID "{mid}"')
-        if result != 'OK' or not data or not data[0]:
-            return '', ''
+        msg_id_list = data[0].split()
+        result, data = imap.fetch(msg_id_list[0], '(RFC822)')
+        email_message = email.message_from_bytes(data[0][1])
+    except:
+        return 'Could not locate email ID', None
 
-        msg_ids = data[0].split()
-        if not msg_ids:
-            return '', ''
+    # extract the subject of the email
+    #subject = extract_for_code(email_message["Subject"])
 
-        result, fetched = imap.fetch(msg_ids[0], '(RFC822)')
-        if result != 'OK':
-            return '', ''
+    # Set default text particulars
+    plain_text_content = ''
+    html_content = None
 
-        email_message = email.message_from_bytes(fetched[0][1])
-
-        if email_message.is_multipart():
-            for part in email_message.walk():
-                content_type = part.get_content_type()
-                disposition = str(part.get("Content-Disposition", ""))
-
-                if "attachment" in disposition.lower():
-                    continue
-
+    # extract the email content as a string
+    if email_message.is_multipart():
+        for part in email_message.walk():
+            if part.get_content_type() == 'text/plain':
                 try:
-                    payload = part.get_payload(decode=True)
-                    charset = part.get_content_charset() or 'utf-8'
-                    decoded = payload.decode(charset, errors='replace') if payload else ''
-                except Exception:
-                    decoded = ''
+                    plain_text_content = part.get_payload(decode=True).decode('utf-8')
+                except UnicodeDecodeError as e:
+                    plain_text_content = part.get_payload(decode=True).decode('utf-8', errors='replace')
+            if part.get_content_type() == "text/html":
+                try:
+                    html_content = part.get_payload(decode=True).decode("utf-8")
+                except UnicodeDecodeError as e:
+                    html_content = part.get_payload(decode=True).decode("utf-8", errors='replace')
 
-                if content_type == "text/plain" and not plaintext:
-                    plaintext = decoded
-
-                if content_type == "text/html" and not htmltext:
-                    htmltext = decoded
-        else:
-            content_type = email_message.get_content_type()
-            payload = email_message.get_payload(decode=True)
-            charset = email_message.get_content_charset() or 'utf-8'
-            decoded = payload.decode(charset, errors='replace') if payload else ''
-
-            if content_type == 'text/html':
-                htmltext = decoded
-            else:
-                plaintext = decoded
-
-        # Safe page preview should be text, not raw HTML
-        if not plaintext and htmltext:
-            plaintext = html_to_text_for_preview(htmltext)
-
-        return plaintext.strip(), htmltext.strip()
-
-    finally:
+                soup = BeautifulSoup(html_content, "html.parser")
+                plain_text_content = soup.get_text()
+    else:
         try:
-            imap.close()
-        except Exception:
-            pass
-        imap.logout()
+            plain_text_content = email_message.get_payload(decode=True).decode('utf-8')
+        except:
+            plain_text_content = 'Could not decode payload'
+    try:
+        print('Returning from get_body_text with plain text')
+        #print('Returning from get_body_text with html', html_content)
+    except:
+        plain_text_content = 'Could not decode payload'
+    return plain_text_content, html_content
 
 def go_to_next(mid, oldmid, taskbox):
     #Loads in the next email off of a remove and go....
-    with step_timer("getting the data from the table with status 0"):
-        qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
+    qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
     if qdat is not None:
         quot = qdat.id
         quotbut = qdat.id
@@ -2568,8 +2223,7 @@ def go_to_next(mid, oldmid, taskbox):
                 # print(f'Getting body_text because it is a successful remove and go')
                 # Change from lower section### gets the email data since below where we get email data
                 taskbox = 5
-                with step_timer("get_body_text for next email"):
-                    plaintext, htmltext = get_cached_body_text(qdat)
+                plaintext, htmltext = get_body_text(qdat)
                 mid = qdat.Mid
                 oldmid = qdat.Mid
                 emailto = qdat.From
@@ -2578,8 +2232,7 @@ def go_to_next(mid, oldmid, taskbox):
                     #qdat.From = emailto
                     #db.session.commit()
                 multibid = ['off', 1, 0, 0]
-                with step_timer("get_places for next email"):
-                    locto, loci = get_place(qdat.Subject, plaintext, multibid)
+                locto, loci = get_place(qdat.Subject, plaintext, multibid)
                 qdat.Location = locto
                 db.session.commit()
                 qdat = Quotes.query.get(quot)
@@ -2746,22 +2399,6 @@ def isoQuote():
     include_text = ''
     whouse = [0]*15
     mdistdata = []
-    send_mode = 'reply'
-    reply_style = 'quoted'
-    save_sent = 'on'
-
-    def to_int(val):
-        try:
-            return int(val)
-        except (TypeError, ValueError):
-            return 0
-
-    equip = [
-        to_int(request.values.get('num40')),
-        to_int(request.values.get('num20')),
-        to_int(request.values.get('num45')),
-        to_int(request.values.get('num40s')),
-    ]
 
     if request.method == 'POST':
         try:
@@ -2791,18 +2428,16 @@ def isoQuote():
         ware = request.values.get('Ware')
         exitnow = request.values.get('exitquotes')
 
+
+
         wareBB = request.values.get('WareBB')
         wareUD = request.values.get('WareUD')
         whouse = get_whouse_values(iter, whouse)
 
-        send_mode = request.values.get('send_mode', 'reply')
-        reply_style = request.values.get('reply_style', 'quoted')
-        save_sent = 'on' if request.values.get('save_sent', 'on') == 'on' else 'off'
-
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
         for jx in range(6):
@@ -2891,8 +2526,7 @@ def isoQuote():
             db.session.commit()
             #This makes first and last records the same so from now on will get original values until a change is made
         else:
-            with step_timer("getting qidat, the next table email"):
-                qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
+            qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
 
         print(f'this data for qidat: {qidat.id}')
         ph_driver = float(qidat.ph_driver) / 100
@@ -2968,14 +2602,12 @@ def isoQuote():
             quot = request.values.get('quotpass')
             quot = nonone(quot)
 
-        with step_timer("getting qdat, the current data from table"):
-            qdat = Quotes.query.get(quot)
+        qdat = Quotes.query.get(quot)
         #print(f'quot:{quot} quotbut:{quotbut} username:{username} taskbox:{taskbox}')
         if qdat is not None:
             mid = qdat.Mid
-            if mid != oldmid and (not plaintext and not htmltext):
-                with step_timer("get_body_text for qdat 2890"):
-                    plaintext, htmltext = get_cached_body_text(qdat)
+            if mid != oldmid:
+                plaintext, htmltext = get_body_text(qdat)
                 #print(f'1465 plaintext: {plaintext}')
 
         if returnhit is not None:
@@ -2988,9 +2620,7 @@ def isoQuote():
             else: qdat.Status = 7
             db.session.commit()
             #Now moving to the next email on the list.....
-            with step_timer("go_to_next"):
-                qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
-            equip = [1, 0, 0, 0]
+            qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
             #print(f'locto from email is {locto}')
             #print(f'1479 plaintext: {plaintext}')
 
@@ -3032,8 +2662,8 @@ def isoQuote():
                 quotbut = qdat.id
                 mid = qdat.Mid
                 print(f'Getting body_text because we just refreshed the emails')
-                with step_timer("get_body_text after refreshing email"):
-                    plaintext, htmltext = get_cached_body_text(qdat)
+                plaintext, htmltext = get_body_text(qdat)
+                print(f'1520 plaintext: {plaintext}')
 
         if taskbox == 1 or taskbox == 5:
             if qdat is None:
@@ -3043,9 +2673,10 @@ def isoQuote():
                     quotbut = qdat.id
                     locto = qdat.Location
             if quot>0 and qdat is not None:
-                if mid != oldmid and (not plaintext and not htmltext):
-                    with step_timer("get_body_text because of change in mid"):
-                        plaintext, htmltext = get_cached_body_text(qdat)
+                if mid != oldmid:
+                    #print(f'Getting body_text because this is a new mid: {mid} not oldmid {oldmid}')
+                    plaintext, htmltext = get_body_text(qdat)
+                    #print(f'1533 plaintext: {plaintext}')
                 if multibid[0] == 'off' and locto is None:
                     #print('Getting new locations because multibid is off and locto is None ')
                     locto, loci = get_place(qdat.Subject, plaintext, multibid)
@@ -3104,8 +2735,7 @@ def isoQuote():
                         for locto in locs:
                             #print(f'Getting data for going to location {locto}')
                             if hasinput(locto) and locto != 'No Location Found':
-                                with step_timer("get_directions on update"):
-                                    miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
+                                miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
                                 timedata, distdata, costdata, biddata, newdirdata, include_text = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata, newmarkup=newmarkup)
                                 #print(f'1659 distdata is {distdata}')
                                 mdistdata.append(distdata)
@@ -3151,63 +2781,29 @@ def isoQuote():
                 if emailgo is not None:
                     #print(f'The task box is {taskbox}')
                     #Email the quote based on the currently loaded email parameters from the html
-                    with step_timer("sendquote following emailgo"):
-                        emaildata, send_result = sendquote()
-
+                    emaildata = sendquote()
                     if taskbox == 1 or taskbox == 5:
                         qdat.Status = 2
-                        qdat.Subjectsend = emaildata.get('subject', '')
-                        qdat.Response = safe_db_text(emaildata.get('body_html', ''))
-                        qdat.Emailto = emaildata.get('to_1', '')
+                        qdat.Subjectsend = emaildata[0]
+                        qdat.Response = emaildata[1]
+                        qdat.Emailto = emaildata[2]
                         qdat.Markup = newmarkup
                         db.session.commit()
                     # Now moving to the next email on the list.....
-                    with step_timer("going to next email"):
-                        qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
-                    ebodytxt = plaintext
+                    qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
                     #print(f'1645 plaintext: {plaintext}')
-                    equip = [1, 0, 0, 0]
 
 
                 #print('Running Directions:',locfrom,locto,bidthis[0],bidname,taskbox,quot)
                 if 1 == 1:
                     if locfrom is not None and locto is not None and locto != 'No Location Found':
                         ####################################  Directions Section  ######################################
-                        #Save session variables so we dont call get directions every update unless locfrom or locto change
-                        route_key = make_route_key(locfrom, locto)
-                        cached_route_key = session.get('route_key')
-                        cached_route = session.get('route_data')
-
-                        if cached_route_key == route_key and cached_route:
-                            print("[TIMING] get_directions: cache hit", flush=True)
-                            miles = cached_route['miles']
-                            hours = cached_route['hours']
-                            lats = cached_route['lats']
-                            lons = cached_route['lons']
-                            dirdata = cached_route['dirdata']
-                            tot_dist = cached_route['tot_dist']
-                            tot_dura = cached_route['tot_dura']
-                        else:
-                            with step_timer("get_directions"):
-                                miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom, locto)
-
-                            session['route_key'] = route_key
-                            session['route_data'] = {
-                                'miles': miles,
-                                'hours': hours,
-                                'lats': lats,
-                                'lons': lons,
-                                'dirdata': dirdata,
-                                'tot_dist': tot_dist,
-                                'tot_dura': tot_dura,
-                            }
+                        miles, hours, lats, lons, dirdata, tot_dist, tot_dura = get_directions(locfrom,locto)
 
                         ####################################  Cost & Bid Section  ######################################
                         tbox = tbox_from_request(request, tbox)
-
-                        with step_timer("get_costs"):
-                            timedata, distdata, costdata, biddata, newdirdata, include_text = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata,newmarkup=newmarkup)
-                        #print(f'1724 ran the get costs section and distdata is {distdata}')
+                        timedata, distdata, costdata, biddata, newdirdata, include_text = get_costs(miles, hours, lats, lons, dirdata, tot_dist, tot_dura, qidat, tbox, expdata,newmarkup=newmarkup)
+                        print(f'1724 ran the get costs section and distdata is {distdata}')
                         if updatego is not None or quotbut is not None or (taskbox == 5 and updatebid is None):
                             #for ix in range(len(tbox)):
                                # tbox[ix] = request.values.get(f'tbox{str(ix)}')
@@ -3266,10 +2862,9 @@ def isoQuote():
                     except:
                         bidname = ''
                     if sboxes[0] == 'direct':
-                        with step_timer("bodymaker_direct"):
-                            ebody, tbox, etitle, bidtypeamount = bodymaker_direct(bidname,cdata,bidthis,locto,tbox,expdata,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes)
+                        ebody, tbox, etitle, bidtypeamount = bodymaker_direct(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes)
                     elif sboxes[0] == 'classic':
-                        ebody, tbox, etitle, bidtypeamount = bodymaker_classic(bidname,cdata,bidthis,locto,tbox,expdata,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes)
+                        ebody, tbox, etitle, bidtypeamount = bodymaker_classic(bidname,cdata,bidthis,locto,tbox,expdata,takedef,distdata,multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes)
                     #print(f'The bidtypeamount here after call is {bidtypeamount} and amount in database is {qdat.Amount} for {quot}')
                     if wareBB is not None or wareUD is not None:
                         ebody = ebody + f'<br><br><em>{signoff}</em>'
@@ -3285,22 +2880,7 @@ def isoQuote():
                     emailin2 = ''
                     emailcc1 = usernames['info']
                     emailcc2 = usernames['serv']
-
-                    #Preview Builder
-                    preview_subject = etitle
-                    if send_mode == 'reply' and qdat is not None:
-                        original_meta = get_original_message_meta(qdat)
-                        preview_subject = make_reply_subject(original_meta.get('subject') or qdat.Subject)
-
-                    emaildata = make_emaildata_list(
-                        preview_subject,
-                        ebody,
-                        emailin1,
-                        emailin2,
-                        emailcc1,
-                        emailcc2,
-                        usernames['quot']
-                    )
+                    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
                     qdat.Amount = bidtypeamount[1]
                     db.session.commit()
                     qdat = Quotes.query.get(quot)
@@ -3329,7 +2909,7 @@ def isoQuote():
 
                         if sboxes[0] == 'direct':
                             ebody, tbox, etitle, bidtypeamount = bodymaker_direct(bidname, cdata, bidthis, locto, tbox,
-                                                                                  expdata, distdata, multibid,
+                                                                                  expdata, takedef, distdata, multibid,
                                                                                   etitle, port, include_text, whouse,
                                                                                   wareBB, wareUD, mdistdata, costdata,
                                                                                   sboxes)
@@ -3354,29 +2934,13 @@ def isoQuote():
                     else:
                         etitle = request.values.get('edat0')
                         ebody = request.values.get('edat1')
-
                     emailin1 = request.values.get('edat2')
                     emailin2 = request.values.get('edat3')
                     emailcc1 = request.values.get('edat4')
                     emailcc2 = request.values.get('edat5')
-
-                    preview_subject = etitle
-                    if send_mode == 'reply' and qdat is not None:
-                        original_meta = get_original_message_meta(qdat)
-                        preview_subject = make_reply_subject(original_meta.get('subject') or qdat.Subject)
-
-                    emaildata = make_emaildata_list(
-                        preview_subject,
-                        ebody,
-                        emailin1,
-                        emailin2,
-                        emailcc1,
-                        emailcc2,
-                        usernames['quot']
-                    )
-
-                    with step_timer("db_commit 3247"):
-                        db.session.commit()
+                    emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
+                    #qdat.Response = ebody
+                    db.session.commit()
                     qdat = Quotes.query.get(quot)
 
 
@@ -3386,10 +2950,12 @@ def isoQuote():
             if quot is not None:
                 qdat = Quotes.query.get(quot)
                 #print(f'Getting body_text because this is not a post so we are getting new values')
-                with step_timer("get_body_text for opt radio selection"):
-                    plaintext, htmltext = get_cached_body_text(qdat)
+                plaintext, htmltext = get_body_text(qdat)
                 #print(f'1766 plaintext: {plaintext}')
-                showtext = plaintext
+                if htmltext is None:
+                    showtext = plaintext
+                else:
+                    showtext = htmltext
             else:
                 showtext = ''
             term, locfrom, locto, port = get_terminal(locto=locto, req=request)
@@ -3400,22 +2966,7 @@ def isoQuote():
             eto2 = ''
             ecc1 = usernames['serv']
             ecc2 = usernames['info']
-
-            preview_subject = etitle
-            if send_mode == 'reply' and qdat is not None:
-                original_meta = get_original_message_meta(qdat)
-                preview_subject = make_reply_subject(original_meta.get('subject') or qdat.Subject)
-
-            emaildata = make_emaildata_list(
-                preview_subject,
-                showtext,
-                eto1,
-                eto2,
-                ecc1,
-                ecc2,
-                efrom
-            )
-
+            emaildata = [etitle, showtext, eto1, eto2, ecc1, ecc2, efrom]
             costdata = None
             biddata = None
             newdirdata = None
@@ -3449,22 +3000,7 @@ def isoQuote():
         eto2 = ''
         ecc1 = usernames['expo']
         ecc2 = usernames['info']
-
-        preview_subject = etitle
-        if send_mode == 'reply' and qdat is not None:
-            original_meta = get_original_message_meta(qdat)
-            preview_subject = make_reply_subject(original_meta.get('subject') or qdat.Subject)
-
-        emaildata = make_emaildata_list(
-            preview_subject,
-            ebody,
-            eto1,
-            eto2,
-            ecc1,
-            ecc2,
-            efrom
-        )
-
+        emaildata = [etitle, ebody, eto1, eto2, ecc1, ecc2, efrom]
         costdata = None
         biddata = None
         newdirdata = None
@@ -3480,8 +3016,7 @@ def isoQuote():
             quot = qdat.id
             quotbut = qdat.id
             #print(f'Getting body_text because this is not a post and we set pointer to top of table')
-            with step_timer("get_body_text for all else"):
-                plaintext, htmltext = get_cached_body_text(qdat)
+            plaintext, htmltext = get_body_text(qdat)
             #print(f'1832 plaintext: {plaintext}')
         else:
             add_quote_emails()
@@ -3491,7 +3026,10 @@ def isoQuote():
 
 
     qdata = dataget_Q(thismuch)
-    showtext = plaintext
+    if htmltext is None:
+        showtext = plaintext
+    else:
+        showtext = htmltext
     print(f'Got qdata for thismuch={thismuch}, quot={quot}, lengthofqdata={len(qdata)}', flush=True)
     print(f'mutlibid on exit is {multibid[0]} and {multibid[1]} and uiter is {uiter} and iter is {iter}')
     #Save all the session variables that may have been updated...
@@ -3520,5 +3058,4 @@ def isoQuote():
     multibid.append(terminals)
     #print(multibid)
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
-    return (bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata,
-            qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup, whouse, sboxes, htmltext, send_mode, reply_style, save_sent, equip)
+    return bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup, whouse, sboxes

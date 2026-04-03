@@ -483,12 +483,16 @@ def EasyStart():
 @main.route('/QuoteMaker', methods=['GET', 'POST'])
 @login_required
 def QuoteMaker():
-    from iso_Q import isoQuote
-    bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, dirdata, qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, ebodytxt, multibid, newmarkup, whouse, sboxes = isoQuote()
+    from webapp.iso_Q import isoQuote, step_timer
+    with step_timer("isoQuote"):
+        (bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, dirdata, qdata, bidthis, taskbox, thismuch, quot,
+        qdat, tbox, ebodytxt, multibid, newmarkup, whouse, sboxes, htmltext, send_mode, reply_style, save_sent, equip) = isoQuote()
     if bidname == 'exitnow': return redirect(url_for('main.Class8Main',genre='Trucking'))
     else:
-        return render_template('Aquotemaker.html', cmpdata=cmpdata, scac=scac, costdata = costdata, biddata=biddata, expdata = expdata, timedata = timedata, whouse = whouse, sboxes = sboxes,
-                           distdata=distdata, locto=locto, locfrom=locfrom, emaildata = emaildata, dirdata=dirdata, qdata = qdata, bidthis=bidthis, taskbox=taskbox, thismuch=thismuch, quot=quot, qdat=qdat, bidname=bidname, tbox=tbox, ebodytxt=ebodytxt, multibid=multibid, newmarkup=newmarkup)
+        with step_timer("render_template"):
+            return render_template('Aquotemaker.html', cmpdata=cmpdata, scac=scac, costdata = costdata, biddata=biddata, expdata=expdata, timedata=timedata, whouse=whouse, sboxes = sboxes,
+                           distdata=distdata, locto=locto, locfrom=locfrom, emaildata=emaildata, dirdata=dirdata, qdata = qdata, bidthis=bidthis, taskbox=taskbox, thismuch=thismuch, quot=quot, qdat=qdat,
+                           bidname=bidname, tbox=tbox, ebodytxt=ebodytxt, multibid=multibid, newmarkup=newmarkup, htmltext=htmltext, send_mode=send_mode, reply_style=reply_style, save_sent=save_sent, equip=equip)
 
 @main.route('/ARMaker', methods=['GET', 'POST'])
 @login_required
