@@ -810,7 +810,6 @@ def sendquote():
                 original_text=original_plaintext
             )
 
-
     if '@' not in (emailin1 or ''):
         error = 1
 
