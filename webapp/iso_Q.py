@@ -557,6 +557,8 @@ def add_quote_emails():
             try:
                 # extract the subject of the email
                 subject = extract_for_code(email_message["Subject"])
+                if('re:' in subject.lower()): skip = True
+                else: skip = False
                 #print(f'For message number {i} th Subject is {subject}')
                 mid = extract_for_code(email_message["Message-ID"])
                 mid = mid.strip()
@@ -607,7 +609,7 @@ def add_quote_emails():
                 #local_dt = utc_dt.astimezone(local_tz)
                 #print(f'Date Time extraction failed using {str(thisdate)} and {str(thistime)}')
 
-            if not decode_error:
+            if not decode_error and not skip:
                 qdat = Quotes.query.filter(Quotes.Mid == mid).first()
                 if qdat is None:
                     try:
@@ -2802,7 +2804,7 @@ def isoQuote():
 
         if exitnow is not None:
             #print('Exiting quotes')
-            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+            return 'exitnow', costdata, None, expdata, None, None, None, locto, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
         for jx in range(6):
