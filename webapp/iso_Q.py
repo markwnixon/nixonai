@@ -3521,5 +3521,6 @@ def isoQuote():
     multibid.append(terminals)
     #print(multibid)
     #print(f'Exiting with iter = {iter} and mid: {mid} for umid: {umid} and osenv for uiter: {os.environ[uiter]}')
+    #print(f'On exit emaildata is: {emaildata}')
     return (bidname, costdata, biddata, expdata, timedata, distdata, emaildata, locto, locfrom, newdirdata,
             qdata, bidthis, taskbox, thismuch, quot, qdat, tbox, showtext, multibid, newmarkup, whouse, sboxes, htmltext, send_mode, reply_style, save_sent, equip)
