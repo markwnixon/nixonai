@@ -2546,7 +2546,7 @@ def get_body_text(qdat):
             pass
         imap.logout()
 
-def go_to_next(mid, oldmid, taskbox):
+def go_to_next(mid, taskbox):
     #Loads in the next email off of a remove and go....
     with step_timer("getting the data from the table with status 0"):
         qdat = Quotes.query.filter(Quotes.Status == 0).order_by(Quotes.id.desc()).first()
@@ -2572,7 +2572,6 @@ def go_to_next(mid, oldmid, taskbox):
                 with step_timer("get_body_text for next email"):
                     plaintext, htmltext = get_cached_body_text(qdat)
                 mid = qdat.Mid
-                oldmid = qdat.Mid
                 emailto = qdat.From
                 #if emailto is None:
                     #emailto = qdat.From
@@ -2600,7 +2599,7 @@ def go_to_next(mid, oldmid, taskbox):
             quot = 0
             return None, quot, None, None, None, None, None, None, None, taskbox, None, None, None, None
 
-        return qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci
+        return qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, taskbox, multibid, emailto, locto, loci
 
     else:
         taskbox = 0
@@ -2727,9 +2726,7 @@ def isoQuote():
     # Qote being worked
     uquot = f'{username}_quot'
     uiter = f'{username}_iter'
-    umid= f'{username}_mid'
-    utext= f'{username}_text'
-    uhtml= f'{username}_html'
+
     quot=0
     tbox = [0]*27
     bidthis = [0]*6
@@ -2769,19 +2766,9 @@ def isoQuote():
             iter = int(os.environ[uiter])
         except:
             iter = 1
-        try:
-            oldmid = os.environ[umid]
-        except:
-            oldmid = 'Not Defined'
-        try:
-            plaintext = os.environ[utext]
-        except:
-            plaintext = ''
-        try:
-            htmltext = os.environ[uhtml]
-        except:
-            htmltext = ''
-        #print(f'This is a POST with iter {iter} and last mid {oldmid}')
+        #plaintext = ''
+        #htmltext = ''
+        print(f'This is a POST with iter {iter} plaintext is {plaintext}')
         emailgo = request.values.get('Email')
         updatego = request.values.get('GetQuote')
         updatebid = request.values.get('Update')
@@ -2969,15 +2956,12 @@ def isoQuote():
             quot = request.values.get('quotpass')
             quot = nonone(quot)
 
-        with step_timer("getting qdat, the current data from table"):
-            qdat = Quotes.query.get(quot)
-        #print(f'quot:{quot} quotbut:{quotbut} username:{username} taskbox:{taskbox}')
+        qdat = Quotes.query.get(quot)
+        print(f'Got qdat for quot:{quot} quotbut:{quotbut} username:{username} taskbox:{taskbox}')
         if qdat is not None:
-            mid = qdat.Mid
-            if mid != oldmid and (not plaintext and not htmltext):
-                with step_timer("get_body_text for qdat 2890"):
-                    plaintext, htmltext = get_cached_body_text(qdat)
-                #print(f'1465 plaintext: {plaintext}')
+            with step_timer("get_body_text for qdat 2890"):
+                plaintext, htmltext = get_cached_body_text(qdat)
+                print(f'Plaintext for qdat {qdat.id}: {plaintext}')
 
         if returnhit is not None:
             taskbox = 0
@@ -2993,7 +2977,7 @@ def isoQuote():
             db.session.commit()
             #Now moving to the next email on the list.....
             with step_timer("go_to_next"):
-                qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
+                qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, taskbox)
             equip = [1, 0, 0, 0]
             #print(f'locto from email is {locto}')
             #print(f'1479 plaintext: {plaintext}')
@@ -3047,9 +3031,7 @@ def isoQuote():
                     quotbut = qdat.id
                     locto = qdat.Location
             if quot>0 and qdat is not None:
-                if mid != oldmid and (not plaintext and not htmltext):
-                    with step_timer("get_body_text because of change in mid"):
-                        plaintext, htmltext = get_cached_body_text(qdat)
+                plaintext, htmltext = get_cached_body_text(qdat)
                 if multibid[0] == 'off' and locto is None:
                     #print('Getting new locations because multibid is off and locto is None ')
                     locto, loci = get_place(qdat.Subject, plaintext, multibid)
@@ -3167,7 +3149,7 @@ def isoQuote():
                         db.session.commit()
                     # Now moving to the next email on the list.....
                     with step_timer("going to next email"):
-                        qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, oldmid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, oldmid, taskbox)
+                        qdat, quot, quotbut, datethis, datelast, plaintext, htmltext, mid, taskbox, multibid, emailto, locto, loci = go_to_next(mid, taskbox)
                     ebodytxt = plaintext
                     #print(f'1645 plaintext: {plaintext}')
                     equip = [1, 0, 0, 0]
@@ -3435,7 +3417,6 @@ def isoQuote():
 
     else:
         iter = 1
-        os.environ['MID'] = 'None Selected'
         #print('This is NOT a Post')
         ebodytxt = ''
         #print('Entering Quotes1',flush=True)
@@ -3501,16 +3482,7 @@ def isoQuote():
     #Save all the session variables that may have been updated...
     iter = iter + 1
     os.environ[uiter] = str(iter)
-    try:
-        os.environ[utext] = plaintext
-    except:
-        plaintext = ''
-    if plaintext is None: plaintext = ''
-    if htmltext is None: htmltext = ''
-    #print(f'plaintext: {plaintext}')
-    os.environ[utext] = plaintext
-    os.environ[uhtml] = htmltext
-    os.environ[umid] = mid
+
 
     if multibid[0] == 'on':
         loci = multibid[2]
