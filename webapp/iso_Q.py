@@ -2982,6 +2982,9 @@ def isoQuote():
         if returnhit is not None:
             taskbox = 0
             quot = 0
+            print('clearing body text cache')
+            clear_cached_body_text()
+
 
         #If choose exit or assign as a warehouse job (status 7)...
         if removego is not None or ware is not None:
