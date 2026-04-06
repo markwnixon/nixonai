@@ -896,9 +896,10 @@ def get_directions(start,end):
     #Convert all mixed units to miles, hours and convert from text to floats
     for di in dis:
         if 'mi' in di:
-            nu = float(di.replace('mi',''))
+            #nu = float(di.replace('mi',''))
+            nu = float(di.replace('mi', '').replace(',', ''))
         elif 'ft' in di:
-            nu = float(di.replace('ft',''))/5280.0
+            nu = float(di.replace('ft','').replace(',', ''))/5280.0
         else:
             nu = 0.0
         dists.append(nu)
