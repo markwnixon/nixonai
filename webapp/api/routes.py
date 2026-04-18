@@ -272,6 +272,7 @@ def make_pin_data():
         outgate = data['outgate']
         pintime = data['pintime']
         pindate = data['pindate']
+        pintime = pintime.replace('6:00-7:00','06:00-07:00').replace('7:00-8:00','07:00-08:00').replace('8:00-9:00','08:00-09:00').replace('9:00-10:00','09:00-10:00')
 
         print(f' The pin date requested is {pindate} and timeslot {pintime}')
         pindate_obj = datetime.datetime.strptime(pindate, "%Y-%m-%d").date()
