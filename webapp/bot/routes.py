@@ -12,7 +12,9 @@ from webapp.models import Orders, People, Drops
 from webapp.viewfuncs import newjo
 from webapp.class8_tasks import next_business_day, Order_Addresses_Update, Add_New_Drop
 import os
-from sqlalchemy import func
+from sqlalchemy import func, or_
+
+
 
 # adds for new bidding api
 from webapp.iso_Q import tbox_from_flags, calculate_and_build_quote_api
@@ -186,6 +188,10 @@ def bot_orders():
     if shipper:
         query = query.filter(Orders.Shipper == shipper)
 
+    load_location = request.args.get('load_location')
+    if load_location:
+        query = query.filter(Orders.Company2 == load_location)
+
     container = request.args.get('container')
     if container:
         query = query.filter(Orders.Container == container)
@@ -218,10 +224,13 @@ def bot_orders():
             "portWindow1": odat.Date4.isoformat() if odat.Date4 else None,
             "portWindow2": odat.Date5.isoformat() if odat.Date5 else None,
             "shipper": odat.Shipper,
-            "dropAddress": odat.Dropblock2,
+            "loadLocation": odat.Company2,
+            "loadAddress": odat.Dropblock2,
             "hstat": odat.Hstat,
             "driver": odat.Driver,
-            "truck": odat.Truck
+            "truck": odat.Truck,
+            "amount": odat.Amount,
+            "quote": odat.Quote
         })
 
     return jsonify({
@@ -334,7 +343,7 @@ def bot_create_order():
 
     haul_type = (data.get('haul_type') or '').strip()
     shipper = (data.get('shipper') or '').strip()
-    loading_location = (data.get('loading_location') or '').strip()
+    loading_location = (data.get('loading_location') or '').replace("\\n", "\n").strip()
     loading_address = (data.get('loading_address') or '').strip()
     container_type = data.get('container_type', '40')
     booking = (data.get('booking') or '').strip()
@@ -755,6 +764,45 @@ def bot_loading_locations():
 
     return jsonify({
         "shipper": shipper,
+        "match_count": len(matches),
+        "matches": matches
+    }), 200
+
+
+
+@bot_bp.route('/bot/shippers', methods=['GET'])
+@bot_token_required(required_scopes={'read:orders'})
+def bot_shippers_list():
+    q = (request.args.get('q') or '').strip().lower()
+
+    query = (
+        db.session.query(People)
+        .filter(People.Ptype == 'Trucking')   # adjust if your People table marks shippers differently
+    )
+
+    if q:
+        query = query.filter(
+            or_(
+                func.lower(People.Company).contains(q),
+            )
+        )
+
+    rows = (
+        query
+        .order_by(People.Company.asc())
+        .limit(50)
+        .all()
+    )
+
+    matches = []
+    for row in rows:
+        matches.append({
+            "id": row.id,
+            "company": row.Company or "",
+        })
+
+    return jsonify({
+        "query": q,
         "match_count": len(matches),
         "matches": matches
     }), 200

@@ -10,23 +10,67 @@ from datetime import datetime, time, timedelta, date
 import ast
 from webapp.revenues import intdol
 
-def repair_dates(odata):
+def add_business_days(start_date, days):
+    current = start_date
+    added = 0
+
+    while added < days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:  # 0=Mon, 4=Fri
+            added += 1
+
+    return current
+
+def previous_business_day(date):
+    current = date
+
+    while True:
+        current -= timedelta(days=1)
+        if current.weekday() < 5:  # Mon–Fri = 0–4
+            return current
+
+def subtract_business_days(start_date, days):
+    current = start_date
+
+    while days > 0:
+        current -= timedelta(days=1)
+        if current.weekday() < 5:
+            days -= 1
+
+    return current
+
+def get_effective_today(today):
+    if today.weekday() == 5:      # Saturday
+        return today + timedelta(days=2)
+    elif today.weekday() == 6:    # Sunday
+        return today + timedelta(days=1)
+    return today
+
+def repair_dates(today, odata):
     for odat in odata:
         gout = odat.Date
         gin = odat.Date2
         deliv = odat.Date3
         hstat = odat.Hstat
+        bus_today = get_effective_today(today)
         if isinstance(gout, date) and isinstance(gin, date) and isinstance(deliv, date):
             if hstat == 1:
                 #If it is pulled already the gateout is the gateout, dont change it.  Then delivery cannot occur before
                 if gout > deliv:
                     odat.Date3 = gout
             if hstat < 1:
-                #If not pulled yet then assume delivery date correct and gout cannot be greater
-                if gout > deliv:
-                    odat.Date = deliv
-            if gin < deliv:
-                odat.Date2 = deliv
+                #If not pulled yet then assume delivery date correct adjust other dates accordingly
+                #Assume gout is day before delivery if delivery is not today
+                if bus_today == deliv:
+                    gout = bus_today
+                    gin = bus_today
+                    odat.Date = gout
+                    odat.Date2 = gin
+                else:
+                    gout = previous_business_day(deliv)
+                    gin = deliv
+                    odat.Date = gout
+                    odat.Date2 = gin
     db.session.commit()
     return
 
@@ -112,10 +156,12 @@ def api_call(scac, now, data_needed, arglist):
         lb_days = 10
         today = now.date()
         lbdate = today - timedelta(days=lb_days)
-        active_date = today + timedelta(days=10)
+        #active_date = today + timedelta(days=2)
+        active_date = add_business_days(today, 2)
         fd = '1900-01-01'
         print(f'Looking back to this date: {lbdate}')
-        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
+        print(f'Looking forward to this date: {active_date}')
+        odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Date3 <= active_date) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
         ret_data = []
         for odat in odata:
             hstat = odat.Hstat
@@ -186,7 +232,7 @@ def api_call(scac, now, data_needed, arglist):
         fd = '1900-01-01'
         print(f'Looking back to this date: {lbdate}')
         odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
-        repair_dates(odata)
+        repair_dates(today, odata)
         odata = Orders.query.filter((Orders.Date3 > lbdate) & (Orders.Hstat < 2)).order_by(Orders.Date).all()
         ret_data = []
         earliest = None

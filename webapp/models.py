@@ -910,7 +910,7 @@ class Imports(db.Model):
 class Drops(db.Model):
     __tablename__ = 'drops'
     id = db.Column('id', db.Integer, primary_key=True)
-    Entity = db.Column('Entity', db.String(50))
+    Entity = db.Column('Entity', db.String(150))
     Addr1 = db.Column('Addr1', db.String(50))
     Addr2 = db.Column('Addr2', db.String(50))
     Phone = db.Column('Phone', db.String(50))
