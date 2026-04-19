@@ -254,6 +254,7 @@ def make_pin_data():
     current_user = get_jwt_identity()
     print(f'user: {current_user}')
 
+
     if request.method == 'POST':
         print('This is a POST')
         data_needed = request.args.get('data_needed')
