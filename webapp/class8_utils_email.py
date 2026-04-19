@@ -38,7 +38,7 @@ def add_person(info):
     input = People(Company=name, First=None, Middle=None, Last=None, Addr1=None, Addr2=None, Addr3=None,
                    Idtype=None, Idnumber=None, Telephone=phone,
                    Email=email, Associate1=None, Associate2=None, Date1=today, Date2=None, Source=message,
-                   Ptype='Contact', Temp1=None, Temp2=None, Accountid=None)
+                   Ptype='Contact', Temp1=None, Temp2=None, Accountid=None, Saljp=None, Saloa=None, Salap=None)
     db.session.add(input)
     db.session.commit()
 
