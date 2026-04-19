@@ -5,8 +5,7 @@ from flask import render_template, flash, redirect, url_for, session, logging, r
 from requests import get
 from webapp.CCC_system_setup import apikeys
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, usernames, passwords, scac, imap_url, accessorials, signoff
-from webapp.viewfuncs import d2s, stat_update, hasinput, d1s
-#from viewfuncs import d2s, d1s
+from webapp.viewfuncs import d2s, stat_update, hasinput, d1s, dataget_Q, nonone, numcheck
 import imaplib, email
 import math
 import re
@@ -23,7 +22,6 @@ from webapp.send_mimemail import send_replymail
 from pyzipcode import ZipCodeDatabase
 zcdb = ZipCodeDatabase()
 
-from viewfuncs import dataget_Q, nonone, numcheck
 try:
     from zoneinfo import ZoneInfo
 except:
