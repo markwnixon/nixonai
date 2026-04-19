@@ -505,6 +505,65 @@ def api_call(scac, now, data_needed, arglist):
         print(ret_data)
         return ret_data
 
+    elif data_needed == 'trucks':
+        info_id = 0
+        ret_data = []
+        odata = Vehicles.query.filter((Vehicles.Active==1) & (Vehicles.Type=='Tractor')).all()
+        for odat in odata:
+            info_id += 1
+            unit = odat.Unit
+            vin = odat.VIN
+            year = odat.Year
+            make = odat.Make
+            model = odat.Model
+            color = odat.Color
+            plate = odat.Plate
+            odom = odat.Odometer
+            weight = odat.EmpWeight
+            ezpass = odat.Ezpassxponder
+            portx = odat.Portxponder
+
+            if unit is None: unit = 'xxx'
+            if vin is None: vin = 'xxx'
+            if year is None: year = 'xxx'
+            if make is None: make = 'xxx'
+            if model is None: model = 'xxx'
+            if color is None: color = 'xxx'
+            if odom is None: odom = 'xxx'
+            if weight is None: weight = 'xxx'
+            if ezpass is None: ezpass = 'xxx'
+            if portx is None: portx = 'xxx'
+
+            ret_data.append({'id': info_id, 'unit': unit, 'vin': vin, 'year': year, 'make': make, 'model': model, 'color': color, 'odom': odom, 'weight': weight, 'ezpass': ezpass, 'portx': portx})
+
+        print(ret_data)
+        return ret_data
+
+    elif data_needed == 'chassis':
+        info_id = 0
+        ret_data = []
+        odata = Vehicles.query.filter((Vehicles.Active==1) & (Vehicles.Type=='Chassis')).all()
+        for odat in odata:
+            info_id += 1
+            unit = odat.Unit
+            length = odat.Owner
+            plate = odat.Plate
+            atag = odat.Title
+            color = odat.Color
+            weight = odat.EmpWeight
+
+            if unit is None: unit = 'xxx'
+            if length is None: length = 'xxx'
+            if plate is None: plate = 'xxx'
+            if atag is None: atag = 'xxx'
+            if color is None: color = 'xxx'
+            if weight is None: weight = 'xxx'
+
+            ret_data.append({'id': info_id, 'unit': unit, 'length': length, 'plate': plate, 'atag': atag, 'color': color, 'weight': weight})
+
+        print(ret_data)
+        return ret_data
+
     elif data_needed == 'pindrivers':
         info_id = 0
         ret_data = []
