@@ -1,8 +1,8 @@
 from webapp import db
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from requests import get
-from CCC_system_setup import apikeys
-from CCC_system_setup import myoslist, addpath, tpath, companydata, usernames, passwords, scac, imap_url, accessorials, signoff
+from webapp.CCC_system_setup import apikeys
+from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, usernames, passwords, scac, imap_url, accessorials, signoff
 from webapp.viewfuncs import d2s, stat_update, hasinput, d1s
 #from viewfuncs import d2s, d1s
 import imaplib, email

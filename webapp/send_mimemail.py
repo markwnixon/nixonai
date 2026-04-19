@@ -13,9 +13,9 @@ from email.utils import formatdate, make_msgid
 import ntpath
 import shutil
 import os
-from CCC_system_setup import addpath
-from CCC_system_setup import websites, passwords, companydata, scac, imap_url
-from CCC_system_setup import usernames as em
+from webapp.CCC_system_setup import addpath
+from webapp.CCC_system_setup import websites, passwords, companydata, scac, imap_url
+from webapp.CCC_system_setup import usernames as em
 
 import socket
 import time

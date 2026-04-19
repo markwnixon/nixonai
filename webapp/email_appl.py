@@ -12,8 +12,8 @@ from email.utils import formatdate, make_msgid
 import ntpath
 import shutil
 import os
-from CCC_system_setup import websites, passwords, companydata, scac
-from CCC_system_setup import usernames as em
+from webapp.CCC_system_setup import websites, passwords, companydata, scac
+from webapp.CCC_system_setup import usernames as em
 from models import People, Orders
 from viewfuncs import stripper
 
