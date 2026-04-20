@@ -335,6 +335,11 @@ def support():
     srcpath = statpath('')
     return render_template('support.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
 
+@main.route('/privacy')
+def privacy():
+    srcpath = statpath('')
+    return render_template('privacy.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
+
 @main.route('/Calculator', methods=['GET', 'POST'])
 def Calculator():
     import ast
