@@ -330,6 +330,11 @@ def Employment():
     srcpath = statpath('')
     return render_template('employment.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, ptype=ptype, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
 
+@main.route('/support')
+def support():
+    srcpath = statpath('')
+    return render_template('support.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
+
 @main.route('/Calculator', methods=['GET', 'POST'])
 def Calculator():
     import ast
