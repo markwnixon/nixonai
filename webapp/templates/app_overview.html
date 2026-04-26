@@ -1,0 +1,642 @@
+{% extends 'desk_layout.html'  %}
+
+{% block body %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dray Trucking App Guide</title>
+  <style>
+    :root {
+      --navy: #0c3153;
+      --navy-2: #133e67;
+      --cream: #f3ead8;
+      --cream-2: #e7d9bc;
+      --gold: #d9b26b;
+      --gold-2: #c89a4a;
+      --text: #13263a;
+      --muted: #4c5b68;
+      --card-border: #ccb98f;
+      --shadow: 0 16px 40px rgba(5, 20, 36, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--cream);
+      color: var(--text);
+    }
+
+    .page {
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    .hero {
+      position: relative;
+      background: linear-gradient(135deg, rgba(12, 49, 83, 0.98), rgba(8, 39, 67, 0.96));
+      color: #fff;
+      padding: 120px 24px 54px;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(7, 32, 54, 0.68), rgba(7, 32, 54, 0.68)),
+        url('static/DRAY/pics/card_class8.png') center/cover no-repeat;
+      opacity: 0.26;
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1220px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(260px, 360px) 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .hero-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-right: 28px;
+      border-right: 2px solid rgba(255,255,255,0.65);
+      min-height: 180px;
+    }
+
+    .hero-brand img {
+      max-width: 100%;
+      width: 290px;
+      height: auto;
+      display: block;
+    }
+
+    .hero-copy h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2.2rem, 5vw, 4.2rem);
+      line-height: 1.02;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .hero-copy .subhead {
+      margin: 0 0 16px;
+      color: #f2d090;
+      font-size: clamp(1.1rem, 2.2vw, 2rem);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      max-width: 720px;
+      font-size: 1.25rem;
+      line-height: 1.5;
+      color: #f6f1e7;
+    }
+
+    .content-wrap {
+      position: relative;
+      margin-top: -24px;
+      background: var(--cream);
+      clip-path: polygon(0 26px, 50% 0, 100% 26px, 100% 100%, 0 100%);
+      padding: 54px 20px 48px;
+    }
+
+    .content-inner {
+      max-width: 1220px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .section-title h2 {
+      margin: 0 0 10px;
+      color: var(--navy);
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      text-transform: uppercase;
+    }
+
+    .section-title p {
+      max-width: 780px;
+      margin: 0 auto;
+      font-size: 1.2rem;
+      color: var(--text);
+    }
+
+    .section-title .accent-line {
+      display: inline-block;
+      margin: 8px auto 14px;
+      color: var(--gold-2);
+      font-size: 1.4rem;
+      letter-spacing: 0.2em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 26px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.28);
+      border: 3px solid var(--card-border);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    .card-header {
+      background: var(--navy);
+      color: #fff;
+      padding: 18px 20px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 94px;
+    }
+
+    .badge {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      border-radius: 999px;
+      background: var(--cream-2);
+      color: var(--navy);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.55rem;
+      box-shadow: inset 0 0 0 2px rgba(12, 49, 83, 0.08);
+    }
+
+    .card-header h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      line-height: 1.05;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .card-body {
+      padding: 16px 22px 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .phone-shot {
+      width: min(100%, 250px);
+      aspect-ratio: 9 / 19.2;
+      object-fit: cover;
+      border-radius: 28px;
+      border: 4px solid #0b0b0b;
+      background: #d9d2c5;
+      display: block;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+    }
+
+    .card-body p {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.45;
+      text-align: center;
+      color: var(--text);
+    }
+
+    .video-link {
+      margin-top: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 250px;
+      text-decoration: none;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 10px;
+      padding: 13px 16px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .play-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--cream);
+      color: var(--navy);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      line-height: 1;
+      padding-left: 2px;
+      font-weight: 700;
+    }
+
+    .support-bar {
+      max-width: 1220px;
+      margin: 34px auto 0;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 18px;
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .support-left,
+    .support-right {
+      padding: 24px 28px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .support-right {
+      justify-content: center;
+      border-left: 1px solid rgba(255,255,255,0.22);
+    }
+
+    .help-icon {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      border-radius: 999px;
+      border: 4px solid rgba(255,255,255,0.8);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .support-left h4 {
+      margin: 0;
+      color: #f0c980;
+      font-size: 2rem;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .support-left p {
+      margin: 6px 0 0;
+      font-size: 1.15rem;
+      color: #fff;
+    }
+
+    .support-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      background: #edd19a;
+      color: var(--navy);
+      font-weight: 700;
+      padding: 16px 22px;
+      border-radius: 12px;
+      font-size: 1.05rem;
+    }
+
+    .support-link .globe {
+      font-size: 1.2rem;
+    }
+
+    @media (max-width: 1100px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hero-inner {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-brand {
+        border-right: 0;
+        border-bottom: 2px solid rgba(255,255,255,0.3);
+        padding-right: 0;
+        padding-bottom: 20px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .support-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .support-right {
+        border-left: 0;
+        border-top: 1px solid rgba(255,255,255,0.22);
+      }
+
+      .hero {
+        padding: 28px 18px 46px;
+        padding-top: 100px;
+      }
+
+      .content-wrap {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .card-header {
+        min-height: auto;
+      }
+    }
+
+.video-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-modal.open {
+  display: flex;
+}
+
+.video-container {
+  position: relative;
+  width: min(95vw, 1100px);
+  max-height: 95vh;
+}
+
+.video-container video {
+  width: 100%;
+  max-height: 85vh;
+  display: block;
+  background: #000;
+}
+
+.close-btn {
+  position: absolute;
+  top: -42px;
+  right: 0;
+  font-size: 28px;
+  color: white;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+
+
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-brand">
+          <img src="static/DRAY/pics/drayapplogo.png" alt="Dray Trucking logo" />
+        </div>
+        <div class="hero-copy">
+          <h1>Dray Trucking App</h1>
+          <div class="subhead">Your Operation. In Your Hands.</div>
+          <p>
+            Powerful tools to manage containers, drivers, assets, documents, and balances &mdash; built for efficiency, visibility, and control.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-wrap">
+      <div class="content-inner">
+        <div class="section-title">
+          <h2>How to Use the App</h2>
+          <div class="accent-line">— ★ —</div>
+          <p>
+            Explore each area of the app below. Click the video link to see a short walkthrough of the feature in action.
+          </p>
+        </div>
+
+        <section class="grid">
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">1</span>
+              <h3>App Overview</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_overview.png" alt="App Overview screenshot" />
+              <p>Get a high-level view of your operations at a glance. Access key metrics, quick actions, and important alerts.</p>
+                                      <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/overview.mp4'); return false;">
+                            <span class="play-icon">▶</span> Watch Video
+                        </a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">2</span>
+              <h3>Company Users &amp; Logging-On</h3>
+            </div>
+                    <div class="card-body">
+                        <img class="phone-shot" src="static/DRAY/pics/app_logon.png" alt="Company users and log-on screenshot" />
+                        <p>Learn how company users are managed and how to securely log in to access the app.</p>
+                        <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/logon.mp4'); return false;">
+                            <span class="play-icon">▶</span> Watch Video
+                        </a>
+                    </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">3</span>
+              <h3>App Security</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_security.png" alt="App security screenshot" />
+              <p>Understand the security measures that help protect company access, operational data, and document visibility.</p>
+                <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/security.mp4'); return false;">
+                    <span class="play-icon">▶</span> No Video
+                </a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">4</span>
+              <h3>Pin Reservations</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_pins.png" alt="Pin reservations screenshot" />
+              <p>Create, view, and manage PIN reservations for container pickups and drop-offs.</p>
+                <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/pins.mp4'); return false;">
+                      <span class="play-icon">▶</span> Watch Video
+                  </a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">5</span>
+              <h3>Scanning</h3>
+            </div>
+              <div class="card-body">
+                  <img class="phone-shot" src="static/DRAY/pics/app_scan.png" alt="Scanning screenshot" />
+                  <p>Scan container barcodes or documents to quickly capture information and update operations in real time.</p>
+                  <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/scans.mp4'); return false;">
+                      <span class="play-icon">▶</span> Watch Video
+                  </a>
+              </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">6</span>
+              <h3>Active Containers</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_containers.png" alt="Active containers screenshot" />
+              <p>View all active containers, their current status, and key details that matter to your daily operation.</p>
+                <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/containers.mp4'); return false;">
+                    <span class="play-icon">▶</span> Watch Video
+                </a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">7</span>
+              <h3>Calendar</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_calendar.png" alt="Calendar screenshot" />
+              <p>Review deliveries, returns, and scheduled moves by date so your team can stay aligned.</p>
+                <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/calendar.mp4'); return false;">
+                      <span class="play-icon">▶</span> Watch Video
+                </a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">8</span>
+              <h3>Open Balances</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_balances.png" alt="Open balances screenshot" />
+              <p>Monitor customer balances and review account activity to keep your operation financially on track.</p>
+                <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/balances.mp4'); return false;">
+                      <span class="play-icon">▶</span> Watch Video
+                </a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <span class="badge">9</span>
+              <h3>Driver &amp; Asset Information</h3>
+            </div>
+            <div class="card-body">
+              <img class="phone-shot" src="static/DRAY/pics/app_information.png" alt="Driver and asset information screenshot" />
+              <p>View drivers, trucks, chassis, and supporting documents in one place for quick operational reference.</p>
+                <a class="video-link" href="#" onclick="openVideo('/static/DRAY/videos/information.mp4'); return false;">
+                    <span class="play-icon">▶</span> Watch Video
+                </a>
+            </div>
+          </article>
+        </section>
+
+        <section class="support-bar">
+          <div class="support-left">
+            <span class="help-icon">?</span>
+            <div>
+              <h4>Need More Help?</h4>
+              <p>Visit our support page or contact your administrator.</p>
+            </div>
+          </div>
+          <div class="support-right">
+              <div class="support-links">
+                  <a class="support-link" href="{{ url_for('main.support') }}">
+                    <span class="globe"><i class="fas fa-globe"></i></span> draytrucking.com/support
+                  </a>
+                    <br><br>
+                  <a class="support-link" href="{{ url_for('main.privacy') }}">
+                    <span class="globe">🔒</span> Privacy Policy
+                  </a>
+                </div>
+
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+<div id="videoModal" class="video-modal">
+  <div class="video-container">
+
+    <video id="modalVideo" controls>
+      <source id="videoSource" src="" type="video/mp4">
+    </video>
+
+    <button class="close-btn" onclick="closeVideo()">✖</button>
+
+  </div>
+</div>
+
+<script>
+function openVideo(src) {
+  const modal = document.getElementById('videoModal');
+  const video = document.getElementById('modalVideo');
+  const source = document.getElementById('videoSource');
+
+  source.src = src;
+  video.load();
+  modal.classList.add('open');
+  video.play();
+}
+
+function closeVideo() {
+  const modal = document.getElementById('videoModal');
+  const video = document.getElementById('modalVideo');
+
+  video.pause();
+  video.currentTime = 0;
+  modal.classList.remove('open');
+}
+</script>
+
+
+
+</body>
+</html>
+
+{% endblock %}

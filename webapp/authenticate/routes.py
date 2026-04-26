@@ -12,6 +12,36 @@ cmpdata = companydata()
 
 authenticate = Blueprint('authenticate',__name__)
 
+# Dray trucking authentication route
+@authenticate.route('/dray-login', methods=['GET', 'POST'])
+def dray_login():
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        thisuser = users.query.filter_by(username=form.username.data).first()
+
+        if thisuser is not None:
+            passcheck = bcrypt.check_password_hash(thisuser.password, form.password.data)
+
+            if passcheck:
+                session['logged_in'] = True
+                session['username'] = thisuser.username
+                session['authority'] = thisuser.authority
+                login_user(thisuser, remember=form.remember.data)
+
+                return redirect(url_for('main.EasyStart'))
+            else:
+                flash('Passwords do not match', 'danger')
+        else:
+            flash('Username not found', 'danger')
+
+    return render_template(
+        'authenticate/dray_login.html',   # 👈 NEW TEMPLATE
+        cmpdata=cmpdata,
+        scac=scac,
+        form=form
+    )
+
 # User login
 @authenticate.route('/login', methods=['GET', 'POST'])
 def login():

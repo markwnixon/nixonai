@@ -340,6 +340,16 @@ def privacy():
     srcpath = statpath('')
     return render_template('privacy.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
 
+@main.route('/app_overview')
+def app_overview():
+    srcpath = statpath('')
+    return render_template('app_overview.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
+
+@main.route('/agents_overview')
+def agents_overview():
+    srcpath = statpath('')
+    return render_template('agents_overview.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
+
 @main.route('/Calculator', methods=['GET', 'POST'])
 def Calculator():
     import ast

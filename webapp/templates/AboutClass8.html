@@ -1,214 +1,630 @@
-{% extends 'layout.html'  %}
+{% extends 'desk_layout.html'  %}
+
+{% block body_class %}class8-detail-page{% endblock %}
 
 {% block body %}
 
-<form action="{{ url_for ('main.AboutClass8') }}" method="post">
+<style>
+  :root {
+    --dt-navy: #0c3153;
+    --dt-navy-2: #133e67;
+    --dt-cream: #f3ead8;
+    --dt-cream-2: #fffaf0;
+    --dt-gold: #d9b26b;
+    --dt-gold-2: #c89a4a;
+    --dt-text: #13263a;
+    --dt-muted: #4c5b68;
+    --dt-border: rgba(204, 185, 143, 0.75);
+    --dt-shadow: 0 18px 50px rgba(5, 20, 36, 0.18);
+  }
 
-<div class="table-responsive">
-    <div id="hero">
-        <div id="hero-overlay">
-            <div class="row"><div class="col-sm-12"> &nbsp </div></div>
-            <div class="row"><div class="col-sm-1"></div><div class="col-sm-11 text-blue"><h2> Class8 Cloud-Based AI-Infused Software for Trucking and Port Operations </h2>
-                <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#requestdemo">Request Demo</button>
+  body {
+    background: var(--dt-cream);
+  }
 
-                <!-- These buttons may be aded at a later date -->
-                <!--
-                <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#requestcallback">Request Callback</button>
-                <button type="button" class="btn btn-outline-primary" data-toggle="modal" data-target="#bewinedanddined">Be Wined & Dined</button>
-                -->
-                {% include 'modals.html' %}
-            </div></div>
-            <div class="row"><div class="col-sm-12">&nbsp </div></div>
+  .class8-page {
+    background: var(--dt-cream);
+    color: var(--dt-text);
+    padding-top: 84px;
+  }
 
-<div class="row">
-  <div class="col-sm-1"></div>
-  <div class="col-sm-10">
+  .class8-hero {
+    position: relative;
+    background:
+      linear-gradient(90deg, rgba(12,49,83,0.98), rgba(12,49,83,0.95), rgba(12,49,83,0.90)),
+      url('{{ srcpath }}pics/card_class8.png') center/cover no-repeat;
+    color: #fff;
+    padding: 95px 0 105px;
+    overflow: hidden;
+  }
 
-          <div class="card-deck">
+  .class8-hero::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 76px;
+    background: var(--dt-cream);
+    clip-path: polygon(0 56%, 50% 0, 100% 56%, 100% 100%, 0 100%);
+  }
 
-          <div class="card">
-            <img class="card-img-top" src="{{srcpath}}pics/card_class8.png" alt="class8three.png">
-            <div class="card-body">
-              <h5 class="card-title text-danger">Overview</h5>
-              <ul class="list-group list-group-flush">
-                <li class="list-group-item">Class8 is an integrated package for managing operations, compliance, and accounting.  It runs in the cloud on your browser and is free for your use.
-                    </li>
-              </ul>
+  .class8-hero-inner {
+    position: relative;
+    z-index: 2;
+    max-width: 980px;
+  }
 
-              <p class="card-text">Manage your trucking operations, port operations, side businesses, compliance, calendar, emails, and accounting all in one place. </p>
-            </div>
-            <div class="card-footer text-center">
+  .class8-kicker {
+    color: var(--dt-gold);
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+    display: inline-block;
+  }
 
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" >Launch Video</a>
-            </div>
-          </div>
+  .class8-hero h1 {
+    font-size: clamp(2.4rem, 6vw, 5rem);
+    line-height: 1.02;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin: 0 0 22px;
+  }
+
+  .class8-hero p {
+    font-size: 1.22rem;
+    line-height: 1.62;
+    color: #f8f2e6;
+    max-width: 850px;
+    margin-bottom: 32px;
+  }
+
+  .class8-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .class8-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 14px 22px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-decoration: none !important;
+    border: 0;
+  }
+
+  .class8-btn-primary {
+    background: linear-gradient(135deg, var(--dt-gold), #f0ce86);
+    color: var(--dt-navy) !important;
+    box-shadow: 0 14px 28px rgba(217,178,107,0.28);
+  }
+
+  .class8-btn-secondary {
+    color: #fff !important;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.75);
+  }
+
+  .class8-section {
+    padding: 78px 0;
+  }
+
+  .class8-section-title {
+    text-align: center;
+    max-width: 920px;
+    margin: 0 auto 42px;
+  }
+
+  .class8-section-title h2 {
+    color: var(--dt-navy);
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .class8-section-title p {
+    color: var(--dt-muted);
+    font-size: 1.15rem;
+    margin: 0;
+  }
+
+  .class8-pill-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+  }
+
+  .class8-pill {
+    background: var(--dt-navy);
+    color: #fff;
+    border-radius: 24px;
+    padding: 30px;
+    box-shadow: var(--dt-shadow);
+    border: 2px solid rgba(217,178,107,0.35);
+  }
+
+  .class8-pill h3 {
+    color: var(--dt-gold);
+    font-weight: 900;
+    font-size: 1.35rem;
+    margin-bottom: 12px;
+  }
+
+  .class8-pill p {
+    color: #f8f2e6;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .class8-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px;
+  }
+
+  .class8-card {
+    background: var(--dt-cream-2);
+    border: 2px solid var(--dt-border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 14px 36px rgba(5,20,36,0.10);
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+
+  .class8-card img {
+    width: 100%;
+    height: 185px;
+    object-fit: cover;
+    display: block;
+    background: #e5dcc9;
+  }
+
+  .class8-card-body {
+    padding: 24px;
+    flex: 1;
+  }
+
+  .class8-card h3 {
+    color: var(--dt-navy);
+    font-size: 1.25rem;
+    font-weight: 900;
+    margin: 0 0 12px;
+  }
+
+  .class8-card .lead-line {
+    color: var(--dt-gold-2);
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+
+  .class8-card p {
+    color: var(--dt-muted);
+    line-height: 1.58;
+    margin: 0;
+  }
+
+  .class8-card-footer {
+    border-top: 1px solid var(--dt-border);
+    background: rgba(12,49,83,0.05);
+    padding: 16px 20px;
+    text-align: center;
+    color: var(--dt-navy);
+    font-weight: 800;
+    min-height: 58px;
+  }
+
+  .class8-card-footer a {
+    color: var(--dt-navy);
+    font-weight: 900;
+  }
+
+  .class8-band {
+    background: linear-gradient(135deg, var(--dt-navy), var(--dt-navy-2));
+    color: #fff;
+  }
+
+  .class8-band .class8-section-title h2 {
+    color: #fff;
+  }
+
+  .class8-band .class8-section-title p {
+    color: #f8f2e6;
+  }
+
+  .class8-workflow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .workflow-step {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 18px;
+    padding: 22px;
+    text-align: center;
+  }
+
+  .workflow-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: var(--dt-gold);
+    color: var(--dt-navy);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+
+  .workflow-step h3 {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 900;
+    margin-bottom: 8px;
+  }
+
+  .workflow-step p {
+    color: #f8f2e6;
+    font-size: 0.95rem;
+    margin: 0;
+  }
+
+  .class8-contact-band {
+    background: #fffaf0;
+  }
+
+  .class8-contact-card {
+    background: #fff;
+    border-radius: 28px;
+    padding: 40px;
+    border: 2px solid var(--dt-border);
+    box-shadow: var(--dt-shadow);
+  }
+
+  @media (max-width: 1200px) {
+    .class8-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .class8-workflow {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 991px) {
+    .class8-pill-row {
+      grid-template-columns: 1fr;
+    }
+
+    .class8-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .class8-page {
+      padding-top: 74px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .class8-grid,
+    .class8-workflow {
+      grid-template-columns: 1fr;
+    }
+
+    .class8-hero {
+      padding: 80px 0 95px;
+    }
+
+    .class8-contact-card {
+      padding: 28px 20px;
+    }
+  }
+
+body.class8-detail-page .dt-navbar {
+    background: #0c3153 !important;
+    border-bottom: 2px solid #d9b26b !important;
+}
+
+.class8-card picture {
+    display: block;
+    width: 100%;
+    height: 450px;
+    overflow: hidden;
+}
+
+.class8-card picture img,
+.class8-card > img {
+    width: 100%;
+    height: 450px;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
 
 
-          <div class="card">
-            <img class="card-img-top" src="{{srcpath}}pics/card_spreadsheetpict.png" alt="portbaltimore.jpg">
-            <div class="card-body">
-              <h5 class="card-title text-danger">Truck Job Manager</h5>
-              <ul class="list-group list-group-flush">
-                <li class="list-group-item">Jobs, Proofs, Interchange, Customers, Manifests, Invoicing, and Receive Payments All in One Location</li>
-              </ul>
-              <p class="card-text"> Job tasks are launched from a spreadsheet style display of job data, which makes it easy to find out the status of container movements, invoices, and payments received.</p>
-            </div>
-            <div class="card-footer text-center">
-              <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Spreadsheet Based Task Launcher
+</style>
 
-            </div>
-          </div>
+<div class="class8-page">
 
+  <section class="class8-hero">
+    <div class="container class8-hero-inner">
+      <span class="class8-kicker">Class8 Web-Based Software</span>
+      <h1>Operations Software for Drayage, Dispatch, Compliance & Accounting</h1>
+      <p>
+        Class8 is a cloud-based operations framework for trucking and port operations.
+        It connects job management, quoting, compliance, scheduling, financial reporting,
+        bookkeeping, document handling, and automation into one coordinated system.
+      </p>
 
-        <div class="card">
-          <img class="card-img-top" src="{{srcpath}}pics/card_carsales.png" alt="portbaltimore.jpg">
-          <div class="card-body">
-            <h5 class="card-title text-danger">Side Business Manager</h5>
-            <ul class="list-group list-group-flush">
-              <li class="list-group-item">Many truck companies have side operations ongoing within their main business area.  For example you may conduct your own shipping operation, or rent equipment. </li>
-            </ul>
-            <p class="card-text">Class 8 provides integrated business managers and automated proper accounting for multiple focus areas or divisions.</p>
-
-          </div>
-          <div class="card-footer text-center">
-                          <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Easily Integrate Multiple Businesses
-          </div>
-        </div>
-
-
-      <div class="card">
-        <img class="card-img-top" src="{{srcpath}}pics/card_compliance.png" alt="portbaltimore.jpg">
-        <div class="card-body">
-          <h5 class="card-title text-danger">Compliance Manager</h5>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">Keep Records and Search Data Associated with Compliance</li>
-          </ul>
-          <p class="card-text">Allows you to stay on top of taxes, permits, fees, and filings required at the Federal, State, and Local levels.  Also monitors complicance with DOT and FMCSA filings and drug screen programs, and Human Resources requirements.</p>
-        </div>
-        <div class="card-footer text-center">
-                        <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Overcoming the Lost File Problem
-        </div>
+      <div class="class8-actions">
+        <button type="button" class="class8-btn class8-btn-primary" data-toggle="modal" data-target="#requestdemo">
+          Request Demo
+        </button>
+        <a class="class8-btn class8-btn-secondary" href="/app-guide">View App Guide</a>
+        <a class="class8-btn class8-btn-secondary" href="{{ url_for('authenticate.login') }}">Login to Portal</a>
       </div>
 
+      {% include 'modals.html' %}
+    </div>
+  </section>
 
-
+  <section class="class8-section">
+    <div class="container">
+      <div class="class8-section-title">
+        <h2>The Class8 Framework</h2>
+        <p>
+          Class8 is the centerpiece of the platform. It provides the operational database,
+          management screens, reporting tools, and API foundation that support the Dray Trucking
+          mobile app and the AI-agentic automation system.
+        </p>
       </div>
 
-</div>
-<div class="col-sm-1"></div>
-</div>
-
-
-<div class="row"><div class="col-sm-12"> &nbsp </div></div>
-
-
-
-<div class="row">
-  <div class="col-sm-1"></div>
-  <div class="col-sm-10">
-          <div class="card-deck">
-
-               <div class="card">
-        <img class="card-img-top" src="{{srcpath}}pics/card_phonescan.png" alt="portbaltimore.jpg">
-        <div class="card-body">
-          <h5 class="card-title text-danger">General Information Manager</h5>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">Centralized Information Collection</li>
-          </ul>
-          <p class="card-text">We all write down important notes and lose them.  With this system just scan or take a pictures of your notes and
-          the automatic uploader with convert the notes to text and file it in a searchable database.</p>
+      <div class="class8-pill-row">
+        <div class="class8-pill">
+          <h3>Operations Management</h3>
+          <p>
+            Manage trucking jobs, containers, dispatch workflows, customer information,
+            schedules, manifests, documents, and port-related activity from one web-based system.
+          </p>
         </div>
-        <div class="card-footer text-center">
-                        <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Your Notes Organized and Accessible
+
+        <div class="class8-pill">
+          <h3>Financial & Compliance Control</h3>
+          <p>
+            Keep financial records, open balances, reports, compliance paperwork, assets,
+            permits, filings, and required documentation connected to real operations.
+          </p>
+        </div>
+
+        <div class="class8-pill">
+          <h3>Automation Ready</h3>
+          <p>
+            Class8 supports automated agents that monitor email, update jobs, process work orders,
+            help generate quotes, download gate tickets, and support invoice packaging.
+          </p>
         </div>
       </div>
+    </div>
+  </section>
 
-            <div class="card">
-              <img class="card-img-top" src="{{srcpath}}pics/card_calendar.png" alt="calendar.jpg">
-              <div class="card-body">
-                <h5 class="card-title text-danger">Integrated Jobs Calendar</h5>
-                <ul class="list-group list-group-flush">
-                  <li class="list-group-item">Calendar View of Each Job on Date of Execution</li>
-                </ul>
-                <p class="card-text">Use this feature to get a sense of the ongoing and upcoming work load.
-                  Each job is shown as a 'Button' with key info.  Clicking button allows updating of job
-                information and creation of a manifest.</p>
-              </div>
-              <div class="card-footer text-center">
-                                             <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Your Own Calendar Auto-Maintained
-              </div>
-            </div>
+  <section class="class8-section class8-band">
+    <div class="container">
+      <div class="class8-section-title">
+        <h2>How Work Moves Through the System</h2>
+        <p>
+          Class8 is designed around the real flow of drayage operations, from customer request to dispatch,
+          port activity, billing, accounting, and reporting.
+        </p>
+      </div>
 
+      <div class="class8-workflow">
+        <div class="workflow-step">
+          <div class="workflow-num">1</div>
+          <h3>Work Arrives</h3>
+          <p>Orders, quote requests, delivery orders, and operational updates enter the system.</p>
+        </div>
 
-            <div class="card">
-              <img class="card-img-top" src="{{srcpath}}pics/card_double_entry_accounting.png" alt="portbaltimore.jpg">
-              <div class="card-body">
-                <h5 class="card-title text-danger">Integrated Banking</h5>
-                <ul class="list-group list-group-flush">
-                  <li class="list-group-item">All Business Operations in One Place</li>
-                </ul>
-                <p class="card-text"> By integrating all business operations in one financial system, the system can keep compliant with
-                all companies, even if you end up paying one company's bill from another company's account.</p>
+        <div class="workflow-step">
+          <div class="workflow-num">2</div>
+          <h3>Jobs Are Managed</h3>
+          <p>Dispatchers manage containers, trips, drivers, schedules, paperwork, and status.</p>
+        </div>
 
-              </div>
-              <div class="card-footer text-center">
-                              <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Financials Without Duplication of Effort
-              </div>
-            </div>
+        <div class="workflow-step">
+          <div class="workflow-num">3</div>
+          <h3>Automation Acts</h3>
+          <p>Agents can monitor email, process documents, trigger workflows, and update records.</p>
+        </div>
 
+        <div class="workflow-step">
+          <div class="workflow-num">4</div>
+          <h3>Billing Is Packaged</h3>
+          <p>Gate tickets, documents, invoices, and supporting records are organized together.</p>
+        </div>
 
-          <div class="card">
-            <img class="card-img-top" src="{{srcpath}}pics/card_reports.png" >
-            <div class="card-body">
-              <h5 class="card-title text-danger">Financial Reports</h5>
-              <ul class="list-group list-group-flush">
-                <li class="list-group-item">Profit/Loss, Balance, Cash Flows, Customer Histories</li>
-              </ul>
-              <p class="card-text">Use this section to get comprehensive, up-to-date reports to stay on top of customer open balances.  Review profit and loss to better understand the company operations.
-              Also provides custom reports such as containers out.</p>
-            </div>
-            <div class="card-footer text-center">
-                            <!-- Add a demo button here when ready
-              <a href="{{ srcpath }}pics/20sDraft2.mp4" class="btn btn-primary">Launch Video</a>
-              -->
-                Financial Reporting Instant & Automatic
-            </div>
+        <div class="workflow-step">
+          <div class="workflow-num">5</div>
+          <h3>Reports Stay Current</h3>
+          <p>Accounting, balances, compliance, and operating reports reflect current business activity.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="class8-section">
+    <div class="container-fluid">
+      <div class="class8-section-title">
+        <h2>Class8 Functional Areas</h2>
+        <p>
+          These modules work together across operations, finance, compliance, and automation.
+        </p>
+      </div>
+
+      <div class="class8-grid">
+
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_class8.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_class8.png" alt="Class8 overview">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Overview</h3>
+            <div class="lead-line">One system for operations, compliance, and accounting</div>
+            <p>
+              Class8 gives trucking and drayage companies a cloud-based control center for jobs,
+              documents, compliance, accounting, reporting, and operational management.
+            </p>
           </div>
+          <div class="class8-card-footer">
+            <a href="{{ srcpath }}videos/20sDraft2.mp4">Launch Video</a>
+          </div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_spreadsheet.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_spreadsheet.png" alt="Truck Job Manager">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Truck Job Manager</h3>
+            <div class="lead-line">Spreadsheet-style job launcher</div>
+            <p>
+              View and filter jobs, containers, customers, manifests, proofs, invoices,
+              and payment status from one operational job screen.
+            </p>
+          </div>
+          <div class="class8-card-footer">Manage jobs from one place</div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_quotes.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_quotes.png" alt="Quote System">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Quote System</h3>
+            <div class="lead-line">Route-based pricing with historical cost context</div>
+            <p>
+              Build quotes using actual routes, mileage, estimated time, tolls, and historical
+              trucking costs to make pricing more consistent and repeatable.
+            </p>
+          </div>
+          <div class="class8-card-footer">Quote with better cost visibility</div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_compliance.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_compliance.png" alt="Compliance Manager">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Compliance Manager</h3>
+            <div class="lead-line">Track assets and mandated paperwork</div>
+            <p>
+              Stay on top of permits, filings, taxes, fees, DOT and FMCSA requirements,
+              drug screening programs, and HR-related compliance records.
+            </p>
+          </div>
+          <div class="class8-card-footer">Reduce lost-file problems</div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_calendar.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_calendar.png" alt="Jobs Calendar">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Integrated Jobs Calendar</h3>
+            <div class="lead-line">Operational workload by date</div>
+            <p>
+              Review ongoing and upcoming work by date. Each job can be accessed as an actionable
+              item for updates, job details, and manifest creation.
+            </p>
+          </div>
+          <div class="class8-card-footer">Auto-maintained job calendar</div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_accounting.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_accounting.png" alt="Integrated Banking">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Integrated Banking</h3>
+            <div class="lead-line">Double-entry accounting connected to operations</div>
+            <p>
+              Connect job activity to accounting records while supporting multiple companies,
+              accounts, expenses, revenues, and transfers across business operations.
+            </p>
+          </div>
+          <div class="class8-card-footer">Financials without duplicated effort</div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_reports.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_reports.png" alt="Financial Reports">
+            </picture>
+          <div class="class8-card-body">
+            <h3>Financial Reports</h3>
+            <div class="lead-line">Profit/loss, balances, cash flow, and customer history</div>
+            <p>
+              View up-to-date business reports, customer open balances, container activity,
+              profit and loss, cash flows, and custom operating reports.
+            </p>
+          </div>
+          <div class="class8-card-footer">Instant financial visibility</div>
+        </div>
 
+        <div class="class8-card">
+            <picture>
+              <source srcset="{{srcpath}}pics/card_information.webp" type="image/webp">
+              <img src="{{srcpath}}pics/card_information.png" alt="Information Manager">
+            </picture>
+          <div class="class8-card-body">
+            <h3>General Information Manager</h3>
+            <div class="lead-line">Searchable notes and document capture</div>
+            <p>
+              Capture notes, images, and documents so important information can be converted,
+              organized, searched, and connected to the correct operational record.
+            </p>
+          </div>
+          <div class="class8-card-footer">Organized and accessible records</div>
+        </div>
 
       </div>
+    </div>
+  </section>
+
+  <section class="class8-section class8-contact-band">
+    <div class="container">
+      <div class="class8-contact-card text-center">
+        <span class="class8-kicker">Ready to See It?</span>
+        <h2 class="section-heading text-uppercase" style="color: var(--dt-navy);">
+          Request a Class8 Demo
+        </h2>
+        <p class="text-muted" style="max-width: 720px; margin: 0 auto 24px;">
+          See how Class8, the Dray Trucking app, and the automation system can work together
+          to support your drayage operation.
+        </p>
+        <button type="button" class="class8-btn class8-btn-primary" data-toggle="modal" data-target="#requestdemo">
+          Request Demo
+        </button>
+      </div>
+    </div>
+  </section>
 
 </div>
-<div class="col-sm-1"></div>
-</div>
 
-
-
-</div></div></div>
-
-</form>
 {% endblock %}

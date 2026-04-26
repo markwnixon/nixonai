@@ -1,0 +1,129 @@
+{% extends 'desk_layout.html' %}
+
+{% block body_class %}login-page{% endblock %}
+
+{% block body %}
+
+<style>
+  :root {
+    --dt-navy: #0c3153;
+    --dt-navy-2: #133e67;
+    --dt-cream: #f3ead8;
+    --dt-cream-2: #fffaf0;
+    --dt-gold: #d9b26b;
+    --dt-border: rgba(204, 185, 143, 0.75);
+    --dt-text: #13263a;
+    --dt-muted: #4c5b68;
+  }
+
+  body.login-page .dt-navbar {
+    background: #0c3153 !important;
+    border-bottom: 2px solid #d9b26b !important;
+  }
+
+  body.login-page {
+    background: linear-gradient(
+      180deg,
+      #0c3153 0%,
+      #0c3153 230px,
+      var(--dt-cream) 230px
+    );
+  }
+
+  .login-wrapper {
+    padding: 150px 20px 80px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--dt-cream-2);
+    border: 2px solid var(--dt-border);
+    border-radius: 24px;
+    box-shadow: 0 18px 50px rgba(5, 20, 36, 0.18);
+    padding: 40px;
+  }
+
+  .login-card h3 {
+    color: var(--dt-navy);
+    font-weight: 900;
+    margin-bottom: 10px;
+  }
+
+  .login-subtitle {
+    color: var(--dt-muted);
+    margin-bottom: 28px;
+  }
+
+  .login-card .form-control {
+    border-radius: 10px;
+    min-height: 48px;
+  }
+
+  .login-card .form-control-label {
+    color: var(--dt-text);
+    font-weight: 700;
+  }
+
+  .login-submit {
+    background: linear-gradient(135deg, var(--dt-gold), #f0ce86);
+    color: var(--dt-navy) !important;
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 22px;
+    font-weight: 900;
+    text-transform: uppercase;
+    width: 100%;
+    box-shadow: 0 14px 28px rgba(217,178,107,0.28);
+  }
+</style>
+
+<div class="login-wrapper">
+  <div class="login-card">
+    {% include 'includes/_messages.html' %}
+
+    <h3>Log In to Portal</h3>
+    <p class="login-subtitle">Access your trucking operations dashboard.</p>
+
+    <form method="POST" action="">
+      {{ form.hidden_tag() }}
+
+      <div class="form-group">
+        {{ form.username.label(class='form-control-label') }}
+        {% if form.username.errors %}
+          {{ form.username(class='form-control form-control-lg is-invalid') }}
+          <div class="invalid-feedback">
+            {% for error in form.username.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          {{ form.username(class='form-control form-control-lg') }}
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        {{ form.password.label(class='form-control-label') }}
+        {% if form.password.errors %}
+          {{ form.password(class='form-control form-control-lg is-invalid') }}
+          <div class="invalid-feedback">
+            {% for error in form.password.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          {{ form.password(class='form-control form-control-lg') }}
+        {% endif %}
+      </div>
+
+      <div class="form-group mt-4">
+        {{ form.submit(class='login-submit') }}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

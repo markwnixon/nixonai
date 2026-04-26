@@ -1,0 +1,457 @@
+{% extends 'desk_layout.html'  %}
+
+{% block body_class %}ai-agents-page{% endblock %}
+
+{% block body %}
+
+
+<style>
+
+:root {
+  --dt-navy: #0c3153;
+  --dt-navy-2: #133e67;
+  --dt-cream: #f3ead8;
+  --dt-cream-2: #fffaf0;
+  --dt-gold: #d9b26b;
+  --dt-gold-2: #c89a4a;
+  --dt-text: #13263a;
+  --dt-muted: #4c5b68;
+  --dt-border: rgba(204, 185, 143, 0.75);
+  --dt-shadow: 0 18px 50px rgba(5, 20, 36, 0.18);
+}
+
+  .agents-page {
+    background: var(--dt-cream);
+    color: var(--dt-text);
+    padding-top: 84px;
+  }
+
+  .agents-hero {
+    position: relative;
+    background:
+      linear-gradient(90deg, rgba(12,49,83,0.98), rgba(12,49,83,0.94), rgba(12,49,83,0.88)),
+      url('{{ srcpath }}pics/card_class8.png') center/cover no-repeat;
+    color: #fff;
+    padding: 95px 0 105px;
+    overflow: hidden;
+  }
+
+  .agents-hero::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 76px;
+    background: var(--dt-cream);
+    clip-path: polygon(0 56%, 50% 0, 100% 56%, 100% 100%, 0 100%);
+  }
+
+  .agents-hero-inner {
+    position: relative;
+    z-index: 2;
+    max-width: 980px;
+  }
+
+  .agents-kicker {
+    color: var(--dt-gold);
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+    display: inline-block;
+  }
+
+  .agents-hero h1 {
+    font-size: clamp(2.4rem, 6vw, 5rem);
+    line-height: 1.02;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin: 0 0 22px;
+  }
+
+  .agents-hero p {
+    font-size: 1.22rem;
+    line-height: 1.62;
+    color: #f8f2e6;
+    max-width: 850px;
+    margin-bottom: 32px;
+  }
+
+  .agents-section {
+    padding: 78px 40px;
+  }
+
+  .agents-section-title {
+    text-align: center;
+    max-width: 920px;
+    margin: 0 auto 42px;
+  }
+
+  .agents-section-title h2 {
+    color: var(--dt-navy);
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .agents-section-title p {
+    color: var(--dt-muted);
+    font-size: 1.15rem;
+    margin: 0;
+  }
+
+  .agents-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+
+  .agent-card {
+    background: var(--dt-cream-2);
+    border: 2px solid var(--dt-border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 14px 36px rgba(5,20,36,0.10);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .agent-card-top {
+    background: linear-gradient(135deg, var(--dt-navy), var(--dt-navy-2));
+    color: #fff;
+    padding: 24px;
+    border-bottom: 3px solid var(--dt-gold);
+  }
+
+  .agent-card-top h3 {
+    margin: 0 0 8px;
+    color: #fff;
+    font-weight: 900;
+    font-size: 1.35rem;
+  }
+
+  .agent-card-top .agent-label {
+    color: var(--dt-gold);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.82rem;
+  }
+
+  .agent-card-body {
+    padding: 24px;
+    flex: 1;
+  }
+
+  .agent-card-body p {
+    color: var(--dt-muted);
+    line-height: 1.58;
+    margin: 0 0 14px;
+  }
+
+  .agent-list {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--dt-text);
+  }
+
+  .agent-list li {
+    margin-bottom: 8px;
+  }
+
+  .agents-band {
+    background: linear-gradient(135deg, var(--dt-navy), var(--dt-navy-2));
+    color: #fff;
+  }
+
+  .agents-band .agents-section-title h2 {
+    color: #fff;
+  }
+
+  .agents-band .agents-section-title p {
+    color: #f8f2e6;
+  }
+
+  .workflow-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 18px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+
+  .workflow-step {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 18px;
+    padding: 22px;
+    text-align: center;
+  }
+
+  .workflow-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: var(--dt-gold);
+    color: var(--dt-navy);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+
+  .workflow-step h3 {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 900;
+    margin-bottom: 8px;
+  }
+
+  .workflow-step p {
+    color: #f8f2e6;
+    font-size: 0.95rem;
+    margin: 0;
+  }
+
+  @media (max-width: 1200px) {
+    .agents-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .workflow-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 767px) {
+    .agents-grid,
+    .workflow-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .agents-section {
+      padding: 64px 20px;
+    }
+  }
+
+  body.class8-detail-page .dt-navbar {
+    background: #0c3153 !important;
+    border-bottom: 2px solid #d9b26b !important;
+}
+
+  body.ai-agents-page .dt-navbar {
+  background: #0c3153 !important;
+  border-bottom: 2px solid #d9b26b !important;
+}
+
+  .agents-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 26px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.agent-card {
+  background: var(--dt-cream-2);
+  border: 2px solid var(--dt-border);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 14px 36px rgba(5,20,36,0.10);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.agent-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 44px rgba(5,20,36,0.18);
+}
+
+.agent-card-header {
+  background: linear-gradient(135deg, var(--dt-navy), var(--dt-navy-2));
+  padding: 22px;
+  border-bottom: 3px solid var(--dt-gold);
+}
+
+.agent-kicker {
+  color: var(--dt-gold);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.agent-card-header h3 {
+  color: #fff;
+  font-weight: 900;
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.agent-card-body {
+  padding: 24px;
+}
+
+.agent-card-body p {
+  color: var(--dt-muted);
+  margin-bottom: 14px;
+}
+
+.agent-list {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.agent-list li {
+  margin-bottom: 6px;
+  color: var(--dt-text);
+}
+
+
+</style>
+
+<div class="agents-page">
+
+  <section class="agents-hero">
+    <div class="container">
+      <div class="agents-hero-inner">
+        <span class="agents-kicker">Customer-Specific AI Automation</span>
+        <h1>AI Agents Built Around Each Customer's Workflow</h1>
+        <p>
+          Each customer receives a controlled agent environment with limited access,
+          company-specific scope, and shared skills that improve over time.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="agents-grid">
+
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-kicker">Private Environment</span>
+        <h3>One Bot per Company</h3>
+      </div>
+      <div class="agent-card-body">
+        <p>
+          Each company receives its own AI agent with access limited to approved systems,
+          email accounts, and workflows.
+        </p>
+        <ul class="agent-list">
+          <li>Company-specific permissions</li>
+          <li>Separate operating context</li>
+          <li>Restricted data access</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-kicker">Controlled Scope</span>
+        <h3>Limited Domain Access</h3>
+      </div>
+      <div class="agent-card-body">
+        <p>
+          Agents operate within defined business boundaries, focusing only on
+          relevant tools and workflows.
+        </p>
+        <ul class="agent-list">
+          <li>Access only assigned resources</li>
+          <li>Task-focused automation</li>
+          <li>Company-level separation</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-kicker">Shared Intelligence</span>
+        <h3>Skills Improve Over Time</h3>
+      </div>
+      <div class="agent-card-body">
+        <p>
+          Skills evolve based on patterns seen across all workflows, improving
+          accuracy and consistency over time.
+        </p>
+        <ul class="agent-list">
+          <li>Better document interpretation</li>
+          <li>Improved quote handling</li>
+          <li>Stronger data extraction</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-kicker">Document Intelligence</span>
+        <h3>Delivery Order Recognition</h3>
+      </div>
+      <div class="agent-card-body">
+        <p>
+          Delivery orders follow repeatable patterns that agents can identify
+          and structure into usable data.
+        </p>
+        <ul class="agent-list">
+          <li>Addresses and locations</li>
+          <li>BOL and booking numbers</li>
+          <li>Container details</li>
+            <li>New job creation into database</li>
+            <li>Uploads delivery orders and rate cons</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-kicker">Quote Support</span>
+        <h3>Quote Interpretation</h3>
+      </div>
+      <div class="agent-card-body">
+        <p>
+          Quote requests contain common patterns that can be identified and
+          prepared for pricing workflows.
+        </p>
+        <ul class="agent-list">
+          <li>Move type detection</li>
+          <li>Location parsing</li>
+          <li>Equipment needs</li>
+            <li>Creates response emails</li>
+            <li>Can send as response or hold for review</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-kicker">Workflow Automation</span>
+        <h3>From Email to Action</h3>
+      </div>
+      <div class="agent-card-body">
+        <p>
+          The goal is not just reading messages, but helping turn incoming
+          information into actionable work.
+        </p>
+        <ul class="agent-list">
+          <li>Email monitoring</li>
+          <li>Data extraction</li>
+          <li>Job preparation</li>
+            <li>Port schedule updates</li>
+            <li>Job delivery updates</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</div>
+
+{% endblock %}
