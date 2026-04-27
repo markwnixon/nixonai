@@ -565,7 +565,7 @@ def Exports_Bk_Diff_task(err, holdvec, task_iter):
 
 def Assign_Drivers_task(err, holdvec, iter):
     drivers= Drivers.query.filter(Drivers.Active == 1).all()
-    trucks = Vehicles.query.filter(Vehicles.Active == 1).all()
+
     drivernow = request.values.get('thisdriver')
     trucknow = request.values.get('truckdefault')
     lupdate = request.values.get('LboxUpdate')
@@ -665,7 +665,7 @@ def Assign_Drivers_task(err, holdvec, iter):
 def Driver_Hours_task(err, holdvec, iter):
 
     drivers= Drivers.query.filter(Drivers.Active == 1).all()
-    trucks = Vehicles.query.filter(Vehicles.Active == 1).all()
+    trucks = Vehicles.query.filter((Vehicles.Type == 'Tractor') & (Vehicles.Active == 1)).all()
     drivernow = request.values.get('thisdriver')
     trucknow = request.values.get('truckdefault')
     lupdate = request.values.get('LboxUpdate')

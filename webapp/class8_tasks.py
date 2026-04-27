@@ -2246,7 +2246,7 @@ def Table_maker(genre):
     movedate = thisdate
     #print(thisdate, thisdate.weekday())
     holdvec[96] = []
-    holdvec[94] = [Drivers.query.filter(Drivers.Active == 1).all(),Vehicles.query.filter(Vehicles.Active == 1).all()]
+    holdvec[94] = [Drivers.query.filter(Drivers.Active == 1).all(), Vehicles.query.filter((Vehicles.Type=='Tractor') & (Vehicles.Active == 1)).all()]
     anyamber = 0
     for idate in range(4):
         boxid = []

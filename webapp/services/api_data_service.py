@@ -581,7 +581,7 @@ def api_call(scac, now, data_needed, arglist):
     elif data_needed == 'pintrucks':
         info_id = 0
         ret_data = []
-        odata = Vehicles.query.filter(Vehicles.Active == 1).all()
+        odata = Vehicles.query.filter((Vehicles.Type=='Tractor') & (Vehicles.Active == 1)).all()
         for odat in odata:
             info_id += 1
             unit = odat.Unit
