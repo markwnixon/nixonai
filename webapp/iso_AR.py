@@ -289,18 +289,20 @@ def get_open_sort_totals(arlist):
             sidat = SumInv.query.filter(SumInv.Si == sin).first()
             if sidat is None:
                 print(f'There is no data for sin of {sin}')
-            invodate = sidat.Date
-            invototal = sidat.Total
-            if invodate is not None and invototal is not None:
-                invototal = float(invototal)
-                iall += 1
-                dolall += invototal
-                if invodate < dat30:
-                    io30 += 1
-                    dolo30 += invototal
-                else:
-                    iu30 += 1
-                    dolu30 += invototal
+            else:
+                print(f'date for sidat {sidat.Si} is {sidat.Date}')
+                invodate = sidat.Date
+                invototal = sidat.Total
+                if invodate is not None and invototal is not None:
+                    invototal = float(invototal)
+                    iall += 1
+                    dolall += invototal
+                    if invodate < dat30:
+                        io30 += 1
+                        dolo30 += invototal
+                    else:
+                        iu30 += 1
+                        dolu30 += invototal
 
         for odat in odata:
             invodate = odat.InvoDate
