@@ -192,6 +192,16 @@ def bot_orders():
     if load_location:
         query = query.filter(Orders.Company2 == load_location)
 
+    address_contains = request.args.get('address_contains') or request.args.get('address')
+    if address_contains:
+        address_terms = [term.strip() for term in address_contains.replace(',', ' ').split() if term.strip()]
+        for term in address_terms:
+            pattern = f'%{term}%'
+            query = query.filter(or_(
+                Orders.Company2.ilike(pattern),
+                Orders.Dropblock2.ilike(pattern)
+            ))
+
     container = request.args.get('container')
     if container:
         query = query.filter(Orders.Container == container)
