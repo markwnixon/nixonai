@@ -6,7 +6,7 @@ import datetime
 from datetime import datetime, timedelta
 
 from webapp.extensions import db
-from webapp.models import Orders, People, Drops
+from webapp.models import Orders, People, Drops, Terminals
 
 # adjust these imports to match your app
 from webapp.viewfuncs import newjo
@@ -776,6 +776,43 @@ def bot_loading_locations():
         "shipper": shipper,
         "match_count": len(matches),
         "matches": matches
+    }), 200
+
+
+@bot_bp.route('/bot/terminals', methods=['GET'])
+@bot_token_required(required_scopes={'read:orders'})
+def bot_terminals():
+    q = (request.args.get('q') or '').strip().lower()
+
+    query = Terminals.query
+    if q:
+        query = query.filter(or_(
+            func.lower(Terminals.Name).contains(q),
+            func.lower(Terminals.Address).contains(q),
+        ))
+
+    rows = (
+        query
+        .order_by(Terminals.Name.asc())
+        .limit(100)
+        .all()
+    )
+
+    terminals = []
+    for row in rows:
+        address = row.Address or ''
+        lines = [line.strip() for line in address.splitlines() if line.strip()]
+        terminals.append({
+            "id": row.id,
+            "name": row.Name or "",
+            "address": address,
+            "lines": lines,
+        })
+
+    return jsonify({
+        "query": q,
+        "count": len(terminals),
+        "terminals": terminals,
     }), 200
 
 
