@@ -1093,8 +1093,9 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, distdata, m
                 etitle = etitle + f' {loc};'
 
         etitle = etitle[:-1]
-        if 'all-in-1d' in btype:
-            ebody = f'Hello {customer}, <br><br>We can cover this move. <br<br>Rate:'
+        if 'all-in-1d' in btype or 'all-in-2d' in btype:
+            all_in_type = 'all-in-2d' if 'all-in-2d' in btype else 'all-in-1d'
+            ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>All-In</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 sen, tbox, btype, stype, mixtype, ow = direct_insert_adds(tbox, expdata, distdata, multibid, mdistdata, ix, costdata)
                 if ow:
@@ -1106,7 +1107,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, distdata, m
                 ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
             else:
                 ebody = ebody + f'{sen}'
-            bidtypeamount[0] = 'all-in-1d'
+            bidtypeamount[0] = all_in_type
             bidtypeamount[1] = bids[0]
 
         elif 'live' in btype:
@@ -1492,6 +1493,60 @@ def build_quote_email_direct_api(
         'tbox': tbox
     }
 
+def build_target_rate_note(multi_quote_results):
+    if not multi_quote_results:
+        return ''
+
+    lines = []
+    for item in multi_quote_results:
+        request_data = item.get('request') or {}
+        target = request_data.get('target_rate')
+        if not target:
+            continue
+
+        result = item.get('result') or {}
+        selected_bid = result.get('selected_bid')
+        locto = result.get('locto') or request_data.get('locto')
+        if not selected_bid:
+            continue
+
+        try:
+            target_value = float(str(target).replace(',', ''))
+            bid_value = float(str(selected_bid).replace(',', ''))
+        except Exception:
+            comparison = 'quoted'
+        else:
+            if bid_value <= target_value:
+                comparison = 'at or below'
+            else:
+                comparison = 'above'
+
+        lines.append(
+            f'Our quote to {locto} is <b>${selected_bid}</b>, which is {comparison} '
+            f'the requested target rate of <b>${target}</b>.'
+        )
+
+    if not lines:
+        return ''
+
+    return '<br><br>' + '<br>'.join(lines)
+
+
+def build_inclusion_note(include_text):
+    include_text = (include_text or '').strip()
+    if not include_text:
+        return ''
+    return f'<br><br>These all-in rates include {include_text}.'
+
+
+def insert_before_signoff(body_html, insert_html):
+    if not insert_html:
+        return body_html
+    marker = '<br><br><em>'
+    if marker in body_html:
+        return body_html.replace(marker, insert_html + marker, 1)
+    return body_html + insert_html
+
 def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, distdata, multibid, etitle, port, include_text, whouse, wareBB, wareUD, mdistdata, costdata, sboxes):
     # Get the costs of the additional boxes checked
     if multibid[0] != 'on':
@@ -1559,7 +1614,8 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
                 etitle = etitle + f' {loc};'
 
         etitle = etitle[:-1]
-        if 'all-in-1d' in btype:
+        if 'all-in-1d' in btype or 'all-in-2d' in btype:
+            all_in_type = 'all-in-2d' if 'all-in-2d' in btype else 'all-in-1d'
             ebody = f'Hello {customer}, <br><br>{cdata[0]} <b>(MC#{cdata[12]})</b> is pleased to offer the following <b>All-In</b> quotes:<br><br>'
             for ix, loc in enumerate(loci):
                 sen, tbox, btype, stype, mixtype, ow = classic_insert_adds(tbox, expdata, takedef, distdata, multibid, mdistdata, ix, costdata)
@@ -1572,7 +1628,7 @@ def bodymaker_classic(customer, cdata, bidthis, locto, tbox, expdata, takedef, d
                 ebody = ebody + f'{sen}<br><br>The following accessorial table is provided for information purposes only.'
             else:
                 ebody = ebody + f'{sen}'
-            bidtypeamount[0] = 'all-in-1d'
+            bidtypeamount[0] = all_in_type
             bidtypeamount[1] = bids[0]
 
         elif 'live' in btype:
@@ -2295,7 +2351,8 @@ def calculate_and_build_quote_api(
         whouse=None,
         wareBB=None,
         wareUD=None,
-        etitle=None):
+        etitle=None,
+        quote_requests=None):
     """
     Top-level API helper:
       1) calculate pricing
@@ -2330,11 +2387,10 @@ def calculate_and_build_quote_api(
         sboxes[0] = 'direct'
         sboxes[1] = 'include' if include_accessorial_table else 'exclude'
 
-    if multibid is None:
-        multibid = ['off', 1, [], []]
-
     if whouse is None:
         whouse = [0] * 9
+
+    quote_requests = quote_requests or []
 
     # ------------------------------------------------------------
     # Step 1: run pricing wrapper
@@ -2348,6 +2404,26 @@ def calculate_and_build_quote_api(
         qidat=qidat,
         expdata=expdata
     )
+
+    multi_quote_results = []
+    if quote_requests:
+        for quote_request in quote_requests:
+            requested_locto = quote_request.get('locto')
+            if not requested_locto:
+                continue
+            this_result = calculate_quote_api(
+                locto=requested_locto,
+                term=term,
+                start_address=start_address,
+                tbox=tbox,
+                newmarkup=newmarkup,
+                qidat=qidat,
+                expdata=expdata
+            )
+            multi_quote_results.append({
+                'request': quote_request,
+                'result': this_result,
+            })
 
     # ------------------------------------------------------------
     # Step 2: build bidthis the same way the web route does
@@ -2380,9 +2456,21 @@ def calculate_and_build_quote_api(
     port = quote_result['port']
     locto_resolved = quote_result['locto']
 
+    if quote_requests:
+        loci = [item['result']['locto'] for item in multi_quote_results]
+        bids = [
+            select_bid_from_tbox(tbox_used, item['result']['biddata'])[1]
+            for item in multi_quote_results
+        ]
+        multibid = ['on', len(loci), loci, bids]
+    elif multibid is None:
+        multibid = ['off', 1, [], []]
+
     if etitle is None:
         if wareBB or wareUD:
             etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote for Warehouse Services from {port}'
+        elif quote_requests:
+            etitle = f'{cdata[0]} (MC#{cdata[12]}) Quotes from {port}'
         else:
             etitle = f'{cdata[0]} (MC#{cdata[12]}) Quote to {locto_resolved} from {port}'
 
@@ -2392,9 +2480,12 @@ def calculate_and_build_quote_api(
     # ------------------------------------------------------------
     mdistdata = []
     if multibid[0] == 'on':
-        # If caller did not prebuild mdistdata, use current distdata for each location slot
-        requested = multibid[1] if len(multibid) > 1 and multibid[1] else 1
-        mdistdata = [quote_result['distdata']] * requested
+        if multi_quote_results:
+            mdistdata = [item['result']['distdata'] for item in multi_quote_results]
+        else:
+            # If caller did not prebuild mdistdata, use current distdata for each location slot
+            requested = multibid[1] if len(multibid) > 1 and multibid[1] else 1
+            mdistdata = [quote_result['distdata']] * requested
 
         # If caller did not prebuild multibid bids, map selected quote type over locations
         if len(multibid) < 4:
@@ -2432,6 +2523,11 @@ def calculate_and_build_quote_api(
         include_accessorial_table=include_accessorial_table
     )
 
+    if multi_quote_results:
+        detail_note = build_inclusion_note(quote_result.get('include_text'))
+        detail_note += build_target_rate_note(multi_quote_results)
+        email_result['body_html'] = insert_before_signoff(email_result.get('body_html'), detail_note)
+
     # ------------------------------------------------------------
     # Step 6: combined return
     # ------------------------------------------------------------
@@ -2451,6 +2547,23 @@ def calculate_and_build_quote_api(
             'locfrom': quote_result.get('locfrom'),
             'locto': quote_result.get('locto'),
             'newdirdata': quote_result.get('newdirdata'),
+            'multi_quotes': [
+                {
+                    'request': item.get('request'),
+                    'selected_bid_type': item['result'].get('selected_bid_type'),
+                    'selected_bid': item['result'].get('selected_bid'),
+                    'biddata': item['result'].get('biddata'),
+                    'costdata': item['result'].get('costdata'),
+                    'distdata': item['result'].get('distdata'),
+                    'timedata': item['result'].get('timedata'),
+                    'include_text': item['result'].get('include_text'),
+                    'port': item['result'].get('port'),
+                    'locfrom': item['result'].get('locfrom'),
+                    'locto': item['result'].get('locto'),
+                    'newdirdata': item['result'].get('newdirdata'),
+                }
+                for item in multi_quote_results
+            ],
         },
         'reply': {
             'body_html': email_result.get('body_html'),

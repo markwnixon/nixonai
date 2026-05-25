@@ -86,6 +86,31 @@ def api_build_quote():
         # Required inputs
         locto = payload.get('locto')
         customer = payload.get('customer')
+        quote_requests = payload.get('quotes') or []
+
+        if quote_requests:
+            if not isinstance(quote_requests, list):
+                return jsonify({
+                    'ok': False,
+                    'error': 'quotes must be a list'
+                }), 400
+
+            clean_quote_requests = []
+            for ix, quote_request in enumerate(quote_requests):
+                if not isinstance(quote_request, dict):
+                    return jsonify({
+                        'ok': False,
+                        'error': f'quotes[{ix}] must be an object'
+                    }), 400
+                quote_locto = quote_request.get('locto')
+                if not quote_locto:
+                    return jsonify({
+                        'ok': False,
+                        'error': f'Missing required field: quotes[{ix}].locto'
+                    }), 400
+                clean_quote_requests.append(quote_request)
+            quote_requests = clean_quote_requests
+            locto = quote_requests[0].get('locto')
 
         if not locto:
             return jsonify({
@@ -132,7 +157,8 @@ def api_build_quote():
             whouse=whouse,
             wareBB=wareBB,
             wareUD=wareUD,
-            etitle=etitle
+            etitle=etitle,
+            quote_requests=quote_requests
         )
 
         return jsonify({
