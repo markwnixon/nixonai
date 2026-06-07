@@ -304,7 +304,7 @@ def getdocs(odat):
 def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, eprof, err, emaildata):
     err = []
     dockind = ['']*4
-    if task_iter > 0 and (eprof == 'Custom' or eprof == 'Custom-Invoice'):
+    if task_iter > 0 and (eprof == 'Custom' or eprof == 'Custom-Invoice' or eprof == 'Request Rate Con'):
         sections = ['1st Section', '2nd Section', '3rd Section', '4th Section']
         for jx, section in enumerate(sections): dockind[jx] = request.values.get(section)
     else:

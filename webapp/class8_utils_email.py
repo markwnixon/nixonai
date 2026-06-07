@@ -22,6 +22,64 @@ import datetime
 today = datetime.datetime.today()
 today_str = today.strftime('%d %b %Y')
 
+
+def accounting_sender_key():
+    if em.get('acct') and passwords.get('acct'):
+        return 'acct'
+    return 'invo'
+
+
+def recipient_first_name(email_value, fallback):
+    if hasinput(email_value):
+        local_part = str(email_value).split('@', 1)[0]
+        for separator in ['.', '_', '-']:
+            local_part = local_part.replace(separator, ' ')
+        first_name = local_part.strip().split()
+        if first_name:
+            return first_name[0].title()
+    return fallback
+
+
+def clean_email(value):
+    value = stripper(value)
+    if not hasinput(value) or '@' not in value:
+        return ''
+    return value
+
+
+def order_email_defaults(odat, pdat=None, commit=True):
+    if odat is None:
+        return '', '', ''
+
+    if pdat is None:
+        if getattr(odat, 'Bid', None):
+            pdat = People.query.get(odat.Bid)
+        if pdat is None and hasinput(getattr(odat, 'Shipper', None)):
+            pdat = People.query.filter(People.Company == odat.Shipper).first()
+
+    emailjp = clean_email(getattr(odat, 'Emailjp', None))
+    emailoa = clean_email(getattr(odat, 'Emailoa', None))
+    emailap = clean_email(getattr(odat, 'Emailap', None))
+    changed = False
+
+    if pdat is not None:
+        if not emailjp:
+            emailjp = clean_email(getattr(pdat, 'Email', None))
+            if emailjp:
+                odat.Emailjp = emailjp
+                changed = True
+        if not emailap:
+            emailap = clean_email(getattr(pdat, 'Associate2', None))
+            if emailap:
+                odat.Emailap = emailap
+                changed = True
+
+    if changed and commit:
+        db.session.commit()
+
+    return emailjp, emailoa, emailap
+
+
 def check_person(info):
     name = info[4]
     email = info[2]
@@ -143,11 +201,7 @@ def etemplate_truck(eprof,odat):
     pdat = People.query.get(bid)
     if pdat is None:
         pdat = People.query.filter(People.Company == shipper).first()
-    if pdat is not None:
-        estatus, epod, eaccts = pdat.Email, pdat.Associate1, pdat.Associate2
-        estatus, epod, eaccts = stripper(estatus), stripper(epod), stripper(eaccts)
-    else:
-        estatus, epod, eaccts = '', '', ''
+    estatus, epod, eaccts = order_email_defaults(odat, pdat)
 
     if eprof== 'eprof1':
         etitle = f'Update on Order: {od} | {keyval} | {con}'
@@ -263,10 +317,12 @@ def etemplate_truck(eprof,odat):
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname]
         return emaildata
 
-    elif eprof == 'Custom' or eprof == 'Custom-Invoice':
-        if eprof == 'Custom-Invoice':
+    elif eprof == 'Custom' or eprof == 'Custom-Invoice' or eprof == 'Request Rate Con':
+        if eprof == 'Custom-Invoice' or eprof == 'Request Rate Con':
             etitle = f'{scac} Invoice Package For: {od} | {keyval} | {con}'
             ebody = f'Dear {odat.Shipper},\n\nThis invoice package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
+            if eprof == 'Request Rate Con':
+                etitle = f'{etitle} *Rate Con Request*'
         else:
             etitle = f'{scac} Document Package For: {od} | {keyval} | {con}'
             ebody = f'Dear {odat.Shipper},\n\nThis document package is enclosed for your review.\nWe greatly appreciate your business.\n\nSincerely,\n\n{signature}'
@@ -275,6 +331,9 @@ def etemplate_truck(eprof,odat):
         emailin2 = eaccts
         emailcc1 = em['invo']
         emailcc2 = ''
+        if eprof == 'Request Rate Con':
+            first_name = recipient_first_name(emailin1, odat.Shipper)
+            ebody = f'Dear {first_name},\n\nThis invoice package is enclosed for your review.  We need an updated rate con for our final submittal.  Please send the requested rate con as soon as possible. Thanks in advance.\n\nSincerely,\n\n{signature}'
         outname = f'Package_{odat.Jo}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vPackage']
         return emaildata
@@ -646,9 +705,10 @@ def invoice_mimemail(docref, err, lastpath, sids):
         shutil.copy(cfrom,newfile)
 
     #emailto = "export@firsteaglelogistics.com"
-    emailfrom = em['invo']
-    username = em['invo']
-    password = passwords['invo']
+    sender_key = accounting_sender_key()
+    emailfrom = em[sender_key]
+    username = em[sender_key]
+    password = passwords[sender_key]
 
     msg = MIMEMultipart()
 
@@ -720,9 +780,10 @@ def info_mimemail(emaildata, sids):
     etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, sendname, folder = emaildata
 
     #emailto = "export@firsteaglelogistics.com"
-    emailfrom = em['invo']
-    username = em['invo']
-    password = passwords['invo']
+    sender_key = accounting_sender_key()
+    emailfrom = em[sender_key]
+    username = em[sender_key]
+    password = passwords[sender_key]
 
     ebody = f'{ebody} {closing}'
 

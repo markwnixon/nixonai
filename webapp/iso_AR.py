@@ -24,7 +24,7 @@ import datetime
 from webapp.models import Quotes, Quoteinput, Orders, People, Ardata, SumInv
 from send_mimemail import send_mimemail
 from pyzipcode import ZipCodeDatabase
-from webapp.class8_utils_email import html_mimemail
+from webapp.class8_utils_email import html_mimemail, order_email_defaults
 import json
 
 zcdb = ZipCodeDatabase()
@@ -579,8 +579,8 @@ def final_update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emails
     etitle = request.values.get('etitle')
     ebody = request.values.get('ebody')
     salutation = request.values.get('salutation')
-    efrom = usernames['invo']
-    epass = passwords['invo']
+    efrom = usernames.get('acct', usernames['invo'])
+    epass = passwords.get('acct', passwords['invo'])
     eto = request.values.get('etolist')
     ecc = request.values.get('ecclist')
     eto = ast.literal_eval(eto)
@@ -664,8 +664,8 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
 
 
     etype = 'o30'
-    efrom = usernames['invo']
-    epass = passwords['invo']
+    efrom = usernames.get('acct', usernames['invo'])
+    epass = passwords.get('acct', passwords['invo'])
     try:
         eto = emailsend[1]
         ecc = emailsend[3]
@@ -822,30 +822,54 @@ def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, e
     #etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, efrom, folder, dat30date, sourcenamelist, sendnamellist = emaildata
     return emaildata
 
-def get_email_customer(pdat, ar_emails_cust):
+def _append_unique(values, value):
+    if hasinput(value) and value not in values:
+        values.append(value)
+
+
+def _selected_order_email_defaults(odata, boxes, pdat):
+    email_jps, email_oas, email_aps = [], [], []
+    sal_ap = None
+    if odata is None:
+        return email_jps, email_oas, email_aps, sal_ap
+
+    for ix, odat in enumerate(odata):
+        if boxes is not None and ix < len(boxes) and boxes[ix] != 'on':
+            continue
+        emailjp, emailoa, emailap = order_email_defaults(odat, pdat)
+        _append_unique(email_jps, emailjp)
+        _append_unique(email_oas, emailoa)
+        _append_unique(email_aps, emailap)
+        if not hasinput(sal_ap) and hasinput(emailap) and hasinput(getattr(odat, 'Salap', None)):
+            sal_ap = odat.Salap
+
+    return email_jps, email_oas, email_aps, sal_ap
+
+
+def get_email_customer(pdat, ar_emails_cust, odata=None, boxes=None):
     if pdat is not None:
         sal_default = None
         emailto_selected = request.values.getlist('emailtolist')
         emailcc_selected = request.values.getlist('emailcclist')
+        order_jps, order_oas, order_aps, order_salap = _selected_order_email_defaults(odata, boxes, pdat)
         #print(f'{emailto_selected}')
         if emailto_selected == []:
-            #set a default value...
-            try:
-                emailto_selected = [pdat.Associate2]
-                sal_default = pdat.Salap
-            except:
-                emailto_selected = []
+            emailto_selected = order_aps or order_jps
+            if hasinput(order_salap):
+                sal_default = order_salap
+            elif order_aps:
+                try:
+                    sal_default = pdat.Salap
+                except:
+                    sal_default = None
         #print(f'{emailcc_selected}')
         emailtos, emailccs = [], []
-        if hasinput(pdat.Email):
-            emailtos.append(pdat.Email)
-            emailccs.append(pdat.Email)
-        if hasinput(pdat.Associate1):
-            emailtos.append(pdat.Associate1)
-            emailccs.append(pdat.Associate1)
-        if hasinput(pdat.Associate2):
-            emailtos.append(pdat.Associate2)
-            emailccs.append(pdat.Associate2)
+        for emailin in order_jps + order_oas + order_aps:
+            _append_unique(emailtos, emailin)
+            _append_unique(emailccs, emailin)
+        for emailin in [pdat.Email, pdat.Associate1, pdat.Associate2]:
+            _append_unique(emailtos, emailin)
+            _append_unique(emailccs, emailin)
 
         # Add in email addresses from related emails
         for ar in ar_emails_cust:
@@ -855,21 +879,17 @@ def get_email_customer(pdat, ar_emails_cust):
             eto = ast.literal_eval(eto)
             ecc = ast.literal_eval(ecc)
             for et in eto:
-                emailtos.append(et)
+                _append_unique(emailtos, et)
             for ec in ecc:
-                emailccs.append(ec)
+                _append_unique(emailccs, ec)
             if efrom is not None:
-                emailtos.append(efrom)
-                emailccs.append(efrom)
+                _append_unique(emailtos, efrom)
+                _append_unique(emailccs, efrom)
 
         #Add these emails for information purposes
-        emailtos.append(usernames['info'])
-        emailccs.append(usernames['info'])
+        _append_unique(emailtos, usernames['info'])
+        _append_unique(emailccs, usernames['info'])
 
-        unique_emailtolist = set(emailtos)
-        unique_emailcclist = set(emailccs)
-        emailtos = list(unique_emailtolist)
-        emailccs = list(unique_emailcclist)
         emailsend = [emailtos, emailto_selected, emailccs, emailcc_selected, sal_default]
         return emailsend
 
@@ -1111,7 +1131,7 @@ def isoAR():
     rview = rselect(nemail)
 
     pdat = People.query.filter(People.Company == this_shipper).first()
-    emailsend = get_email_customer(pdat, ar_emails_cust)
+    emailsend = get_email_customer(pdat, ar_emails_cust, odata, boxes)
     #print(f'Emailsend = {emailsend}')
 
     if emailgo is not None:

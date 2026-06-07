@@ -218,7 +218,7 @@ def get_Orders_keydata(keydata, checked_data):
             pdat = None
         #print(f'The sid is {sid}')
         if hasvalue(em1):
-            keydata['emaildata1'] = []
+            keydata['emaildata1'] = [em1]
         elif keydata['emaildata1'] == []:
             elist = []
             for kdat in kdata:
@@ -233,7 +233,7 @@ def get_Orders_keydata(keydata, checked_data):
                 keydata['emaildata1'] = elist
 
         if hasvalue(em2):
-            keydata['emaildata2'] = []
+            keydata['emaildata2'] = [em2]
         elif keydata['emaildata2'] == []:
             elist = []
             for kdat in kdata:
@@ -248,7 +248,7 @@ def get_Orders_keydata(keydata, checked_data):
 
 
         if hasvalue(em3):
-            keydata['emaildata3'] = []
+            keydata['emaildata3'] = [em3]
         elif keydata['emaildata3'] == []:
             elist = []
             for kdat in kdata:
@@ -3076,6 +3076,8 @@ def New_task(tablesetup, task_iter):
                 if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                     if entry[1] != 'hidden':
                         holdvec[jx] = request.values.get(f'{entry[0]}')
+                        if itable == 'Bills' and entry[0] == 'Co' and not hasinput(holdvec[jx]):
+                            holdvec[jx] = companydata()[10]
                         if entry[0] in form_checks: required = True
                         else: required = False
                         #print(f'New Task entry[0]={entry[0]}, {entry[1]}, {entry[4]}, holdvec[jx] = {holdvec[jx]}')
@@ -3133,6 +3135,8 @@ def New_task(tablesetup, task_iter):
             for jx, entry in enumerate(entrydata):
                 if entry[0] in form_checks: required = True
                 else: required = False
+                if itable == 'Bills' and entry[0] == 'Co' and not hasinput(holdvec[jx]):
+                    holdvec[jx] = companydata()[10]
                 holdvec[jx], entry[5], entry[6] = form_check(entry[0],holdvec[jx], entry[4], 'New', required, task_iter, htold, 0, itable)
                 #*#print(f'Entry loop: jx"{jx}, entry:{entry[0]} {entry[5]} {entry[6]} {required}')
 
@@ -4359,7 +4363,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
         if email_requested:
             #print('Exiting after email requested completed')
-            if 'Invoice' in dockind:
+            if 'Invoice' in dockind and eprof != 'Request Rate Con':
                 #print('This is an invoice based package')
                 odat.Istat = 3
                 db.session.commit()
@@ -4911,6 +4915,7 @@ def get_billform_data(entrydata, tablesetup, holdvec, err, thisform, itable):
     form_show = tablesetup['form show'][thisform]
     form_checks = tablesetup['form checks'][thisform]
     task_iter = 1
+    today = datetime.date.today().strftime('%Y-%m-%d')
     if thisform != 'MultiChecks': form_show.append('Always')
     failed = 0
     warned = 0
@@ -4918,6 +4923,9 @@ def get_billform_data(entrydata, tablesetup, holdvec, err, thisform, itable):
         if entry[4] is not None and entry[9] in form_show:
             # Some items are part of bringdata so do not test those - make sure entry[4] is None for those
             holdvec[jx] = request.values.get(f'{entry[0]}')
+            if thisform == 'MultiChecks' and entry[0] == 'pDate' and (
+                    not hasinput(holdvec[jx]) or str(holdvec[jx]).strip().lower() == 'unknown'):
+                holdvec[jx] = today
             if entry[0] in form_checks: required = True
             else: required = False
             holdvec[jx], entry[5], entry[6] = form_check(entry[0], holdvec[jx], entry[4], thisform, required, task_iter, 'unknown', 0, itable)
@@ -5133,34 +5141,38 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 # Get Default Account Data
                 #print('co is', co[10])
                 adat = Accounts.query.filter((Accounts.Type == 'Bank') & (Accounts.Co == co[10])).first()
+                default_pay_method = 'ACH'
                 for jx, entry in enumerate(entrydata):
                     holdvec[jx] = getattr(bdat, f'{entry[0]}')
                     aj = hasinput(holdvec[jx])
                     if aj == 0:
                         #print(f'{entry[0]} {holdvec[jx]} {aj}')
                         if entry[0] == 'pMeth':
-                            holdvec[jx], entry[5], entry[6] = 'Check', 1, 'Warning: Inserted Default Value'
+                            holdvec[jx], entry[5], entry[6] = default_pay_method, 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'pAccount':
                             holdvec[jx], entry[5], entry[6] = adat.Name, 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'pAmount':
                             holdvec[jx], entry[5], entry[6] = bdat.bAmount, 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'pDate':
-                            holdvec[jx], entry[5], entry[6] = today, 1, 'Warning: Inserted Default Value'
+                            holdvec[jx], entry[5], entry[6] = datetime.date.today().strftime('%Y-%m-%d'), 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'Memo':
                             holdvec[jx], entry[5], entry[6] = f'{bdat.bSubcat} {bdat.bAccount}', 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'Ref':
-                            blast = Bills.query.filter(
-                                (Bills.pAccount == adat.Name) & (Bills.pMeth == 'Check') & (Bills.Status == 'Paid')).order_by(
-                                Bills.id.desc()).first()
-                            try:
-                                next_check = int(blast.Ref) + 1
-                            except:
-                                next_check = ''
-                            if blast is not None:  holdvec[jx], entry[5], entry[6] = f'{next_check}', 1, 'Warning: Inserted Default Value'
+                            if default_pay_method == 'Check':
+                                blast = Bills.query.filter(
+                                    (Bills.pAccount == adat.Name) & (Bills.pMeth == 'Check') & (Bills.Status == 'Paid')).order_by(
+                                    Bills.id.desc()).first()
+                                try:
+                                    next_check = int(blast.Ref) + 1
+                                except:
+                                    next_check = ''
+                                if blast is not None:  holdvec[jx], entry[5], entry[6] = f'{next_check}', 1, 'Warning: Inserted Default Value'
+                            else:
+                                holdvec[jx], entry[5], entry[6] = default_pay_method, 1, 'Warning: Inserted Default Value'
 ####################################################################
             #print(f'Writing checks with sids = {sids}')
             pmeth = request.values.get('pMeth')
-            if pmeth is None: pmeth = 'Check'
+            if pmeth is None: pmeth = 'ACH'
             docref, file1, cache, style = writechecks(sids,pmeth)
             #print(f'The check style is {style}')
             #######################################################
@@ -5178,17 +5190,26 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                     #print(f'{lastfile} does not exist')
 
             if record_item is not None:
+                ledger_errors = []
                 for sid in sids:
                     nextquery = f"{table}.query.get({sid})"
                     each_bdat = eval(nextquery)
                     #print(nextquery)
                     #print(each_bdat)
-                    err = gledger_write(['paybill'], each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount, 0)
-                    err.append(f'Ledger paid {each_bdat.Jo} to {each_bdat.bAccount} from {each_bdat.pAccount}')
-                    each_bdat.Check = docref
-                    each_bdat.Ccache = cache + 1
+                    ledger_err = gledger_write(['paybill'], each_bdat.Jo, each_bdat.bAccount, each_bdat.pAccount, 0)
+                    if ledger_err:
+                        ledger_errors.extend([f'{each_bdat.Jo}: {msg}' for msg in ledger_err])
+                        each_bdat.Status = 'Unpaid'
+                    else:
+                        err.append(f'Ledger paid {each_bdat.Jo} to {each_bdat.bAccount} from {each_bdat.pAccount}')
+                        each_bdat.Check = docref
+                        each_bdat.Ccache = cache + 1
                 db.session.commit()
-                holdvec[37] = 1
+                if ledger_errors:
+                    err.extend(ledger_errors)
+                    holdvec[37] = None
+                else:
+                    holdvec[37] = 1
             else:
                 bdat.Ccache = cache + 1
                 db.session.commit()

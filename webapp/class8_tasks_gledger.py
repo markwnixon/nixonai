@@ -4,6 +4,94 @@ import datetime
 from webapp.viewfuncs import stripper
 import json
 
+
+def audit_journal_balance(journal_id):
+    lines = Gledger.query.filter(Gledger.JournalId == journal_id).all()
+    debit_total = sum(line.Debit or 0 for line in lines)
+    credit_total = sum(line.Credit or 0 for line in lines)
+    if debit_total != credit_total:
+        return [f'Journal {journal_id} out of balance: debits {debit_total} credits {credit_total}']
+    return []
+
+
+def post_balanced_journal(lines, journal_id=None, journal_memo=None, posted_by='class8',
+                          source_table=None, source_id=None):
+    err = []
+    debit_total = sum(line.get('debit', 0) for line in lines)
+    credit_total = sum(line.get('credit', 0) for line in lines)
+    if debit_total != credit_total:
+        return [f'Ledger out of balance: debits {debit_total} credits {credit_total}']
+    if debit_total <= 0:
+        return ['Ledger amount must be greater than zero']
+
+    required = ['account', 'aid', 'source', 'sid', 'type', 'tcode', 'com', 'date']
+    for line in lines:
+        for key in required:
+            if line.get(key) is None:
+                err.append(f"Ledger line missing {key} for {line.get('tcode')} {line.get('type')}")
+    if err:
+        return err
+
+    try:
+        posted_at = datetime.datetime.now()
+        if journal_id is None:
+            journal_id = lines[0].get('journal_id')
+        if journal_memo is None:
+            journal_memo = lines[0].get('journal_memo')
+        if source_table is None:
+            source_table = lines[0].get('source_table')
+        if source_id is None:
+            source_id = lines[0].get('source_id')
+
+        for seq, line in enumerate(lines, start=1):
+            query = Gledger.query.filter(
+                (Gledger.Tcode == line['tcode']) &
+                (Gledger.Type == line['type'])
+            )
+            if line.get('match_aid', False):
+                query = query.filter(Gledger.Aid == line['aid'])
+            gdat = query.first()
+            if gdat is not None:
+                gdat.Debit = line.get('debit', 0)
+                gdat.Credit = line.get('credit', 0)
+                gdat.Account = line['account']
+                gdat.Aid = line['aid']
+                gdat.Source = line['source']
+                gdat.Sid = line['sid']
+                gdat.Com = line['com']
+                gdat.Recorded = line['recorded']
+                gdat.Date = line['date']
+                gdat.Ref = line.get('ref')
+                gdat.JournalId = journal_id
+                gdat.JournalSeq = seq
+                gdat.JournalMemo = journal_memo
+                gdat.PostedBy = posted_by
+                gdat.PostedAt = posted_at
+                gdat.SourceTable = source_table
+                gdat.SourceId = source_id
+            else:
+                input_line = Gledger(Debit=line.get('debit', 0), Credit=line.get('credit', 0),
+                                     Account=line['account'], Aid=line['aid'], Source=line['source'],
+                                     Sid=line['sid'], Type=line['type'], Tcode=line['tcode'],
+                                     Com=line['com'], Recorded=line['recorded'], Reconciled=0,
+                                     Date=line['date'], Ref=line.get('ref'),
+                                     JournalId=journal_id, JournalSeq=seq, JournalMemo=journal_memo,
+                                     PostedBy=posted_by, PostedAt=posted_at,
+                                     SourceTable=source_table, SourceId=source_id)
+                db.session.add(input_line)
+        db.session.commit()
+        if journal_id:
+            err = audit_journal_balance(journal_id)
+            if err:
+                db.session.rollback()
+                return err
+    except Exception as exc:
+        db.session.rollback()
+        return [f'Ledger write failed: {exc}']
+
+    return []
+
+
 def get_company(pid):
     cdat = People.query.get(pid)
     if cdat is not None:
@@ -332,101 +420,84 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
                 if acr is None: err.append(f'Cannot locate Credit Account {acctcr} for {cc}')
 
         if bus=='paybill':
-            from viewfuncs import check_multi_line
+            from webapp.viewfuncs import check_multi_line
 
             bdat=Bills.query.filter(Bills.Jo==jo).first()
+            if bdat is None:
+                return [f'Cannot locate Bill JO {jo}']
+
             err, amt, nbills = check_multi_line(jo)
+            if err:
+                return err
+
             iflag = bdat.iflag
             if iflag is not None:
                 if iflag > 0:
                     jo = jo + f'-{iflag}'
                     amt = float(bdat.pAmount2)
             amt=int(amt*100)
+            journal_id = f'PAYBILL-{jo}'
 
             pid=bdat.Pid
             pdate = bdat.pDate
             co = get_company(pid)
 
             acctdb = 'Accounts Payable'
-            print(f'the acctcr is {acctcr} and the cc is {cc}')
 
-            adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first() #the expense account
-            acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first() #the asset account
+            adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first() #the AP debit account
+            acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first() #the paid credit account
+
+            if adb is None:
+                return [f'Cannot locate Debit Account {acctdb} for {cc}']
 
             if acr is None:
                 #This account must be for another company and we have a cross bill situation
                 acr = Accounts.query.filter(Accounts.Name == acctcr).first()
-                if acr is not None:
-                    acrco = acr.Co
-                    if acrco != cc:
-                       #print('Mismatched Bills')
-                        newcc = acr.Co
+                if acr is None:
+                    return [f'Cannot locate Credit Account {acctcr}']
+                newcc = acr.Co
+                if newcc == cc:
+                    return [f'Cannot locate Credit Account {acctcr} for {cc}']
 
                 adat1 = Accounts.query.filter( (Accounts.Name.contains('Due to')) & (Accounts.Name.contains(cc)) & (Accounts.Co == newcc)).first()
-                duetodb = adat1.Name
-                duetodbid = adat1.id
                 adat2 = Accounts.query.filter( (Accounts.Name.contains('Due to')) & (Accounts.Name.contains(newcc)) & (Accounts.Co == cc)).first()
-                duetocr = adat2.Name
-                duetocrid = adat2.id
+                if adat1 is None:
+                    return [f'Cannot locate due-to account for {cc} in {newcc}']
+                if adat2 is None:
+                    return [f'Cannot locate due-to account for {newcc} in {cc}']
 
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Aid==duetodbid) & (Gledger.Type=='PD')).first()
-                if gdat is not None:
-                    gdat.Debit=amt
-                    gdat.Recorded=dt
-                    gdat.Date = pdate
-                else:
-                    input1 = Gledger(Debit=amt,Credit=0,Account=duetodb,Aid=duetodbid,Source=co,Sid=pid,Type='PD',Tcode=jo,Com=newcc,Recorded=dt,Reconciled=0,Date=pdate,Ref=bdat.Ref)
-                    db.session.add(input1)
-                db.session.commit()
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) &  (Gledger.Type=='PC')).first()
-                if gdat is not None:
-                    gdat.Credit=amt
-                    gdat.Recorded=dt
-                    gdat.Date = pdate
-                else:
-                    input2 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='PC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=pdate,Ref=bdat.Ref)
-                    db.session.add(input2)
-                db.session.commit()
-
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Aid==adb.id) & (Gledger.Type=='QD')).first()
-                if gdat is not None:
-                    gdat.Debit=amt
-                    gdat.Recorded=dt
-                    gdat.Date=pdate
-                else:
-                    input1 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type='QD',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=pdate,Ref=bdat.Ref)
-                    db.session.add(input1)
-                db.session.commit()
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type=='QC')).first()
-                if gdat is not None:
-                    gdat.Credit=amt
-                    gdat.Recorded=dt
-                    gdat.Date = pdate
-                else:
-                    input2 = Gledger(Debit=0,Credit=amt,Account=duetocr,Aid=duetocrid,Source=co,Sid=pid,Type='QC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=pdate,Ref=bdat.Ref)
-                    db.session.add(input2)
-                db.session.commit()
+                err = post_balanced_journal([
+                    {'debit': amt, 'credit': 0, 'account': adat1.Name, 'aid': adat1.id, 'source': co,
+                     'sid': pid, 'type': 'PD', 'tcode': jo, 'com': newcc, 'recorded': dt,
+                     'date': pdate, 'ref': bdat.Ref, 'match_aid': True},
+                    {'debit': 0, 'credit': amt, 'account': acctcr, 'aid': acr.id, 'source': co,
+                     'sid': pid, 'type': 'PC', 'tcode': jo, 'com': cc, 'recorded': dt,
+                     'date': pdate, 'ref': bdat.Ref},
+                    {'debit': amt, 'credit': 0, 'account': acctdb, 'aid': adb.id, 'source': co,
+                     'sid': pid, 'type': 'QD', 'tcode': jo, 'com': cc, 'recorded': dt,
+                     'date': pdate, 'ref': bdat.Ref, 'match_aid': True},
+                    {'debit': 0, 'credit': amt, 'account': adat2.Name, 'aid': adat2.id, 'source': co,
+                     'sid': pid, 'type': 'QC', 'tcode': jo, 'com': cc, 'recorded': dt,
+                     'date': pdate, 'ref': bdat.Ref},
+                ], journal_id=journal_id,
+                    journal_memo=f'Pay bill {jo} to {co} from {acctcr}',
+                    source_table='Bills', source_id=bdat.id)
+                if err:
+                    return err
 
             else:
-
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Aid==adb.id) & (Gledger.Type=='PD')).first()
-                if gdat is not None:
-                    gdat.Debit=amt
-                    gdat.Recorded=dt
-                    gdat.Date=pdate
-                else:
-                    input1 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type='PD',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=pdate,Ref=bdat.Ref)
-                    db.session.add(input1)
-                db.session.commit()
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) &  (Gledger.Type=='PC')).first()
-                if gdat is not None:
-                    gdat.Credit=amt
-                    gdat.Recorded=dt
-                    gdat.Date=pdate
-                else:
-                    input2 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='PC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=pdate,Ref=bdat.Ref)
-                    db.session.add(input2)
-                db.session.commit()
+                err = post_balanced_journal([
+                    {'debit': amt, 'credit': 0, 'account': acctdb, 'aid': adb.id, 'source': co,
+                     'sid': pid, 'type': 'PD', 'tcode': jo, 'com': cc, 'recorded': dt,
+                     'date': pdate, 'ref': bdat.Ref, 'match_aid': True},
+                    {'debit': 0, 'credit': amt, 'account': acctcr, 'aid': acr.id, 'source': co,
+                     'sid': pid, 'type': 'PC', 'tcode': jo, 'com': cc, 'recorded': dt,
+                     'date': pdate, 'ref': bdat.Ref},
+                ], journal_id=journal_id,
+                    journal_memo=f'Pay bill {jo} to {co} from {acctcr}',
+                    source_table='Bills', source_id=bdat.id)
+                if err:
+                    return err
 
         if bus=='xfer':
             bdat=Bills.query.filter(Bills.Jo==jo).first()

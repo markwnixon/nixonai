@@ -25,6 +25,16 @@ env/
 # Environment files
 .env
 
+# Local deployment/system setup
+webapp/CCC_system_setup.py
+db_dumps/
+local_runtime/
+webapp/static/css/
+webapp/static/font/
+webapp/static/js/
+webapp/static/OSLM/
+webapp/templates/companysite/OSLM/
+
 # pytest
 .pytest_cache/
 

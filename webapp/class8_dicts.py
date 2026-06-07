@@ -39,6 +39,7 @@ Trucking_genre = {'table': 'Orders',
                   'document_profiles'  : {
                                         'Custom' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
                                         'Custom-Invoice' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
+                                        'Request Rate Con' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
                                         'Signed Load Con' : ['Source','0','0','0'],
                                         'Update w/Source'   : ['Source','0','0','0'],
                                         'Update w/Proof'    : ['Proofs','0','0','0'],
@@ -1707,3 +1708,32 @@ Accounts_setup = {'name' : 'Account',
                     'sourcenaming': [None, None, 'Name'],
                     'copyswaps': {}
                     }
+
+Accounts_genre = {'table': 'Accounts',
+                  'genre_tables': ['Accounts'],
+                  'genre_tables_on': ['on'],
+                  'quick_buttons': ['New Account', 'Edit Item'],
+                  'table_filters': [{'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
+                  'task_boxes': [{'Adding': ['New Account']},
+                                 {'Editing': ['Edit Item']},
+                                 {'Undo': ['Delete Item']}],
+                  'task_mapping': {'Account': 'Accounts'},
+                  'task_box_map': {'Quick':
+                                      {
+                                          'New Account': ['Table_Selected', 'New', 'Accounts'],
+                                          'Edit Item': ['Single_Item_Selection', 'Edit', 'Form']
+                                      },
+                                   'Adding':
+                                      {
+                                          'New Account': ['Table_Selected', 'New', 'Accounts']
+                                      },
+                                   'Editing':
+                                      {
+                                          'Edit Item': ['Single_Item_Selection', 'Edit', 'Form']
+                                      },
+                                   'Undo':
+                                      {
+                                          'Delete Item': ['All_Item_Selection', 'Undo', 'Delete']
+                                      }
+                                   }
+                  }

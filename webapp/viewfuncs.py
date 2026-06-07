@@ -63,6 +63,25 @@ def d2sa(instr):
         outstr='0.00'
     return outstr
 
+
+def form_value(*names):
+    for name in names:
+        value = request.values.get(name)
+        if value not in (None, ''):
+            return value
+    return None
+
+
+def default_order_emails(pdat):
+    emailjp = form_value('Emailjp', 'emailjp', 'email_jp')
+    emailoa = form_value('Emailoa', 'emailoa', 'email_oa')
+    emailap = form_value('Emailap', 'emailap', 'email_ap')
+    if pdat is not None:
+        emailjp = emailjp or stripper(getattr(pdat, 'Email', None))
+        emailoa = emailoa or stripper(getattr(pdat, 'Associate1', None))
+        emailap = emailap or stripper(getattr(pdat, 'Associate2', None))
+    return emailjp, emailoa, emailap
+
 def d1s(instr):
     try:
         instr=instr.replace('$','').replace(',','')
@@ -1188,32 +1207,45 @@ def global_inv(odata,odervec):
 
 
 def make_new_order():
-    sdate = request.values.get('date')
-    if sdate == '' or sdate == None:
+    sdate = form_value('date', 'Date', 'Date3')
+    if sdate == '' or sdate is None:
         sdate = today.strftime('%Y-%m-%d')
     nextjo = newjo(jbcode, sdate)
 
-    vals = ['shipper', 'order', 'bol', 'booking', 'container', 'pickup',
-            'date', 'date2', 'amount', 'ctype', 'dropblock1', 'dropblock2', 'commodity', 'packing', 'seal', 'desc']
-    a = list(range(len(vals)))
-    for ix, vx in enumerate(vals):
-        a[ix] = request.values.get(vx)
+    shipper = form_value('shipper', 'Shipper')
+    order = form_value('order', 'Order')
+    bol = form_value('bol', 'BOL')
+    booking = form_value('booking', 'Booking')
+    container = form_value('container', 'Container')
+    pickup = form_value('pickup', 'Pickup')
+    date = form_value('date', 'Date')
+    date2 = form_value('date2', 'Date2')
+    date3 = form_value('Date3', 'date3')
+    amount = d2sa(form_value('amount', 'Amount'))
+    ctype = form_value('ctype', 'Type')
+    haul_type = form_value('HaulType', 'haul_type', 'haultype')
+    dropblock1 = form_value('dropblock1', 'Dropblock1')
+    dropblock2 = form_value('dropblock2', 'Dropblock2')
+    dropblock3 = form_value('dropblock3', 'Dropblock3')
+    commodity = form_value('commodity', 'Commodity')
+    packing = form_value('packing', 'Packing')
+    seal = form_value('seal', 'Seal')
+    description = form_value('desc', 'Description')
 
-    bid = People.query.filter(People.Company == a[0]).first()
+    bid = People.query.filter(People.Company == shipper).first()
     if bid is not None:
         idb = bid.id
     else:
         idb = 0
 
-    dropblock1 = a[10]
-    dropblock2 = a[11]
+    emailjp, emailoa, emailap = default_order_emails(bid)
 
     idl, newdrop1, company = testdrop(dropblock1)
     idd, newdrop2, company2 = testdrop(dropblock2)
 
     if idl == 0:
         company = dropupdate(dropblock1)
-        newdrop1 = a[10]
+        newdrop1 = dropblock1
         lid = Drops.query.filter(Drops.Entity == company).first()
         if lid is not None:
             idl = lid.id
@@ -1222,33 +1254,35 @@ def make_new_order():
 
     if idd == 0:
         company2 = dropupdate(dropblock2)
-        newdrop2 = a[11]
+        newdrop2 = dropblock2
         did = Drops.query.filter(Drops.Entity == company2).first()
         if did is not None:
             idd = did.id
         else:
             idd = 0
 
-    amt = d2sa(a[8])
-
-    input = Orders(Status='00', Jo=nextjo, Load=None, Order=a[1], Company=company, Location=None, Booking=a[3],
-                   BOL=a[2], Container=a[4],
-                   Date=a[6], Driver=None, Company2=company2, Time=None, Date2=a[7], Time2=None, Seal=a[14],
-                   Pickup=a[5], Delivery=None,
-                   Amount=amt, Path=None, Original=None, Description=a[15], Chassis=None, Detention='0',
-                   Storage='0', InvoTotal=amt,
-                   Release=0, Shipper=a[0], Type=a[9], Time3=None, Bid=idb, Lid=idl, Did=idd, Label='FileUpload',
-                   Dropblock1=newdrop1, Dropblock2=newdrop2, Commodity=a[12], Packing=a[13], Links=None, Hstat=0, Istat=0,
-                   Proof=None,Invoice=None,Gate=None,Package=None,Manifest=None,Scache=0,Pcache=0,Icache=0,Mcache=0,
-                   Pkcache=0, QBi=0, Date3=None, Date4=None, Date5=None, Date6=None, Date7=None, Date8=None)
+    input = Orders(Status='00', Jo=nextjo, HaulType=haul_type, Order=order, Company=company,
+                   Location=None, Booking=booking, BOL=bol, Container=container, Driver=None, Pickup=pickup,
+                   Delivery=None, Amount=amount, Date=date, Time=None, Date2=date2, Time2=None, Time3=None,
+                   PaidInvoice=None, Source=None, Description=description, Chassis=None, Detention='0',
+                   Storage='0', Release=0, Company2=company2, Seal=seal, Shipper=shipper, Type=ctype,
+                   Bid=idb, Lid=idl, Did=idd, Label='FileUpload', Dropblock1=newdrop1, Dropblock2=newdrop2,
+                   Commodity=commodity, Packing=packing, Links=None, Hstat=0, Istat=0, Proof=None,
+                   Invoice=None, Gate=None, Package=None, Manifest=None, Scache=0, Pcache=0, Icache=0,
+                   Mcache=0, Pkcache=0, QBi=0, InvoTotal=amount, Truck=None, Dropblock3=dropblock3,
+                   Location3=None, Date3=date3, Date4=None, Date5=None, Date6=None, Date7=None,
+                   Date8=None, InvoDate=None, PaidDate=None, PaidAmt=None, PayRef=None, PayMeth=None,
+                   PayAcct=None, BalDue=None, Payments=None, Quote=None, RateCon=None, Rcache=0,
+                   Proof2=None, Pcache2=0, Emailjp=emailjp, Emailoa=emailoa, Emailap=emailap,
+                   Saljp=None, Saloa=None, Salap=None, SSCO=None, Ship=None, Voyage=None, UserMod=None,
+                   DelStat=None, DrvProof=None, DrvSeal=None, D1cache=None, D2cache=None)
     db.session.add(input)
     db.session.commit()
 
     odat = Orders.query.filter(Orders.Jo == nextjo).first()
     oid = odat.id
-    print('madeneworder',oid,nextjo)
-    return oid,nextjo
-
+    print('madeneworder', oid, nextjo)
+    return oid, nextjo
 
 def make_new_bill():
     sdate = request.values.get('bdate')

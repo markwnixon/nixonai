@@ -60,6 +60,7 @@ def save_order_upload_file(order_row, uploaded_file, filetype):
     filename1 = f'{filetype}_{fileout}_c{str(bn)}{ext}'
     print(addpath(tpath(f'Orders-{filetype}', filename1)))
     output1 = addpath(tpath(f'Orders-{filetype}', filename1))
+    os.makedirs(os.path.dirname(output1), exist_ok=True)
 
     uploaded_file.save(output1)
 
@@ -266,7 +267,15 @@ def bot_orders():
             "driver": odat.Driver,
             "truck": odat.Truck,
             "amount": odat.Amount,
-            "quote": odat.Quote
+            "quote": odat.Quote,
+            "sourceFile": odat.Source,
+            "rateConFile": odat.RateCon,
+            "emailJp": odat.Emailjp,
+            "emailOa": odat.Emailoa,
+            "emailAp": odat.Emailap,
+            "salJp": odat.Saljp,
+            "salOa": odat.Saloa,
+            "salAp": odat.Salap,
         })
 
     return jsonify({
@@ -291,6 +300,14 @@ def bot_order_detail(order_id):
         "status": odat.Status,
         "driver": odat.Driver,
         "dropAddress": odat.Dropblock2,
+        "sourceFile": odat.Source,
+        "rateConFile": odat.RateCon,
+        "emailJp": odat.Emailjp,
+        "emailOa": odat.Emailoa,
+        "emailAp": odat.Emailap,
+        "salJp": odat.Saljp,
+        "salOa": odat.Saloa,
+        "salAp": odat.Salap,
         "date3": odat.Date3.isoformat() if odat.Date3 else None,
         "hstat": odat.Hstat
     }), 200
@@ -311,8 +328,52 @@ def bot_orders_by_container():
         "id": o.id,
         "jo": o.Jo,
         "status": o.Status,
-        "date3": o.Date3.isoformat() if o.Date3 else None
+        "date3": o.Date3.isoformat() if o.Date3 else None,
+        "sourceFile": o.Source,
+        "rateConFile": o.RateCon,
+        "emailJp": o.Emailjp,
+        "emailOa": o.Emailoa,
+        "emailAp": o.Emailap,
+        "salJp": o.Saljp,
+        "salOa": o.Saloa,
+        "salAp": o.Salap,
     } for o in rows]), 200
+
+
+@bot_bp.route('/bot/orders/<int:order_id>/ratecon', methods=['POST'])
+@bot_token_required(required_scopes={'write:orders'})
+def bot_order_ratecon_upload(order_id):
+    odat = Orders.query.get_or_404(order_id)
+    force = str(request.form.get('force') or '').strip().lower() in {'1', 'true', 'yes'}
+    ratecon_file = request.files.get('ratecon_file') or request.files.get('file')
+
+    if ratecon_file is None:
+        return jsonify({"message": "ratecon_file is required"}), 400
+
+    if odat.RateCon and not force:
+        return jsonify({
+            "message": "Rate con already exists",
+            "order_id": odat.id,
+            "jo": odat.Jo,
+            "ratecon_file": odat.RateCon,
+        }), 409
+
+    old_ratecon = odat.RateCon
+    saved_ratecon, ratecon_error = save_order_upload_file(odat, ratecon_file, 'RateCon')
+    if ratecon_error:
+        db.session.rollback()
+        return jsonify({"message": ratecon_error}), 400
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Rate con uploaded",
+        "order_id": odat.id,
+        "jo": odat.Jo,
+        "container": odat.Container,
+        "old_ratecon_file": old_ratecon,
+        "ratecon_file": saved_ratecon,
+    }), 200
 
 @bot_bp.route('/bot/orders/summary', methods=['GET'])
 @bot_token_required(required_scopes={'read:orders'})
@@ -362,6 +423,85 @@ def _is_export_haul(haul_type):
 def _is_import_haul(haul_type):
     h = (haul_type or "").lower()
     return "import" in h
+
+
+def _clean_email(value):
+    value = (value or '').strip()
+    return value or None
+
+
+def _payload_email_fields(data, pdat):
+    emailjp = _clean_email(data.get('emailjp') or data.get('email_jp') or data.get('Emailjp'))
+    emailoa = _clean_email(data.get('emailoa') or data.get('email_oa') or data.get('Emailoa'))
+    emailap = _clean_email(data.get('emailap') or data.get('email_ap') or data.get('Emailap'))
+
+    if pdat is not None:
+        emailjp = emailjp or _clean_email(getattr(pdat, 'Email', None))
+        emailoa = emailoa or _clean_email(getattr(pdat, 'Associate1', None))
+        emailap = emailap or _clean_email(getattr(pdat, 'Associate2', None))
+
+    return emailjp, emailoa, emailap
+
+
+def _salutation_from_email(email_value):
+    email_value = _clean_email(email_value)
+    if not email_value or '@' not in email_value:
+        return None
+    local_part = email_value.split('@', 1)[0]
+    for separator in ('.', '_', '-'):
+        local_part = local_part.replace(separator, ' ')
+    words = [word for word in local_part.split() if word]
+    if not words:
+        return None
+    generic = {'ap', 'ar', 'acct', 'accounting', 'accounts', 'billing', 'dispatch', 'info', 'invoice', 'invoices', 'payable', 'service'}
+    if len(words) == 1 and words[0].lower() in generic:
+        return None
+    return words[0].title()
+
+
+def _historical_salutations(shipper, loading_location, loading_address):
+    base_query = (
+        Orders.query
+        .filter(Orders.Shipper == shipper)
+        .filter(Orders.Date3 != None)
+    )
+
+    history = (
+        base_query
+        .filter(Orders.Company2 == loading_location)
+        .filter(Orders.Dropblock2 == loading_address)
+        .order_by(Orders.Date3.desc(), Orders.id.desc())
+        .first()
+    )
+
+    if history is None:
+        history = (
+            base_query
+            .filter(Orders.Dropblock2 == loading_address)
+            .order_by(Orders.Date3.desc(), Orders.id.desc())
+            .first()
+        )
+
+    if history is None:
+        history = (
+            base_query
+            .filter(Orders.Company2 == loading_location)
+            .order_by(Orders.Date3.desc(), Orders.id.desc())
+            .first()
+        )
+
+    if history is None:
+        return None, None, None, None
+
+    return history.Saljp, history.Saloa, history.Salap, history.id
+
+
+def _resolve_salutations(historical, emailjp, emailoa, emailap):
+    saljp, saloa, salap, source_order_id = historical
+    saljp = _clean_email(saljp) or _salutation_from_email(emailjp)
+    saloa = _clean_email(saloa) or _salutation_from_email(emailoa)
+    salap = _clean_email(salap) or _salutation_from_email(emailap)
+    return saljp, saloa, salap, source_order_id
 
 
 @bot_bp.route('/bot/orders/create', methods=['POST'])
@@ -439,6 +579,18 @@ def bot_create_order():
         return jsonify({
             "message": f"People record not found for {shipper}"
         }), 400
+
+    emailjp, emailoa, emailap = _payload_email_fields(data, pdat)
+    saljp, saloa, salap, salutation_source_order_id = _resolve_salutations(
+        _historical_salutations(
+            shipper,
+            loading_location,
+            loading_address,
+        ),
+        emailjp,
+        emailoa,
+        emailap,
+    )
 
     today = datetime.now()
     today_str = today.strftime('%Y-%m-%d')
@@ -541,12 +693,12 @@ def bot_create_order():
                 Rcache=0,
                 Proof2=None,
                 Pcache2=0,
-                Emailjp=None,
-                Emailoa=None,
-                Emailap=None,
-                Saljp=None,
-                Saloa=None,
-                Salap=None,
+                Emailjp=emailjp,
+                Emailoa=emailoa,
+                Emailap=emailap,
+                Saljp=saljp,
+                Saloa=saloa,
+                Salap=salap,
                 Date7=None,
                 SSCO=None,
                 Date8=today,
@@ -592,6 +744,13 @@ def bot_create_order():
                 "loading_location": loading_location,
                 "source_file": saved_source,
                 "ratecon_file": saved_ratecon,
+                "email_jp": input_row.Emailjp,
+                "email_oa": input_row.Emailoa,
+                "email_ap": input_row.Emailap,
+                "sal_jp": input_row.Saljp,
+                "sal_oa": input_row.Saloa,
+                "sal_ap": input_row.Salap,
+                "salutation_source_order_id": salutation_source_order_id,
                 "lid": input_row.Lid,
                 "did": input_row.Did,
                 "bid": input_row.Bid
@@ -685,12 +844,12 @@ def bot_create_order():
                 Rcache=0,
                 Proof2=None,
                 Pcache2=0,
-                Emailjp=None,
-                Emailoa=None,
-                Emailap=None,
-                Saljp=None,
-                Saloa=None,
-                Salap=None,
+                Emailjp=emailjp,
+                Emailoa=emailoa,
+                Emailap=emailap,
+                Saljp=saljp,
+                Saloa=saloa,
+                Salap=salap,
                 Date7=None,
                 SSCO=None,
                 Date8=today,
@@ -736,6 +895,13 @@ def bot_create_order():
                 "container_type": putsize,
                 "source_file": saved_source,
                 "ratecon_file": saved_ratecon,
+                "email_jp": input_row.Emailjp,
+                "email_oa": input_row.Emailoa,
+                "email_ap": input_row.Emailap,
+                "sal_jp": input_row.Saljp,
+                "sal_oa": input_row.Saloa,
+                "sal_ap": input_row.Salap,
+                "salutation_source_order_id": salutation_source_order_id,
                 "lid": input_row.Lid,
                 "did": input_row.Did,
                 "bid": input_row.Bid,

@@ -1,12 +1,13 @@
-from flask import render_template, redirect, url_for, jsonify
+from flask import render_template, redirect, url_for, jsonify, request, send_file
 from flask import Blueprint
 
 from webapp.extensions import db
-from webapp.models import People
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
 from flask_login import login_required
+from sqlalchemy import func
 
 from decimal import Decimal
 
@@ -17,7 +18,8 @@ from webapp.messager import msg_analysis
 import requests
 import mimetypes
 from urllib.parse import urlparse
-from webapp.viewfuncs import nonone, monvals, getmonths
+from webapp.viewfuncs import nonone, monvals, getmonths, newjo
+from webapp.class8_tasks_gledger import post_balanced_journal
 from webapp.class8_utils_email import email_template, info_mimemail, check_person, add_person
 
 from webapp.class8_utils import *
@@ -445,6 +447,8 @@ def Calculator():
 def Class8Main(genre):
 
     print('routes.py 237: The genre is',genre)
+    if genre == 'Banking':
+        return redirect(url_for('main.Banking'))
     genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup = Table_maker(genre)
     if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)
@@ -467,6 +471,2248 @@ def Revenue():
     #print('Made it to the Revenue Data Center')
     title1,col1,data1,title2,col2,data2,title3,col3,data3,tabon = get_revenues()
     return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2, title3=title3, col3=col3, data3=data3, tabon=tabon)
+
+
+@main.route('/IntercompanyEntries', methods=['GET', 'POST'])
+@login_required
+def IntercompanyEntries():
+    company_names = {
+        'K': 'One Stop Logistics',
+        'J': 'Jays Auto',
+        'N': 'Owner Personal',
+    }
+    allowed_companies = list(company_names.keys())
+
+    def parse_date(value):
+        if not value:
+            return datetime.datetime.today()
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d')
+        except ValueError:
+            return None
+
+    def cents(value):
+        clean = (value or '').replace('$', '').replace(',', '').strip()
+        if not clean:
+            return 0
+        try:
+            return int((Decimal(clean) * 100).quantize(Decimal('1')))
+        except Exception:
+            return None
+
+    def money(value):
+        return "${:,.2f}".format((value or 0) / 100)
+
+    def company_label(code):
+        return f"{company_names.get(code, code)} Account {code}"
+
+    def find_due_account(book_company, target_company):
+        target_name = company_names.get(target_company, target_company)
+        base_query = Accounts.query.filter(
+            (Accounts.Co == book_company) &
+            (Accounts.Name.contains('Due'))
+        )
+        for term in [target_name, target_company]:
+            account = base_query.filter(Accounts.Name.contains(term)).first()
+            if account is not None:
+                return account
+        return None
+
+    def build_line(amount, debit, account, source, line_type, tcode, company_code, entry_date, ref):
+        return {
+            'debit': amount if debit else 0,
+            'credit': 0 if debit else amount,
+            'account': account.Name,
+            'aid': account.id,
+            'source': source,
+            'sid': 0,
+            'type': line_type,
+            'tcode': tcode,
+            'com': company_code,
+            'recorded': datetime.datetime.now(),
+            'date': entry_date,
+            'ref': ref,
+            'match_aid': True,
+        }
+
+    selected = {
+        'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
+        'entry_type': request.values.get('entry_type', 'Expense'),
+        'cash_account_id': request.values.get('cash_account_id', ''),
+        'operating_company': request.values.get('operating_company', 'K'),
+        'operating_account_id': request.values.get('operating_account_id', ''),
+        'amount': request.values.get('amount', ''),
+        'source': request.values.get('source', ''),
+        'ref': request.values.get('ref', ''),
+        'memo': request.values.get('memo', ''),
+    }
+    err = []
+    msg = ''
+
+    if request.method == 'POST' and request.values.get('create_entry'):
+        entry_date = parse_date(request.values.get('entry_date'))
+        entry_type = request.values.get('entry_type', 'Expense')
+        amount = cents(request.values.get('amount'))
+        cash_account = Accounts.query.get(request.values.get('cash_account_id') or 0)
+        operating_account = Accounts.query.get(request.values.get('operating_account_id') or 0)
+        operating_company = request.values.get('operating_company')
+        source = request.values.get('source', '').strip()
+        ref = request.values.get('ref', '').strip()
+        memo = request.values.get('memo', '').strip()
+
+        if entry_date is None:
+            err.append('Enter a valid transaction date.')
+        if amount is None or amount <= 0:
+            err.append('Enter an amount greater than zero.')
+        if cash_account is None or cash_account.Co not in allowed_companies:
+            err.append('Choose a valid K, J, or N cash account.')
+        if operating_company not in allowed_companies:
+            err.append('Choose a valid operating company.')
+        if operating_account is None or operating_account.Co != operating_company:
+            err.append('Choose an operating account for the selected operating company.')
+        if operating_account is not None and entry_type == 'Expense' and operating_account.Type != 'Expense':
+            err.append('Expense entries must use an expense operating account.')
+        if operating_account is not None and entry_type == 'Income' and operating_account.Type != 'Income':
+            err.append('Income entries must use an income operating account.')
+        if not source:
+            err.append('Enter a source, payee, customer, or owner name.')
+
+        if not err:
+            cash_company = cash_account.Co
+            journal_memo = memo or f'{entry_type} for {company_label(operating_company)} through {company_label(cash_company)}'
+            tcode = None
+            journal_id = None
+            lines = []
+
+            if cash_company == operating_company:
+                tcode = newjo('IC', entry_date.strftime('%Y-%m-%d'))
+                journal_id = f'INTERCOMPANY-{tcode}'
+                if entry_type == 'Expense':
+                    lines = [
+                        build_line(amount, True, operating_account, source, 'IE', tcode, operating_company, entry_date, ref),
+                        build_line(amount, False, cash_account, source, 'PC', tcode, cash_company, entry_date, ref),
+                    ]
+                else:
+                    lines = [
+                        build_line(amount, True, cash_account, source, 'DD', tcode, cash_company, entry_date, ref),
+                        build_line(amount, False, operating_account, source, 'IR', tcode, operating_company, entry_date, ref),
+                    ]
+            elif entry_type == 'Expense':
+                due_in_cash_company = find_due_account(cash_company, operating_company)
+                due_in_operating_company = find_due_account(operating_company, cash_company)
+                if due_in_cash_company is None:
+                    err.append(f'Missing due-to account in {company_label(cash_company)} for {company_label(operating_company)}.')
+                if due_in_operating_company is None:
+                    err.append(f'Missing due-to account in {company_label(operating_company)} for {company_label(cash_company)}.')
+                if not err:
+                    tcode = newjo('IC', entry_date.strftime('%Y-%m-%d'))
+                    journal_id = f'INTERCOMPANY-{tcode}'
+                    lines = [
+                        build_line(amount, True, operating_account, source, 'IE', tcode, operating_company, entry_date, ref),
+                        build_line(amount, False, due_in_operating_company, source, 'IL', tcode, operating_company, entry_date, ref),
+                        build_line(amount, True, due_in_cash_company, source, 'IA', tcode, cash_company, entry_date, ref),
+                        build_line(amount, False, cash_account, source, 'PC', tcode, cash_company, entry_date, ref),
+                    ]
+            else:
+                due_in_cash_company = find_due_account(cash_company, operating_company)
+                due_in_operating_company = find_due_account(operating_company, cash_company)
+                if due_in_cash_company is None:
+                    err.append(f'Missing due-to account in {company_label(cash_company)} for {company_label(operating_company)}.')
+                if due_in_operating_company is None:
+                    err.append(f'Missing due-to account in {company_label(operating_company)} for {company_label(cash_company)}.')
+                if not err:
+                    tcode = newjo('IC', entry_date.strftime('%Y-%m-%d'))
+                    journal_id = f'INTERCOMPANY-{tcode}'
+                    lines = [
+                        build_line(amount, True, cash_account, source, 'DD', tcode, cash_company, entry_date, ref),
+                        build_line(amount, False, due_in_cash_company, source, 'IL', tcode, cash_company, entry_date, ref),
+                        build_line(amount, True, due_in_operating_company, source, 'IA', tcode, operating_company, entry_date, ref),
+                        build_line(amount, False, operating_account, source, 'IR', tcode, operating_company, entry_date, ref),
+                    ]
+
+            if not err:
+                post_err = post_balanced_journal(
+                    lines,
+                    journal_id=journal_id,
+                    journal_memo=journal_memo,
+                    posted_by='intercompany',
+                    source_table='IntercompanyEntry',
+                )
+                if post_err:
+                    err.extend(post_err)
+                else:
+                    msg = f'Recorded intercompany entry {tcode}.'
+                    selected = {
+                        'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
+                        'entry_type': entry_type,
+                        'cash_account_id': '',
+                        'operating_company': operating_company,
+                        'operating_account_id': '',
+                        'amount': '',
+                        'source': '',
+                        'ref': '',
+                        'memo': '',
+                    }
+
+    bank_accounts = Accounts.query.filter(
+        (Accounts.Co.in_(allowed_companies)) &
+        (Accounts.Type.in_(['Bank', 'Asset']))
+    ).order_by(Accounts.Co, Accounts.Name).all()
+    operating_accounts = Accounts.query.filter(
+        (Accounts.Co.in_(allowed_companies)) &
+        (Accounts.Type.in_(['Income', 'Expense']))
+    ).order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
+
+    setup_warnings = []
+    bank_companies = {account.Co for account in bank_accounts}
+    for code in allowed_companies:
+        if code not in bank_companies:
+            setup_warnings.append(f'No cash/bank account is configured for {company_label(code)}.')
+    for book_company in allowed_companies:
+        for target_company in allowed_companies:
+            if book_company == target_company:
+                continue
+            if find_due_account(book_company, target_company) is None:
+                setup_warnings.append(f'No due-to account is configured in {company_label(book_company)} for {company_label(target_company)}.')
+
+    raw_recent = Gledger.query.filter(
+        Gledger.SourceTable == 'IntercompanyEntry'
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(120).all()
+    journal_map = {}
+    for line in raw_recent:
+        key = line.JournalId or line.Tcode
+        item = journal_map.setdefault(key, {
+            'journal_id': key,
+            'date': line.Date,
+            'tcode': line.Tcode,
+            'memo': line.JournalMemo,
+            'ref': line.Ref,
+            'source': line.Source,
+            'companies': set(),
+            'debit': 0,
+            'credit': 0,
+            'bank_amount': 0,
+        })
+        item['companies'].add(line.Com)
+        item['debit'] += line.Debit or 0
+        item['credit'] += line.Credit or 0
+        if line.Type in ['PC', 'DD']:
+            item['bank_amount'] = (line.Debit or line.Credit or 0)
+    recent_entries = sorted(journal_map.values(), key=lambda item: item['date'] or datetime.datetime.min, reverse=True)
+    for item in recent_entries:
+        item['companies'] = ', '.join(sorted(item['companies']))
+        item['amount_fmt'] = money(item['bank_amount'] or max(item['debit'], item['credit']))
+        item['balanced'] = item['debit'] == item['credit']
+
+    due_accounts = Accounts.query.filter(
+        (Accounts.Co.in_(allowed_companies)) &
+        (Accounts.Name.contains('Due'))
+    ).order_by(Accounts.Co, Accounts.Name).all()
+    due_balances = []
+    for account in due_accounts:
+        totals = db.session.query(
+            func.coalesce(func.sum(Gledger.Debit), 0),
+            func.coalesce(func.sum(Gledger.Credit), 0),
+        ).filter(Gledger.Aid == account.id).first()
+        debit_total = int(totals[0] or 0)
+        credit_total = int(totals[1] or 0)
+        due_balances.append({
+            'company': account.Co,
+            'account': account.Name,
+            'debit': money(debit_total),
+            'credit': money(credit_total),
+            'net_credit': money(credit_total - debit_total),
+        })
+
+    return render_template(
+        'intercompany_entries.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        company_names=company_names,
+        bank_accounts=bank_accounts,
+        operating_accounts=operating_accounts,
+        selected=selected,
+        err='\n'.join(err),
+        msg=msg,
+        setup_warnings=setup_warnings,
+        recent_entries=recent_entries[:40],
+        due_balances=due_balances,
+    )
+
+
+@main.route('/GeneralLedger', methods=['GET', 'POST'])
+@login_required
+def GeneralLedger():
+    def parse_date(value):
+        if not value:
+            return None
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d')
+        except ValueError:
+            return None
+
+    def money(value):
+        return "${:,.2f}".format((value or 0) / 100)
+
+    filters = {
+        'account': request.values.get('account', '').strip(),
+        'tcode': request.values.get('tcode', '').strip(),
+        'journal_id': request.values.get('journal_id', '').strip(),
+        'com': request.values.get('com', '').strip(),
+        'date_from': request.values.get('date_from', '').strip(),
+        'date_to': request.values.get('date_to', '').strip(),
+        'unbalanced': request.values.get('unbalanced', ''),
+        'limit': request.values.get('limit', '500').strip() or '500',
+    }
+
+    try:
+        limit = min(max(int(filters['limit']), 1), 5000)
+    except ValueError:
+        limit = 500
+        filters['limit'] = '500'
+
+    date_from = parse_date(filters['date_from'])
+    date_to = parse_date(filters['date_to'])
+    if date_to:
+        date_to = date_to + datetime.timedelta(days=1)
+
+    query = Gledger.query
+    if filters['account']:
+        query = query.filter(Gledger.Account == filters['account'])
+    if filters['tcode']:
+        query = query.filter(Gledger.Tcode.ilike(f"%{filters['tcode']}%"))
+    if filters['journal_id']:
+        query = query.filter(Gledger.JournalId.ilike(f"%{filters['journal_id']}%"))
+    if filters['com']:
+        query = query.filter(Gledger.Com == filters['com'])
+    if date_from:
+        query = query.filter(Gledger.Date >= date_from)
+    if date_to:
+        query = query.filter(Gledger.Date < date_to)
+    if filters['unbalanced']:
+        unbalanced_ids = [
+            item[0] for item in db.session.query(Gledger.JournalId)
+            .filter(Gledger.JournalId.isnot(None))
+            .group_by(Gledger.JournalId)
+            .having(func.coalesce(func.sum(Gledger.Debit), 0) != func.coalesce(func.sum(Gledger.Credit), 0))
+            .all()
+        ]
+        if unbalanced_ids:
+            query = query.filter(Gledger.JournalId.in_(unbalanced_ids))
+        else:
+            query = query.filter(Gledger.id == -1)
+
+    entries = query.order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(limit).all()
+
+    debit_total = sum((entry.Debit or 0) for entry in entries)
+    credit_total = sum((entry.Credit or 0) for entry in entries)
+    journal_map = {}
+    for entry in entries:
+        key = entry.JournalId or f"legacy-{entry.id}"
+        item = journal_map.setdefault(key, {
+            'journal_id': entry.JournalId or '(legacy row)',
+            'date': entry.Date,
+            'memo': entry.JournalMemo or '',
+            'source': entry.SourceTable or entry.Source or '',
+            'source_id': entry.SourceId or entry.Sid or '',
+            'debit': 0,
+            'credit': 0,
+            'rows': 0,
+        })
+        item['debit'] += entry.Debit or 0
+        item['credit'] += entry.Credit or 0
+        item['rows'] += 1
+        if entry.Date and (not item['date'] or entry.Date > item['date']):
+            item['date'] = entry.Date
+
+    journal_summaries = sorted(
+        journal_map.values(),
+        key=lambda item: item['date'] or datetime.datetime.min,
+        reverse=True,
+    )
+    for item in journal_summaries:
+        item['balanced'] = item['debit'] == item['credit']
+        item['debit_fmt'] = money(item['debit'])
+        item['credit_fmt'] = money(item['credit'])
+        item['variance_fmt'] = money(item['debit'] - item['credit'])
+
+    for entry in entries:
+        entry.debit_fmt = money(entry.Debit)
+        entry.credit_fmt = money(entry.Credit)
+
+    accounts = Accounts.query.order_by(Accounts.Name).all()
+    companies = [
+        item[0] for item in db.session.query(Gledger.Com)
+        .filter(Gledger.Com.isnot(None))
+        .distinct()
+        .order_by(Gledger.Com)
+        .all()
+    ]
+
+    totals = {
+        'debit': money(debit_total),
+        'credit': money(credit_total),
+        'variance': money(debit_total - credit_total),
+        'balanced': debit_total == credit_total,
+        'row_count': len(entries),
+        'limit': limit,
+    }
+
+    return render_template(
+        'general_ledger.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        entries=entries,
+        accounts=accounts,
+        companies=companies,
+        filters=filters,
+        totals=totals,
+        journal_summaries=journal_summaries,
+    )
+
+
+@main.route('/IncomeExpenseReview', methods=['GET', 'POST'])
+@login_required
+def IncomeExpenseReview():
+    def parse_date(value):
+        if not value:
+            return None
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d')
+        except ValueError:
+            return None
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    def money_number(cents):
+        return float(cents or 0) / 100
+
+    def build_rollup_rows(account_summaries):
+        rows = []
+        for section in ['Income', 'Expense']:
+            section_items = [item for item in account_summaries if item['type'] == section]
+            if not section_items:
+                continue
+            section_total = sum(item['net'] for item in section_items)
+            rows.append({'level': 0, 'label': section.upper(), 'amount': section_total, 'kind': 'section'})
+            categories = sorted({item['category'] or '(No Category)' for item in section_items})
+            for category in categories:
+                category_items = [item for item in section_items if (item['category'] or '(No Category)') == category]
+                category_total = sum(item['net'] for item in category_items)
+                rows.append({'level': 1, 'label': category, 'amount': category_total, 'kind': 'category'})
+                subcategories = sorted({item['subcategory'] or '(No Subcategory)' for item in category_items})
+                for subcategory in subcategories:
+                    subcategory_items = [item for item in category_items if (item['subcategory'] or '(No Subcategory)') == subcategory]
+                    subcategory_total = sum(item['net'] for item in subcategory_items)
+                    rows.append({'level': 2, 'label': subcategory, 'amount': subcategory_total, 'kind': 'subcategory'})
+                    for item in sorted(subcategory_items, key=lambda row: row['account']):
+                        rows.append({'level': 3, 'label': item['account'], 'amount': item['net'], 'kind': 'account'})
+            rows.append({'level': 1, 'label': f'Total {section}', 'amount': section_total, 'kind': 'total'})
+            rows.append({'level': 0, 'label': '', 'amount': None, 'kind': 'blank'})
+        income_total = sum(item['net'] for item in account_summaries if item['type'] == 'Income')
+        expense_total = sum(item['net'] for item in account_summaries if item['type'] == 'Expense')
+        rows.append({'level': 0, 'label': 'NET INCOME', 'amount': income_total - expense_total, 'kind': 'net'})
+        return rows
+
+    def export_rollup_xlsx(rollup_rows, filters):
+        from io import BytesIO
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        output = BytesIO()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Income Expense'
+        ws['A1'] = 'Income & Expense Review'
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A2'] = f"Period: {filters['date_from']} to {filters['date_to']}"
+        ws['A3'] = f"Company: {filters['com'] or 'All'}"
+        ws.append([])
+        ws.append(['Description', 'Amount'])
+        header_row = ws.max_row
+        for cell in ws[header_row]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill('solid', fgColor='D9EAF7')
+
+        for row in rollup_rows:
+            label = ('    ' * row['level']) + row['label']
+            ws.append([label, money_number(row['amount']) if row['amount'] is not None else None])
+            excel_row = ws.max_row
+            if row['kind'] in ['section', 'category', 'total', 'net']:
+                ws.cell(excel_row, 1).font = Font(bold=True)
+                ws.cell(excel_row, 2).font = Font(bold=True)
+            if row['kind'] == 'section':
+                ws.cell(excel_row, 1).fill = PatternFill('solid', fgColor='E2F0D9')
+                ws.cell(excel_row, 2).fill = PatternFill('solid', fgColor='E2F0D9')
+            if row['kind'] == 'net':
+                ws.cell(excel_row, 1).fill = PatternFill('solid', fgColor='FFF2CC')
+                ws.cell(excel_row, 2).fill = PatternFill('solid', fgColor='FFF2CC')
+            if row['amount'] is not None:
+                ws.cell(excel_row, 2).number_format = '$#,##0.00;[Red]($#,##0.00)'
+
+        ws.column_dimensions['A'].width = 52
+        ws.column_dimensions['B'].width = 18
+        for row in ws.iter_rows(min_col=2, max_col=2):
+            for cell in row:
+                cell.alignment = Alignment(horizontal='right')
+        wb.save(output)
+        output.seek(0)
+        filename = f"income_expense_{filters['com'] or 'all'}_{filters['date_from']}_{filters['date_to']}.xlsx".replace('/', '-')
+        return send_file(output, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    def export_rollup_pdf(rollup_rows, filters):
+        from io import BytesIO
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+        output = BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+        styles = getSampleStyleSheet()
+        story = [
+            Paragraph('Income & Expense Review', styles['Title']),
+            Paragraph(f"Period: {filters['date_from']} to {filters['date_to']} &nbsp;&nbsp; Company: {filters['com'] or 'All'}", styles['Normal']),
+            Spacer(1, 12),
+        ]
+        table_data = [['Description', 'Amount']]
+        row_styles = []
+        for row in rollup_rows:
+            table_data.append([('    ' * row['level']) + row['label'], money(row['amount']) if row['amount'] is not None else ''])
+            idx = len(table_data) - 1
+            if row['kind'] in ['section', 'category', 'total', 'net']:
+                row_styles.append(('FONTNAME', (0, idx), (-1, idx), 'Helvetica-Bold'))
+            if row['kind'] == 'section':
+                row_styles.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor('#E2F0D9')))
+            if row['kind'] == 'net':
+                row_styles.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor('#FFF2CC')))
+        table = Table(table_data, colWidths=[380, 120])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#D9EAF7')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -1), .25, colors.lightgrey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ] + row_styles))
+        story.append(table)
+        doc.build(story)
+        output.seek(0)
+        filename = f"income_expense_{filters['com'] or 'all'}_{filters['date_from']}_{filters['date_to']}.pdf".replace('/', '-')
+        return send_file(output, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+    today_value = datetime.date.today()
+    preset = request.values.get('preset', 'this_year')
+    custom_from = request.values.get('date_from', '').strip()
+    custom_to = request.values.get('date_to', '').strip()
+
+    if preset == 'this_month':
+        date_from = datetime.datetime(today_value.year, today_value.month, 1)
+        date_to = datetime.datetime.combine(today_value, datetime.time.min) + datetime.timedelta(days=1)
+    elif preset == 'last_month':
+        first_this_month = datetime.date(today_value.year, today_value.month, 1)
+        last_month_end = first_this_month - datetime.timedelta(days=1)
+        date_from = datetime.datetime(last_month_end.year, last_month_end.month, 1)
+        date_to = datetime.datetime.combine(first_this_month, datetime.time.min)
+    elif preset == 'last_year':
+        date_from = datetime.datetime(today_value.year - 1, 1, 1)
+        date_to = datetime.datetime(today_value.year, 1, 1)
+    elif preset == 'custom':
+        date_from = parse_date(custom_from)
+        date_to = parse_date(custom_to)
+        if date_to:
+            date_to = date_to + datetime.timedelta(days=1)
+    else:
+        preset = 'this_year'
+        date_from = datetime.datetime(today_value.year, 1, 1)
+        date_to = datetime.datetime.combine(today_value, datetime.time.min) + datetime.timedelta(days=1)
+
+    company_filter = request.values.get('com', cmpdata[10]).strip()
+    account_type_filter = request.values.get('account_type', 'all').strip()
+
+    account_rows = Accounts.query.filter(Accounts.Type.in_(['Income', 'Expense']))
+    if company_filter:
+        account_rows = account_rows.filter(Accounts.Co == company_filter)
+    account_rows = account_rows.order_by(Accounts.Type, Accounts.Name).all()
+    account_by_name = {account.Name: account for account in account_rows}
+    account_names = list(account_by_name.keys())
+
+    query = Gledger.query
+    if company_filter:
+        query = query.filter(Gledger.Com == company_filter)
+    if date_from:
+        query = query.filter(Gledger.Date >= date_from)
+    if date_to:
+        query = query.filter(Gledger.Date < date_to)
+    if account_names:
+        query = query.filter(Gledger.Account.in_(account_names))
+    else:
+        query = query.filter(Gledger.id == -1)
+    if account_type_filter in ['Income', 'Expense']:
+        filtered_names = [
+            account.Name for account in account_rows
+            if account.Type == account_type_filter
+        ]
+        query = query.filter(Gledger.Account.in_(filtered_names if filtered_names else ['__none__']))
+
+    entries = query.order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
+
+    grouped = {}
+    income_total = 0
+    expense_total = 0
+    for entry in entries:
+        account = account_by_name.get(entry.Account)
+        if account is None:
+            continue
+        group = grouped.setdefault(entry.Account, {
+            'account': entry.Account,
+            'type': account.Type,
+            'category': account.Category or '',
+            'subcategory': account.Subcategory or '',
+            'debit': 0,
+            'credit': 0,
+            'net': 0,
+            'rows': 0,
+        })
+        debit = entry.Debit or 0
+        credit = entry.Credit or 0
+        group['debit'] += debit
+        group['credit'] += credit
+        group['rows'] += 1
+        if account.Type == 'Income':
+            net = credit - debit
+            income_total += net
+        else:
+            net = debit - credit
+            expense_total += net
+
+    for group in grouped.values():
+        if group['type'] == 'Income':
+            group['net'] = group['credit'] - group['debit']
+        else:
+            group['net'] = group['debit'] - group['credit']
+        group['debit_fmt'] = money(group['debit'])
+        group['credit_fmt'] = money(group['credit'])
+        group['net_fmt'] = money(group['net'])
+
+    account_summaries = sorted(
+        grouped.values(),
+        key=lambda item: (item['type'], item['category'], item['account'])
+    )
+
+    category_map = {}
+    for item in account_summaries:
+        key = (
+            item['type'],
+            item['category'] or '(No Category)',
+            item['subcategory'] or '',
+        )
+        category = category_map.setdefault(key, {
+            'type': item['type'],
+            'category': item['category'] or '(No Category)',
+            'subcategory': item['subcategory'] or '',
+            'debit': 0,
+            'credit': 0,
+            'net': 0,
+            'accounts': 0,
+            'rows': 0,
+        })
+        category['debit'] += item['debit']
+        category['credit'] += item['credit']
+        category['net'] += item['net']
+        category['accounts'] += 1
+        category['rows'] += item['rows']
+
+    category_summaries = sorted(
+        category_map.values(),
+        key=lambda item: (item['type'], item['category'], item['subcategory'])
+    )
+    for category in category_summaries:
+        category['debit_fmt'] = money(category['debit'])
+        category['credit_fmt'] = money(category['credit'])
+        category['net_fmt'] = money(category['net'])
+
+    for entry in entries:
+        account = account_by_name.get(entry.Account)
+        entry.account_type = account.Type if account is not None else ''
+        entry.account_category = account.Category if account is not None else ''
+        entry.debit_fmt = money(entry.Debit)
+        entry.credit_fmt = money(entry.Credit)
+        if account is not None and account.Type == 'Income':
+            entry.net_fmt = money((entry.Credit or 0) - (entry.Debit or 0))
+        else:
+            entry.net_fmt = money((entry.Debit or 0) - (entry.Credit or 0))
+
+    companies = [
+        item[0] for item in db.session.query(Gledger.Com)
+        .filter(Gledger.Com.isnot(None))
+        .distinct()
+        .order_by(Gledger.Com)
+        .all()
+    ]
+
+    filters = {
+        'preset': preset,
+        'date_from': custom_from or (date_from.strftime('%Y-%m-%d') if date_from else ''),
+        'date_to': custom_to or ((date_to - datetime.timedelta(days=1)).strftime('%Y-%m-%d') if date_to else ''),
+        'com': company_filter,
+        'account_type': account_type_filter,
+    }
+    totals = {
+        'income': money(income_total),
+        'expenses': money(expense_total),
+        'net_income': money(income_total - expense_total),
+        'net_income_positive': income_total >= expense_total,
+        'row_count': len(entries),
+        'account_count': len(account_summaries),
+    }
+
+    rollup_rows = build_rollup_rows(account_summaries)
+    export_type = request.values.get('export', '').strip().lower()
+    if export_type == 'xlsx':
+        return export_rollup_xlsx(rollup_rows, filters)
+    if export_type == 'pdf':
+        return export_rollup_pdf(rollup_rows, filters)
+
+    return render_template(
+        'income_expense_review.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        filters=filters,
+        totals=totals,
+        companies=companies,
+        category_summaries=category_summaries,
+        account_summaries=account_summaries,
+        entries=entries,
+    )
+
+
+@main.route('/Banking', methods=['GET', 'POST'])
+@login_required
+def Banking():
+    from webapp.iso_Bank import isoBank
+    odata, oder, err, modata, modlink, leftscreen, leftsize, today, now, docref, cache, acdata, thismuch, acctinfo, hv = isoBank()
+    def date_only(value):
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        return value
+
+    def sort_datetime(value):
+        if isinstance(value, datetime.datetime):
+            return value
+        if isinstance(value, datetime.date):
+            return datetime.datetime.combine(value, datetime.time.min)
+        return datetime.datetime.min
+
+    bank_rows = []
+    grouped = {}
+    for item in odata:
+        if item.Type in ['DD', 'XD']:
+            key = (
+                date_only(item.Date),
+                item.Type or '',
+                item.Source or '',
+                item.Ref or '',
+                item.Reconciled,
+            )
+        else:
+            key = ('single', item.id)
+        row = grouped.setdefault(key, {
+            'ids': [],
+            'date': item.Date,
+            'recorded': item.Recorded,
+            'type': item.Type or '',
+            'tcodes': [],
+            'source': item.Source or '',
+            'ref': item.Ref or '',
+            'debit': 0,
+            'credit': 0,
+            'reconciled': item.Reconciled,
+            'memos': [],
+        })
+        row['ids'].append(item.id)
+        if item.Tcode and item.Tcode not in row['tcodes']:
+            row['tcodes'].append(item.Tcode)
+        row['debit'] += item.Debit or 0
+        row['credit'] += item.Credit or 0
+        if item.JournalMemo and item.JournalMemo not in row['memos']:
+            row['memos'].append(item.JournalMemo)
+        if item.Recorded and (not row['recorded'] or item.Recorded > row['recorded']):
+            row['recorded'] = item.Recorded
+    for index, row in enumerate(grouped.values()):
+        row['index'] = index
+        row['id_value'] = ','.join(str(row_id) for row_id in row['ids'])
+        row['checked'] = row['ids'] and all(row_id in hv[1] for row_id in row['ids'])
+        row['row_count'] = len(row['ids'])
+        row['tcode'] = row['tcodes'][0] if row['tcodes'] else ''
+        row['all_tcodes'] = ', '.join(row['tcodes'])
+        row['has_more_tcodes'] = len(row['tcodes']) > 1
+        row['memo'] = '; '.join(row['memos'])
+        row['debit_fmt'] = "${:,.2f}".format(float(row['debit'] or 0) / 100)
+        row['credit_fmt'] = "${:,.2f}".format(float(row['credit'] or 0) / 100)
+        row['has_detail'] = bool(row['ids'])
+        row['has_payment_mismatch'] = False
+        bank_rows.append(row)
+    bank_rows = sorted(
+        bank_rows,
+        key=lambda row: (sort_datetime(row['date']), row['source'], row['ref']),
+        reverse=True,
+    )
+    return render_template(
+        'banking.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        odata=odata,
+        oder=oder,
+        err=err,
+        modata=modata,
+        modlink=modlink,
+        leftscreen=leftscreen,
+        leftsize=leftsize,
+        today=today,
+        now=now,
+        docref=docref,
+        cache=cache,
+        acdata=acdata,
+        thismuch=thismuch,
+        acctinfo=acctinfo,
+        hv=hv,
+        bank_rows=bank_rows,
+    )
+
+
+@main.route('/Banking/payment_detail', methods=['GET'])
+@login_required
+def BankingPaymentDetail():
+    def cents_from_value(value):
+        try:
+            return int(round(float(str(value).replace(',', '').replace('$', '')) * 100))
+        except:
+            return 0
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    ids = []
+    for item in request.values.get('ids', '').split(','):
+        try:
+            ids.append(int(item))
+        except:
+            pass
+
+    detail_rows = []
+    invoice_total = 0
+    received_total = 0
+    balance_total = 0
+    header = {'date': '', 'source': '', 'ref': '', 'amount': '$0.00'}
+
+    for ledger_id in ids:
+        ledger_line = Gledger.query.get(ledger_id)
+        if ledger_line is None:
+            continue
+        if header['date'] == '' and ledger_line.Date is not None:
+            header['date'] = ledger_line.Date.strftime('%Y-%m-%d')
+            header['source'] = ledger_line.Source or ''
+            header['ref'] = ledger_line.Ref or ''
+        order = Orders.query.filter(Orders.Jo == ledger_line.Tcode).first()
+        income = Deposits.query.filter(Deposits.Jo == ledger_line.Tcode).first()
+        invoice = Invoices.query.filter(Invoices.Jo == ledger_line.Tcode).first()
+        is_manual = ledger_line.SourceTable == 'ManualDeposit'
+        invo_cents = 0 if is_manual else cents_from_value(invoice.Total if invoice is not None else (order.InvoTotal if order is not None else 0))
+        received_cents = ledger_line.Debit or 0
+        balance_cents = 0 if is_manual else invo_cents - received_cents
+        invoice_total += invo_cents
+        received_total += received_cents
+        balance_total += balance_cents
+        detail_rows.append({
+            'ledger_id': ledger_line.id,
+            'jo': ledger_line.Tcode or '',
+            'order_id': order.id if order is not None else '',
+            'shipper': order.Shipper if order is not None else ledger_line.Source,
+            'container': order.Container if order is not None else '',
+            'invoice': '' if is_manual else money(invo_cents),
+            'received': money(received_cents),
+            'balance': '' if is_manual else money(balance_cents),
+            'balance_cents': balance_cents,
+            'pay_ref': income.Ref if income is not None else ledger_line.Ref,
+            'paid_date': income.Date.strftime('%Y-%m-%d') if income is not None and income.Date is not None else (ledger_line.Date.strftime('%Y-%m-%d') if ledger_line.Date is not None else ''),
+            'manual': is_manual,
+        })
+
+    header['amount'] = money(received_total)
+    return jsonify({
+        'header': header,
+        'invoice_total': money(invoice_total),
+        'received_total': money(received_total),
+        'balance_total': money(balance_total),
+        'has_payment_mismatch': any(row['balance_cents'] != 0 for row in detail_rows if not row['manual']),
+        'rows': detail_rows,
+    })
+
+
+@main.route('/ReceiveByAccount', methods=['GET', 'POST'])
+@login_required
+def ReceiveByAccount():
+    from webapp.class8_tasks import ReceiveByAccount_task
+    from webapp.viewfuncs import d2s
+
+    def receive_batch_lookback():
+        options = [
+            ('30', 'Last 30 Days'),
+            ('90', 'Last 90 Days'),
+            ('365', 'One Year'),
+        ]
+        selected = request.values.get('batch_lookback', '30')
+        allowed = dict(options)
+        if selected not in allowed:
+            selected = '30'
+        return selected, int(selected), options
+
+    def receive_order_stopdate():
+        lookbacktime = request.values.get('lookbacktime')
+        if lookbacktime == 'Two Years':
+            lookback = 728
+        elif lookbacktime == 'Three Years':
+            lookback = 1092
+        else:
+            lookback = 364
+            lookbacktime = 'One Year'
+        return lookbacktime, datetime.date.today() - datetime.timedelta(days=lookback)
+
+    def cents_to_money(cents):
+        try:
+            return d2s(float(cents or 0) / 100)
+        except:
+            return '0.00'
+
+    def money_to_cents(value):
+        try:
+            return int(round(float(str(value).replace('$', '').replace(',', '').strip()) * 100))
+        except:
+            return 0
+
+    def refresh_order_payment_status(order):
+        payment_rows = Gledger.query.filter(
+            (Gledger.Tcode == order.Jo) &
+            (Gledger.Type.in_(['DD', 'ID']))
+        ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
+        paid_cents = sum(row.Debit or 0 for row in payment_rows)
+        latest = payment_rows[0] if payment_rows else None
+        invoice = Invoices.query.filter(Invoices.Jo == order.Jo).first()
+        invoice_total = 0.0
+        try:
+            invoice_total = float(invoice.Total if invoice is not None else order.InvoTotal or 0)
+        except:
+            invoice_total = 0.0
+        paid_total = float(paid_cents) / 100
+        balance_due = invoice_total - paid_total
+        order.Payments = d2s(paid_total)
+        order.BalDue = d2s(balance_due)
+        if latest is not None:
+            pay_record = PaymentsRec.query.get(latest.Sid) if latest.Sid else None
+            order.PaidDate = latest.Date
+            order.PaidAmt = d2s(float(latest.Debit or 0) / 100)
+            order.PayRef = latest.Ref
+            order.PayMeth = pay_record.Type if pay_record is not None else order.PayMeth
+            order.PayAcct = latest.Account
+            order.QBi = latest.Sid
+        else:
+            order.PaidDate = None
+            order.PaidAmt = '0.00'
+            order.PayRef = None
+            order.QBi = None
+
+        if paid_total > 0:
+            if balance_due > .01:
+                order.Istat = 4
+            elif order.Istat in [6, 7, 8]:
+                order.Istat = 8
+            else:
+                order.Istat = 5
+
+    def update_reloaded_receive_batch(err_list):
+        selected_ids = request.values.get('reloaded_batch_ids', '')
+        try:
+            original_ids = [int(row_id) for row_id in selected_ids.split(',') if row_id.strip()]
+        except:
+            err_list.append('Reloaded payment batch has invalid row data.')
+            return err_list
+        if not original_ids:
+            err_list.append('Reload a payment batch before updating it.')
+            return err_list
+
+        old_debit_rows = Gledger.query.filter(
+            (Gledger.id.in_(original_ids)) &
+            (Gledger.Type.in_(['DD', 'ID'])) &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        if not old_debit_rows:
+            err_list.append('Could not find the reloaded payment batch to update.')
+            return err_list
+
+        first = old_debit_rows[0]
+        payment_ref_id = first.Sid
+        pay_date = request.values.get('thisdate')
+        pay_ref = request.values.get('thisref')
+        pay_method = request.values.get('paymethod')
+        deposit_account = request.values.get('acctfordeposit')
+        try:
+            pay_date_value = datetime.datetime.strptime(pay_date, '%Y-%m-%d')
+        except:
+            err_list.append('Payment date is invalid.')
+            return err_list
+        if not pay_method or not deposit_account:
+            err_list.append('Choose payment method and deposit account before updating.')
+            return err_list
+
+        new_lines = {}
+        for key in request.values:
+            if not key.startswith('oder'):
+                continue
+            try:
+                order_id = int(key.replace('oder', ''))
+            except:
+                continue
+            order = Orders.query.get(order_id)
+            if order is None:
+                continue
+            amount = money_to_cents(request.values.get(f'amount{order.id}', '0.00'))
+            if amount > 0:
+                new_lines[order.Jo] = (order, amount)
+        if not new_lines:
+            err_list.append('Select at least one invoice with a positive received amount.')
+            return err_list
+
+        payment_record = PaymentsRec.query.get(payment_ref_id) if payment_ref_id else None
+        if payment_record is None:
+            payment_record = PaymentsRec(
+                Amount=0,
+                Account=deposit_account,
+                Source=first.Source,
+                Type=pay_method,
+                Com=cmpdata[10],
+                Recorded=datetime.datetime.now(),
+                Date=pay_date_value,
+                Ref=pay_ref,
+            )
+            db.session.add(payment_record)
+            db.session.flush()
+            payment_ref_id = payment_record.id
+
+        old_jos = {row.Tcode for row in old_debit_rows if row.Tcode}
+        new_jos = set(new_lines.keys())
+        affected_jos = old_jos | new_jos
+        for jo in old_jos - new_jos:
+            Gledger.query.filter(
+                (Gledger.Tcode == jo) &
+                (Gledger.Type.in_(['DD', 'ID', 'IC'])) &
+                (Gledger.Sid == payment_ref_id)
+            ).delete(synchronize_session=False)
+
+        dtype = 'ID' if deposit_account in ['Undeposited Funds'] or pay_method in ['Cash', 'Check'] else 'DD'
+        debit_account = Accounts.query.filter(
+            (Accounts.Name == deposit_account) &
+            (Accounts.Co == cmpdata[10])
+        ).first()
+        credit_account = Accounts.query.filter(
+            (Accounts.Name == 'Accounts Receivable') &
+            (Accounts.Co == cmpdata[10])
+        ).first()
+        if debit_account is None or credit_account is None:
+            err_list.append('Required ledger accounts could not be found.')
+            return err_list
+
+        total_amount = 0
+        recorded = datetime.datetime.now()
+        for jo, (order, amount) in new_lines.items():
+            total_amount += amount
+            Gledger.query.filter(
+                (Gledger.Tcode == jo) &
+                (Gledger.Type.in_(['DD', 'ID'])) &
+                (Gledger.Sid == payment_ref_id) &
+                (Gledger.Type != dtype)
+            ).delete(synchronize_session=False)
+            debit_line = Gledger.query.filter(
+                (Gledger.Tcode == jo) &
+                (Gledger.Type == dtype) &
+                (Gledger.Sid == payment_ref_id)
+            ).first()
+            if debit_line is None:
+                debit_line = Gledger(0, 0, deposit_account, debit_account.id, order.Shipper, payment_ref_id, dtype, jo, cmpdata[10], recorded, 0, pay_date_value, pay_ref)
+                db.session.add(debit_line)
+            debit_line.Debit = amount
+            debit_line.Credit = 0
+            debit_line.Account = deposit_account
+            debit_line.Aid = debit_account.id
+            debit_line.Source = order.Shipper
+            debit_line.Sid = payment_ref_id
+            debit_line.Recorded = recorded
+            debit_line.Date = pay_date_value
+            debit_line.Ref = pay_ref
+
+            credit_line = Gledger.query.filter(
+                (Gledger.Tcode == jo) &
+                (Gledger.Type == 'IC') &
+                (Gledger.Sid == payment_ref_id)
+            ).first()
+            if credit_line is None:
+                credit_line = Gledger(0, 0, 'Accounts Receivable', credit_account.id, order.Shipper, payment_ref_id, 'IC', jo, cmpdata[10], recorded, 0, pay_date_value, pay_ref)
+                db.session.add(credit_line)
+            credit_line.Debit = 0
+            credit_line.Credit = amount
+            credit_line.Account = 'Accounts Receivable'
+            credit_line.Aid = credit_account.id
+            credit_line.Source = order.Shipper
+            credit_line.Sid = payment_ref_id
+            credit_line.Recorded = recorded
+            credit_line.Date = pay_date_value
+            credit_line.Ref = pay_ref
+
+        payment_record.Amount = total_amount
+        payment_record.Account = deposit_account
+        payment_record.Type = pay_method
+        payment_record.Com = cmpdata[10]
+        payment_record.Recorded = recorded
+        payment_record.Date = pay_date_value
+        payment_record.Ref = pay_ref
+
+        for jo in affected_jos:
+            order = Orders.query.filter(Orders.Jo == jo).first()
+            if order is not None:
+                refresh_order_payment_status(order)
+
+        db.session.commit()
+        err_list.append(f'Updated reloaded payment batch {payment_ref_id} for ${total_amount / 100:,.2f}.')
+        return err_list
+
+    def reload_receive_batch(holdvec, selected_batches, err_list, use_posted_values=False):
+        if len(selected_batches) != 1:
+            err_list.append('Select exactly one received payment batch to reload.')
+            return holdvec, err_list
+
+        try:
+            row_ids = [int(row_id) for row_id in selected_batches[0].split(',') if row_id.strip()]
+        except:
+            err_list.append('Selected payment batch has invalid row data.')
+            return holdvec, err_list
+        if not row_ids:
+            err_list.append('Selected payment batch has no ledger rows.')
+            return holdvec, err_list
+
+        batch_rows = Gledger.query.filter(
+            (Gledger.id.in_(row_ids)) &
+            (Gledger.Type.in_(['DD', 'ID'])) &
+            (Gledger.Com == cmpdata[10])
+        ).order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
+        if not batch_rows:
+            err_list.append('Could not find the selected payment batch.')
+            return holdvec, err_list
+
+        first = batch_rows[0]
+        customer = first.Source or ''
+        pay_date = first.Date.strftime('%Y-%m-%d') if first.Date else datetime.date.today().strftime('%Y-%m-%d')
+        pay_ref = first.Ref or ''
+        deposit_account = first.Account or ''
+        first_order = Orders.query.filter(Orders.Jo == first.Tcode).first()
+        pay_method = first_order.PayMeth if first_order is not None and first_order.PayMeth else None
+        if pay_method is None:
+            pay_method = 'Direct Deposit' if first.Type == 'DD' else 'Check'
+        if use_posted_values:
+            pay_date = request.values.get('thisdate') or pay_date
+            pay_ref = request.values.get('thisref') or pay_ref
+            deposit_account = request.values.get('acctfordeposit') or deposit_account
+            pay_method = request.values.get('paymethod') or pay_method
+
+        lookbacktime, stopdate = receive_order_stopdate()
+        open_orders = Orders.query.filter(
+            (Orders.Shipper == customer) &
+            ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) &
+            (Orders.Date > stopdate)
+        ).order_by(Orders.Date.desc(), Orders.id.desc()).all()
+
+        by_jo = {row.Tcode: row for row in batch_rows if row.Tcode}
+        current_ids = {order.id for order in open_orders}
+        for row in batch_rows:
+            order = Orders.query.filter(Orders.Jo == row.Tcode).first()
+            if order is not None and order.id not in current_ids:
+                open_orders.append(order)
+                current_ids.add(order.id)
+
+        tjobs = Orders.query.filter(
+            ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) &
+            (Orders.Date > stopdate)
+        ).all()
+        comps = sorted({job.Shipper for job in tjobs if job.Shipper})
+        if customer and customer not in comps:
+            comps.append(customer)
+            comps.sort()
+
+        checks = [0] * len(open_orders)
+        amts = ['0.00'] * len(open_orders)
+        invts = ['0.00'] * len(open_orders)
+        invotot = 0.0
+        paytot = 0.0
+        for index, order in enumerate(open_orders):
+            invoice = Invoices.query.filter(Invoices.Jo == order.Jo).first()
+            if invoice is not None:
+                invts[index] = invoice.Total
+            elif order.InvoTotal:
+                invts[index] = order.InvoTotal
+
+            payment_row = by_jo.get(order.Jo)
+            if use_posted_values:
+                posted_amount = request.values.get(f'amount{order.id}')
+                if posted_amount is not None:
+                    amts[index] = cents_to_money(money_to_cents(posted_amount))
+                elif payment_row is not None:
+                    amts[index] = cents_to_money(payment_row.Debit)
+                elif invoice is not None:
+                    amts[index] = invoice.Total
+
+                if request.values.get(f'oder{order.id}') is not None:
+                    checks[index] = 1
+                    try:
+                        invotot += float(invts[index])
+                    except:
+                        pass
+                    try:
+                        paytot += float(amts[index])
+                    except:
+                        pass
+            elif payment_row is not None:
+                checks[index] = 1
+                amts[index] = cents_to_money(payment_row.Debit)
+                try:
+                    invotot += float(invts[index])
+                except:
+                    pass
+                try:
+                    paytot += float(amts[index])
+                except:
+                    pass
+            elif invoice is not None:
+                amts[index] = invoice.Total
+
+        if pay_method in ['Cash', 'Check']:
+            deposit_accounts = ['Undeposited Funds']
+        elif pay_method == 'Credit Card':
+            deposit_accounts = [account.Name for account in Accounts.query.filter(
+                (Accounts.Type == 'Bank') & (Accounts.Description.contains('Merchant'))
+            ).all()]
+        else:
+            deposit_accounts = [account.Name for account in Accounts.query.filter(
+                (Accounts.Type == 'Bank') | (Accounts.Type == 'Exch')
+            ).all()]
+        if deposit_account and deposit_account not in deposit_accounts:
+            deposit_accounts.append(deposit_account)
+
+        holdvec[0] = customer
+        holdvec[1] = open_orders
+        holdvec[2] = comps
+        holdvec[3] = checks
+        holdvec[4] = d2s(invotot)
+        holdvec[5] = d2s(paytot)
+        holdvec[6] = amts
+        holdvec[7] = pay_date
+        holdvec[8] = pay_ref
+        holdvec[9] = deposit_accounts
+        holdvec[10] = deposit_account
+        holdvec[11] = nonone(request.values.get('autodisbox'))
+        holdvec[12] = invts
+        holdvec[13] = 1 if paytot > 0 and deposit_account else 0
+        holdvec[14] = pay_method
+        holdvec[21] = selected_batches[0]
+        holdvec[20] = lookbacktime
+        err_list.append(f'Reloaded payment batch for {customer} dated {pay_date}. Review amounts, then preview or record.')
+        return holdvec, err_list
+
+    batch_lookback, batch_days, batch_options = receive_batch_lookback()
+    is_reloaded_batch = request.values.get('reloaded_batch_ids') is not None
+    is_reloaded_record = is_reloaded_batch and (
+        request.values.get('update_reloaded_batch') is not None or
+        request.values.get('recordpayment') is not None
+    )
+
+    if is_reloaded_record:
+        completed = False
+        err_list = []
+        holdvec = [''] * 150
+        err_list = update_reloaded_receive_batch(err_list)
+        holdvec, err_list = reload_receive_batch(
+            holdvec,
+            [request.values.get('reloaded_batch_ids')],
+            err_list,
+            use_posted_values=True,
+        )
+    else:
+        completed, err_list, holdvec = ReceiveByAccount_task([], [''] * 150, 0)
+
+    if request.values.get('reload_batch') is not None:
+        holdvec, err_list = reload_receive_batch(holdvec, request.values.getlist('payment_batch'), err_list)
+    elif is_reloaded_batch and not is_reloaded_record:
+        holdvec, err_list = reload_receive_batch(
+            holdvec,
+            [request.values.get('reloaded_batch_ids')],
+            err_list,
+            use_posted_values=True,
+        )
+
+    payment_groups = {}
+    batch_stopdate = datetime.date.today() - datetime.timedelta(days=batch_days)
+    rows = Gledger.query.filter(
+        (Gledger.Type.in_(['DD', 'ID'])) &
+        (Gledger.Com == cmpdata[10]) &
+        (Gledger.Date >= batch_stopdate)
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
+
+    for row in rows:
+        key = (
+            row.Date.strftime('%Y-%m-%d') if row.Date else '',
+            row.Source or '',
+            row.Ref or '',
+            row.Account or '',
+            row.Type or '',
+        )
+        group = payment_groups.setdefault(key, {
+            'date': row.Date,
+            'source': row.Source or '',
+            'ref': row.Ref or '',
+            'account': row.Account or '',
+            'type': row.Type or '',
+            'ids': [],
+            'amount': 0,
+            'count': 0,
+        })
+        group['ids'].append(row.id)
+        group['amount'] += row.Debit or 0
+        group['count'] += 1
+
+    recent_batches = sorted(
+        payment_groups.values(),
+        key=lambda item: item['date'] or datetime.datetime.min,
+        reverse=True,
+    )
+    for batch in recent_batches:
+        batch['id_value'] = ','.join(str(row_id) for row_id in batch['ids'])
+        batch['amount_fmt'] = "${:,.2f}".format(batch['amount'] / 100)
+
+    return render_template(
+        'receive_by_account.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        err='\n'.join(err_list) if isinstance(err_list, list) else err_list,
+        holdvec=holdvec,
+        completed=completed,
+        recent_batches=recent_batches,
+        batch_lookback=batch_lookback,
+        batch_options=batch_options,
+    )
+
+
+@main.route('/GeneralDeposits', methods=['GET', 'POST'])
+@login_required
+def GeneralDeposits():
+    from webapp.class8_tasks_gledger import post_balanced_journal
+    from webapp.viewfuncs import newjo
+
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            return int(round(float(clean) * 100))
+        except:
+            return 0
+
+    company_code = cmpdata[10]
+    today_value = datetime.date.today().strftime('%Y-%m-%d')
+    err = []
+    selected = {
+        'deposit_date': request.values.get('deposit_date', today_value),
+        'bank_account': request.values.get('bank_account', ''),
+        'credit_account': request.values.get('credit_account', ''),
+        'amount': request.values.get('amount', ''),
+        'source': request.values.get('source', ''),
+        'ref': request.values.get('ref', ''),
+        'memo': request.values.get('memo', ''),
+        'edit_journal': request.values.get('edit_journal', ''),
+    }
+
+    bank_accounts = Accounts.query.filter(
+        (Accounts.Type == 'Bank') &
+        (Accounts.Co == company_code)
+    ).order_by(Accounts.Name).all()
+    credit_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (Accounts.Type.in_(['Income', 'Equity', 'Current Liability']))
+    ).order_by(Accounts.Type, Accounts.Name).all()
+
+    if not selected['bank_account'] and bank_accounts:
+        selected['bank_account'] = bank_accounts[0].Name
+    if not selected['credit_account'] and credit_accounts:
+        selected['credit_account'] = credit_accounts[0].Name
+
+    def load_manual_deposit(journal_id):
+        debit_line = Gledger.query.filter(
+            (Gledger.JournalId == journal_id) &
+            (Gledger.SourceTable == 'ManualDeposit') &
+            (Gledger.Com == company_code) &
+            (Gledger.Type == 'DD')
+        ).first()
+        credit_line = Gledger.query.filter(
+            (Gledger.JournalId == journal_id) &
+            (Gledger.SourceTable == 'ManualDeposit') &
+            (Gledger.Com == company_code) &
+            (Gledger.Credit > 0)
+        ).first()
+        if debit_line is None or credit_line is None:
+            return None
+        return {
+            'deposit_date': debit_line.Date.strftime('%Y-%m-%d') if debit_line.Date else today_value,
+            'bank_account': debit_line.Account or '',
+            'credit_account': credit_line.Account or '',
+            'amount': "{:,.2f}".format((debit_line.Debit or 0) / 100),
+            'source': debit_line.Source or '',
+            'ref': debit_line.Ref or '',
+            'memo': debit_line.JournalMemo or '',
+            'edit_journal': journal_id,
+        }
+
+    if request.method == 'POST' and request.values.get('load_deposit') is not None:
+        selected_journals = request.values.getlist('deposit_journal')
+        if len(selected_journals) != 1:
+            err.append('Select exactly one general deposit to edit')
+        else:
+            loaded = load_manual_deposit(selected_journals[0])
+            if loaded is None:
+                err.append('Selected general deposit could not be loaded for editing')
+            else:
+                selected = loaded
+                err.append(f'Editing general deposit {selected["edit_journal"]}')
+
+    if request.method == 'POST' and request.values.get('delete_deposits') is not None:
+        selected_journals = request.values.getlist('deposit_journal')
+        if not selected_journals:
+            err.append('No general deposits selected for deletion')
+        else:
+            deleted_rows = 0
+            deleted_journals = 0
+            for journal_id in selected_journals:
+                lines = Gledger.query.filter(
+                    (Gledger.JournalId == journal_id) &
+                    (Gledger.SourceTable == 'ManualDeposit') &
+                    (Gledger.Com == company_code)
+                ).all()
+                if lines:
+                    deleted_journals += 1
+                    deleted_rows += len(lines)
+                    for line in lines:
+                        db.session.delete(line)
+            db.session.commit()
+            err.append(f'Deleted {deleted_journals} general deposit journal(s), {deleted_rows} ledger row(s)')
+
+    if request.method == 'POST' and request.values.get('save_deposit') is not None:
+        deposit_date = None
+        try:
+            deposit_date = datetime.datetime.strptime(selected['deposit_date'], '%Y-%m-%d')
+        except ValueError:
+            err.append('Deposit date is invalid')
+
+        amount = money_to_cents(selected['amount'])
+        if amount <= 0:
+            err.append('Deposit amount must be greater than zero')
+
+        bank = Accounts.query.filter(
+            (Accounts.Name == selected['bank_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        credit = Accounts.query.filter(
+            (Accounts.Name == selected['credit_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        debit_line = Gledger.query.filter(
+            (Gledger.JournalId == selected['edit_journal']) &
+            (Gledger.SourceTable == 'ManualDeposit') &
+            (Gledger.Com == company_code) &
+            (Gledger.Type == 'DD')
+        ).first()
+        credit_line = Gledger.query.filter(
+            (Gledger.JournalId == selected['edit_journal']) &
+            (Gledger.SourceTable == 'ManualDeposit') &
+            (Gledger.Com == company_code) &
+            (Gledger.Credit > 0)
+        ).first()
+        if bank is None:
+            err.append('Bank account is required')
+        if credit is None:
+            err.append('Credit account is required')
+        if debit_line is None or credit_line is None:
+            err.append('Manual deposit journal could not be found for update')
+        if not selected['source'].strip():
+            err.append('Deposit source is required')
+
+        if not err:
+            memo = selected['memo'].strip() or f"General deposit from {selected['source'].strip()}"
+            recorded = datetime.datetime.now()
+            ref = selected['ref'].strip() or None
+
+            debit_line.Debit = amount
+            debit_line.Credit = 0
+            debit_line.Account = bank.Name
+            debit_line.Aid = bank.id
+            debit_line.Source = selected['source'].strip()
+            debit_line.Sid = credit.id
+            debit_line.Recorded = recorded
+            debit_line.Date = deposit_date
+            debit_line.Ref = ref
+            debit_line.JournalMemo = memo
+            debit_line.PostedAt = recorded
+
+            credit_line.Debit = 0
+            credit_line.Credit = amount
+            credit_line.Account = credit.Name
+            credit_line.Aid = credit.id
+            credit_line.Source = bank.Name
+            credit_line.Sid = bank.id
+            credit_line.Recorded = recorded
+            credit_line.Date = deposit_date
+            credit_line.Ref = ref
+            credit_line.JournalMemo = memo
+            credit_line.PostedAt = recorded
+
+            db.session.commit()
+            err.append(f'General deposit {debit_line.Tcode} updated')
+            selected = {
+                'deposit_date': today_value,
+                'bank_account': bank.Name,
+                'credit_account': credit.Name,
+                'amount': '',
+                'source': '',
+                'ref': '',
+                'memo': '',
+                'edit_journal': '',
+            }
+
+    if request.method == 'POST' and request.values.get('create_deposit') is not None:
+        deposit_date = None
+        try:
+            deposit_date = datetime.datetime.strptime(selected['deposit_date'], '%Y-%m-%d')
+        except ValueError:
+            err.append('Deposit date is invalid')
+
+        amount = money_to_cents(selected['amount'])
+        if amount <= 0:
+            err.append('Deposit amount must be greater than zero')
+
+        bank = Accounts.query.filter(
+            (Accounts.Name == selected['bank_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        credit = Accounts.query.filter(
+            (Accounts.Name == selected['credit_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        if bank is None:
+            err.append('Bank account is required')
+        if credit is None:
+            err.append('Credit account is required')
+        if not selected['source'].strip():
+            err.append('Deposit source is required')
+
+        if not err:
+            tcode = newjo(f'{company_code}D', selected['deposit_date'])
+            memo = selected['memo'].strip() or f"General deposit from {selected['source'].strip()}"
+            journal_id = f'GDEP-{tcode}'
+            recorded = datetime.datetime.now()
+            err = post_balanced_journal(
+                [
+                    {
+                        'debit': amount,
+                        'credit': 0,
+                        'account': bank.Name,
+                        'aid': bank.id,
+                        'source': selected['source'].strip(),
+                        'sid': credit.id,
+                        'type': 'DD',
+                        'tcode': tcode,
+                        'com': company_code,
+                        'recorded': recorded,
+                        'date': deposit_date,
+                        'ref': selected['ref'].strip() or None,
+                    },
+                    {
+                        'debit': 0,
+                        'credit': amount,
+                        'account': credit.Name,
+                        'aid': credit.id,
+                        'source': bank.Name,
+                        'sid': bank.id,
+                        'type': 'GC',
+                        'tcode': tcode,
+                        'com': company_code,
+                        'recorded': recorded,
+                        'date': deposit_date,
+                        'ref': selected['ref'].strip() or None,
+                    },
+                ],
+                journal_id=journal_id,
+                journal_memo=memo,
+                posted_by='general_deposits',
+                source_table='ManualDeposit',
+                source_id=None,
+            )
+            if not err:
+                err.append(f'General deposit {tcode} recorded for ${amount / 100:,.2f}')
+                selected = {
+                    'deposit_date': today_value,
+                    'bank_account': bank.Name,
+                    'credit_account': credit.Name,
+                    'amount': '',
+                    'source': '',
+                    'ref': '',
+                    'memo': '',
+                    'edit_journal': '',
+                }
+
+    recent_deposits = Gledger.query.filter(
+        (Gledger.Type == 'DD') &
+        (Gledger.Com == company_code) &
+        (Gledger.SourceTable == 'ManualDeposit')
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(50).all()
+    for item in recent_deposits:
+        item.amount_fmt = "${:,.2f}".format((item.Debit or 0) / 100)
+        credit_line = Gledger.query.filter(
+            (Gledger.JournalId == item.JournalId) &
+            (Gledger.Credit > 0)
+        ).first()
+        item.deposit_type = ''
+        if credit_line is not None:
+            acct = Accounts.query.get(credit_line.Aid)
+            if acct is not None:
+                item.deposit_type = f'{credit_line.Account} ({acct.Type})'
+            else:
+                item.deposit_type = credit_line.Account
+
+    return render_template(
+        'general_deposits.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        err='\n'.join(err) if err else 'Ready',
+        selected=selected,
+        bank_accounts=bank_accounts,
+        credit_accounts=credit_accounts,
+        recent_deposits=recent_deposits,
+    )
+
+
+@main.route('/PayrollBatches', methods=['GET', 'POST'])
+@login_required
+def PayrollBatches():
+    from webapp.class8_tasks_gledger import post_balanced_journal
+    from webapp.viewfuncs import newjo
+
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            return int(round(float(clean) * 100))
+        except:
+            return 0
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    def default_account(accounts, names):
+        lowered = [(account, (account.Name or '').lower()) for account in accounts]
+        for name in names:
+            needle = name.lower()
+            for account, account_name in lowered:
+                if needle in account_name:
+                    return account.Name
+        return accounts[0].Name if accounts else ''
+
+    def account_by_name(name):
+        return Accounts.query.filter(
+            (Accounts.Name == name) &
+            (Accounts.Co == company_code)
+        ).first()
+
+    def person_display(person):
+        if person.Source:
+            return person.Source
+        parts = [person.First or '', person.Middle or '', person.Last or '']
+        return ' '.join(part for part in parts if part).strip()
+
+    def split_person_name(name):
+        parts = name.strip().split()
+        first = parts[0] if parts else ''
+        last = parts[-1] if len(parts) > 1 else ''
+        middle = ' '.join(parts[1:-1]) if len(parts) > 2 else ''
+        return first, middle, last
+
+    def get_or_create_payroll_vendor(name):
+        vendor_name = name.strip() or 'Payroll'
+        vendor = People.query.filter(
+            (People.Ptype == 'Vendor') &
+            (People.Company == vendor_name)
+        ).first()
+        if vendor is not None:
+            return vendor
+        first, middle, last = split_person_name(vendor_name)
+        vendor = People(
+            Ptype='Vendor',
+            Company=vendor_name,
+            First=first,
+            Middle=middle,
+            Last=last,
+            Addr1=None,
+            Addr2=None,
+            Addr3=None,
+            Idtype=None,
+            Idnumber=None,
+            Telephone=None,
+            Email=None,
+            Associate1=None,
+            Associate2=None,
+            Temp1='Payroll',
+            Temp2=None,
+            Date1=datetime.datetime.now(),
+            Date2=None,
+            Source=vendor_name,
+            Accountid=None,
+            Saljp=None,
+            Saloa=None,
+            Salap=None,
+        )
+        db.session.add(vendor)
+        db.session.flush()
+        return vendor
+
+    def add_payroll_bill_row(jo, vendor, employee, account, amount_cents, pay_date, ref, source, bank_name, memo, journal_id, pay_method):
+        if amount_cents <= 0:
+            return
+        existing = Bills.query.filter(Bills.Jo == jo).first()
+        if existing is not None:
+            return
+        amount = f'{amount_cents / 100:.2f}'
+        bill = Bills(
+            Jo=jo,
+            Pid=vendor.id,
+            Company=vendor.Company,
+            Memo=memo[:50],
+            Description=f'{employee} payroll: {account.Name}'[:600],
+            bAmount=amount,
+            Status='Paid',
+            Scache=0,
+            Source=None,
+            Ref=ref,
+            Date=pay_date,
+            pDate=pay_date,
+            pAmount=amount,
+            pMulti=None,
+            pAccount=bank_name,
+            bAccount=account.Name,
+            bType=account.Type,
+            bCat=account.Category,
+            bSubcat=account.Subcategory,
+            Link=None,
+            User='payroll_batches',
+            Co=company_code,
+            Temp1='PayrollBatch',
+            Temp2=journal_id,
+            Recurring=0,
+            dDate=pay_date,
+            pAmount2='0.00',
+            pDate2=None,
+            Proof=None,
+            Check=None,
+            Ccache=0,
+            QBi=0,
+            iflag=0,
+            PmtList=amount,
+            PacctList=bank_name,
+            RefList=ref,
+            MemoList=memo[:200],
+            PdateList=pay_date.strftime('%Y-%m-%d') if pay_date else None,
+            CheckList=None,
+            MethList=pay_method,
+            Pcache=0,
+            pMeth=pay_method,
+        )
+        db.session.add(bill)
+
+    def create_payroll_bill_rows(tcode, journal_id, people_rows, vendor_name, bank_name, pay_date, ref, memo):
+        vendor = get_or_create_payroll_vendor(vendor_name)
+        pay_method = 'ACH'
+        for index, row in enumerate(people_rows, start=1):
+            row_tcode = f'{tcode}-{index}'
+            add_payroll_bill_row(
+                f'{row_tcode}-W',
+                vendor,
+                row['employee'].strip(),
+                row['wage_account_obj'],
+                row['gross_cents'],
+                pay_date,
+                ref,
+                vendor_name,
+                bank_name,
+                memo,
+                journal_id,
+                pay_method,
+            )
+            add_payroll_bill_row(
+                f'{row_tcode}-T',
+                vendor,
+                row['employee'].strip(),
+                row['tax_account_obj'],
+                row['employer_tax_cents'],
+                pay_date,
+                ref,
+                vendor_name,
+                bank_name,
+                memo,
+                journal_id,
+                pay_method,
+            )
+        db.session.commit()
+
+    company_code = cmpdata[10]
+    today_value = datetime.date.today().strftime('%Y-%m-%d')
+    err = []
+    selected = {
+        'pay_date': request.values.get('pay_date', today_value),
+        'provider': request.values.get('provider', ''),
+        'ref': request.values.get('ref', ''),
+        'bank_account': request.values.get('bank_account', ''),
+        'wage_account': request.values.get('wage_account', ''),
+        'tax_account': request.values.get('tax_account', ''),
+        'tax_withdrawal': request.values.get('tax_withdrawal', ''),
+        'memo': request.values.get('memo', ''),
+    }
+
+    bank_accounts = Accounts.query.filter(
+        (Accounts.Type == 'Bank') &
+        (Accounts.Co == company_code)
+    ).order_by(Accounts.Name).all()
+    expense_accounts = Accounts.query.filter(
+        (Accounts.Type == 'Expense') &
+        (Accounts.Co == company_code)
+    ).order_by(Accounts.Name).all()
+
+    if not selected['bank_account']:
+        selected['bank_account'] = default_account(bank_accounts, ['bank of america', 'bank'])
+    if not selected['wage_account']:
+        selected['wage_account'] = default_account(expense_accounts, ['owner payroll expense', 'payroll expense', 'labor expense', 'wage'])
+    if not selected['tax_account']:
+        selected['tax_account'] = default_account(expense_accounts, ['payroll taxes expense', 'federal taxes expense', 'tax'])
+
+    if request.method == 'POST' and request.values.get('add_payroll_person') is not None:
+        person_name = request.values.get('new_person_name', '').strip()
+        person_account_name = request.values.get('new_person_account', selected['wage_account'])
+        person_tax_account_name = request.values.get('new_person_tax_account', selected['tax_account'])
+        person_account = account_by_name(person_account_name)
+        person_tax_account = account_by_name(person_tax_account_name)
+        if not person_name:
+            err.append('Payroll person name is required')
+        if person_account is None:
+            err.append('Payroll person gross pay expense account is required')
+        if person_tax_account is None:
+            err.append('Payroll person tax expense account is required')
+        if not err:
+            first, middle, last = split_person_name(person_name)
+            person = People.query.filter(
+                (People.Ptype == 'Payroll') &
+                (People.Company == company_code) &
+                (People.Source == person_name)
+            ).first()
+            if person is None:
+                person = People(
+                    Ptype='Payroll',
+                    Company=company_code,
+                    First=first,
+                    Middle=middle,
+                    Last=last,
+                    Addr1=None,
+                    Addr2=None,
+                    Addr3=None,
+                    Idtype=None,
+                    Idnumber=None,
+                    Telephone=None,
+                    Email=None,
+                    Associate1=None,
+                    Associate2=None,
+                    Temp1='Active',
+                    Temp2=str(person_tax_account.id),
+                    Date1=datetime.datetime.now(),
+                    Date2=None,
+                    Source=person_name,
+                    Accountid=person_account.id,
+                    Saljp=None,
+                    Saloa=None,
+                    Salap=None,
+                )
+                db.session.add(person)
+                err.append(f'Added payroll person {person_name}')
+            else:
+                person.First = first
+                person.Middle = middle
+                person.Last = last
+                person.Accountid = person_account.id
+                person.Temp2 = str(person_tax_account.id)
+                person.Temp1 = 'Active'
+                err.append(f'Updated payroll person {person_name}')
+            db.session.commit()
+
+    if request.method == 'POST' and request.values.get('update_payroll_roster') is not None:
+        roster_ids = request.values.getlist('roster_person_id[]')
+        roster_names = request.values.getlist('roster_person_name[]')
+        roster_accounts = request.values.getlist('roster_person_account[]')
+        roster_tax_accounts = request.values.getlist('roster_person_tax_account[]')
+        updated = 0
+        for index, person_id in enumerate(roster_ids):
+            person = People.query.filter(
+                (People.id == person_id) &
+                (People.Ptype == 'Payroll') &
+                (People.Company == company_code)
+            ).first()
+            if person is None:
+                continue
+            person_name = roster_names[index].strip() if index < len(roster_names) else person_display(person)
+            account_name = roster_accounts[index] if index < len(roster_accounts) else selected['wage_account']
+            tax_account_name = roster_tax_accounts[index] if index < len(roster_tax_accounts) else selected['tax_account']
+            account = account_by_name(account_name)
+            tax_account_row = account_by_name(tax_account_name)
+            if not person_name:
+                err.append(f'Payroll roster row {index + 1} is missing person name')
+                continue
+            if account is None:
+                err.append(f'Payroll roster row {index + 1} has invalid gross pay expense account')
+                continue
+            if tax_account_row is None:
+                err.append(f'Payroll roster row {index + 1} has invalid tax expense account')
+                continue
+            first, middle, last = split_person_name(person_name)
+            person.First = first
+            person.Middle = middle
+            person.Last = last
+            person.Source = person_name
+            person.Accountid = account.id
+            person.Temp2 = str(tax_account_row.id)
+            person.Temp1 = 'Active'
+            updated += 1
+        if updated:
+            db.session.commit()
+            err.append(f'Updated {updated} payroll roster person(s)')
+
+    if request.method == 'POST' and request.values.get('deactivate_payroll_people') is not None:
+        selected_people = request.values.getlist('roster_select')
+        if not selected_people:
+            err.append('Select at least one payroll person to deactivate')
+        else:
+            count = 0
+            for person_id in selected_people:
+                person = People.query.filter(
+                    (People.id == person_id) &
+                    (People.Ptype == 'Payroll') &
+                    (People.Company == company_code)
+                ).first()
+                if person is not None:
+                    person.Temp1 = 'Inactive'
+                    count += 1
+            db.session.commit()
+            err.append(f'Deactivated {count} payroll roster person(s)')
+
+    payroll_people = People.query.filter(
+        (People.Ptype == 'Payroll') &
+        (People.Company == company_code) &
+        ((People.Temp1 != 'Inactive') | (People.Temp1.is_(None)))
+    ).order_by(People.Source, People.Last, People.First).all()
+    person_account_defaults = {}
+    person_tax_account_defaults = {}
+    for person in payroll_people:
+        display = person_display(person)
+        account = Accounts.query.get(person.Accountid) if person.Accountid else None
+        try:
+            tax_account = Accounts.query.get(int(person.Temp2)) if person.Temp2 else None
+        except:
+            tax_account = None
+        if display:
+            person.display_name = display
+            person.default_account = account.Name if account is not None else selected['wage_account']
+            person.default_tax_account = tax_account.Name if tax_account is not None else selected['tax_account']
+            person_account_defaults[display] = person.default_account
+            person_tax_account_defaults[display] = person.default_tax_account
+
+    posted_people = request.values.getlist('employee[]')
+    posted_wage_accounts = request.values.getlist('wage_account[]')
+    posted_tax_accounts = request.values.getlist('tax_account[]')
+    posted_gross = request.values.getlist('gross_pay[]')
+    posted_net = request.values.getlist('net_pay[]')
+    posted_employer_tax = request.values.getlist('employer_tax[]')
+    people_rows = []
+    row_count = max(len(posted_people), len(posted_wage_accounts), len(posted_tax_accounts), len(posted_gross), len(posted_net), len(posted_employer_tax), 3)
+    for index in range(row_count):
+        person = posted_people[index] if index < len(posted_people) else ''
+        wage_account_name = posted_wage_accounts[index] if index < len(posted_wage_accounts) else ''
+        tax_account_name = posted_tax_accounts[index] if index < len(posted_tax_accounts) else ''
+        if not wage_account_name:
+            wage_account_name = person_account_defaults.get(person, selected['wage_account'])
+        if not tax_account_name:
+            tax_account_name = person_tax_account_defaults.get(person, selected['tax_account'])
+        gross = posted_gross[index] if index < len(posted_gross) else ''
+        net = posted_net[index] if index < len(posted_net) else ''
+        employer_tax_row = posted_employer_tax[index] if index < len(posted_employer_tax) else ''
+        if request.method == 'POST' or index < 3:
+            people_rows.append({
+                'employee': person,
+                'wage_account': wage_account_name,
+                'tax_account': tax_account_name,
+                'gross_pay': gross,
+                'net_pay': net,
+                'employer_tax': employer_tax_row,
+                'gross_cents': money_to_cents(gross),
+                'net_cents': money_to_cents(net),
+                'employer_tax_cents': money_to_cents(employer_tax_row),
+            })
+    if request.method == 'POST':
+        people_rows = [
+            row for row in people_rows
+            if row['employee'].strip() or row['gross_cents'] or row['net_cents'] or row['employer_tax_cents']
+        ]
+        if not people_rows:
+            people_rows = [{'employee': '', 'wage_account': selected['wage_account'], 'tax_account': selected['tax_account'], 'gross_pay': '', 'net_pay': '', 'employer_tax': '', 'gross_cents': 0, 'net_cents': 0, 'employer_tax_cents': 0}]
+
+    gross_pay = sum(row['gross_cents'] for row in people_rows)
+    net_pay = sum(row['net_cents'] for row in people_rows)
+    employer_tax = sum(row['employer_tax_cents'] for row in people_rows)
+    tax_withdrawal = money_to_cents(selected['tax_withdrawal'])
+    employee_withholding = gross_pay - net_pay
+    debit_total = gross_pay + employer_tax
+    credit_total = net_pay + tax_withdrawal
+    balance_difference = debit_total - credit_total
+    tax_expected = employee_withholding + employer_tax
+    tax_difference = tax_withdrawal - tax_expected
+
+    if request.method == 'POST' and request.values.get('record_payroll') is not None:
+        try:
+            pay_date = datetime.datetime.strptime(selected['pay_date'], '%Y-%m-%d')
+        except:
+            pay_date = None
+            err.append('Pay date is invalid')
+
+        bank = Accounts.query.filter(
+            (Accounts.Name == selected['bank_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        wage_account = account_by_name(selected['wage_account'])
+        tax_account = Accounts.query.filter(
+            (Accounts.Name == selected['tax_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        if bank is None:
+            err.append('Bank account is required')
+        if wage_account is None:
+            err.append('Gross wages expense account is required')
+        if tax_account is None:
+            err.append('Employer payroll tax expense account is required')
+        if gross_pay <= 0:
+            err.append('Gross pay must be greater than zero')
+        if net_pay <= 0:
+            err.append('Net pay withdrawal must be greater than zero')
+        if tax_withdrawal < 0 or employer_tax < 0:
+            err.append('Tax amounts cannot be negative')
+        for index, row in enumerate(people_rows, start=1):
+            if not row['employee'].strip():
+                err.append(f'Payroll row {index} is missing employee/person')
+            row_account = account_by_name(row['wage_account'])
+            row_tax_account = account_by_name(row['tax_account'])
+            row['wage_account_obj'] = row_account
+            row['tax_account_obj'] = row_tax_account
+            if row_account is None:
+                err.append(f'Payroll row {index} expense account is required')
+            if row_tax_account is None:
+                err.append(f'Payroll row {index} tax expense account is required')
+            if row['gross_cents'] <= 0:
+                err.append(f'Payroll row {index} gross pay must be greater than zero')
+            if row['net_cents'] < 0 or row['employer_tax_cents'] < 0:
+                err.append(f'Payroll row {index} amounts cannot be negative')
+            if row['net_cents'] > row['gross_cents']:
+                err.append(f'Payroll row {index} net pay cannot exceed gross pay')
+        if balance_difference != 0:
+            err.append(f'Payroll batch is not balanced by {money(balance_difference)}')
+
+        if not err:
+            tcode = newjo(f'{company_code}P', selected['pay_date'])
+            source = selected['provider'].strip() or 'Payroll'
+            memo = selected['memo'].strip() or f"Payroll batch for {len(people_rows)} person(s)"
+            journal_id = f'PAYROLL-{tcode}'
+            recorded = datetime.datetime.now()
+            lines = []
+            for index, row in enumerate(people_rows, start=1):
+                row_tcode = f'{tcode}-{index}'
+                lines.extend([
+                    {
+                        'debit': row['gross_cents'],
+                        'credit': 0,
+                        'account': row['wage_account_obj'].Name,
+                        'aid': row['wage_account_obj'].id,
+                        'source': row['employee'].strip(),
+                        'sid': bank.id,
+                        'type': 'PW',
+                        'tcode': row_tcode,
+                        'com': company_code,
+                        'recorded': recorded,
+                        'date': pay_date,
+                        'ref': selected['ref'].strip() or None,
+                    },
+                    {
+                        'debit': row['employer_tax_cents'],
+                        'credit': 0,
+                        'account': row['tax_account_obj'].Name,
+                        'aid': row['tax_account_obj'].id,
+                        'source': row['employee'].strip(),
+                        'sid': bank.id,
+                        'type': 'PT',
+                        'tcode': row_tcode,
+                        'com': company_code,
+                        'recorded': recorded,
+                        'date': pay_date,
+                        'ref': selected['ref'].strip() or None,
+                    },
+                ])
+            lines.extend([
+                {
+                    'debit': 0,
+                    'credit': net_pay,
+                    'account': bank.Name,
+                    'aid': bank.id,
+                    'source': source,
+                    'sid': wage_account.id,
+                    'type': 'PC',
+                    'tcode': tcode,
+                    'com': company_code,
+                    'recorded': recorded,
+                    'date': pay_date,
+                    'ref': selected['ref'].strip() or None,
+                },
+                {
+                    'debit': 0,
+                    'credit': tax_withdrawal,
+                    'account': bank.Name,
+                    'aid': bank.id,
+                    'source': f'{source} payroll taxes',
+                    'sid': tax_account.id,
+                    'type': 'XC',
+                    'tcode': tcode,
+                    'com': company_code,
+                    'recorded': recorded,
+                    'date': pay_date,
+                    'ref': selected['ref'].strip() or None,
+                },
+            ])
+            err = post_balanced_journal(
+                lines,
+                journal_id=journal_id,
+                journal_memo=memo,
+                posted_by='payroll_batches',
+                source_table='PayrollBatch',
+                source_id=None,
+            )
+            if not err:
+                create_payroll_bill_rows(
+                    tcode=tcode,
+                    journal_id=journal_id,
+                    people_rows=people_rows,
+                    vendor_name=source,
+                    bank_name=bank.Name,
+                    pay_date=pay_date,
+                    ref=selected['ref'].strip() or None,
+                    memo=memo,
+                )
+                err.append(f'Payroll batch {tcode} recorded. Net pay and tax withdrawals will appear in banking reconciliation.')
+                selected.update({
+                    'pay_date': today_value,
+                    'provider': '',
+                    'ref': '',
+                    'tax_withdrawal': '',
+                    'memo': '',
+                })
+                people_rows = [
+                    {'employee': '', 'wage_account': selected['wage_account'], 'tax_account': selected['tax_account'], 'gross_pay': '', 'net_pay': '', 'employer_tax': '', 'gross_cents': 0, 'net_cents': 0, 'employer_tax_cents': 0},
+                    {'employee': '', 'wage_account': selected['wage_account'], 'tax_account': selected['tax_account'], 'gross_pay': '', 'net_pay': '', 'employer_tax': '', 'gross_cents': 0, 'net_cents': 0, 'employer_tax_cents': 0},
+                    {'employee': '', 'wage_account': selected['wage_account'], 'tax_account': selected['tax_account'], 'gross_pay': '', 'net_pay': '', 'employer_tax': '', 'gross_cents': 0, 'net_cents': 0, 'employer_tax_cents': 0},
+                ]
+
+    payroll_groups = {}
+    recent_lines = Gledger.query.filter(
+        (Gledger.SourceTable == 'PayrollBatch') &
+        (Gledger.Com == company_code)
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(400).all()
+    for line in recent_lines:
+        group = payroll_groups.setdefault(line.JournalId or line.Tcode, {
+            'journal_id': line.JournalId or '',
+            'tcode': line.Tcode or '',
+            'date': line.Date,
+            'memo': line.JournalMemo or '',
+            'gross': 0,
+            'employer_tax': 0,
+            'net': 0,
+            'tax_withdrawal': 0,
+            'people': set(),
+        })
+        if line.Type == 'PW':
+            group['gross'] += line.Debit or 0
+            if line.Source:
+                group['people'].add(line.Source)
+        elif line.Type == 'PT':
+            group['employer_tax'] += line.Debit or 0
+            if line.Source:
+                group['people'].add(line.Source)
+        elif line.Type == 'PC':
+            group['net'] += line.Credit or 0
+        elif line.Type == 'XC':
+            group['tax_withdrawal'] += line.Credit or 0
+        if line.Date and (not group['date'] or line.Date > group['date']):
+            group['date'] = line.Date
+
+    recent_batches = sorted(
+        payroll_groups.values(),
+        key=lambda item: item['date'] or datetime.datetime.min,
+        reverse=True,
+    )
+    for batch in recent_batches:
+        batch['gross_fmt'] = money(batch['gross'])
+        batch['employer_tax_fmt'] = money(batch['employer_tax'])
+        batch['net_fmt'] = money(batch['net'])
+        batch['tax_withdrawal_fmt'] = money(batch['tax_withdrawal'])
+        batch['bank_total_fmt'] = money(batch['net'] + batch['tax_withdrawal'])
+        batch['people_count'] = len(batch['people'])
+        batch['people_text'] = ', '.join(sorted(batch['people']))
+
+    summary = {
+        'employee_withholding': money(employee_withholding),
+        'employer_tax': money(employer_tax),
+        'expected_tax_withdrawal': money(tax_expected),
+        'tax_difference': money(tax_difference),
+        'debit_total': money(debit_total),
+        'credit_total': money(credit_total),
+        'balance_difference': money(balance_difference),
+        'balanced': balance_difference == 0 and debit_total > 0,
+    }
+
+    return render_template(
+        'payroll_batches.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        err='\n'.join(err) if err else 'Ready',
+        selected=selected,
+        people_rows=people_rows,
+        payroll_people=payroll_people,
+        person_account_defaults=person_account_defaults,
+        person_tax_account_defaults=person_tax_account_defaults,
+        bank_accounts=bank_accounts,
+        expense_accounts=expense_accounts,
+        recent_batches=recent_batches,
+        summary=summary,
+    )
 
 
 
@@ -540,8 +2786,3 @@ def Reports():
     idata1, idata2, idata3, idata4, hv, cache, err, leftscreen, docref, leftsize, today, now, doctxt, sdate, fdate, fyear, customerlist, thiscomp, clist = isoR()
     rightsize = 12-leftsize
     return render_template('Areports.html', cmpdata=cmpdata, scac=scac, clist=clist, thiscomp=thiscomp, customerlist=customerlist, fyear=fyear, cache=cache, sdate=sdate, fdate=fdate, err=err, doctxt=doctxt, leftscreen=leftscreen, docref=docref, leftsize=leftsize, rightsize=rightsize, idata1 = idata1, idata2=idata2, idata3=idata3, idata4=idata4, hv=hv)
-
-
-
-
-

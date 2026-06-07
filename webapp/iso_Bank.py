@@ -12,11 +12,179 @@ from webapp.report_maker import reportmaker
 from webapp.viewfuncs import d2s
 from webapp.CCC_system_setup import scac
 
-def reset_trial(ix):
-    gdata = Gledger.query.filter(Gledger.Reconciled == 25).all()
+def reset_trial(ix, bankacct=None):
+    query = Gledger.query.filter(Gledger.Reconciled == 25)
+    if bankacct is not None:
+        query = query.filter(Gledger.Account == bankacct)
+    gdata = query.all()
     for gdat in gdata:
         gdat.Reconciled = ix
     db.session.commit()
+
+def trial_ids(odata):
+    selected = [row.id for row in odata if row.Reconciled == 25]
+    return selected if selected else [0]
+
+def parse_money(value):
+    try:
+        return float(str(value).replace('$', '').replace(',', '').strip())
+    except:
+        return 0.00
+
+def latest_reconciliation(bankacct):
+    return Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Status == 1)
+    ).order_by(Reconciliations.Rdate.desc()).first()
+
+def trial_reconciliation(bankacct):
+    return Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Status == 25)
+    ).order_by(Reconciliations.Rdate.desc()).first()
+
+def default_beginning_balance(bankacct):
+    rdat = latest_reconciliation(bankacct)
+    if rdat is not None and rdat.Ebal not in [None, '']:
+        return rdat.Ebal
+    return '0.00'
+
+def statement_defaults(bankacct, today_str):
+    defaults = {
+        'rdate': today_str,
+        'begbal': default_beginning_balance(bankacct),
+        'endbal': '0.00',
+    }
+    rdat = trial_reconciliation(bankacct)
+    if rdat is not None:
+        if rdat.Rdate is not None:
+            defaults['rdate'] = rdat.Rdate.strftime('%Y-%m-%d')
+        if rdat.Bbal not in [None, '']:
+            defaults['begbal'] = rdat.Bbal
+        if rdat.Ebal not in [None, '']:
+            defaults['endbal'] = rdat.Ebal
+    return defaults
+
+def recon_list_text(values):
+    try:
+        text = json.dumps(values)
+    except:
+        return None
+    if len(text) <= 290:
+        return text
+    first = values[:5]
+    last = values[-5:] if len(values) > 5 else []
+    return json.dumps({'count': len(values), 'first': first, 'last': last})
+
+def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, servicefees, dlist, wlist, diff):
+    try:
+        dlists = recon_list_text(dlist)
+    except:
+        dlists = None
+    try:
+        wlists = recon_list_text(wlist)
+    except:
+        wlists = None
+
+    rdat = trial_reconciliation(bankacct)
+    if rdat is None:
+        rdat = Reconciliations(
+            Account=bankacct,
+            Rdate=rdate,
+            Bbal=bbal,
+            Ebal=ebal,
+            Deposits=deposits,
+            Withdraws=withdraws,
+            Servicefees=servicefees,
+            DepositList=dlists,
+            WithdrawList=wlists,
+            Status=25,
+            Diff=diff,
+        )
+        db.session.add(rdat)
+    else:
+        rdat.Account = bankacct
+        rdat.Rdate = rdate
+        rdat.Bbal = bbal
+        rdat.Ebal = ebal
+        rdat.Deposits = deposits
+        rdat.Withdraws = withdraws
+        rdat.Servicefees = servicefees
+        rdat.DepositList = dlists
+        rdat.WithdrawList = wlists
+        rdat.Status = 25
+        rdat.Diff = diff
+    db.session.commit()
+    return rdat
+
+def baseline_reconciliation(bankacct, cutoff_date, trusted_balance):
+    cutoff_end = cutoff_date + datetime.timedelta(days=1)
+    rows = Gledger.query.filter(
+        (Gledger.Account == bankacct) &
+        (Gledger.Date < cutoff_end) &
+        ((Gledger.Reconciled == 0) | (Gledger.Reconciled == 25))
+    ).all()
+
+    deposits = 0
+    withdrawals = 0
+    for row in rows:
+        if row.Type in ['DD', 'XD']:
+            deposits += row.Debit or 0
+        if row.Type in ['PC', 'XC']:
+            withdrawals += row.Credit or 0
+        row.Reconciled = cutoff_date.month
+
+    trusted_balance = d2s(trusted_balance)
+    existing = Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Rdate == cutoff_date)
+    ).first()
+    if existing is None:
+        existing = Reconciliations(
+            Account=bankacct,
+            Rdate=cutoff_date,
+            Bbal='0.00',
+            Ebal=trusted_balance,
+            Deposits=d2s(float(deposits) / 100),
+            Withdraws=d2s(float(withdrawals) / 100),
+            Servicefees='0.00',
+            DepositList='baseline',
+            WithdrawList='baseline',
+            Status=1,
+            Diff='0.00',
+        )
+        db.session.add(existing)
+    else:
+        existing.Bbal = '0.00'
+        existing.Ebal = trusted_balance
+        existing.Deposits = d2s(float(deposits) / 100)
+        existing.Withdraws = d2s(float(withdrawals) / 100)
+        existing.Servicefees = '0.00'
+        existing.DepositList = 'baseline'
+        existing.WithdrawList = 'baseline'
+        existing.Status = 1
+        existing.Diff = '0.00'
+
+    db.session.commit()
+    return len(rows), d2s(float(deposits) / 100), d2s(float(withdrawals) / 100), trusted_balance
+
+def selected_bank_ids(odata):
+    selected = []
+    valid_ids = {row.id for row in odata}
+    for row in odata:
+        testone = request.values.get('oder' + str(row.id))
+        if testone:
+            selected.append(int(testone))
+    for key, value in request.values.items():
+        if key.startswith('bankgroup') and value:
+            for item in value.split(','):
+                try:
+                    row_id = int(item)
+                    if row_id in valid_ids and row_id not in selected:
+                        selected.append(row_id)
+                except:
+                    pass
+    return selected
 
 def dataget_Bank(thismuch,bankacct):
     # 0=order,#1=proofs,#2=interchange,#3=people/services
@@ -64,15 +232,20 @@ def banktotals(bankacct):
     totalc=0
     totald_U = 0
     totalc_U = 0
+    defaults = statement_defaults(bankacct, datetime.date.today().strftime('%Y-%m-%d'))
     endbal = request.values.get('endbal')
     begbal = request.values.get('begbal')
+    if endbal in [None, '']:
+        endbal = defaults['endbal']
+    if begbal in [None, '']:
+        begbal = defaults['begbal']
     print(begbal,endbal)
     try:
-        endbal = float(endbal)
+        endbal = parse_money(endbal)
     except:
         endbal=0.00
     try:
-        begbal = float(begbal)
+        begbal = parse_money(begbal)
     except:
         begbal=0.00
     gdata = Gledger.query.filter(Gledger.Account==bankacct).all()
@@ -113,8 +286,8 @@ def isoBank():
     if request.method == 'POST':
 # ____________________________________________________________________________________________________________________B.FormVariables.General
 
-        from viewfuncs import parseline, popjo, jovec, newjo, timedata, nonone, nononef, enter_bk_charges
-        from viewfuncs import numcheck, numcheckv, viewbuttons, get_ints, numcheckvec, numcheckv, d2s, erud
+        from webapp.viewfuncs import parseline, popjo, jovec, newjo, timedata, nonone, nononef, enter_bk_charges
+        from webapp.viewfuncs import numcheck, numcheckv, viewbuttons, get_ints, numcheckvec, numcheckv, d2s, erud
 
         today = datetime.date.today()
         today_str = today.strftime('%Y-%m-%d')
@@ -159,22 +332,30 @@ def isoBank():
         recothese = request.values.get('recothese')
         finalize = request.values.get('finalize')
         undothese = request.values.get('undothese')
+        baselinehit = request.values.get('baseline_reconcile')
+        baseline_date = request.values.get('baseline_date')
+        baseline_balance = request.values.get('baseline_balance')
+        defaults = statement_defaults(acname, today_str)
         rdate = request.values.get('rdate')
         if rdate is None:
-            rdate = today_str
+            rdate = defaults['rdate']
         hv[0] = rdate
         hv[1] = [0]
         endbal = request.values.get('endbal')
         begbal = request.values.get('begbal')
+        if endbal in [None, '']:
+            endbal = defaults['endbal']
+        if begbal in [None, '']:
+            begbal = defaults['begbal']
         recready = 1
         try:
-            endbal=float(endbal)
+            endbal=parse_money(endbal)
         except:
             endbal=0.00
             err.append('No Statement Balance Entered for Reconciliation')
             recready=0
         try:
-            begbal=float(begbal)
+            begbal=parse_money(begbal)
         except:
             endbal=0.00
             err.append('No Statement Ending Entered for Reconciliation')
@@ -225,18 +406,38 @@ def isoBank():
         #odata = Income.query.all()
         print('acname=',acname)
         odata = dataget_Bank(thismuch,acname)
+        hv[1] = trial_ids(odata)
         acctinfo = banktotals(acname)
 # ____________________________________________________________________________________________________________________B.Search.General
 
+        if baselinehit is not None:
+            try:
+                if baseline_balance in [None, '']:
+                    raise ValueError('trusted bank balance is required')
+                cutoff_date = datetime.datetime.strptime(baseline_date, "%Y-%m-%d")
+                trusted_balance = parse_money(baseline_balance)
+                row_count, deposits, withdrawals, trusted = baseline_reconciliation(acname, cutoff_date, trusted_balance)
+                err[0] = f'Baseline completed for {acname} through {baseline_date}'
+                err[1] = f'Marked {row_count} ledger rows reconciled; deposits ${deposits}; withdrawals ${withdrawals}'
+                err[2] = f'Beginning balance for future reconciliation defaults to ${trusted}'
+                thismuch = '1'
+                odata = dataget_Bank(thismuch, acname)
+                acctinfo = banktotals(acname)
+            except Exception as exc:
+                err[0] = f'Baseline failed: {exc}'
+
         if modlink==0:
             oder,numchecked=numcheck(1,odata,0,0,0,0,['oder'])
+            group_ids = selected_bank_ids(odata)
+            if group_ids:
+                numchecked = len(group_ids)
 
 # ____________________________________________________________________________________________________________________E.Search.General
         if (recothese is not None or finalize is not None) and recready == 1:
 
             if numchecked > -1:
 
-                reset_trial(0)
+                reset_trial(0, acname)
                 #Get date of reconciliation and bank charges for month
                 rdate = request.values.get('rdate')
                 recdate = datetime.datetime.strptime(rdate, "%Y-%m-%d")
@@ -256,7 +457,7 @@ def isoBank():
                 except:
                     bkf = 0.00
 
-                odervec = numcheckv(odata)
+                odervec = selected_bank_ids(odata)
                 print('bkid=',bkchargeid)
                 if bkchargeid > 0 and bkchargeid not in odervec: odervec.append(bkchargeid)
                 hv[1] = odervec
@@ -268,18 +469,19 @@ def isoBank():
                 acctinfo = banktotals(acname)
                 hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname)
                 print(hv[2],hv[3])
+                save_trial_reconciliation(acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5])
                 odata = dataget_Bank(thismuch, acname)
 
                 if finalize is not None:
-                    reset_trial(recmo)
+                    reset_trial(recmo, acname)
                     hv[1] = [0]
                     rdat = Reconciliations.query.filter((Reconciliations.Rdate == hv[0]) & (Reconciliations.Account == acname)).first()
                     try:
-                        dlists = json.dumps(dlist)
+                        dlists = recon_list_text(dlist)
                     except:
                         dlists = None
                     try:
-                        wlists = json.dumps(wlist)
+                        wlists = recon_list_text(wlist)
                     except:
                         wlists = None
                     if rdat is None:
@@ -307,7 +509,7 @@ def isoBank():
 
         if undothese is not None:
 
-            odervec = numcheckv(odata)
+            odervec = selected_bank_ids(odata)
             for oder in odervec:
                 gdat = Gledger.query.get(oder)
                 gdat.Reconciled=0
@@ -407,14 +609,13 @@ def isoBank():
 
     #This is the else for 1st time through (not posting data from overseas.html)
     else:
-        from viewfuncs import popjo, jovec, timedata, nonone, nononef, init_truck_zero,d2s, erud
+        from webapp.viewfuncs import popjo, jovec, timedata, nonone, nononef, init_truck_zero,d2s, erud
         today = datetime.date.today()
         today_str = today.strftime('%Y-%m-%d')
         hv = [0]*9
         hv[0] = today_str
         hv[1] = [0]
         now = datetime.datetime.now().strftime('%I:%M %p')
-        reset_trial(0)
         oder=0
         modata=0
         modlink=0
@@ -429,8 +630,11 @@ def isoBank():
         cache=nonone(cache)
         adat = Accounts.query.filter(Accounts.Type=='Bank').first()
         bankacct = adat.Name
+        defaults = statement_defaults(bankacct, today_str)
+        hv[0] = defaults['rdate']
         acctinfo = banktotals(bankacct)
         odata = dataget_Bank(thismuch,bankacct)
+        hv[1] = trial_ids(odata)
 
 
     leftsize = 8
