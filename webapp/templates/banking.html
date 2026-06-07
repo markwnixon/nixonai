@@ -1,0 +1,384 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Banking</h2>
+            <p class="text-muted">Bank account review and reconciliation.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.Banking') }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="cache" value="{{ cache }}">
+
+        <div class="row">
+            <div class="col-lg-3 mb-3">
+                <div class="border rounded p-3 h-100">
+                    <h5>Account</h5>
+                    <div class="form-group">
+                        <label for="acname">Bank Account</label>
+                        <select class="form-control" id="acname" name="acname" onchange="this.form.submit()">
+                            {% for account in acdata %}
+                                <option value="{{ account.Name }}" {% if acctinfo[6] == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="thismuch">Show</label>
+                        <select class="form-control" id="thismuch" name="thismuch" onchange="this.form.submit()">
+                            <option value="1" {% if thismuch == '1' %}selected{% endif %}>Unreconciled</option>
+                            <option value="5" {% if thismuch == '5' %}selected{% endif %}>Trial Reconciliation</option>
+                            <option value="2" {% if thismuch == '2' %}selected{% endif %}>Last 45 Days</option>
+                            <option value="3" {% if thismuch == '3' %}selected{% endif %}>Last 90 Days</option>
+                            <option value="4" {% if thismuch not in ['1', '2', '3', '5'] %}selected{% endif %}>All</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="rdate">Statement Date</label>
+                        <input type="date" class="form-control" id="rdate" name="rdate" value="{{ hv[0] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="begbal">Beginning Balance</label>
+                        <input type="text" class="form-control" id="begbal" name="begbal" value="{{ acctinfo[9] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="endbal">Ending Balance</label>
+                        <input type="text" class="form-control" id="endbal" name="endbal" value="{{ acctinfo[4] }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="bkcharges">Bank Charges</label>
+                        <input type="text" class="form-control" id="bkcharges" name="bkcharges" value="0.00">
+                    </div>
+
+                    <button type="submit" name="recothese" value="1" class="btn btn-primary btn-block mb-2">Mark Trial</button>
+                    <button type="submit" name="finalize" value="1" class="btn btn-success btn-block mb-2">Finalize</button>
+                    <button type="submit" name="undothese" value="1" class="btn btn-outline-secondary btn-block">Undo Checked</button>
+
+                    <hr>
+                    <h5>Historical Baseline</h5>
+                    <p class="text-muted small">Marks unreconciled rows through the cutoff date as reconciled for this bank account, then records the trusted ending balance as the starting point for future reconciliation.</p>
+                    <div class="form-group">
+                        <label for="baseline_date">Baseline Through</label>
+                        <input type="date" class="form-control" id="baseline_date" name="baseline_date" value="2025-12-31">
+                    </div>
+                    <div class="form-group">
+                        <label for="baseline_balance">Trusted Bank Balance</label>
+                        <input type="text" class="form-control" id="baseline_balance" name="baseline_balance" placeholder="0.00">
+                    </div>
+                    <button type="submit" name="baseline_reconcile" value="1" class="btn btn-warning btn-block"
+                            onclick="return confirm('Mark this bank account reconciled through the selected baseline date?');">
+                        Set Baseline
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-9">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <div class="text-muted">Current Balance</div>
+                            <h5>${{ acctinfo[0] }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <div class="text-muted">Unreconciled Deposits</div>
+                            <h5>${{ acctinfo[1] }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <div class="text-muted">Unreconciled Withdrawals</div>
+                            <h5>${{ acctinfo[2] }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <div class="text-muted">Difference</div>
+                            <h5>${{ acctinfo[5] }}</h5>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 bg-light">
+                            <div class="text-muted">Selected Deposits</div>
+                            <h5 id="selectedDeposits">$0.00</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 bg-light">
+                            <div class="text-muted">Selected Withdrawals</div>
+                            <h5 id="selectedWithdrawals">$0.00</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 bg-light">
+                            <div class="text-muted">Selected Net</div>
+                            <h5 id="selectedNet">$0.00</h5>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 bg-light">
+                            <div class="text-muted">Selected Lines</div>
+                            <h5 id="selectedLines">0</h5>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info" role="alert">
+                    <pre class="mb-0">{{ err }}</pre>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="dtBanking" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                        <thead class="thead-light">
+                            <tr>
+                                <th></th>
+                                <th>Date</th>
+                                <th>Recorded</th>
+                                <th>Type</th>
+                                <th>Tcode</th>
+                                <th>Source</th>
+                                <th>Ref</th>
+                                <th class="text-right">Debit</th>
+                                <th class="text-right">Credit</th>
+                                <th>Rows</th>
+                                <th>Recon</th>
+                                <th>Memo</th>
+                            </tr>
+                        </thead>
+                        <tfoot>
+                            <tr>
+                                <th></th>
+                                <th>Date</th>
+                                <th>Recorded</th>
+                                <th>Type</th>
+                                <th>Tcode</th>
+                                <th>Source</th>
+                                <th>Ref</th>
+                                <th>Debit</th>
+                                <th>Credit</th>
+                                <th>Rows</th>
+                                <th>Recon</th>
+                                <th>Memo</th>
+                            </tr>
+                        </tfoot>
+                        <tbody>
+                            {% for item in bank_rows %}
+                                <tr data-debit="{{ item.debit }}" data-credit="{{ item.credit }}">
+                                    <td class="text-center">
+                                        <input type="checkbox" name="bankgroup{{ item.index }}" value="{{ item.id_value }}" {% if item.checked %}checked{% endif %}>
+                                    </td>
+                                    <td>{% if item.date %}{{ item.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                    <td>{% if item.recorded %}{{ item.recorded.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                    <td>{{ item.type }}</td>
+                                    <td class="banking-tcode">
+                                        {{ item.tcode }}
+                                        {% if item.has_detail %}
+                                            <button type="button" class="btn btn-link btn-sm p-0 ml-1 align-baseline bank-detail-button"
+                                                    data-ids="{{ item.id_value }}">
+                                                {% if item.has_more_tcodes %}+{{ item.row_count - 1 }}{% else %}details{% endif %}
+                                            </button>
+                                        {% endif %}
+                                        {% if item.has_payment_mismatch %}
+                                            <span class="badge badge-warning ml-1">review</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.source }}</td>
+                                    <td>{{ item.ref }}</td>
+                                    <td class="text-right">{{ item.debit_fmt }}</td>
+                                    <td class="text-right">{{ item.credit_fmt }}</td>
+                                    <td class="text-center">{{ item.row_count }}</td>
+                                    <td>{{ item.reconciled if item.reconciled is not none else '' }}</td>
+                                    <td>{{ item.memo }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="modal fade" id="bankPaymentDetailModal" tabindex="-1" role="dialog" aria-labelledby="bankPaymentDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bankPaymentDetailModalLabel">Payment Detail</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="bankPaymentDetailStatus" class="text-muted">Loading...</div>
+                    <div id="bankPaymentDetailContent" class="d-none">
+                        <div class="mb-2" id="bankPaymentDetailHeader"></div>
+                        <div class="mb-2" id="bankPaymentDetailTotals"></div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped table-bordered">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>JO</th>
+                                        <th>Order ID</th>
+                                        <th>Shipper</th>
+                                        <th>Container</th>
+                                        <th class="text-right">Invoice</th>
+                                        <th class="text-right">Received</th>
+                                        <th class="text-right">Difference</th>
+                                        <th>Ref</th>
+                                        <th>Paid Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bankPaymentDetailRows"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable || !document.getElementById('dtBanking')) {
+        return;
+    }
+
+    $('#dtBanking tfoot th').each(function (index) {
+        if (index === 0) {
+            $(this).html('');
+            return;
+        }
+        var label = $(this).text();
+        $(this).html('<input type="text" class="form-control form-control-sm" placeholder="Filter ' + label + '" />');
+    });
+
+    var table = $('#dtBanking').DataTable({
+        "aaSorting": [[1, "desc"]],
+        "scrollX": true,
+        "scrollY": 650,
+        "stateSave": true,
+        "paging": false
+    });
+
+    function moneyFromCents(cents) {
+        var sign = cents < 0 ? '-' : '';
+        var dollars = Math.abs(cents) / 100;
+        return sign + '$' + dollars.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function updateSelectedTotals() {
+        var deposits = 0;
+        var withdrawals = 0;
+        var selected = 0;
+        var ledgerRows = 0;
+
+        table.rows({ search: 'applied' }).every(function () {
+            var rowNode = this.node();
+            var checkbox = $('input[type="checkbox"]', rowNode);
+            if (!checkbox.prop('checked')) {
+                return;
+            }
+            deposits += parseInt($(rowNode).data('debit'), 10) || 0;
+            withdrawals += parseInt($(rowNode).data('credit'), 10) || 0;
+            selected += 1;
+            ledgerRows += parseInt($('td:eq(9)', rowNode).text(), 10) || 0;
+        });
+
+        $('#selectedDeposits').text(moneyFromCents(deposits));
+        $('#selectedWithdrawals').text(moneyFromCents(withdrawals));
+        $('#selectedNet').text(moneyFromCents(deposits - withdrawals));
+        $('#selectedLines').text(selected + ' / ' + ledgerRows);
+    }
+
+    table.columns().every(function () {
+        var column = this;
+        $('input', column.footer()).on('keyup change clear', function () {
+            if (column.search() !== this.value) {
+                column.search(this.value).draw();
+            }
+        });
+    });
+
+    $('#dtBanking tbody').on('change', 'input[type="checkbox"]', updateSelectedTotals);
+    table.on('draw', updateSelectedTotals);
+    updateSelectedTotals();
+
+    function escapeHtml(value) {
+        return $('<div>').text(value || '').html();
+    }
+
+    $('#dtBanking tbody').on('click', '.bank-detail-button', function () {
+        var ids = $(this).data('ids');
+        $('#bankPaymentDetailStatus').text('Loading...').removeClass('d-none');
+        $('#bankPaymentDetailContent').addClass('d-none');
+        $('#bankPaymentDetailRows').empty();
+        $('#bankPaymentDetailModal').modal('show');
+
+        $.getJSON('{{ url_for("main.BankingPaymentDetail") }}', { ids: ids })
+            .done(function (data) {
+                var header = data.header || {};
+                $('#bankPaymentDetailHeader').html(
+                    '<strong>' + escapeHtml(header.date) + '</strong> ' +
+                    escapeHtml(header.source) + ' ' +
+                    escapeHtml(header.ref) + ' ' +
+                    escapeHtml(header.amount)
+                );
+
+                var diffClass = data.has_payment_mismatch ? 'text-danger' : 'text-success';
+                $('#bankPaymentDetailTotals').html(
+                    'Invoice Total: <strong>' + escapeHtml(data.invoice_total) + '</strong>' +
+                    '&nbsp; Received Total: <strong>' + escapeHtml(data.received_total) + '</strong>' +
+                    '&nbsp; Difference: <strong class="' + diffClass + '">' + escapeHtml(data.balance_total) + '</strong>'
+                );
+
+                (data.rows || []).forEach(function (detail) {
+                    var rowClass = detail.balance_cents !== 0 && !detail.manual ? ' class="table-warning"' : '';
+                    $('#bankPaymentDetailRows').append(
+                        '<tr' + rowClass + '>' +
+                        '<td>' + escapeHtml(detail.jo) + '</td>' +
+                        '<td>' + escapeHtml(detail.order_id) + '</td>' +
+                        '<td>' + escapeHtml(detail.shipper) + '</td>' +
+                        '<td>' + escapeHtml(detail.container) + '</td>' +
+                        '<td class="text-right">' + escapeHtml(detail.invoice) + '</td>' +
+                        '<td class="text-right">' + escapeHtml(detail.received) + '</td>' +
+                        '<td class="text-right">' + escapeHtml(detail.balance) + '</td>' +
+                        '<td>' + escapeHtml(detail.pay_ref) + '</td>' +
+                        '<td>' + escapeHtml(detail.paid_date) + '</td>' +
+                        '</tr>'
+                    );
+                });
+
+                $('#bankPaymentDetailStatus').addClass('d-none');
+                $('#bankPaymentDetailContent').removeClass('d-none');
+            })
+            .fail(function () {
+                $('#bankPaymentDetailStatus').text('Unable to load payment details.');
+            });
+    });
+
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+
+<style>
+.banking-tcode {
+    max-width: 8rem;
+    white-space: nowrap;
+}
+.banking-tcode-list {
+    white-space: normal;
+    word-break: break-word;
+}
+</style>
+{% endblock %}

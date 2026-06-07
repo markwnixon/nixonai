@@ -1,0 +1,347 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Payroll Batches</h2>
+            <p class="text-muted">Record payroll runs with gross wages, employer payroll taxes, and the two bank withdrawals shown on the statement.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.PayrollBatches') }}" method="post">
+        <div class="row">
+            <div class="col-lg-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>Payroll Batch</h5>
+                    <div class="form-group">
+                        <label for="pay_date">Pay Date</label>
+                        <input type="date" class="form-control" id="pay_date" name="pay_date" value="{{ selected.pay_date }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="provider">Payroll Provider</label>
+                        <input type="text" class="form-control" id="provider" name="provider" value="{{ selected.provider }}" placeholder="Payroll service or source">
+                    </div>
+                    <div class="form-group">
+                        <label for="ref">Reference</label>
+                        <input type="text" class="form-control" id="ref" name="ref" value="{{ selected.ref }}" placeholder="ACH, payroll id, or memo">
+                    </div>
+                    <div class="form-group">
+                        <label for="bank_account">Bank Account</label>
+                        <select class="form-control" id="bank_account" name="bank_account">
+                            {% for account in bank_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.bank_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="wage_account">Gross Wages Expense Account</label>
+                        <select class="form-control" id="wage_account" name="wage_account">
+                            {% for account in expense_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.wage_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Default for blank/new payroll rows. Each person can override this below.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="tax_account">Employer Payroll Tax Expense Account</label>
+                        <select class="form-control" id="tax_account" name="tax_account">
+                            {% for account in expense_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.tax_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <hr>
+                    <h6>Add Person to Payroll</h6>
+                    <div class="form-group">
+                        <label for="new_person_name">Person Name</label>
+                        <input type="text" class="form-control" id="new_person_name" name="new_person_name" value="">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_person_account">Default Gross Pay Expense Account</label>
+                        <select class="form-control" id="new_person_account" name="new_person_account">
+                            {% for account in expense_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.wage_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="new_person_tax_account">Default Tax Expense Account</label>
+                        <select class="form-control" id="new_person_tax_account" name="new_person_tax_account">
+                            {% for account in expense_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.tax_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" name="add_payroll_person" value="1" class="btn btn-outline-primary btn-block">
+                        Add / Update Person
+                    </button>
+                    <hr>
+                    <h6>Payroll Roster</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th></th>
+                                    <th>Person</th>
+                                    <th>Gross Pay Account</th>
+                                    <th>Tax Account</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for person in payroll_people %}
+                                    <tr>
+                                        <td class="text-center">
+                                            <input type="checkbox" name="roster_select" value="{{ person.id }}">
+                                            <input type="hidden" name="roster_person_id[]" value="{{ person.id }}">
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm" name="roster_person_name[]" value="{{ person.display_name }}">
+                                        </td>
+                                        <td>
+                                            <select class="form-control form-control-sm" name="roster_person_account[]">
+                                                {% for account in expense_accounts %}
+                                                    <option value="{{ account.Name }}" {% if person.default_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-control form-control-sm" name="roster_person_tax_account[]">
+                                                {% for account in expense_accounts %}
+                                                    <option value="{{ account.Name }}" {% if person.default_tax_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="submit" name="update_payroll_roster" value="1" class="btn btn-primary btn-sm">
+                        Save Roster
+                    </button>
+                    <button type="submit" name="deactivate_payroll_people" value="1" class="btn btn-outline-danger btn-sm"
+                            onclick="return confirm('Deactivate selected payroll roster people?');">
+                        Deactivate Selected
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-5 mb-3">
+                <div class="border rounded p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">People</h5>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="addPayrollPerson">Add Person</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered" id="payrollPeopleTable">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Employee / Person</th>
+                                    <th>Gross Pay Account</th>
+                                    <th>Tax Account</th>
+                                    <th class="text-right">Gross</th>
+                                    <th class="text-right">Net</th>
+                                    <th class="text-right">Company Tax</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in people_rows %}
+                                    <tr>
+                                        <td>
+                                            <select class="form-control form-control-sm payroll-person-select" name="employee[]">
+                                                <option value=""></option>
+                                                {% for person in payroll_people %}
+                                                    <option value="{{ person.display_name }}" {% if row.employee == person.display_name %}selected{% endif %}>{{ person.display_name }}</option>
+                                                {% endfor %}
+                                                {% if row.employee and row.employee not in person_account_defaults %}
+                                                    <option value="{{ row.employee }}" selected>{{ row.employee }}</option>
+                                                {% endif %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-control form-control-sm payroll-account-select" name="wage_account[]">
+                                                {% for account in expense_accounts %}
+                                                    <option value="{{ account.Name }}" {% if row.wage_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="form-control form-control-sm payroll-tax-account-select" name="tax_account[]">
+                                                {% for account in expense_accounts %}
+                                                    <option value="{{ account.Name }}" {% if row.tax_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td><input type="text" class="form-control form-control-sm text-right payroll-amount" name="gross_pay[]" value="{{ row.gross_pay }}" placeholder="0.00"></td>
+                                        <td><input type="text" class="form-control form-control-sm text-right payroll-amount" name="net_pay[]" value="{{ row.net_pay }}" placeholder="0.00"></td>
+                                        <td><input type="text" class="form-control form-control-sm text-right payroll-amount" name="employer_tax[]" value="{{ row.employer_tax }}" placeholder="0.00"></td>
+                                        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-payroll-person">X</button></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="form-group">
+                        <label for="tax_withdrawal">Payroll Tax Bank Withdrawal</label>
+                        <input type="text" class="form-control payroll-amount" id="tax_withdrawal" name="tax_withdrawal" value="{{ selected.tax_withdrawal }}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="memo">Memo</label>
+                        <textarea class="form-control" id="memo" name="memo" rows="3">{{ selected.memo }}</textarea>
+                    </div>
+                    <button type="submit" name="preview_payroll" value="1" class="btn btn-primary btn-block">
+                        Preview Payroll Batch
+                    </button>
+                    <button type="submit" name="record_payroll" value="1" class="btn btn-success btn-block"
+                            onclick="return confirm('Record this payroll batch to the general ledger?');">
+                        Record Payroll Batch
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-3 mb-3">
+                <div class="alert alert-info" role="alert">
+                    <pre class="mb-0">{{ err }}</pre>
+                </div>
+                <div class="border rounded p-3">
+                    <h5>Batch Check</h5>
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr>
+                                <th>Employee Withholding</th>
+                                <td class="text-right">{{ summary.employee_withholding }}</td>
+                            </tr>
+                            <tr>
+                                <th>Expected Tax Withdrawal</th>
+                                <td class="text-right">{{ summary.expected_tax_withdrawal }}</td>
+                            </tr>
+                            <tr>
+                                <th>Actual Tax Withdrawal Difference</th>
+                                <td class="text-right">{{ summary.tax_difference }}</td>
+                            </tr>
+                            <tr>
+                                <th>Debit Total</th>
+                                <td class="text-right">{{ summary.debit_total }}</td>
+                            </tr>
+                            <tr>
+                                <th>Credit Total</th>
+                                <td class="text-right">{{ summary.credit_total }}</td>
+                            </tr>
+                            <tr class="{% if summary.balanced %}table-success{% else %}table-warning{% endif %}">
+                                <th>Balance Difference</th>
+                                <td class="text-right">{{ summary.balance_difference }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <hr>
+    <h5>Recent Payroll Batches</h5>
+    <div class="table-responsive">
+        <table id="dtPayrollBatches" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Tcode</th>
+                    <th>Journal</th>
+                    <th>People</th>
+                    <th>Memo</th>
+                    <th class="text-right">Gross</th>
+                    <th class="text-right">Employer Tax</th>
+                    <th class="text-right">Net Withdrawal</th>
+                    <th class="text-right">Tax Withdrawal</th>
+                    <th class="text-right">Bank Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in recent_batches %}
+                    <tr>
+                        <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                        <td>{{ batch.tcode }}</td>
+                        <td>{{ batch.journal_id }}</td>
+                        <td title="{{ batch.people_text }}">{{ batch.people_count }}</td>
+                        <td>{{ batch.memo }}</td>
+                        <td class="text-right">{{ batch.gross_fmt }}</td>
+                        <td class="text-right">{{ batch.employer_tax_fmt }}</td>
+                        <td class="text-right">{{ batch.net_fmt }}</td>
+                        <td class="text-right">{{ batch.tax_withdrawal_fmt }}</td>
+                        <td class="text-right">{{ batch.bank_total_fmt }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var personAccountDefaults = {{ person_account_defaults|tojson }};
+    var personTaxAccountDefaults = {{ person_tax_account_defaults|tojson }};
+    var defaultWageAccount = {{ selected.wage_account|tojson }};
+    var defaultTaxAccount = {{ selected.tax_account|tojson }};
+    var personOptions = '<option value=""></option>';
+    {% for person in payroll_people %}
+        personOptions += '<option value="{{ person.display_name|e }}">{{ person.display_name|e }}</option>';
+    {% endfor %}
+    var accountOptions = '';
+    {% for account in expense_accounts %}
+        accountOptions += '<option value="{{ account.Name|e }}">{{ account.Name|e }}</option>';
+    {% endfor %}
+
+    function applyPersonDefault(row) {
+        var personName = row.find('.payroll-person-select').val();
+        var accountName = personAccountDefaults[personName] || defaultWageAccount;
+        var taxAccountName = personTaxAccountDefaults[personName] || defaultTaxAccount;
+        row.find('.payroll-account-select').val(accountName);
+        row.find('.payroll-tax-account-select').val(taxAccountName);
+    }
+
+    function bindRemoveButtons() {
+        $('.remove-payroll-person').off('click').on('click', function () {
+            var tbody = $('#payrollPeopleTable tbody');
+            if (tbody.find('tr').length > 1) {
+                $(this).closest('tr').remove();
+            } else {
+                $(this).closest('tr').find('input').val('');
+            }
+        });
+        $('.payroll-person-select').off('change').on('change', function () {
+            applyPersonDefault($(this).closest('tr'));
+        });
+    }
+
+    $('#addPayrollPerson').on('click', function () {
+        $('#payrollPeopleTable tbody').append(
+            '<tr>' +
+            '<td><select class="form-control form-control-sm payroll-person-select" name="employee[]">' + personOptions + '</select></td>' +
+            '<td><select class="form-control form-control-sm payroll-account-select" name="wage_account[]">' + accountOptions + '</select></td>' +
+            '<td><select class="form-control form-control-sm payroll-tax-account-select" name="tax_account[]">' + accountOptions + '</select></td>' +
+            '<td><input type="text" class="form-control form-control-sm text-right payroll-amount" name="gross_pay[]" value="" placeholder="0.00"></td>' +
+            '<td><input type="text" class="form-control form-control-sm text-right payroll-amount" name="net_pay[]" value="" placeholder="0.00"></td>' +
+            '<td><input type="text" class="form-control form-control-sm text-right payroll-amount" name="employer_tax[]" value="" placeholder="0.00"></td>' +
+            '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-payroll-person">X</button></td>' +
+            '</tr>'
+        );
+        bindRemoveButtons();
+    });
+    bindRemoveButtons();
+
+    if (!window.jQuery || !$.fn.DataTable || !document.getElementById('dtPayrollBatches')) {
+        return;
+    }
+    $('#dtPayrollBatches').DataTable({
+        "aaSorting": [[0, "desc"]],
+        "scrollX": true,
+        "scrollY": 350,
+        "stateSave": true,
+        "paging": false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}

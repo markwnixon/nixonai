@@ -1,0 +1,219 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Income & Expense Review</h2>
+            <p class="text-muted">Read-only review from the general ledger income and expense accounts.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.IncomeExpenseReview') }}" method="get" class="mb-3">
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-2">
+                <label for="preset">Period</label>
+                <select class="form-control form-control-sm" id="preset" name="preset">
+                    <option value="this_year" {% if filters.preset == 'this_year' %}selected{% endif %}>This Year</option>
+                    <option value="this_month" {% if filters.preset == 'this_month' %}selected{% endif %}>This Month</option>
+                    <option value="last_month" {% if filters.preset == 'last_month' %}selected{% endif %}>Last Month</option>
+                    <option value="last_year" {% if filters.preset == 'last_year' %}selected{% endif %}>Last Year</option>
+                    <option value="custom" {% if filters.preset == 'custom' %}selected{% endif %}>Custom</option>
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="date_from">From</label>
+                <input type="date" class="form-control form-control-sm" id="date_from" name="date_from" value="{{ filters.date_from }}">
+            </div>
+            <div class="form-group col-md-2">
+                <label for="date_to">To</label>
+                <input type="date" class="form-control form-control-sm" id="date_to" name="date_to" value="{{ filters.date_to }}">
+            </div>
+            <div class="form-group col-md-2">
+                <label for="com">Company</label>
+                <select class="form-control form-control-sm" id="com" name="com">
+                    <option value="">All</option>
+                    {% for company in companies %}
+                        <option value="{{ company }}" {% if filters.com == company %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="account_type">Account Type</label>
+                <select class="form-control form-control-sm" id="account_type" name="account_type">
+                    <option value="all" {% if filters.account_type == 'all' %}selected{% endif %}>Income & Expense</option>
+                    <option value="Income" {% if filters.account_type == 'Income' %}selected{% endif %}>Income Only</option>
+                    <option value="Expense" {% if filters.account_type == 'Expense' %}selected{% endif %}>Expense Only</option>
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm btn-block">Apply</button>
+                <div class="btn-group btn-block mt-1" role="group">
+                    <button type="submit" name="export" value="xlsx" class="btn btn-outline-success btn-sm">Excel</button>
+                    <button type="submit" name="export" value="pdf" class="btn btn-outline-secondary btn-sm">PDF</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row mb-3">
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Income</div>
+                <h4>{{ totals.income }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Expenses</div>
+                <h4>{{ totals.expenses }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3 {% if totals.net_income_positive %}border-success{% else %}border-danger{% endif %}">
+                <div class="text-muted">Net Income</div>
+                <h4>{{ totals.net_income }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Rows / Accounts</div>
+                <h4>{{ totals.row_count }} / {{ totals.account_count }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <h5>Summary By Category</h5>
+    <div class="table-responsive mb-4">
+        <table id="dtIncomeExpenseCategory" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Subcategory</th>
+                    <th class="text-right">Debits</th>
+                    <th class="text-right">Credits</th>
+                    <th class="text-right">Net</th>
+                    <th class="text-right">Accounts</th>
+                    <th class="text-right">Rows</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in category_summaries %}
+                    <tr>
+                        <td>{{ item.type }}</td>
+                        <td>{{ item.category }}</td>
+                        <td>{{ item.subcategory }}</td>
+                        <td class="text-right">{{ item.debit_fmt }}</td>
+                        <td class="text-right">{{ item.credit_fmt }}</td>
+                        <td class="text-right">{{ item.net_fmt }}</td>
+                        <td class="text-right">{{ item.accounts }}</td>
+                        <td class="text-right">{{ item.rows }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Summary By Account</h5>
+    <div class="table-responsive mb-4">
+        <table id="dtIncomeExpenseSummary" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Type</th>
+                    <th>Account</th>
+                    <th>Category</th>
+                    <th>Subcategory</th>
+                    <th class="text-right">Debits</th>
+                    <th class="text-right">Credits</th>
+                    <th class="text-right">Net</th>
+                    <th class="text-right">Rows</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in account_summaries %}
+                    <tr>
+                        <td>{{ item.type }}</td>
+                        <td>{{ item.account }}</td>
+                        <td>{{ item.category }}</td>
+                        <td>{{ item.subcategory }}</td>
+                        <td class="text-right">{{ item.debit_fmt }}</td>
+                        <td class="text-right">{{ item.credit_fmt }}</td>
+                        <td class="text-right">{{ item.net_fmt }}</td>
+                        <td class="text-right">{{ item.rows }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Ledger Detail</h5>
+    <div class="table-responsive">
+        <table id="dtIncomeExpenseDetail" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Account</th>
+                    <th>Source</th>
+                    <th>Ref</th>
+                    <th>Tcode</th>
+                    <th>Journal</th>
+                    <th>Memo</th>
+                    <th class="text-right">Debit</th>
+                    <th class="text-right">Credit</th>
+                    <th class="text-right">Net</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                    <tr>
+                        <td>{% if entry.Date %}{{ entry.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                        <td>{{ entry.account_type }}</td>
+                        <td>{{ entry.Account }}</td>
+                        <td>{{ entry.Source or '' }}</td>
+                        <td>{{ entry.Ref or '' }}</td>
+                        <td>{{ entry.Tcode or '' }}</td>
+                        <td>{{ entry.JournalId or '' }}</td>
+                        <td>{{ entry.JournalMemo or '' }}</td>
+                        <td class="text-right">{{ entry.debit_fmt }}</td>
+                        <td class="text-right">{{ entry.credit_fmt }}</td>
+                        <td class="text-right">{{ entry.net_fmt }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable) {
+        return;
+    }
+    if (document.getElementById('dtIncomeExpenseCategory')) {
+        $('#dtIncomeExpenseCategory').DataTable({
+            "aaSorting": [[0, "asc"], [1, "asc"], [2, "asc"]],
+            "scrollX": true,
+            "paging": false
+        });
+    }
+    if (document.getElementById('dtIncomeExpenseSummary')) {
+        $('#dtIncomeExpenseSummary').DataTable({
+            "aaSorting": [[0, "asc"], [1, "asc"]],
+            "scrollX": true,
+            "paging": false
+        });
+    }
+    if (document.getElementById('dtIncomeExpenseDetail')) {
+        $('#dtIncomeExpenseDetail').DataTable({
+            "aaSorting": [[0, "desc"]],
+            "scrollX": true,
+            "scrollY": 500,
+            "paging": false
+        });
+    }
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}

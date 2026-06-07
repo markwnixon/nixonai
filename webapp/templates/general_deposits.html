@@ -1,0 +1,139 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>General Deposits</h2>
+            <p class="text-muted">Record bank deposits that are not tied to trucking invoices.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.GeneralDeposits') }}" method="post">
+        <input type="hidden" name="edit_journal" value="{{ selected.edit_journal }}">
+        <div class="row">
+            <div class="col-lg-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>{% if selected.edit_journal %}Edit Deposit{% else %}Deposit Entry{% endif %}</h5>
+                    {% if selected.edit_journal %}
+                        <div class="alert alert-warning py-2">Editing {{ selected.edit_journal }}</div>
+                    {% endif %}
+                    <div class="form-group">
+                        <label for="deposit_date">Deposit Date</label>
+                        <input type="date" class="form-control" id="deposit_date" name="deposit_date" value="{{ selected.deposit_date }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="bank_account">Bank Account</label>
+                        <select class="form-control" id="bank_account" name="bank_account">
+                            {% for account in bank_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.bank_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="credit_account">Credit Account</label>
+                        <select class="form-control" id="credit_account" name="credit_account">
+                            {% for account in credit_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.credit_account == account.Name %}selected{% endif %}>{{ account.Name }} ({{ account.Type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Amount</label>
+                        <input type="text" class="form-control" id="amount" name="amount" value="{{ selected.amount }}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="source">Source</label>
+                        <input type="text" class="form-control" id="source" name="source" value="{{ selected.source }}" placeholder="Owner, customer, or source name">
+                    </div>
+                    <div class="form-group">
+                        <label for="ref">Reference</label>
+                        <input type="text" class="form-control" id="ref" name="ref" value="{{ selected.ref }}" placeholder="ACH, wire, check, PayCargo, note">
+                    </div>
+                    <div class="form-group">
+                        <label for="memo">Memo</label>
+                        <textarea class="form-control" id="memo" name="memo" rows="3">{{ selected.memo }}</textarea>
+                    </div>
+                    {% if selected.edit_journal %}
+                        <button type="submit" name="save_deposit" value="1" class="btn btn-primary btn-block"
+                                onclick="return confirm('Save changes to this general deposit journal?');">
+                            Save Changes
+                        </button>
+                        <a class="btn btn-outline-secondary btn-block" href="{{ url_for('main.GeneralDeposits') }}">Cancel Edit</a>
+                    {% else %}
+                        <button type="submit" name="create_deposit" value="1" class="btn btn-success btn-block"
+                                onclick="return confirm('Record this general deposit to the general ledger?');">
+                            Record Deposit
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="alert alert-info" role="alert">
+                    <pre class="mb-0">{{ err }}</pre>
+                </div>
+
+                <h5>Recent General Deposits</h5>
+                <button type="submit" name="load_deposit" value="1" class="btn btn-primary btn-sm mb-2">
+                    Edit Selected
+                </button>
+                <button type="submit" name="delete_deposits" value="1" class="btn btn-danger btn-sm mb-2"
+                        onclick="return confirm('Delete the selected general deposit journal entries from the general ledger?');">
+                    Undo Selected
+                </button>
+                <div class="table-responsive">
+                    <table id="dtGeneralDeposits" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                        <thead class="thead-light">
+                            <tr>
+                                <th></th>
+                                <th>Date</th>
+                                <th>Tcode</th>
+                                <th>Bank</th>
+                                <th>Deposit Type</th>
+                                <th>Source</th>
+                                <th>Ref</th>
+                                <th class="text-right">Amount</th>
+                                <th>Memo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in recent_deposits %}
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" name="deposit_journal" value="{{ item.JournalId }}">
+                                    </td>
+                                    <td>{% if item.Date %}{{ item.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                    <td>{{ item.Tcode }}</td>
+                                    <td>{{ item.Account }}</td>
+                                    <td>{{ item.deposit_type }}</td>
+                                    <td>{{ item.Source }}</td>
+                                    <td>{{ item.Ref or '' }}</td>
+                                    <td class="text-right">{{ item.amount_fmt }}</td>
+                                    <td>{{ item.JournalMemo or '' }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable || !document.getElementById('dtGeneralDeposits')) {
+        return;
+    }
+    $('#dtGeneralDeposits').DataTable({
+        "aaSorting": [[1, "desc"]],
+        "scrollX": true,
+        "scrollY": 500,
+        "stateSave": true,
+        "paging": false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}
