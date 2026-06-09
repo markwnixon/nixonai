@@ -1319,6 +1319,9 @@ def BankingPaymentDetail():
         income = Deposits.query.filter(Deposits.Jo == ledger_line.Tcode).first()
         invoice = Invoices.query.filter(Invoices.Jo == ledger_line.Tcode).first()
         is_manual = ledger_line.SourceTable == 'ManualDeposit'
+        original_payment = None
+        if ledger_line.SourceTable == 'CounterDepositItem' and ledger_line.SourceId:
+            original_payment = Gledger.query.get(ledger_line.SourceId)
         invo_cents = 0 if is_manual else cents_from_value(invoice.Total if invoice is not None else (order.InvoTotal if order is not None else 0))
         received_cents = ledger_line.Debit or 0
         balance_cents = 0 if is_manual else invo_cents - received_cents
@@ -1335,8 +1338,8 @@ def BankingPaymentDetail():
             'received': money(received_cents),
             'balance': '' if is_manual else money(balance_cents),
             'balance_cents': balance_cents,
-            'pay_ref': income.Ref if income is not None else ledger_line.Ref,
-            'paid_date': income.Date.strftime('%Y-%m-%d') if income is not None and income.Date is not None else (ledger_line.Date.strftime('%Y-%m-%d') if ledger_line.Date is not None else ''),
+            'pay_ref': original_payment.Ref if original_payment is not None else (income.Ref if income is not None else ledger_line.Ref),
+            'paid_date': original_payment.Date.strftime('%Y-%m-%d') if original_payment is not None and original_payment.Date is not None else (income.Date.strftime('%Y-%m-%d') if income is not None and income.Date is not None else (ledger_line.Date.strftime('%Y-%m-%d') if ledger_line.Date is not None else '')),
             'manual': is_manual,
         })
 
@@ -1391,6 +1394,134 @@ def ReceiveByAccount():
             return int(round(float(str(value).replace('$', '').replace(',', '').strip()) * 100))
         except:
             return 0
+
+    def selected_payment_ledger_ids():
+        ids = []
+        for selected in request.values.getlist('payment_batch'):
+            for row_id in selected.split(','):
+                try:
+                    ids.append(int(row_id))
+                except:
+                    pass
+        return ids
+
+    def create_counter_deposit(err_list):
+        payment_ids = selected_payment_ledger_ids()
+        if not payment_ids:
+            err_list.append('Select one or more received check batches for the counter deposit.')
+            return err_list
+
+        bank_account_name = request.values.get('counter_deposit_account')
+        deposit_date = request.values.get('counter_deposit_date')
+        deposit_ref = (request.values.get('counter_deposit_ref') or '').strip()
+        try:
+            deposit_date_value = datetime.datetime.strptime(deposit_date, '%Y-%m-%d')
+        except:
+            err_list.append('Counter deposit date is invalid.')
+            return err_list
+        if not bank_account_name:
+            err_list.append('Choose the bank account for the counter deposit.')
+            return err_list
+        if not deposit_ref:
+            err_list.append('Enter a counter deposit reference number.')
+            return err_list
+
+        bank_account = Accounts.query.filter(
+            (Accounts.Name == bank_account_name) &
+            (Accounts.Co == cmpdata[10])
+        ).first()
+        undeposited_account = Accounts.query.filter(
+            (Accounts.Name == 'Undeposited Funds') &
+            (Accounts.Co == cmpdata[10])
+        ).first()
+        if bank_account is None or undeposited_account is None:
+            err_list.append('Required bank or undeposited-funds account could not be found.')
+            return err_list
+
+        payment_rows = Gledger.query.filter(
+            (Gledger.id.in_(payment_ids)) &
+            (Gledger.Type == 'ID') &
+            (Gledger.Account == 'Undeposited Funds') &
+            (Gledger.Com == cmpdata[10])
+        ).order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
+        if not payment_rows:
+            err_list.append('Selected rows do not include undeposited check payments.')
+            return err_list
+
+        already_deposited = Gledger.query.filter(
+            (Gledger.SourceTable == 'CounterDepositItem') &
+            (Gledger.SourceId.in_([row.id for row in payment_rows])) &
+            (Gledger.Type == 'XD')
+        ).first()
+        if already_deposited is not None:
+            err_list.append('At least one selected check is already assigned to a counter deposit.')
+            return err_list
+
+        recorded = datetime.datetime.now()
+        journal_id = f'CD-{cmpdata[10]}-{deposit_ref}'
+        total_amount = 0
+        for seq, row in enumerate(payment_rows, start=1):
+            amount = row.Debit or 0
+            if amount <= 0:
+                continue
+            total_amount += amount
+            memo = f'Counter deposit {deposit_ref}; original check {row.Ref or ""}'.strip()
+
+            bank_line = Gledger(
+                Debit=amount,
+                Credit=0,
+                Account=bank_account.Name,
+                Aid=bank_account.id,
+                Source='Counter Deposit',
+                Sid=row.Sid,
+                Type='XD',
+                Tcode=row.Tcode,
+                Com=cmpdata[10],
+                Recorded=recorded,
+                Reconciled=0,
+                Date=deposit_date_value,
+                Ref=deposit_ref,
+                JournalId=journal_id,
+                JournalSeq=seq * 2 - 1,
+                JournalMemo=memo,
+                PostedBy='receive_by_account',
+                PostedAt=recorded,
+                SourceTable='CounterDepositItem',
+                SourceId=row.id,
+            )
+            db.session.add(bank_line)
+
+            clearing_line = Gledger(
+                Debit=0,
+                Credit=amount,
+                Account='Undeposited Funds',
+                Aid=undeposited_account.id,
+                Source='Counter Deposit',
+                Sid=row.Sid,
+                Type='XC',
+                Tcode=row.Tcode,
+                Com=cmpdata[10],
+                Recorded=recorded,
+                Reconciled=0,
+                Date=deposit_date_value,
+                Ref=deposit_ref,
+                JournalId=journal_id,
+                JournalSeq=seq * 2,
+                JournalMemo=memo,
+                PostedBy='receive_by_account',
+                PostedAt=recorded,
+                SourceTable='CounterDepositItem',
+                SourceId=row.id,
+            )
+            db.session.add(clearing_line)
+
+        if total_amount <= 0:
+            err_list.append('Counter deposit total is zero.')
+            return err_list
+
+        db.session.commit()
+        err_list.append(f'Counter deposit {deposit_ref} posted to {bank_account.Name} for ${total_amount / 100:,.2f}.')
+        return err_list
 
     def refresh_order_payment_status(order):
         payment_rows = Gledger.query.filter(
@@ -1748,7 +1879,9 @@ def ReceiveByAccount():
     else:
         completed, err_list, holdvec = ReceiveByAccount_task([], [''] * 150, 0)
 
-    if request.values.get('reload_batch') is not None:
+    if request.values.get('create_counter_deposit') is not None:
+        err_list = create_counter_deposit(err_list)
+    elif request.values.get('reload_batch') is not None:
         holdvec, err_list = reload_receive_batch(holdvec, request.values.getlist('payment_batch'), err_list)
     elif is_reloaded_batch and not is_reloaded_record:
         holdvec, err_list = reload_receive_batch(
@@ -1767,6 +1900,11 @@ def ReceiveByAccount():
     ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
 
     for row in rows:
+        counter_deposit = Gledger.query.filter(
+            (Gledger.SourceTable == 'CounterDepositItem') &
+            (Gledger.SourceId == row.id) &
+            (Gledger.Type == 'XD')
+        ).first()
         key = (
             row.Date.strftime('%Y-%m-%d') if row.Date else '',
             row.Source or '',
@@ -1783,10 +1921,19 @@ def ReceiveByAccount():
             'ids': [],
             'amount': 0,
             'count': 0,
+            'deposited': False,
+            'deposit_ref': '',
+            'deposit_account': '',
+            'deposit_date': None,
         })
         group['ids'].append(row.id)
         group['amount'] += row.Debit or 0
         group['count'] += 1
+        if counter_deposit is not None:
+            group['deposited'] = True
+            group['deposit_ref'] = counter_deposit.Ref or ''
+            group['deposit_account'] = counter_deposit.Account or ''
+            group['deposit_date'] = counter_deposit.Date
 
     recent_batches = sorted(
         payment_groups.values(),
@@ -1796,6 +1943,12 @@ def ReceiveByAccount():
     for batch in recent_batches:
         batch['id_value'] = ','.join(str(row_id) for row_id in batch['ids'])
         batch['amount_fmt'] = "${:,.2f}".format(batch['amount'] / 100)
+        batch['deposit_date_fmt'] = batch['deposit_date'].strftime('%Y-%m-%d') if batch['deposit_date'] else ''
+
+    counter_deposit_accounts = Accounts.query.filter(
+        (Accounts.Type == 'Bank') &
+        (Accounts.Co == cmpdata[10])
+    ).order_by(Accounts.Name.asc()).all()
 
     return render_template(
         'receive_by_account.html',
@@ -1807,6 +1960,8 @@ def ReceiveByAccount():
         recent_batches=recent_batches,
         batch_lookback=batch_lookback,
         batch_options=batch_options,
+        counter_deposit_accounts=counter_deposit_accounts,
+        today_value=datetime.date.today().strftime('%Y-%m-%d'),
     )
 
 

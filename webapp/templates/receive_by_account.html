@@ -46,6 +46,35 @@
                 </button>
             </div>
         </div>
+
+        <div class="border rounded p-3 mb-3 bg-light">
+            <h6>Counter Deposit</h6>
+            <div class="row">
+                <div class="col-md-3 mb-2">
+                    <label class="small mb-1" for="counter_deposit_date">Deposit Date</label>
+                    <input type="date" class="form-control form-control-sm" id="counter_deposit_date" name="counter_deposit_date" value="{{ today_value }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="small mb-1" for="counter_deposit_ref">Deposit Reference</label>
+                    <input type="text" class="form-control form-control-sm" id="counter_deposit_ref" name="counter_deposit_ref" placeholder="Bank deposit number">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="small mb-1" for="counter_deposit_account">Bank Account</label>
+                    <select class="form-control form-control-sm" id="counter_deposit_account" name="counter_deposit_account">
+                        <option value="" selected>Choose Bank Account</option>
+                        {% for account in counter_deposit_accounts %}
+                            <option value="{{ account.Name }}">{{ account.Name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-sm btn-success btn-block" name="create_counter_deposit">
+                        Create Counter Deposit
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="table-responsive">
             <table id="dtReceiveBatches" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
                 <thead class="thead-light">
@@ -58,6 +87,7 @@
                         <th>Type</th>
                         <th class="text-right">Amount</th>
                         <th>Rows</th>
+                        <th>Counter Deposit</th>
                         <th>Review</th>
                     </tr>
                 </thead>
@@ -65,7 +95,8 @@
                     {% for batch in recent_batches %}
                         <tr>
                             <td class="text-center">
-                                <input type="checkbox" name="payment_batch" value="{{ batch.id_value }}">
+                                <input type="checkbox" name="payment_batch" value="{{ batch.id_value }}"
+                                       {% if batch.deposited or batch.account != 'Undeposited Funds' or batch.type != 'ID' %}disabled{% endif %}>
                             </td>
                             <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
                             <td>{{ batch.source }}</td>
@@ -74,6 +105,15 @@
                             <td>{{ batch.type }}</td>
                             <td class="text-right">{{ batch.amount_fmt }}</td>
                             <td class="text-center">{{ batch.count }}</td>
+                            <td>
+                                {% if batch.deposited %}
+                                    {{ batch.deposit_ref }} {{ batch.deposit_account }} {{ batch.deposit_date_fmt }}
+                                {% elif batch.account == 'Undeposited Funds' and batch.type == 'ID' %}
+                                    Ready
+                                {% else %}
+                                    Not check deposit
+                                {% endif %}
+                            </td>
                             <td>
                                 <button type="button" class="btn btn-link btn-sm p-0 receive-detail-button" data-ids="{{ batch.id_value }}">
                                     details

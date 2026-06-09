@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Income, Accounts, users, JO, Gledger, Reconciliations
+from webapp.models import Income, Accounts, users, JO, Gledger, Reconciliations, Orders
 from flask import session, logging, request
 import datetime
 import calendar
@@ -30,6 +30,30 @@ def parse_money(value):
         return float(str(value).replace('$', '').replace(',', '').strip())
     except:
         return 0.00
+
+def mark_reconciled_payment_jobs(ledger_ids):
+    updated = 0
+    for ledger_id in ledger_ids:
+        ledger_line = Gledger.query.get(ledger_id)
+        if ledger_line is None or ledger_line.Type not in ['DD', 'XD']:
+            continue
+        if ledger_line.SourceTable == 'ManualDeposit':
+            continue
+        if not ledger_line.Tcode:
+            continue
+        order = Orders.query.filter(Orders.Jo == ledger_line.Tcode).first()
+        if order is None:
+            continue
+        if order.Istat not in [5, 8, 9]:
+            continue
+        if parse_money(order.BalDue) > .01:
+            continue
+        if order.Istat != 9:
+            order.Istat = 9
+            updated += 1
+    if updated:
+        db.session.commit()
+    return updated
 
 def latest_reconciliation(bankacct):
     return Reconciliations.query.filter(
@@ -474,6 +498,7 @@ def isoBank():
 
                 if finalize is not None:
                     reset_trial(recmo, acname)
+                    reconciled_jobs = mark_reconciled_payment_jobs(odervec)
                     hv[1] = [0]
                     rdat = Reconciliations.query.filter((Reconciliations.Rdate == hv[0]) & (Reconciliations.Account == acname)).first()
                     try:
@@ -503,6 +528,8 @@ def isoBank():
                         rdat.Diff = acctinfo[5]
                         db.session.commit()
                     err.append(f'Reconciliation data saved for Account {acname} Date: {hv[0]}')
+                    if reconciled_jobs:
+                        err.append(f'Marked {reconciled_jobs} paid job(s) as bank reconciled')
 
             else:
                 err.append('No items checked for reconciliation')

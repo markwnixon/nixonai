@@ -2584,9 +2584,9 @@ def get_dbdata(table_setup, tfilters):
                 elif itest == 'Unsent':
                     pfilter = f'({table}.Istat == None)  | ({table}.Istat < 3)'
                 elif itest == 'Unpaid':
-                    pfilter = f'{table}.Istat != 5'
+                    pfilter = f'{table}.Istat.notin_([5, 8, 9])'
                 elif itest == 'InvoSummaries':
-                    pfilter = f'{table}.Istat > 5'
+                    pfilter = f'{table}.Istat.in_([6, 7, 8])'
                 query_adds.append(pfilter)
 
         # Determine if haul filter applies to query:
