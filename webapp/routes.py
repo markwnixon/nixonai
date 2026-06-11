@@ -1360,17 +1360,26 @@ def ReceiveByAccount():
     from webapp.class8_tasks import ReceiveByAccount_task
     from webapp.viewfuncs import d2s
 
-    def receive_batch_lookback():
-        options = [
-            ('30', 'Last 30 Days'),
-            ('90', 'Last 90 Days'),
-            ('365', 'One Year'),
-        ]
-        selected = request.values.get('batch_lookback', '30')
-        allowed = dict(options)
-        if selected not in allowed:
-            selected = '30'
-        return selected, int(selected), options
+    def receive_batch_date_range():
+        today = datetime.date.today()
+        default_start = today - datetime.timedelta(days=30)
+        start_text = request.values.get('batch_start_date') or default_start.strftime('%Y-%m-%d')
+        end_text = request.values.get('batch_end_date') or today.strftime('%Y-%m-%d')
+        try:
+            start_date = datetime.datetime.strptime(start_text, '%Y-%m-%d')
+        except:
+            start_date = datetime.datetime.combine(default_start, datetime.time.min)
+            start_text = default_start.strftime('%Y-%m-%d')
+        try:
+            end_date = datetime.datetime.strptime(end_text, '%Y-%m-%d')
+        except:
+            end_date = datetime.datetime.combine(today, datetime.time.min)
+            end_text = today.strftime('%Y-%m-%d')
+        if end_date < start_date:
+            start_date, end_date = end_date, start_date
+            start_text, end_text = end_text, start_text
+        end_exclusive = end_date + datetime.timedelta(days=1)
+        return start_text, end_text, start_date, end_exclusive
 
     def receive_order_stopdate():
         lookbacktime = request.values.get('lookbacktime')
@@ -1446,6 +1455,9 @@ def ReceiveByAccount():
         ).order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
         if not payment_rows:
             err_list.append('Selected rows do not include undeposited check payments.')
+            return err_list
+        if len({row.id for row in payment_rows}) != len(set(payment_ids)):
+            err_list.append('Only undeposited check payment batches can be included in a counter deposit.')
             return err_list
 
         already_deposited = Gledger.query.filter(
@@ -1858,7 +1870,7 @@ def ReceiveByAccount():
         err_list.append(f'Reloaded payment batch for {customer} dated {pay_date}. Review amounts, then preview or record.')
         return holdvec, err_list
 
-    batch_lookback, batch_days, batch_options = receive_batch_lookback()
+    batch_start_date, batch_end_date, batch_start, batch_end_exclusive = receive_batch_date_range()
     is_reloaded_batch = request.values.get('reloaded_batch_ids') is not None
     is_reloaded_record = is_reloaded_batch and (
         request.values.get('update_reloaded_batch') is not None or
@@ -1892,19 +1904,25 @@ def ReceiveByAccount():
         )
 
     payment_groups = {}
-    batch_stopdate = datetime.date.today() - datetime.timedelta(days=batch_days)
     rows = Gledger.query.filter(
         (Gledger.Type.in_(['DD', 'ID'])) &
         (Gledger.Com == cmpdata[10]) &
-        (Gledger.Date >= batch_stopdate)
+        (Gledger.Date >= batch_start) &
+        (Gledger.Date < batch_end_exclusive)
     ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
 
-    for row in rows:
-        counter_deposit = Gledger.query.filter(
+    row_ids = [row.id for row in rows]
+    counter_deposits = {}
+    if row_ids:
+        for deposit_row in Gledger.query.filter(
             (Gledger.SourceTable == 'CounterDepositItem') &
-            (Gledger.SourceId == row.id) &
+            (Gledger.SourceId.in_(row_ids)) &
             (Gledger.Type == 'XD')
-        ).first()
+        ).all():
+            counter_deposits[deposit_row.SourceId] = deposit_row
+
+    for row in rows:
+        counter_deposit = counter_deposits.get(row.id)
         key = (
             row.Date.strftime('%Y-%m-%d') if row.Date else '',
             row.Source or '',
@@ -1958,8 +1976,8 @@ def ReceiveByAccount():
         holdvec=holdvec,
         completed=completed,
         recent_batches=recent_batches,
-        batch_lookback=batch_lookback,
-        batch_options=batch_options,
+        batch_start_date=batch_start_date,
+        batch_end_date=batch_end_date,
         counter_deposit_accounts=counter_deposit_accounts,
         today_value=datetime.date.today().strftime('%Y-%m-%d'),
     )

@@ -35,9 +35,8 @@ cdata = companydata()
 
 date_y4=re.compile(r'([1-9]|0[1-9]|[12][0-9]|3[01]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})')
 
-today_now = datetime.datetime.now()
-today = today_now.date()
-timenow = today_now.time()
+def current_date():
+    return datetime.datetime.now().date()
 
 def roundup(x):
     return int(math.ceil(x / 10.0)) * 10
@@ -270,6 +269,7 @@ def update_suminv_totals(sinum):
 
 
 def get_open_sort_totals(arlist):
+    today = current_date()
     dat30 = today - datetime.timedelta(30)
     lb360 = today - datetime.timedelta(360)
     cdata = []
@@ -324,6 +324,7 @@ def get_open_sort_totals(arlist):
     return cdata
 
 def get_open_for_cust(this_shipper, lb_date):
+    today = current_date()
     dat30 = today - datetime.timedelta(30)
 
     odata = Orders.query.filter((Orders.Shipper == this_shipper) & ((Orders.Istat>1) & (Orders.Istat<5)) & (Orders.Date3>lb_date)).order_by(Orders.Date3).all()
@@ -404,6 +405,7 @@ def column_wide(headers,ydata):
     return column_widths
 
 def make_workbook(customer, data, tboxes, ftotal):
+    today = current_date()
     # if this flag on we will also create a new workbook to attach
     wb = openpyxl.Workbook()
     shtlist = wb.sheetnames
@@ -575,6 +577,7 @@ def get_table_formatted(odata, sdata, etype, tboxes, boxes, sboxes, make_wb, cus
 
 def final_update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, email_update):
     cdata = companydata()
+    today = current_date()
     dat30 = today - datetime.timedelta(30)
     etitle = request.values.get('etitle')
     ebody = request.values.get('ebody')
@@ -641,6 +644,7 @@ def final_update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emails
 
 def update_email(this_shipper, odata, sdata, tboxes, boxes, sboxes, emailsend, email_update):
     cdata = companydata()
+    today = current_date()
     dat30 = today - datetime.timedelta(30)
 
     #Items same regarless of email tone
@@ -932,6 +936,7 @@ def shortbody(jolist, containerlist):
     return text
 
 def ardata_email_update(emaildata, shipper, jolist, containerlist):
+    today = current_date()
 
     etitle, ebody, emailin, emailcc, username, password, folder1, dat30date, invoices, packages, ni, np, salutation, wbfile, wbattach, tone, folder2 = emaildata
     sentfiles = []
@@ -974,6 +979,7 @@ def ardata_email_update(emaildata, shipper, jolist, containerlist):
 
 
 def isoAR():
+    today = current_date()
     username = session['username'].capitalize()
     #define User variables
     # Qote being worked

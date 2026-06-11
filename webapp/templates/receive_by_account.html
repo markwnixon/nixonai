@@ -32,16 +32,17 @@
         {% endif %}
 
         <hr>
-        <div class="d-sm-flex justify-content-between align-items-center mb-2">
-            <h5 class="mb-2 mb-sm-0">Recent Received Payment Batches</h5>
-            <div class="d-sm-flex align-items-center">
-                <label class="mb-0 mr-2" for="batch_lookback">Review back:</label>
-                <select id="batch_lookback" name="batch_lookback" class="form-control form-control-sm mr-sm-2" onchange="this.form.submit()">
-                    {% for value, label in batch_options %}
-                        <option value="{{ value }}" {% if value == batch_lookback %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-sm btn-primary mt-2 mt-sm-0" name="reload_batch">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 receive-batch-toolbar">
+            <h5 class="mb-2 mb-md-0">Recent Received Payment Batches</h5>
+            <div class="d-flex flex-wrap justify-content-md-end align-items-center receive-batch-controls">
+                <label class="mb-0" for="batch_start_date">Review</label>
+                <input type="date" id="batch_start_date" name="batch_start_date" class="form-control form-control-sm receive-date-input" value="{{ batch_start_date }}">
+                <span class="text-muted">to</span>
+                <input type="date" id="batch_end_date" name="batch_end_date" class="form-control form-control-sm receive-date-input" value="{{ batch_end_date }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary receive-action-button" name="review_batches">
+                    Review
+                </button>
+                <button type="submit" class="btn btn-sm btn-primary receive-action-button" name="reload_batch">
                     Reload Selected
                 </button>
             </div>
@@ -76,7 +77,7 @@
         </div>
 
         <div class="table-responsive">
-            <table id="dtReceiveBatches" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <table id="dtReceiveBatches" class="table table-sm table-striped table-bordered table-hover nowrap receive-batches-table" width="100%">
                 <thead class="thead-light">
                     <tr>
                         <th>Select</th>
@@ -94,9 +95,8 @@
                 <tbody>
                     {% for batch in recent_batches %}
                         <tr>
-                            <td class="text-center">
-                                <input type="checkbox" name="payment_batch" value="{{ batch.id_value }}"
-                                       {% if batch.deposited or batch.account != 'Undeposited Funds' or batch.type != 'ID' %}disabled{% endif %}>
+                            <td class="text-center align-middle">
+                                <input class="align-middle" type="checkbox" name="payment_batch" value="{{ batch.id_value }}">
                             </td>
                             <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
                             <td>{{ batch.source }}</td>
@@ -235,4 +235,33 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
+<style>
+.receive-batch-toolbar {
+    gap: 1rem;
+}
+.receive-batch-controls {
+    gap: .6rem;
+}
+.receive-date-input {
+    min-width: 9.25rem;
+    width: auto;
+}
+.receive-action-button {
+    min-width: 6.75rem;
+}
+.receive-batches-table tbody td {
+    vertical-align: middle;
+}
+@media (max-width: 767.98px) {
+    .receive-batch-controls {
+        justify-content: flex-start;
+        width: 100%;
+    }
+    .receive-date-input,
+    .receive-action-button {
+        flex: 1 1 9rem;
+    }
+}
+</style>
 {% endblock %}

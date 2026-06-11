@@ -19,8 +19,14 @@ from webapp.models import People, Orders, Ardata
 from webapp.viewfuncs import stripper, hasinput
 
 import datetime
-today = datetime.datetime.today()
-today_str = today.strftime('%d %b %Y')
+
+
+def current_today():
+    return datetime.datetime.today()
+
+
+def current_today_str():
+    return current_today().strftime('%d %b %Y')
 
 
 def accounting_sender_key():
@@ -95,7 +101,7 @@ def add_person(info):
     message = info[1]
     input = People(Company=name, First=None, Middle=None, Last=None, Addr1=None, Addr2=None, Addr3=None,
                    Idtype=None, Idnumber=None, Telephone=phone,
-                   Email=email, Associate1=None, Associate2=None, Date1=today, Date2=None, Source=message,
+                   Email=email, Associate1=None, Associate2=None, Date1=current_today(), Date2=None, Source=message,
                    Ptype='Contact', Temp1=None, Temp2=None, Accountid=None, Saljp=None, Saloa=None, Salap=None)
     db.session.add(input)
     db.session.commit()
@@ -143,6 +149,7 @@ def email_template(type, info):
 
 def etemplate_suminv(eprof, sdat):
     if eprof == 'suminv':
+        today_str = current_today_str()
         pdat = People.query.get(sdat.Pid)
         if pdat is not None:
             estatus, epod, eaccts = pdat.Email, pdat.Associate1, pdat.Associate2
@@ -153,8 +160,8 @@ def etemplate_suminv(eprof, sdat):
         aname = sdat.Source
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['info']
-        emailcc2 = em['expo']
+        emailcc1 = em['invo']
+        emailcc2 = ''
         outname = f'Invoice_Summary_{sdat.Si}.pdf'
         emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, aname, outname, 'vinvoice']
         return emaildata
@@ -449,6 +456,7 @@ def etemplate_truck(eprof,odat):
         return emaildata
 
     elif eprof == 'suminv':
+        today_str = current_today_str()
         etitle = f'Summary Invoice {odat.Si} {today_str}'
         ebody = f'Dear {odat.Shipper},\n\nThe subject order has been completed, and your invoice package for services is attached.\n\nWe greatly appreciate your business.'
         aname = odat.Source
@@ -645,6 +653,7 @@ def email_app(pdat):
     #os.remove(newfile)
 
 def update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids):
+    today = current_today()
     jolist = []
     conlist = []
     shipper = None
