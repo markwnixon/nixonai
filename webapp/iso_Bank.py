@@ -192,6 +192,66 @@ def baseline_reconciliation(bankacct, cutoff_date, trusted_balance):
     db.session.commit()
     return len(rows), d2s(float(deposits) / 100), d2s(float(withdrawals) / 100), trusted_balance
 
+def reconciliation_list_ids(value):
+    try:
+        parsed = json.loads(value or '')
+    except:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    ids = []
+    for item in parsed:
+        try:
+            ids.append(int(item))
+        except:
+            pass
+    return ids
+
+def rows_for_reconciliation(rdat):
+    row_ids = reconciliation_list_ids(rdat.DepositList) + reconciliation_list_ids(rdat.WithdrawList)
+    if row_ids:
+        return Gledger.query.filter(
+            (Gledger.id.in_(row_ids)) &
+            (Gledger.Account == rdat.Account)
+        ).all()
+
+    previous = Reconciliations.query.filter(
+        (Reconciliations.Account == rdat.Account) &
+        (Reconciliations.Status == 1) &
+        (Reconciliations.Rdate < rdat.Rdate)
+    ).order_by(Reconciliations.Rdate.desc()).first()
+
+    query = Gledger.query.filter(
+        (Gledger.Account == rdat.Account) &
+        (Gledger.Reconciled == rdat.Rdate.month) &
+        (Gledger.Date <= rdat.Rdate)
+    )
+    if previous is not None and previous.Rdate is not None:
+        query = query.filter(Gledger.Date > previous.Rdate)
+    return query.all()
+
+def reopen_reconciliation(bankacct, rdate):
+    rdat = Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Rdate == rdate) &
+        (Reconciliations.Status == 1)
+    ).first()
+    if rdat is None:
+        rdat = Reconciliations.query.filter(
+            (Reconciliations.Account == bankacct) &
+            (Reconciliations.Rdate <= rdate) &
+            (Reconciliations.Status == 1)
+        ).order_by(Reconciliations.Rdate.desc()).first()
+    if rdat is None:
+        return 0, f'No finalized reconciliation was found for {bankacct} on or before {rdate.strftime("%Y-%m-%d")}.'
+
+    rows = rows_for_reconciliation(rdat)
+    for row in rows:
+        row.Reconciled = 0
+    rdat.Status = 0
+    db.session.commit()
+    return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) are now unreconciled.'
+
 def selected_bank_ids(odata):
     selected = []
     valid_ids = {row.id for row in odata}
@@ -357,6 +417,7 @@ def isoBank():
         finalize = request.values.get('finalize')
         undothese = request.values.get('undothese')
         baselinehit = request.values.get('baseline_reconcile')
+        reopenhit = request.values.get('reopen_reconciliation')
         baseline_date = request.values.get('baseline_date')
         baseline_balance = request.values.get('baseline_balance')
         defaults = statement_defaults(acname, today_str)
@@ -449,6 +510,19 @@ def isoBank():
                 acctinfo = banktotals(acname)
             except Exception as exc:
                 err[0] = f'Baseline failed: {exc}'
+
+        if reopenhit is not None:
+            try:
+                recdate = datetime.datetime.strptime(rdate, "%Y-%m-%d")
+                row_count, reopen_msg = reopen_reconciliation(acname, recdate)
+                err[0] = reopen_msg
+                if row_count:
+                    thismuch = '1'
+                    odata = dataget_Bank(thismuch, acname)
+                    hv[1] = trial_ids(odata)
+                    acctinfo = banktotals(acname)
+            except Exception as exc:
+                err[0] = f'Reopen failed: {exc}'
 
         if modlink==0:
             oder,numchecked=numcheck(1,odata,0,0,0,0,['oder'])
@@ -665,7 +739,9 @@ def isoBank():
 
 
     leftsize = 8
-    acdata = Accounts.query.filter(Accounts.Type=='Bank').all()
+    acdata = Accounts.query.filter(
+        ~Accounts.Type.in_(['Income', 'Expense'])
+    ).order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
     err=erud(err)
 
 

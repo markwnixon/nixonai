@@ -33,6 +33,55 @@ from webapp.class8_utils import *
 from webapp.utils import *
 from webapp.viewfuncs import newjo, expense_totals, holding_totals
 import uuid
+from sqlalchemy import or_
+
+
+def delete_bill_ledger_entries(bill):
+    if bill is None or not bill.Jo:
+        return 0
+
+    rows = bill_ledger_entries(bill)
+    if not rows:
+        return 0
+    row_ids = [row.id for row in rows]
+    return Gledger.query.filter(Gledger.id.in_(row_ids)).delete(synchronize_session=False)
+
+
+def bill_ledger_entries(bill):
+    if bill is None or not bill.Jo:
+        return []
+
+    jo = bill.Jo
+    ledger_filter = or_(
+        Gledger.Tcode == jo,
+        Gledger.Tcode.like(f'{jo}-%'),
+        Gledger.JournalId == f'PAYBILL-{jo}',
+        Gledger.JournalId.like(f'PAYBILL-{jo}-%'),
+        (Gledger.SourceTable == 'Bills') & (Gledger.SourceId == bill.id),
+    )
+    return Gledger.query.filter(ledger_filter).all()
+
+
+def reconciled_bill_ledger_entries(bill):
+    return [
+        row for row in bill_ledger_entries(bill)
+        if row.Reconciled not in [None, 0, 25]
+    ]
+
+
+def bill_payment_account_names(company_code=None):
+    query = Accounts.query.filter(
+        ~Accounts.Type.in_(['Income', 'Expense'])
+    )
+    if company_code:
+        query = query.filter(Accounts.Co == company_code)
+    query = query.filter(~Accounts.Name.in_(['Accounts Payable', 'Accounts Receivable']))
+    accounts = query.order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
+    names = []
+    for account in accounts:
+        if hasinput(account.Name) and account.Name.strip() not in names:
+            names.append(account.Name.strip())
+    return names
 
 def Add_New_Drop(dropblock):
     droplist=dropblock.splitlines()
@@ -392,6 +441,8 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
                     if nextvalue not in dblist:
                         if hasinput(nextvalue): dblist.append(nextvalue)
                 keydata.update({key: dblist})
+                if tableget == 'Bills' and key == 'acctdata':
+                    keydata.update({key: bill_payment_account_names()})
                 #print(f'For the key {key} in keydata[key] is {keydata[key]} and select_value is {select_value}')
                 if keydata[key] == []:
                     def_list = get_default_list(key, select_value)
@@ -3407,9 +3458,22 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                 err.append(f'Working on single item {sid}')
                 if task_focus == 'Delete':
                     #print('made it here with jx, thistable sid', jx, thistable, sid)
-                    rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
-                    eval(rstring)
-                    db.session.commit()
+                    if table == 'Bills':
+                        bdat = Bills.query.get(sid)
+                        if bdat is not None:
+                            closed_rows = reconciled_bill_ledger_entries(bdat)
+                            if closed_rows:
+                                accounts = ', '.join(sorted({row.Account for row in closed_rows if row.Account}))
+                                err.append(f'Cannot delete bill {bdat.Jo}. Ledger activity is already reconciled for {accounts}. Reopen the reconciliation statement first.')
+                            else:
+                                deleted_ledger_rows = delete_bill_ledger_entries(bdat)
+                                Bills.query.filter(Bills.id == sid).delete()
+                                db.session.commit()
+                                err.append(f'Deleted bill {bdat.Jo} and {deleted_ledger_rows} associated ledger row(s)')
+                    else:
+                        rstring = f'{table}.query.filter({table}.id == {sid}).delete()'
+                        eval(rstring)
+                        db.session.commit()
                 elif task_focus == 'Invoice':
                     # Need to add the undo of the journal entries
                     rstring = f'{table}.query.get({sid})'
@@ -3552,12 +3616,24 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                     odat = eval(rstring)
                     if odat is not None:
                         if odat.Status == 'Paid':
+                            closed_rows = reconciled_bill_ledger_entries(odat)
+                            if closed_rows:
+                                accounts = ', '.join(sorted({row.Account for row in closed_rows if row.Account}))
+                                err.append(f'Cannot undo payment for bill {odat.Jo}. Ledger activity is already reconciled for {accounts}. Reopen the reconciliation statement first.')
+                                continue
                             check = odat.Check
                             pacctlist = odat.PacctList
                             if pacctlist is None: multi = False
                             else: multi = True
                             if multi:
                                 kill_list = eval(pacctlist)
+                                closed_multi_rows = []
+                                for k in kill_list:
+                                    closed_multi_rows.extend(reconciled_bill_ledger_entries(Bills.query.get(k)))
+                                if closed_multi_rows:
+                                    accounts = ', '.join(sorted({row.Account for row in closed_multi_rows if row.Account}))
+                                    err.append(f'Cannot undo this multi-bill payment. Ledger activity is already reconciled for {accounts}. Reopen the reconciliation statement first.')
+                                    continue
                                 for k in kill_list:
                                     kdat = Bills.query.get(k)
                                     kdat.Status = None
@@ -5141,6 +5217,10 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 # Get Default Account Data
                 #print('co is', co[10])
                 adat = Accounts.query.filter((Accounts.Type == 'Bank') & (Accounts.Co == co[10])).first()
+                if adat is None:
+                    account_names = bill_payment_account_names(co[10])
+                    if account_names:
+                        adat = Accounts.query.filter((Accounts.Name == account_names[0]) & (Accounts.Co == co[10])).first()
                 default_pay_method = 'ACH'
                 for jx, entry in enumerate(entrydata):
                     holdvec[jx] = getattr(bdat, f'{entry[0]}')
@@ -5150,7 +5230,8 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                         if entry[0] == 'pMeth':
                             holdvec[jx], entry[5], entry[6] = default_pay_method, 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'pAccount':
-                            holdvec[jx], entry[5], entry[6] = adat.Name, 1, 'Warning: Inserted Default Value'
+                            if adat is not None:
+                                holdvec[jx], entry[5], entry[6] = adat.Name, 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'pAmount':
                             holdvec[jx], entry[5], entry[6] = bdat.bAmount, 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'pDate':
@@ -5158,7 +5239,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                         elif entry[0] == 'Memo':
                             holdvec[jx], entry[5], entry[6] = f'{bdat.bSubcat} {bdat.bAccount}', 1, 'Warning: Inserted Default Value'
                         elif entry[0] == 'Ref':
-                            if default_pay_method == 'Check':
+                            if default_pay_method == 'Check' and adat is not None:
                                 blast = Bills.query.filter(
                                     (Bills.pAccount == adat.Name) & (Bills.pMeth == 'Check') & (Bills.Status == 'Paid')).order_by(
                                     Bills.id.desc()).first()

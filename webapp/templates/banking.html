@@ -5,7 +5,7 @@
     <div class="row">
         <div class="col-sm-12">
             <h2>Banking</h2>
-            <p class="text-muted">Bank account review and reconciliation.</p>
+            <p class="text-muted">Bank, credit card, and account reconciliation.</p>
         </div>
     </div>
 
@@ -17,7 +17,7 @@
                 <div class="border rounded p-3 h-100">
                     <h5>Account</h5>
                     <div class="form-group">
-                        <label for="acname">Bank Account</label>
+                        <label for="acname">Reconciliation Account</label>
                         <select class="form-control" id="acname" name="acname" onchange="this.form.submit()">
                             {% for account in acdata %}
                                 <option value="{{ account.Name }}" {% if acctinfo[6] == account.Name %}selected{% endif %}>{{ account.Name }}</option>
@@ -69,6 +69,13 @@
                     <button type="submit" name="baseline_reconcile" value="1" class="btn btn-warning btn-block"
                             onclick="return confirm('Mark this bank account reconciled through the selected baseline date?');">
                         Set Baseline
+                    </button>
+                    <hr>
+                    <h5>Reopen Statement</h5>
+                    <p class="text-muted small">Reopens the finalized reconciliation for this account and statement date so corrected transactions can be edited or deleted.</p>
+                    <button type="submit" name="reopen_reconciliation" value="1" class="btn btn-outline-danger btn-block"
+                            onclick="return confirm('Reopen the finalized reconciliation for this account and statement date?');">
+                        Reopen Selected Statement
                     </button>
                 </div>
             </div>

@@ -535,12 +535,35 @@ def IntercompanyEntries():
             'match_aid': True,
         }
 
+    def build_transfer_line(amount, debit, account, source_account, line_type, tcode, entry_date, ref):
+        return {
+            'debit': amount if debit else 0,
+            'credit': 0 if debit else amount,
+            'account': account.Name,
+            'aid': account.id,
+            'source': source_account.Name,
+            'sid': source_account.id,
+            'type': line_type,
+            'tcode': tcode,
+            'com': account.Co,
+            'recorded': datetime.datetime.now(),
+            'date': entry_date,
+            'ref': ref,
+            'match_aid': True,
+        }
+
     selected = {
         'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
         'entry_type': request.values.get('entry_type', 'Expense'),
         'cash_account_id': request.values.get('cash_account_id', ''),
         'operating_company': request.values.get('operating_company', 'K'),
         'operating_account_id': request.values.get('operating_account_id', ''),
+        'transfer_date': request.values.get('transfer_date', datetime.date.today().strftime('%Y-%m-%d')),
+        'transfer_from_account_id': request.values.get('transfer_from_account_id', ''),
+        'transfer_to_account_id': request.values.get('transfer_to_account_id', ''),
+        'transfer_amount': request.values.get('transfer_amount', ''),
+        'transfer_ref': request.values.get('transfer_ref', ''),
+        'transfer_memo': request.values.get('transfer_memo', ''),
         'amount': request.values.get('amount', ''),
         'source': request.values.get('source', ''),
         'ref': request.values.get('ref', ''),
@@ -654,6 +677,55 @@ def IntercompanyEntries():
                         'memo': '',
                     }
 
+    if request.method == 'POST' and request.values.get('create_transfer'):
+        transfer_date = parse_date(request.values.get('transfer_date'))
+        amount = cents(request.values.get('transfer_amount'))
+        from_account = Accounts.query.get(request.values.get('transfer_from_account_id') or 0)
+        to_account = Accounts.query.get(request.values.get('transfer_to_account_id') or 0)
+        ref = request.values.get('transfer_ref', '').strip()
+        memo = request.values.get('transfer_memo', '').strip()
+
+        if transfer_date is None:
+            err.append('Enter a valid transfer date.')
+        if amount is None or amount <= 0:
+            err.append('Enter a transfer amount greater than zero.')
+        if from_account is None:
+            err.append('Choose a valid account to pay from.')
+        if to_account is None:
+            err.append('Choose a valid account to pay to.')
+        if from_account is not None and to_account is not None:
+            if from_account.id == to_account.id:
+                err.append('The transfer accounts must be different.')
+            if from_account.Co != to_account.Co:
+                err.append('Account transfers must stay within one company. Use the intercompany entry section for cross-company activity.')
+
+        if not err:
+            tcode = newjo('XF', transfer_date.strftime('%Y-%m-%d'))
+            journal_id = f'TRANSFER-{tcode}'
+            journal_memo = memo or f'Transfer from {from_account.Name} to {to_account.Name}'
+            post_err = post_balanced_journal(
+                [
+                    build_transfer_line(amount, True, to_account, from_account, 'XD', tcode, transfer_date, ref),
+                    build_transfer_line(amount, False, from_account, to_account, 'XC', tcode, transfer_date, ref),
+                ],
+                journal_id=journal_id,
+                journal_memo=journal_memo,
+                posted_by='account_transfer',
+                source_table='AccountTransfer',
+            )
+            if post_err:
+                err.extend(post_err)
+            else:
+                msg = f'Recorded account transfer {tcode}.'
+                selected.update({
+                    'transfer_date': datetime.date.today().strftime('%Y-%m-%d'),
+                    'transfer_from_account_id': '',
+                    'transfer_to_account_id': '',
+                    'transfer_amount': '',
+                    'transfer_ref': '',
+                    'transfer_memo': '',
+                })
+
     bank_accounts = Accounts.query.filter(
         (Accounts.Co.in_(allowed_companies)) &
         (Accounts.Type.in_(['Bank', 'Asset']))
@@ -661,6 +733,9 @@ def IntercompanyEntries():
     operating_accounts = Accounts.query.filter(
         (Accounts.Co.in_(allowed_companies)) &
         (Accounts.Type.in_(['Income', 'Expense']))
+    ).order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
+    transfer_accounts = Accounts.query.filter(
+        ~Accounts.Type.in_(['Income', 'Expense'])
     ).order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
 
     setup_warnings = []
@@ -676,13 +751,14 @@ def IntercompanyEntries():
                 setup_warnings.append(f'No due-to account is configured in {company_label(book_company)} for {company_label(target_company)}.')
 
     raw_recent = Gledger.query.filter(
-        Gledger.SourceTable == 'IntercompanyEntry'
+        Gledger.SourceTable.in_(['IntercompanyEntry', 'AccountTransfer'])
     ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(120).all()
     journal_map = {}
     for line in raw_recent:
         key = line.JournalId or line.Tcode
         item = journal_map.setdefault(key, {
             'journal_id': key,
+            'entry_kind': 'Transfer' if line.SourceTable == 'AccountTransfer' else 'Intercompany',
             'date': line.Date,
             'tcode': line.Tcode,
             'memo': line.JournalMemo,
@@ -696,7 +772,7 @@ def IntercompanyEntries():
         item['companies'].add(line.Com)
         item['debit'] += line.Debit or 0
         item['credit'] += line.Credit or 0
-        if line.Type in ['PC', 'DD']:
+        if line.Type in ['PC', 'DD', 'XD', 'XC']:
             item['bank_amount'] = (line.Debit or line.Credit or 0)
     recent_entries = sorted(journal_map.values(), key=lambda item: item['date'] or datetime.datetime.min, reverse=True)
     for item in recent_entries:
@@ -731,6 +807,7 @@ def IntercompanyEntries():
         company_names=company_names,
         bank_accounts=bank_accounts,
         operating_accounts=operating_accounts,
+        transfer_accounts=transfer_accounts,
         selected=selected,
         err='\n'.join(err),
         msg=msg,

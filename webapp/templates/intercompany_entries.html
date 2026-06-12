@@ -4,16 +4,66 @@
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-sm-12">
-            <h2>Intercompany Entries</h2>
-            <p class="text-muted">Record income or expenses that clear through the wrong K, J, or N account while preserving balanced due-to entries.</p>
+            <h2>Intercompany Entries & Account Transfers</h2>
+            <p class="text-muted">Record intercompany activity with due-to entries, or transfer money between accounts in the same company.</p>
         </div>
     </div>
 
     <form action="{{ url_for('main.IntercompanyEntries') }}" method="post">
         <div class="row">
             <div class="col-lg-4 mb-3">
+                <div class="border rounded p-3 mb-3">
+                    <h5>Account Transfer</h5>
+                    <div class="form-group">
+                        <label for="transfer_date">Date</label>
+                        <input type="date" class="form-control" id="transfer_date" name="transfer_date" value="{{ selected.transfer_date }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_from_account_id">Pay From</label>
+                        <select class="form-control" id="transfer_from_account_id" name="transfer_from_account_id">
+                            <option value="">Select account</option>
+                            {% for account in transfer_accounts %}
+                                <option value="{{ account.id }}"
+                                        data-company="{{ account.Co }}"
+                                        {% if selected.transfer_from_account_id|string == account.id|string %}selected{% endif %}>
+                                    {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_to_account_id">Pay To</label>
+                        <select class="form-control" id="transfer_to_account_id" name="transfer_to_account_id">
+                            <option value="">Select account</option>
+                            {% for account in transfer_accounts %}
+                                <option value="{{ account.id }}"
+                                        data-company="{{ account.Co }}"
+                                        {% if selected.transfer_to_account_id|string == account.id|string %}selected{% endif %}>
+                                    {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_amount">Amount</label>
+                        <input type="text" class="form-control" id="transfer_amount" name="transfer_amount" value="{{ selected.transfer_amount }}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_ref">Reference</label>
+                        <input type="text" class="form-control" id="transfer_ref" name="transfer_ref" value="{{ selected.transfer_ref }}" placeholder="ACH, check, confirmation">
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer_memo">Memo</label>
+                        <textarea class="form-control" id="transfer_memo" name="transfer_memo" rows="2">{{ selected.transfer_memo }}</textarea>
+                    </div>
+                    <button type="submit" name="create_transfer" value="1" class="btn btn-success btn-block"
+                            onclick="return confirm('Record this account transfer?');">
+                        Record Transfer
+                    </button>
+                </div>
+
                 <div class="border rounded p-3">
-                    <h5>New Entry</h5>
+                    <h5>Intercompany Entry</h5>
                     <div class="form-group">
                         <label for="entry_date">Date</label>
                         <input type="date" class="form-control" id="entry_date" name="entry_date" value="{{ selected.entry_date }}">
@@ -101,12 +151,13 @@
                     </div>
                 {% endif %}
 
-                <h5>Recent Intercompany Entries</h5>
+                <h5>Recent Entries and Transfers</h5>
                 <div class="table-responsive mb-4">
                     <table id="dtIntercompanyRecent" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
                         <thead class="thead-light">
                             <tr>
                                 <th>Date</th>
+                                <th>Kind</th>
                                 <th>Tcode</th>
                                 <th>Companies</th>
                                 <th>Source</th>
@@ -120,6 +171,7 @@
                             {% for item in recent_entries %}
                                 <tr>
                                     <td>{% if item.date %}{{ item.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                    <td>{{ item.entry_kind }}</td>
                                     <td>{{ item.tcode }}</td>
                                     <td>{{ item.companies }}</td>
                                     <td>{{ item.source }}</td>
@@ -165,6 +217,30 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    function filterTransferAccounts() {
+        var fromSelect = document.getElementById('transfer_from_account_id');
+        var toSelect = document.getElementById('transfer_to_account_id');
+        var fromOption = fromSelect.options[fromSelect.selectedIndex];
+        var company = fromOption ? fromOption.dataset.company : '';
+        var selectedVisible = false;
+
+        Array.prototype.forEach.call(toSelect.options, function (option) {
+            if (!option.value || !company) {
+                option.hidden = false;
+                return;
+            }
+            var visible = option.dataset.company === company && option.value !== fromSelect.value;
+            option.hidden = !visible;
+            if (visible && option.selected) {
+                selectedVisible = true;
+            }
+        });
+
+        if (company && !selectedVisible) {
+            toSelect.value = '';
+        }
+    }
+
     function filterOperatingAccounts() {
         var entryType = document.getElementById('entry_type').value;
         var company = document.getElementById('operating_company').value;
@@ -188,6 +264,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    document.getElementById('transfer_from_account_id').addEventListener('change', filterTransferAccounts);
+    filterTransferAccounts();
     document.getElementById('entry_type').addEventListener('change', filterOperatingAccounts);
     document.getElementById('operating_company').addEventListener('change', filterOperatingAccounts);
     filterOperatingAccounts();
