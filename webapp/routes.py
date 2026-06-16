@@ -625,6 +625,39 @@ def IntercompanyEntries():
                 return account
         return query.first()
 
+    def ensure_owner_equity_account(company_code):
+        account = find_owner_equity_account(company_code)
+        if account is not None:
+            return account
+
+        if company_code == 'N':
+            account_name = 'Owner Equity'
+            description = 'Created automatically for owner personal transfers'
+            subcategory = 'Owner Equity'
+        else:
+            account_name = 'Owner Draw / Distributions'
+            description = 'Created automatically for owner equity transfers'
+            subcategory = 'Owner Draws'
+
+        account = Accounts(
+            Name=account_name,
+            Balance=0.00,
+            AcctNumber=None,
+            Routing=None,
+            Payee=None,
+            Type='Equity',
+            Description=description,
+            Category='Equity',
+            Subcategory=subcategory,
+            Taxrollup=None,
+            Co=company_code,
+            QBmap=None,
+            Shared=None,
+        )
+        db.session.add(account)
+        db.session.flush()
+        return account
+
     def build_line(amount, debit, account, source, line_type, tcode, company_code, entry_date, ref):
         return {
             'debit': amount if debit else 0,
@@ -668,8 +701,8 @@ def IntercompanyEntries():
 
         owner_involved = 'N' in [from_account.Co, to_account.Co]
         if owner_involved and owner_transfer_treatment == 'equity':
-            from_equity = find_owner_equity_account(from_account.Co)
-            to_equity = find_owner_equity_account(to_account.Co)
+            from_equity = ensure_owner_equity_account(from_account.Co)
+            to_equity = ensure_owner_equity_account(to_account.Co)
             errs = []
             if from_equity is None:
                 errs.append(f'Missing owner equity account in {company_label(from_account.Co)}.')
