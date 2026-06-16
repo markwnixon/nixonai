@@ -4,8 +4,8 @@
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-sm-12">
-            <h2>Intercompany Entries & Account Transfers</h2>
-            <p class="text-muted">Record intercompany activity with due-to entries, or transfer money between accounts in the same company.</p>
+            <h2>Account Transfers</h2>
+            <p class="text-muted">Record transfers between bank, merchant, and credit card accounts. Same-company transfers post directly; cross-company transfers add the due-to entries automatically.</p>
         </div>
     </div>
 
@@ -26,7 +26,11 @@
                                 <option value="{{ account.id }}"
                                         data-company="{{ account.Co }}"
                                         {% if selected.transfer_from_account_id|string == account.id|string %}selected{% endif %}>
-                                    {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                    {% if account.Co == 'N' and account.Name == 'Owner Personal Cash' %}
+                                        Owner Personal - Cash / ATM
+                                    {% else %}
+                                        {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                    {% endif %}
                                 </option>
                             {% endfor %}
                         </select>
@@ -39,9 +43,21 @@
                                 <option value="{{ account.id }}"
                                         data-company="{{ account.Co }}"
                                         {% if selected.transfer_to_account_id|string == account.id|string %}selected{% endif %}>
-                                    {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                    {% if account.Co == 'N' and account.Name == 'Owner Personal Cash' %}
+                                        Owner Personal - Cash / ATM
+                                    {% else %}
+                                        {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                    {% endif %}
                                 </option>
                             {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" id="owner_transfer_treatment_group">
+                        <label for="owner_transfer_treatment">Owner Transfer Type</label>
+                        <select class="form-control" id="owner_transfer_treatment" name="owner_transfer_treatment">
+                            <option value="">Select owner transfer type</option>
+                            <option value="loan" {% if selected.owner_transfer_treatment == 'loan' %}selected{% endif %}>Loan / repayable</option>
+                            <option value="equity" {% if selected.owner_transfer_treatment == 'equity' %}selected{% endif %}>Owner equity withdrawal / contribution</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -59,74 +75,6 @@
                     <button type="submit" name="create_transfer" value="1" class="btn btn-success btn-block"
                             onclick="return confirm('Record this account transfer?');">
                         Record Transfer
-                    </button>
-                </div>
-
-                <div class="border rounded p-3">
-                    <h5>Intercompany Entry</h5>
-                    <div class="form-group">
-                        <label for="entry_date">Date</label>
-                        <input type="date" class="form-control" id="entry_date" name="entry_date" value="{{ selected.entry_date }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="entry_type">Entry Type</label>
-                        <select class="form-control" id="entry_type" name="entry_type">
-                            <option value="Expense" {% if selected.entry_type == 'Expense' %}selected{% endif %}>Expense paid from cash account</option>
-                            <option value="Income" {% if selected.entry_type == 'Income' %}selected{% endif %}>Income received in cash account</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="cash_account_id">Cash Account Used</label>
-                        <select class="form-control" id="cash_account_id" name="cash_account_id">
-                            <option value="">Select cash account</option>
-                            {% for account in bank_accounts %}
-                                <option value="{{ account.id }}" data-company="{{ account.Co }}" {% if selected.cash_account_id|string == account.id|string %}selected{% endif %}>
-                                    {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="operating_company">Belongs To</label>
-                        <select class="form-control" id="operating_company" name="operating_company">
-                            {% for code, name in company_names.items() %}
-                                <option value="{{ code }}" {% if selected.operating_company == code %}selected{% endif %}>{{ name }} Account {{ code }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="operating_account_id">Income / Expense Account</label>
-                        <select class="form-control" id="operating_account_id" name="operating_account_id">
-                            <option value="">Select operating account</option>
-                            {% for account in operating_accounts %}
-                                <option value="{{ account.id }}"
-                                        data-company="{{ account.Co }}"
-                                        data-type="{{ account.Type }}"
-                                        {% if selected.operating_account_id|string == account.id|string %}selected{% endif %}>
-                                    {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="amount">Amount</label>
-                        <input type="text" class="form-control" id="amount" name="amount" value="{{ selected.amount }}" placeholder="0.00">
-                    </div>
-                    <div class="form-group">
-                        <label for="source">Source / Payee / Customer</label>
-                        <input type="text" class="form-control" id="source" name="source" value="{{ selected.source }}" placeholder="Who this came from or was paid to">
-                    </div>
-                    <div class="form-group">
-                        <label for="ref">Reference</label>
-                        <input type="text" class="form-control" id="ref" name="ref" value="{{ selected.ref }}" placeholder="ACH, check, wire, note">
-                    </div>
-                    <div class="form-group">
-                        <label for="memo">Memo</label>
-                        <textarea class="form-control" id="memo" name="memo" rows="3">{{ selected.memo }}</textarea>
-                    </div>
-                    <button type="submit" name="create_entry" value="1" class="btn btn-success btn-block"
-                            onclick="return confirm('Record this balanced intercompany journal entry?');">
-                        Record Entry
                     </button>
                 </div>
             </div>
@@ -220,39 +168,18 @@ document.addEventListener('DOMContentLoaded', function () {
     function filterTransferAccounts() {
         var fromSelect = document.getElementById('transfer_from_account_id');
         var toSelect = document.getElementById('transfer_to_account_id');
+        var treatmentGroup = document.getElementById('owner_transfer_treatment_group');
+        var treatmentSelect = document.getElementById('owner_transfer_treatment');
         var fromOption = fromSelect.options[fromSelect.selectedIndex];
-        var company = fromOption ? fromOption.dataset.company : '';
+        var toOption = toSelect.options[toSelect.selectedIndex];
         var selectedVisible = false;
 
         Array.prototype.forEach.call(toSelect.options, function (option) {
-            if (!option.value || !company) {
-                option.hidden = false;
-                return;
-            }
-            var visible = option.dataset.company === company && option.value !== fromSelect.value;
-            option.hidden = !visible;
-            if (visible && option.selected) {
-                selectedVisible = true;
-            }
-        });
-
-        if (company && !selectedVisible) {
-            toSelect.value = '';
-        }
-    }
-
-    function filterOperatingAccounts() {
-        var entryType = document.getElementById('entry_type').value;
-        var company = document.getElementById('operating_company').value;
-        var accountSelect = document.getElementById('operating_account_id');
-        var selectedVisible = false;
-
-        Array.prototype.forEach.call(accountSelect.options, function (option) {
             if (!option.value) {
                 option.hidden = false;
                 return;
             }
-            var visible = option.dataset.company === company && option.dataset.type === entryType;
+            var visible = option.value !== fromSelect.value;
             option.hidden = !visible;
             if (visible && option.selected) {
                 selectedVisible = true;
@@ -260,15 +187,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (!selectedVisible) {
-            accountSelect.value = '';
+            toSelect.value = '';
+            toOption = toSelect.options[toSelect.selectedIndex];
+        }
+
+        var fromCompany = fromOption ? fromOption.dataset.company : '';
+        var toCompany = toOption ? toOption.dataset.company : '';
+        var ownerInvolved = fromCompany && toCompany && fromCompany !== toCompany && (fromCompany === 'N' || toCompany === 'N');
+        treatmentGroup.classList.toggle('d-none', !ownerInvolved);
+        if (!ownerInvolved) {
+            treatmentSelect.value = '';
         }
     }
 
     document.getElementById('transfer_from_account_id').addEventListener('change', filterTransferAccounts);
+    document.getElementById('transfer_to_account_id').addEventListener('change', filterTransferAccounts);
     filterTransferAccounts();
-    document.getElementById('entry_type').addEventListener('change', filterOperatingAccounts);
-    document.getElementById('operating_company').addEventListener('change', filterOperatingAccounts);
-    filterOperatingAccounts();
 
     $('#dtIntercompanyRecent').DataTable({
         order: [[0, 'desc']],

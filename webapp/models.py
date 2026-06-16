@@ -1487,6 +1487,62 @@ class Vehicles(db.Model):
         self.Tcache = Tcache
 
 
+class DepreciationAsset(db.Model):
+    __tablename__ = 'depreciation_assets'
+    id = db.Column('id', db.Integer, primary_key=True)
+    SourceTable = db.Column('SourceTable', db.String(45))
+    SourceId = db.Column('SourceId', db.Integer)
+    Company = db.Column('Company', db.String(2))
+    AssetName = db.Column('AssetName', db.String(100))
+    AssetIdentifier = db.Column('AssetIdentifier', db.String(100))
+    AssetAccount = db.Column('AssetAccount', db.String(50))
+    AccumDepAccount = db.Column('AccumDepAccount', db.String(50))
+    DepExpenseAccount = db.Column('DepExpenseAccount', db.String(50))
+    InServiceDate = db.Column('InServiceDate', db.Date)
+    CostBasis = db.Column('CostBasis', db.Integer)
+    SalvageValue = db.Column('SalvageValue', db.Integer)
+    BookMethod = db.Column('BookMethod', db.String(45))
+    BookLifeMonths = db.Column('BookLifeMonths', db.Integer)
+    TaxMethod = db.Column('TaxMethod', db.String(45))
+    TaxClass = db.Column('TaxClass', db.String(45))
+    TaxLifeMonths = db.Column('TaxLifeMonths', db.Integer)
+    Section179 = db.Column('Section179', db.Integer)
+    BonusDepreciation = db.Column('BonusDepreciation', db.Integer)
+    PriorBookAccum = db.Column('PriorBookAccum', db.Integer)
+    PriorTaxAccum = db.Column('PriorTaxAccum', db.Integer)
+    Status = db.Column('Status', db.String(25))
+    CreatedAt = db.Column('CreatedAt', db.DateTime)
+    UpdatedAt = db.Column('UpdatedAt', db.DateTime)
+
+    def __init__(self, SourceTable, SourceId, Company, AssetName, AssetIdentifier, AssetAccount,
+                 AccumDepAccount, DepExpenseAccount, InServiceDate, CostBasis, SalvageValue,
+                 BookMethod, BookLifeMonths, TaxMethod, TaxClass, TaxLifeMonths, Section179,
+                 BonusDepreciation, PriorBookAccum, PriorTaxAccum, Status, CreatedAt, UpdatedAt):
+        self.SourceTable = SourceTable
+        self.SourceId = SourceId
+        self.Company = Company
+        self.AssetName = AssetName
+        self.AssetIdentifier = AssetIdentifier
+        self.AssetAccount = AssetAccount
+        self.AccumDepAccount = AccumDepAccount
+        self.DepExpenseAccount = DepExpenseAccount
+        self.InServiceDate = InServiceDate
+        self.CostBasis = CostBasis
+        self.SalvageValue = SalvageValue
+        self.BookMethod = BookMethod
+        self.BookLifeMonths = BookLifeMonths
+        self.TaxMethod = TaxMethod
+        self.TaxClass = TaxClass
+        self.TaxLifeMonths = TaxLifeMonths
+        self.Section179 = Section179
+        self.BonusDepreciation = BonusDepreciation
+        self.PriorBookAccum = PriorBookAccum
+        self.PriorTaxAccum = PriorTaxAccum
+        self.Status = Status
+        self.CreatedAt = CreatedAt
+        self.UpdatedAt = UpdatedAt
+
+
 class Trucklog(db.Model):
     __tablename__ = 'trucklog'
     id = db.Column('id', db.Integer, primary_key=True)

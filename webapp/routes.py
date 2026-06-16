@@ -2,12 +2,12 @@ from flask import render_template, redirect, url_for, jsonify, request, send_fil
 from flask import Blueprint
 
 from webapp.extensions import db
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
 from flask_login import login_required
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from decimal import Decimal
 
@@ -482,6 +482,7 @@ def IntercompanyEntries():
         'N': 'Owner Personal',
     }
     allowed_companies = list(company_names.keys())
+    owner_cash_account_name = 'Owner Personal Cash'
 
     def parse_date(value):
         if not value:
@@ -506,6 +507,76 @@ def IntercompanyEntries():
     def company_label(code):
         return f"{company_names.get(code, code)} Account {code}"
 
+    def is_transfer_endpoint_account(account):
+        if account is None or account.Co not in allowed_companies:
+            return False
+
+        account_type = account.Type or ''
+        account_text = ' '.join([
+            account.Name or '',
+            account.Description or '',
+            account.Category or '',
+            account.Subcategory or '',
+        ]).lower()
+
+        if account_type in ['Bank', 'Exch']:
+            return True
+
+        if account_type in ['Credit Card']:
+            return True
+
+        if account_type == 'Current Liability':
+            internal_terms = [
+                'accounts payable',
+                'due to',
+                'payroll',
+                'tax',
+                'opening balance',
+                'accrued',
+            ]
+            return not any(term in account_text for term in internal_terms)
+
+        return False
+
+    def find_owner_cash_account():
+        for account_name in [owner_cash_account_name, 'Owner Cash', 'Owner Personal', 'Owner']:
+            account = Accounts.query.filter(
+                (Accounts.Co == 'N') &
+                (Accounts.Name == account_name)
+            ).first()
+            if is_transfer_endpoint_account(account):
+                return account
+
+        return Accounts.query.filter(
+            (Accounts.Co == 'N') &
+            (Accounts.Type.in_(['Bank', 'Exch'])) &
+            (Accounts.Name.contains('Owner'))
+        ).first()
+
+    def ensure_owner_cash_account():
+        account = find_owner_cash_account()
+        if account is not None:
+            return account, None
+
+        account = Accounts(
+            Name=owner_cash_account_name,
+            Balance=0.00,
+            AcctNumber=None,
+            Routing=None,
+            Payee=None,
+            Type='Exch',
+            Description='Owner personal cash endpoint for account transfers',
+            Category='Assets',
+            Subcategory='Cash',
+            Taxrollup=None,
+            Co='N',
+            QBmap=None,
+            Shared=None,
+        )
+        db.session.add(account)
+        db.session.flush()
+        return account, f'Created {owner_cash_account_name} for owner personal transfers.'
+
     def find_due_account(book_company, target_company):
         target_name = company_names.get(target_company, target_company)
         base_query = Accounts.query.filter(
@@ -517,6 +588,42 @@ def IntercompanyEntries():
             if account is not None:
                 return account
         return None
+
+    def ensure_due_account(book_company, target_company):
+        account = find_due_account(book_company, target_company)
+        if account is not None:
+            return account, None
+
+        target_name = company_names.get(target_company, target_company)
+        account = Accounts(
+            Name=f'Due to {target_name}',
+            Balance=0.00,
+            AcctNumber=None,
+            Routing=None,
+            Payee=None,
+            Type='Current Liability',
+            Description='Created automatically for account transfers',
+            Category='Liabilities',
+            Subcategory='Current Liabilities',
+            Taxrollup=None,
+            Co=book_company,
+            QBmap=None,
+            Shared=None,
+        )
+        db.session.add(account)
+        db.session.flush()
+        return account, f'Created {account.Name} in {company_label(book_company)}.'
+
+    def find_owner_equity_account(company_code):
+        query = Accounts.query.filter(
+            (Accounts.Co == company_code) &
+            (Accounts.Type == 'Equity')
+        )
+        for term in ['Owner', 'Draw', 'Distribution', 'Capital', 'Equity']:
+            account = query.filter(Accounts.Name.contains(term)).first()
+            if account is not None:
+                return account
+        return query.first()
 
     def build_line(amount, debit, account, source, line_type, tcode, company_code, entry_date, ref):
         return {
@@ -552,6 +659,49 @@ def IntercompanyEntries():
             'match_aid': True,
         }
 
+    def transfer_journal_lines(amount, from_account, to_account, tcode, entry_date, ref, owner_transfer_treatment):
+        if from_account.Co == to_account.Co:
+            return [
+                build_transfer_line(amount, True, to_account, from_account, 'XD', tcode, entry_date, ref),
+                build_transfer_line(amount, False, from_account, to_account, 'XC', tcode, entry_date, ref),
+            ], []
+
+        owner_involved = 'N' in [from_account.Co, to_account.Co]
+        if owner_involved and owner_transfer_treatment == 'equity':
+            from_equity = find_owner_equity_account(from_account.Co)
+            to_equity = find_owner_equity_account(to_account.Co)
+            errs = []
+            if from_equity is None:
+                errs.append(f'Missing owner equity account in {company_label(from_account.Co)}.')
+            if to_equity is None:
+                errs.append(f'Missing owner equity account in {company_label(to_account.Co)}.')
+            if errs:
+                return [], errs
+
+            return [
+                build_transfer_line(amount, True, to_account, from_account, 'XD', tcode, entry_date, ref),
+                build_transfer_line(amount, False, to_equity, from_account, 'OC', tcode, entry_date, ref),
+                build_transfer_line(amount, True, from_equity, to_account, 'OD', tcode, entry_date, ref),
+                build_transfer_line(amount, False, from_account, to_account, 'XC', tcode, entry_date, ref),
+            ], []
+
+        due_in_from_company, from_note = ensure_due_account(from_account.Co, to_account.Co)
+        due_in_to_company, to_note = ensure_due_account(to_account.Co, from_account.Co)
+        errs = []
+        if due_in_from_company is None:
+            errs.append(f'Missing due-to account in {company_label(from_account.Co)} for {company_label(to_account.Co)}.')
+        if due_in_to_company is None:
+            errs.append(f'Missing due-to account in {company_label(to_account.Co)} for {company_label(from_account.Co)}.')
+        if errs:
+            return [], errs
+
+        return [
+            build_transfer_line(amount, True, due_in_from_company, to_account, 'IA', tcode, entry_date, ref),
+            build_transfer_line(amount, False, from_account, to_account, 'XC', tcode, entry_date, ref),
+            build_transfer_line(amount, True, to_account, from_account, 'XD', tcode, entry_date, ref),
+            build_transfer_line(amount, False, due_in_to_company, from_account, 'IL', tcode, entry_date, ref),
+        ], []
+
     selected = {
         'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
         'entry_type': request.values.get('entry_type', 'Expense'),
@@ -564,6 +714,7 @@ def IntercompanyEntries():
         'transfer_amount': request.values.get('transfer_amount', ''),
         'transfer_ref': request.values.get('transfer_ref', ''),
         'transfer_memo': request.values.get('transfer_memo', ''),
+        'owner_transfer_treatment': request.values.get('owner_transfer_treatment', ''),
         'amount': request.values.get('amount', ''),
         'source': request.values.get('source', ''),
         'ref': request.values.get('ref', ''),
@@ -684,6 +835,7 @@ def IntercompanyEntries():
         to_account = Accounts.query.get(request.values.get('transfer_to_account_id') or 0)
         ref = request.values.get('transfer_ref', '').strip()
         memo = request.values.get('transfer_memo', '').strip()
+        owner_transfer_treatment = request.values.get('owner_transfer_treatment', '').strip()
 
         if transfer_date is None:
             err.append('Enter a valid transfer date.')
@@ -693,62 +845,82 @@ def IntercompanyEntries():
             err.append('Choose a valid account to pay from.')
         if to_account is None:
             err.append('Choose a valid account to pay to.')
+        if from_account is not None and not is_transfer_endpoint_account(from_account):
+            err.append('Pay From must be a bank, exchange, merchant, or credit card account.')
+        if to_account is not None and not is_transfer_endpoint_account(to_account):
+            err.append('Pay To must be a bank, exchange, merchant, or credit card account.')
         if from_account is not None and to_account is not None:
             if from_account.id == to_account.id:
                 err.append('The transfer accounts must be different.')
-            if from_account.Co != to_account.Co:
-                err.append('Account transfers must stay within one company. Use the intercompany entry section for cross-company activity.')
+            if from_account.Co != to_account.Co and 'N' in [from_account.Co, to_account.Co] and owner_transfer_treatment not in ['loan', 'equity']:
+                err.append('Choose whether this owner transfer is repayable or owner equity.')
 
         if not err:
             tcode = newjo('XF', transfer_date.strftime('%Y-%m-%d'))
             journal_id = f'TRANSFER-{tcode}'
             journal_memo = memo or f'Transfer from {from_account.Name} to {to_account.Name}'
-            post_err = post_balanced_journal(
-                [
-                    build_transfer_line(amount, True, to_account, from_account, 'XD', tcode, transfer_date, ref),
-                    build_transfer_line(amount, False, from_account, to_account, 'XC', tcode, transfer_date, ref),
-                ],
-                journal_id=journal_id,
-                journal_memo=journal_memo,
-                posted_by='account_transfer',
-                source_table='AccountTransfer',
-            )
-            if post_err:
-                err.extend(post_err)
+            lines, transfer_err = transfer_journal_lines(amount, from_account, to_account, tcode, transfer_date, ref, owner_transfer_treatment)
+            if transfer_err:
+                err.extend(transfer_err)
             else:
-                msg = f'Recorded account transfer {tcode}.'
-                selected.update({
-                    'transfer_date': datetime.date.today().strftime('%Y-%m-%d'),
-                    'transfer_from_account_id': '',
-                    'transfer_to_account_id': '',
-                    'transfer_amount': '',
-                    'transfer_ref': '',
-                    'transfer_memo': '',
-                })
+                post_err = post_balanced_journal(
+                    lines,
+                    journal_id=journal_id,
+                    journal_memo=journal_memo,
+                    posted_by='account_transfer',
+                    source_table='AccountTransfer',
+                )
+                if post_err:
+                    err.extend(post_err)
+                else:
+                    msg = f'Recorded account transfer {tcode}.'
+                    selected.update({
+                        'transfer_date': datetime.date.today().strftime('%Y-%m-%d'),
+                        'transfer_from_account_id': '',
+                        'transfer_to_account_id': '',
+                        'transfer_amount': '',
+                        'transfer_ref': '',
+                        'transfer_memo': '',
+                        'owner_transfer_treatment': '',
+                    })
+
+    setup_warnings = []
+    setup_changed = False
+    owner_cash_account, owner_cash_note = ensure_owner_cash_account()
+    if owner_cash_note:
+        setup_changed = True
+        setup_warnings.append(owner_cash_note)
+    for book_company in allowed_companies:
+        for target_company in allowed_companies:
+            if book_company == target_company:
+                continue
+            account, note = ensure_due_account(book_company, target_company)
+            if note:
+                setup_changed = True
+                setup_warnings.append(note)
+    if setup_changed:
+        db.session.commit()
 
     bank_accounts = Accounts.query.filter(
         (Accounts.Co.in_(allowed_companies)) &
-        (Accounts.Type.in_(['Bank', 'Asset']))
+        (Accounts.Type.in_(['Bank', 'Asset', 'Exch']))
     ).order_by(Accounts.Co, Accounts.Name).all()
     operating_accounts = Accounts.query.filter(
         (Accounts.Co.in_(allowed_companies)) &
         (Accounts.Type.in_(['Income', 'Expense']))
     ).order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
-    transfer_accounts = Accounts.query.filter(
-        ~Accounts.Type.in_(['Income', 'Expense'])
+    transfer_account_candidates = Accounts.query.filter(
+        Accounts.Co.in_(allowed_companies)
     ).order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
+    transfer_accounts = [
+        account for account in transfer_account_candidates
+        if is_transfer_endpoint_account(account)
+    ]
 
-    setup_warnings = []
     bank_companies = {account.Co for account in bank_accounts}
     for code in allowed_companies:
         if code not in bank_companies:
             setup_warnings.append(f'No cash/bank account is configured for {company_label(code)}.')
-    for book_company in allowed_companies:
-        for target_company in allowed_companies:
-            if book_company == target_company:
-                continue
-            if find_due_account(book_company, target_company) is None:
-                setup_warnings.append(f'No due-to account is configured in {company_label(book_company)} for {company_label(target_company)}.')
 
     raw_recent = Gledger.query.filter(
         Gledger.SourceTable.in_(['IntercompanyEntry', 'AccountTransfer'])
@@ -1262,6 +1434,1013 @@ def IncomeExpenseReview():
         category_summaries=category_summaries,
         account_summaries=account_summaries,
         entries=entries,
+    )
+
+
+@main.route('/BalanceSheet', methods=['GET'])
+@login_required
+def BalanceSheet():
+    def parse_date(value):
+        if not value:
+            return datetime.datetime.combine(datetime.date.today(), datetime.time.min)
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d')
+        except ValueError:
+            return datetime.datetime.combine(datetime.date.today(), datetime.time.min)
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    def account_section(account):
+        account_type = account.Type or ''
+        category = account.Category or ''
+        if account_type in ['Bank', 'Asset', 'Exch'] or category == 'Assets':
+            return 'Assets'
+        if 'Liability' in account_type or category == 'Liabilities':
+            return 'Liabilities'
+        if account_type == 'Equity' or category == 'Equity':
+            return 'Equity'
+        return 'Other Balance Accounts'
+
+    def account_balance(account, debit, credit):
+        section = account_section(account)
+        if section in ['Liabilities', 'Equity']:
+            return credit - debit
+        return debit - credit
+
+    today_value = datetime.date.today().strftime('%Y-%m-%d')
+    as_of_text = request.values.get('as_of', today_value).strip() or today_value
+    as_of_date = parse_date(as_of_text)
+    as_of_next = as_of_date + datetime.timedelta(days=1)
+    company_filter = request.values.get('com', cmpdata[10]).strip()
+
+    all_account_rows = Accounts.query
+    if company_filter:
+        all_account_rows = all_account_rows.filter(Accounts.Co == company_filter)
+    all_account_rows = all_account_rows.order_by(Accounts.Co, Accounts.Type, Accounts.Name).all()
+    all_accounts_by_id = {account.id: account for account in all_account_rows}
+    all_accounts_by_company_name = {(account.Co, account.Name): account for account in all_account_rows}
+    balance_accounts_by_id = {
+        account.id: account for account in all_account_rows
+        if account.Type not in ['Income', 'Expense']
+    }
+    balance_accounts_by_company_name = {
+        (account.Co, account.Name): account for account in all_account_rows
+        if account.Type not in ['Income', 'Expense']
+    }
+
+    ledger_query = Gledger.query.filter(Gledger.Date < as_of_next)
+    if company_filter:
+        ledger_query = ledger_query.filter(Gledger.Com == company_filter)
+    entries = ledger_query.all()
+
+    grouped = {}
+    income_total = 0
+    expense_total = 0
+    row_count = 0
+    for entry in entries:
+        account = balance_accounts_by_id.get(entry.Aid) or balance_accounts_by_company_name.get((entry.Com, entry.Account))
+        debit = entry.Debit or 0
+        credit = entry.Credit or 0
+
+        if account is None:
+            income_expense_account = all_accounts_by_id.get(entry.Aid) or all_accounts_by_company_name.get((entry.Com, entry.Account))
+            if income_expense_account is None:
+                continue
+            if income_expense_account.Type == 'Income':
+                income_total += credit - debit
+            else:
+                expense_total += debit - credit
+            continue
+
+        key = (account.Co, account.Name)
+        group = grouped.setdefault(key, {
+            'company': account.Co,
+            'account': account.Name,
+            'type': account.Type or '',
+            'category': account.Category or '',
+            'subcategory': account.Subcategory or '',
+            'section': account_section(account),
+            'debit': 0,
+            'credit': 0,
+            'balance': 0,
+            'rows': 0,
+        })
+        group['debit'] += debit
+        group['credit'] += credit
+        group['rows'] += 1
+        row_count += 1
+
+    for group in grouped.values():
+        account = balance_accounts_by_company_name.get((group['company'], group['account']))
+        group['balance'] = account_balance(account, group['debit'], group['credit'])
+
+    current_earnings = income_total - expense_total
+    if current_earnings:
+        grouped[('__earnings__', company_filter or 'All')] = {
+            'company': company_filter or 'All',
+            'account': 'Current Earnings',
+            'type': 'Equity',
+            'category': 'Equity',
+            'subcategory': '',
+            'section': 'Equity',
+            'debit': expense_total,
+            'credit': income_total,
+            'balance': current_earnings,
+            'rows': 0,
+        }
+
+    section_order = ['Assets', 'Liabilities', 'Equity', 'Other Balance Accounts']
+    account_summaries = sorted(
+        grouped.values(),
+        key=lambda item: (section_order.index(item['section']) if item['section'] in section_order else 99,
+                          item['company'], item['category'], item['account'])
+    )
+    for item in account_summaries:
+        item['debit_fmt'] = money(item['debit'])
+        item['credit_fmt'] = money(item['credit'])
+        item['balance_fmt'] = money(item['balance'])
+
+    section_summaries = []
+    for section in section_order:
+        section_items = [item for item in account_summaries if item['section'] == section]
+        if not section_items:
+            continue
+        total = sum(item['balance'] for item in section_items)
+        section_summaries.append({
+            'section': section,
+            'balance': total,
+            'balance_fmt': money(total),
+            'accounts': len(section_items),
+        })
+
+    category_map = {}
+    for item in account_summaries:
+        key = (item['section'], item['category'] or '(No Category)', item['subcategory'] or '')
+        category = category_map.setdefault(key, {
+            'section': item['section'],
+            'category': item['category'] or '(No Category)',
+            'subcategory': item['subcategory'] or '',
+            'balance': 0,
+            'accounts': 0,
+        })
+        category['balance'] += item['balance']
+        category['accounts'] += 1
+    category_summaries = sorted(
+        category_map.values(),
+        key=lambda item: (section_order.index(item['section']) if item['section'] in section_order else 99,
+                          item['category'], item['subcategory'])
+    )
+    for item in category_summaries:
+        item['balance_fmt'] = money(item['balance'])
+
+    assets_total = sum(item['balance'] for item in account_summaries if item['section'] == 'Assets')
+    liabilities_total = sum(item['balance'] for item in account_summaries if item['section'] == 'Liabilities')
+    equity_total = sum(item['balance'] for item in account_summaries if item['section'] == 'Equity')
+    other_total = sum(item['balance'] for item in account_summaries if item['section'] == 'Other Balance Accounts')
+    liabilities_equity_total = liabilities_total + equity_total
+    difference = assets_total - liabilities_equity_total - other_total
+
+    companies = [
+        item[0] for item in db.session.query(Gledger.Com)
+        .filter(Gledger.Com.isnot(None))
+        .distinct()
+        .order_by(Gledger.Com)
+        .all()
+    ]
+
+    filters = {
+        'as_of': as_of_date.strftime('%Y-%m-%d'),
+        'com': company_filter,
+    }
+    totals = {
+        'assets': money(assets_total),
+        'liabilities': money(liabilities_total),
+        'equity': money(equity_total),
+        'liabilities_equity': money(liabilities_equity_total),
+        'other': money(other_total),
+        'difference': money(difference),
+        'balanced': difference == 0,
+        'row_count': row_count,
+        'account_count': len(account_summaries),
+    }
+
+    return render_template(
+        'balance_sheet.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        filters=filters,
+        totals=totals,
+        companies=companies,
+        section_summaries=section_summaries,
+        category_summaries=category_summaries,
+        account_summaries=account_summaries,
+    )
+
+
+@main.route('/OpeningBalances', methods=['GET', 'POST'])
+@login_required
+def OpeningBalances():
+    def parse_date(value):
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d')
+        except:
+            return None
+
+    def money(cents):
+        return "{:,.2f}".format((cents or 0) / 100)
+
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            if clean in ['', '-']:
+                return 0
+            return int((Decimal(clean) * 100).quantize(Decimal('1')))
+        except:
+            return None
+
+    def account_section(account):
+        account_type = account.Type or ''
+        category = account.Category or ''
+        if account_type in ['Bank', 'Asset', 'Exch'] or category == 'Assets':
+            return 'Assets'
+        if 'Liability' in account_type or category == 'Liabilities':
+            return 'Liabilities'
+        if account_type == 'Equity' or category == 'Equity':
+            return 'Equity'
+        return 'Other Balance Accounts'
+
+    def line_for_normal_balance(account, cents):
+        section = account_section(account)
+        if section in ['Liabilities', 'Equity']:
+            debit = abs(cents) if cents < 0 else 0
+            credit = cents if cents > 0 else 0
+        else:
+            debit = cents if cents > 0 else 0
+            credit = abs(cents) if cents < 0 else 0
+        return debit, credit
+
+    def normal_balance_for_line(account, line):
+        section = account_section(account)
+        debit = line.Debit or 0
+        credit = line.Credit or 0
+        if section in ['Liabilities', 'Equity']:
+            return credit - debit
+        return debit - credit
+
+    def ensure_opening_equity(company_code):
+        account = Accounts.query.filter(
+            (Accounts.Co == company_code) &
+            (Accounts.Name == 'Opening Balance Equity')
+        ).first()
+        if account is not None:
+            return account
+        account = Accounts(
+            Name='Opening Balance Equity',
+            Balance=0.00,
+            AcctNumber=None,
+            Routing=None,
+            Payee=None,
+            Type='Equity',
+            Description='Created automatically for opening balance journals',
+            Category='Equity',
+            Subcategory='Opening Balances',
+            Taxrollup=None,
+            Co=company_code,
+            QBmap=None,
+            Shared=None,
+        )
+        db.session.add(account)
+        db.session.flush()
+        return account
+
+    today_value = datetime.date.today()
+    default_date = datetime.date(today_value.year, 1, 1).strftime('%Y-%m-%d')
+    selected = {
+        'company': request.values.get('company', cmpdata[10]).strip(),
+        'opening_date': request.values.get('opening_date', default_date).strip() or default_date,
+    }
+    err = []
+
+    companies = [
+        item[0] for item in db.session.query(Accounts.Co)
+        .filter(Accounts.Co.isnot(None))
+        .distinct()
+        .order_by(Accounts.Co)
+        .all()
+    ]
+    if selected['company'] not in companies and companies:
+        selected['company'] = companies[0]
+
+    opening_date = parse_date(selected['opening_date'])
+    journal_id = f"OPENBAL-{selected['company']}-{selected['opening_date'].replace('-', '')}"
+
+    accounts = Accounts.query.filter(
+        (Accounts.Co == selected['company']) &
+        (~Accounts.Type.in_(['Income', 'Expense'])) &
+        (Accounts.Name != 'Opening Balance Equity')
+    ).order_by(Accounts.Type, Accounts.Name).all()
+
+    existing_lines = Gledger.query.filter(
+        (Gledger.JournalId == journal_id) &
+        (Gledger.SourceTable == 'OpeningBalance') &
+        (Gledger.Com == selected['company'])
+    ).all()
+    existing_by_aid = {line.Aid: line for line in existing_lines}
+
+    if request.method == 'POST' and request.values.get('save_opening_balances') is not None:
+        if opening_date is None:
+            err.append('Opening balance date is invalid.')
+
+        reconciled_lines = [line for line in existing_lines if line.Reconciled not in [None, 0, 25]]
+        if reconciled_lines:
+            err.append('Cannot replace these opening balances because at least one line has already been reconciled.')
+
+        lines = []
+        debit_total = 0
+        credit_total = 0
+        recorded = datetime.datetime.now()
+        if not err:
+            for index, account in enumerate(accounts, start=1):
+                raw_value = request.values.get(f'balance_{account.id}', '')
+                amount = money_to_cents(raw_value)
+                if amount is None:
+                    err.append(f'Opening balance for {account.Name} is invalid.')
+                    continue
+                if amount == 0:
+                    continue
+                debit, credit = line_for_normal_balance(account, amount)
+                debit_total += debit
+                credit_total += credit
+                lines.append(Gledger(
+                    Debit=debit,
+                    Credit=credit,
+                    Account=account.Name,
+                    Aid=account.id,
+                    Source='Opening Balance',
+                    Sid=0,
+                    Type='DD' if debit else 'PC',
+                    Tcode=f'OB{selected["company"]}',
+                    Com=selected['company'],
+                    Recorded=recorded,
+                    Reconciled=0,
+                    Date=opening_date,
+                    Ref='Opening Balance',
+                    JournalId=journal_id,
+                    JournalSeq=index,
+                    JournalMemo=f'Opening balances as of {selected["opening_date"]}',
+                    PostedBy='opening_balances',
+                    PostedAt=recorded,
+                    SourceTable='OpeningBalance',
+                    SourceId=account.id,
+                ))
+
+        if not err and lines:
+            equity = ensure_opening_equity(selected['company'])
+            difference = debit_total - credit_total
+            if difference > 0:
+                equity_debit, equity_credit = 0, difference
+            elif difference < 0:
+                equity_debit, equity_credit = abs(difference), 0
+            else:
+                equity_debit, equity_credit = 0, 0
+            if equity_debit or equity_credit:
+                lines.append(Gledger(
+                    Debit=equity_debit,
+                    Credit=equity_credit,
+                    Account=equity.Name,
+                    Aid=equity.id,
+                    Source='Opening Balance',
+                    Sid=0,
+                    Type='OE',
+                    Tcode=f'OB{selected["company"]}',
+                    Com=selected['company'],
+                    Recorded=recorded,
+                    Reconciled=0,
+                    Date=opening_date,
+                    Ref='Opening Balance',
+                    JournalId=journal_id,
+                    JournalSeq=len(lines) + 1,
+                    JournalMemo=f'Opening balances as of {selected["opening_date"]}',
+                    PostedBy='opening_balances',
+                    PostedAt=recorded,
+                    SourceTable='OpeningBalance',
+                    SourceId=equity.id,
+                ))
+
+            for line in existing_lines:
+                db.session.delete(line)
+            for line in lines:
+                db.session.add(line)
+            db.session.commit()
+            err.append(f'Saved opening balance journal {journal_id} with {len(lines)} ledger row(s).')
+            existing_lines = Gledger.query.filter(
+                (Gledger.JournalId == journal_id) &
+                (Gledger.SourceTable == 'OpeningBalance') &
+                (Gledger.Com == selected['company'])
+            ).all()
+            existing_by_aid = {line.Aid: line for line in existing_lines}
+        elif not err:
+            for line in existing_lines:
+                db.session.delete(line)
+            db.session.commit()
+            err.append(f'Removed opening balance journal {journal_id}; all entered balances were zero.')
+            existing_lines = []
+            existing_by_aid = {}
+
+    account_rows = []
+    total_debits = 0
+    total_credits = 0
+    for account in accounts:
+        existing_line = existing_by_aid.get(account.id)
+        existing_balance = normal_balance_for_line(account, existing_line) if existing_line is not None else 0
+        debit, credit = line_for_normal_balance(account, existing_balance)
+        total_debits += debit
+        total_credits += credit
+        account_rows.append({
+            'id': account.id,
+            'name': account.Name,
+            'type': account.Type or '',
+            'category': account.Category or '',
+            'section': account_section(account),
+            'balance': money(existing_balance) if existing_balance else '',
+        })
+
+    existing_offset = next((line for line in existing_lines if line.Type == 'OE'), None)
+    offset_balance = 0
+    if existing_offset is not None:
+        offset_balance = (existing_offset.Credit or 0) - (existing_offset.Debit or 0)
+
+    totals = {
+        'journal_id': journal_id,
+        'debits': "${:,.2f}".format(total_debits / 100),
+        'credits': "${:,.2f}".format(total_credits / 100),
+        'offset': "${:,.2f}".format(offset_balance / 100),
+        'rows': len(existing_lines),
+    }
+
+    return render_template(
+        'opening_balances.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        companies=companies,
+        selected=selected,
+        account_rows=account_rows,
+        totals=totals,
+        err='\n'.join(err),
+    )
+
+
+@main.route('/CashFlowStatement', methods=['GET'])
+@login_required
+def CashFlowStatement():
+    def parse_date(value):
+        if not value:
+            return None
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d')
+        except ValueError:
+            return None
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    def classify_cash_flow(offset_accounts, source_table):
+        names = ' '.join((account.Name or '') for account in offset_accounts).lower()
+        types = {account.Type for account in offset_accounts if account is not None}
+        categories = {account.Category for account in offset_accounts if account is not None}
+
+        if not offset_accounts:
+            return 'Transfers', 'Cash transfer or opening balance'
+        if any(name in names for name in ['accounts receivable', 'accounts payable', 'payroll']):
+            return 'Operating Activities', 'Receipts/payments from operations'
+        if 'Income' in types or 'Expense' in types:
+            return 'Operating Activities', 'Income and expense activity'
+        if source_table in ['PayrollBatch', 'ManualDeposit']:
+            return 'Operating Activities', source_table
+        if any(account.Type in ['Asset'] and account.Type not in ['Bank', 'Exch'] for account in offset_accounts):
+            return 'Investing Activities', 'Non-cash asset activity'
+        if any(('Liability' in (account.Type or '')) or account.Type == 'Equity' for account in offset_accounts):
+            return 'Financing Activities', 'Debt, equity, owner, or intercompany activity'
+        return 'Operating Activities', 'Other cash activity'
+
+    def cash_balance_before(cash_account_names, company_filter, cutoff_date):
+        query = Gledger.query.filter(
+            (Gledger.Account.in_(cash_account_names)) &
+            (Gledger.Date < cutoff_date)
+        )
+        if company_filter:
+            query = query.filter(Gledger.Com == company_filter)
+        return sum((row.Debit or 0) - (row.Credit or 0) for row in query.all())
+
+    today_value = datetime.date.today()
+    default_from = datetime.date(today_value.year, 1, 1).strftime('%Y-%m-%d')
+    default_to = today_value.strftime('%Y-%m-%d')
+    filters = {
+        'date_from': request.values.get('date_from', default_from).strip() or default_from,
+        'date_to': request.values.get('date_to', default_to).strip() or default_to,
+        'com': request.values.get('com', cmpdata[10]).strip(),
+        'cash_account': request.values.get('cash_account', '').strip(),
+    }
+    date_from = parse_date(filters['date_from']) or datetime.datetime(today_value.year, 1, 1)
+    date_to = parse_date(filters['date_to']) or datetime.datetime.combine(today_value, datetime.time.min)
+    date_to_exclusive = date_to + datetime.timedelta(days=1)
+
+    cash_accounts_query = Accounts.query.filter(Accounts.Type.in_(['Bank', 'Exch']))
+    if filters['com']:
+        cash_accounts_query = cash_accounts_query.filter(Accounts.Co == filters['com'])
+    cash_accounts = cash_accounts_query.order_by(Accounts.Co, Accounts.Name).all()
+    cash_account_names = [account.Name for account in cash_accounts]
+    if filters['cash_account']:
+        cash_account_names = [filters['cash_account']]
+
+    account_rows = Accounts.query.all()
+    accounts_by_id = {account.id: account for account in account_rows}
+    accounts_by_company_name = {(account.Co, account.Name): account for account in account_rows}
+
+    cash_query = Gledger.query.filter(
+        (Gledger.Account.in_(cash_account_names if cash_account_names else ['__none__'])) &
+        (Gledger.Date >= date_from) &
+        (Gledger.Date < date_to_exclusive)
+    )
+    if filters['com']:
+        cash_query = cash_query.filter(Gledger.Com == filters['com'])
+    cash_lines = cash_query.order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
+
+    detail_rows = []
+    processed = set()
+    section_totals = {
+        'Operating Activities': 0,
+        'Investing Activities': 0,
+        'Financing Activities': 0,
+        'Transfers': 0,
+    }
+    for cash_line in cash_lines:
+        key = cash_line.JournalId or (f'TCODE-{cash_line.Com}-{cash_line.Tcode}' if cash_line.Tcode else f'LINE-{cash_line.id}')
+        if key in processed:
+            continue
+        processed.add(key)
+
+        if cash_line.JournalId:
+            journal_lines = Gledger.query.filter(Gledger.JournalId == cash_line.JournalId).all()
+        elif cash_line.Tcode:
+            journal_lines = Gledger.query.filter(
+                (Gledger.Com == cash_line.Com) &
+                (Gledger.Tcode == cash_line.Tcode)
+            ).all()
+        else:
+            journal_lines = [cash_line]
+
+        if filters['com']:
+            journal_lines = [line for line in journal_lines if line.Com == filters['com']]
+
+        selected_cash_lines = [
+            line for line in journal_lines
+            if line.Account in cash_account_names and date_from <= line.Date < date_to_exclusive
+        ]
+        cash_change = sum((line.Debit or 0) - (line.Credit or 0) for line in selected_cash_lines)
+
+        offset_lines = [line for line in journal_lines if line.Account not in cash_account_names]
+        offset_accounts = []
+        for line in offset_lines:
+            account = accounts_by_id.get(line.Aid) or accounts_by_company_name.get((line.Com, line.Account))
+            if account is not None:
+                offset_accounts.append(account)
+        section, classification = classify_cash_flow(offset_accounts, cash_line.SourceTable)
+
+        if cash_change == 0 and section != 'Transfers':
+            section = 'Transfers'
+            classification = 'Net cash change is zero'
+        section_totals[section] += cash_change
+
+        detail_rows.append({
+            'date': cash_line.Date,
+            'section': section,
+            'classification': classification,
+            'cash_accounts': ', '.join(sorted({line.Account for line in selected_cash_lines})),
+            'offset_accounts': ', '.join(sorted({line.Account for line in offset_lines})) or '(cash transfer)',
+            'source': cash_line.Source or cash_line.SourceTable or '',
+            'ref': cash_line.Ref or '',
+            'journal': cash_line.JournalId or cash_line.Tcode or '',
+            'memo': cash_line.JournalMemo or '',
+            'amount': cash_change,
+            'amount_fmt': money(cash_change),
+        })
+
+    beginning_cash = cash_balance_before(cash_account_names, filters['com'], date_from)
+    ending_cash = cash_balance_before(cash_account_names, filters['com'], date_to_exclusive)
+    net_change = ending_cash - beginning_cash
+
+    section_summaries = []
+    for section in ['Operating Activities', 'Investing Activities', 'Financing Activities']:
+        section_summaries.append({
+            'section': section,
+            'amount': section_totals[section],
+            'amount_fmt': money(section_totals[section]),
+        })
+    transfer_total = section_totals['Transfers']
+
+    companies = [
+        item[0] for item in db.session.query(Gledger.Com)
+        .filter(Gledger.Com.isnot(None))
+        .distinct()
+        .order_by(Gledger.Com)
+        .all()
+    ]
+    totals = {
+        'beginning_cash': money(beginning_cash),
+        'ending_cash': money(ending_cash),
+        'net_change': money(net_change),
+        'reported_change': money(section_totals['Operating Activities'] + section_totals['Investing Activities'] + section_totals['Financing Activities']),
+        'transfers': money(transfer_total),
+        'row_count': len(detail_rows),
+    }
+
+    return render_template(
+        'cash_flow_statement.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        filters=filters,
+        companies=companies,
+        cash_accounts=cash_accounts,
+        section_summaries=section_summaries,
+        detail_rows=detail_rows,
+        totals=totals,
+    )
+
+
+@main.route('/DepreciationSchedules', methods=['GET', 'POST'])
+@login_required
+def DepreciationSchedules():
+    def ensure_depreciation_schema():
+        if db.engine.dialect.name != 'mysql':
+            DepreciationAsset.__table__.create(bind=db.engine, checkfirst=True)
+            return
+
+        columns = {
+            'SourceTable': 'VARCHAR(45)',
+            'SourceId': 'INT',
+            'Company': 'VARCHAR(2)',
+            'AssetName': 'VARCHAR(100)',
+            'AssetIdentifier': 'VARCHAR(100)',
+            'AssetAccount': 'VARCHAR(50)',
+            'AccumDepAccount': 'VARCHAR(50)',
+            'DepExpenseAccount': 'VARCHAR(50)',
+            'InServiceDate': 'DATE',
+            'CostBasis': 'INT',
+            'SalvageValue': 'INT',
+            'BookMethod': 'VARCHAR(45)',
+            'BookLifeMonths': 'INT',
+            'TaxMethod': 'VARCHAR(45)',
+            'TaxClass': 'VARCHAR(45)',
+            'TaxLifeMonths': 'INT',
+            'Section179': 'INT',
+            'BonusDepreciation': 'INT',
+            'PriorBookAccum': 'INT',
+            'PriorTaxAccum': 'INT',
+            'Status': 'VARCHAR(25)',
+            'CreatedAt': 'DATETIME',
+            'UpdatedAt': 'DATETIME',
+        }
+
+        create_columns = ',\n                '.join(
+            [f'`{name}` {definition}' for name, definition in columns.items()]
+        )
+        with db.engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS `depreciation_assets` (
+                    `id` INT NOT NULL AUTO_INCREMENT,
+                    {create_columns},
+                    PRIMARY KEY (`id`)
+                )
+            """))
+            existing_columns = {
+                row[0] for row in conn.execute(text('SHOW COLUMNS FROM `depreciation_assets`'))
+            }
+            for name, definition in columns.items():
+                if name not in existing_columns:
+                    conn.execute(text(
+                        f'ALTER TABLE `depreciation_assets` ADD COLUMN `{name}` {definition}'
+                    ))
+
+    ensure_depreciation_schema()
+
+    def parse_date(value):
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d').date()
+        except:
+            return None
+
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            if clean in ['', '-']:
+                return 0
+            return int((Decimal(clean) * 100).quantize(Decimal('1')))
+        except:
+            return None
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    def source_label(source_table, source_id):
+        if source_table == 'Vehicles':
+            item = Vehicles.query.get(source_id)
+            if item is None:
+                return 'Missing vehicle'
+            return f'Vehicle {item.Unit or item.id} {item.Year or ""} {item.Make or ""} {item.Model or ""}'.strip()
+        if source_table == 'Autos':
+            item = Autos.query.get(source_id)
+            if item is None:
+                return 'Missing auto'
+            return f'Auto {item.Jo or item.id} {item.Year or ""} {item.Make or ""} {item.Model or ""}'.strip()
+        return f'{source_table} #{source_id}'
+
+    def source_identifier(source_table, source_id):
+        if source_table == 'Vehicles':
+            item = Vehicles.query.get(source_id)
+            if item is None:
+                return ''
+            return item.VIN or item.Plate or item.Unit or str(item.id)
+        if source_table == 'Autos':
+            item = Autos.query.get(source_id)
+            if item is None:
+                return ''
+            return item.VIN or item.Title or item.Jo or str(item.id)
+        return str(source_id)
+
+    def schedule_rows(asset, mode):
+        in_service = asset.InServiceDate
+        if in_service is None:
+            return []
+        cost = asset.CostBasis or 0
+        salvage = asset.SalvageValue or 0
+        if mode == 'book':
+            life_months = asset.BookLifeMonths or 60
+            basis = max(cost - salvage - (asset.PriorBookAccum or 0), 0)
+            first_year_extra = 0
+            prior_accum = asset.PriorBookAccum or 0
+        else:
+            life_months = asset.TaxLifeMonths or 60
+            section179 = min(asset.Section179 or 0, cost)
+            bonus = min(asset.BonusDepreciation or 0, max(cost - section179, 0))
+            basis = max(cost - section179 - bonus - (asset.PriorTaxAccum or 0), 0)
+            first_year_extra = section179 + bonus
+            prior_accum = asset.PriorTaxAccum or 0
+
+        if life_months <= 0:
+            return []
+        monthly = basis / life_months
+        rows = []
+        accumulated = prior_accum
+        months_used = 0
+        year = in_service.year
+        while months_used < life_months or first_year_extra:
+            start_month = in_service.month if year == in_service.year else 1
+            months = min(12 - start_month + 1, life_months - months_used)
+            if months < 0:
+                months = 0
+            depreciation = int(round(monthly * months))
+            if first_year_extra:
+                depreciation += first_year_extra
+                first_year_extra = 0
+            if depreciation <= 0 and months_used >= life_months:
+                break
+            months_used += months
+            accumulated += depreciation
+            rows.append({
+                'year': year,
+                'depreciation': depreciation,
+                'depreciation_fmt': money(depreciation),
+                'accumulated': accumulated,
+                'accumulated_fmt': money(accumulated),
+                'basis': max(cost - accumulated, 0),
+                'basis_fmt': money(max(cost - accumulated, 0)),
+            })
+            year += 1
+            if len(rows) > 50:
+                break
+        return rows
+
+    today_value = datetime.date.today().strftime('%Y-%m-%d')
+    selected_id = request.values.get('current_asset_id', '').strip()
+    if request.values.get('load_asset') is not None:
+        selected_id = request.values.get('asset_id', '').strip()
+    err = []
+    selected = {
+        'asset_id': selected_id,
+        'source': request.values.get('source', ''),
+        'company': request.values.get('company', cmpdata[10]),
+        'asset_name': request.values.get('asset_name', ''),
+        'asset_identifier': request.values.get('asset_identifier', ''),
+        'asset_account': request.values.get('asset_account', ''),
+        'accum_dep_account': request.values.get('accum_dep_account', ''),
+        'dep_expense_account': request.values.get('dep_expense_account', ''),
+        'in_service_date': request.values.get('in_service_date', today_value),
+        'cost_basis': request.values.get('cost_basis', ''),
+        'salvage_value': request.values.get('salvage_value', '0.00'),
+        'book_method': request.values.get('book_method', 'Straight Line'),
+        'book_life_months': request.values.get('book_life_months', '60'),
+        'tax_method': request.values.get('tax_method', 'Straight Line'),
+        'tax_class': request.values.get('tax_class', ''),
+        'tax_life_months': request.values.get('tax_life_months', '60'),
+        'section179': request.values.get('section179', '0.00'),
+        'bonus_depreciation': request.values.get('bonus_depreciation', '0.00'),
+        'prior_book_accum': request.values.get('prior_book_accum', '0.00'),
+        'prior_tax_accum': request.values.get('prior_tax_accum', '0.00'),
+        'status': request.values.get('status', 'Active'),
+    }
+
+    if request.method == 'POST' and request.values.get('load_asset') is not None:
+        asset = DepreciationAsset.query.get(selected_id or 0)
+        if asset is not None:
+            selected.update({
+                'asset_id': str(asset.id),
+                'source': f'{asset.SourceTable}:{asset.SourceId}',
+                'company': asset.Company or cmpdata[10],
+                'asset_name': asset.AssetName or '',
+                'asset_identifier': asset.AssetIdentifier or '',
+                'asset_account': asset.AssetAccount or '',
+                'accum_dep_account': asset.AccumDepAccount or '',
+                'dep_expense_account': asset.DepExpenseAccount or '',
+                'in_service_date': asset.InServiceDate.strftime('%Y-%m-%d') if asset.InServiceDate else today_value,
+                'cost_basis': money(asset.CostBasis).replace('$', ''),
+                'salvage_value': money(asset.SalvageValue).replace('$', ''),
+                'book_method': asset.BookMethod or 'Straight Line',
+                'book_life_months': str(asset.BookLifeMonths or 60),
+                'tax_method': asset.TaxMethod or 'Straight Line',
+                'tax_class': asset.TaxClass or '',
+                'tax_life_months': str(asset.TaxLifeMonths or 60),
+                'section179': money(asset.Section179).replace('$', ''),
+                'bonus_depreciation': money(asset.BonusDepreciation).replace('$', ''),
+                'prior_book_accum': money(asset.PriorBookAccum).replace('$', ''),
+                'prior_tax_accum': money(asset.PriorTaxAccum).replace('$', ''),
+                'status': asset.Status or 'Active',
+            })
+
+    if request.method == 'POST' and request.values.get('use_source') is not None:
+        source = selected['source']
+        try:
+            source_table, source_id = source.split(':', 1)
+            source_id = int(source_id)
+            selected['asset_name'] = source_label(source_table, source_id)
+            selected['asset_identifier'] = source_identifier(source_table, source_id)
+        except:
+            err.append('Choose a valid operational source asset.')
+
+    if request.method == 'POST' and request.values.get('save_asset') is not None:
+        try:
+            source_table, source_id = selected['source'].split(':', 1)
+            source_id = int(source_id)
+        except:
+            source_table, source_id = None, None
+            err.append('Choose a source asset to link.')
+
+        in_service = parse_date(selected['in_service_date'])
+        if in_service is None:
+            err.append('In-service date is invalid.')
+        cost_basis = money_to_cents(selected['cost_basis'])
+        salvage_value = money_to_cents(selected['salvage_value'])
+        section179 = money_to_cents(selected['section179'])
+        bonus_depreciation = money_to_cents(selected['bonus_depreciation'])
+        prior_book_accum = money_to_cents(selected['prior_book_accum'])
+        prior_tax_accum = money_to_cents(selected['prior_tax_accum'])
+        for label, value in [
+            ('Cost basis', cost_basis),
+            ('Salvage value', salvage_value),
+            ('Section 179', section179),
+            ('Bonus depreciation', bonus_depreciation),
+            ('Prior book accumulated depreciation', prior_book_accum),
+            ('Prior tax accumulated depreciation', prior_tax_accum),
+        ]:
+            if value is None:
+                err.append(f'{label} is invalid.')
+        try:
+            book_life_months = int(selected['book_life_months'])
+            tax_life_months = int(selected['tax_life_months'])
+        except:
+            book_life_months, tax_life_months = 0, 0
+            err.append('Book and tax life must be month counts.')
+        if book_life_months <= 0 or tax_life_months <= 0:
+            err.append('Book and tax life must be greater than zero.')
+        if cost_basis is not None and cost_basis <= 0:
+            err.append('Cost basis must be greater than zero.')
+        if not selected['asset_name'].strip():
+            err.append('Asset name is required.')
+
+        if not err:
+            now = datetime.datetime.now()
+            asset = DepreciationAsset.query.get(selected_id or 0)
+            if asset is None:
+                asset = DepreciationAsset(
+                    SourceTable=source_table,
+                    SourceId=source_id,
+                    Company=selected['company'],
+                    AssetName=selected['asset_name'].strip(),
+                    AssetIdentifier=selected['asset_identifier'].strip(),
+                    AssetAccount=selected['asset_account'].strip(),
+                    AccumDepAccount=selected['accum_dep_account'].strip(),
+                    DepExpenseAccount=selected['dep_expense_account'].strip(),
+                    InServiceDate=in_service,
+                    CostBasis=cost_basis,
+                    SalvageValue=salvage_value,
+                    BookMethod=selected['book_method'],
+                    BookLifeMonths=book_life_months,
+                    TaxMethod=selected['tax_method'],
+                    TaxClass=selected['tax_class'].strip(),
+                    TaxLifeMonths=tax_life_months,
+                    Section179=section179,
+                    BonusDepreciation=bonus_depreciation,
+                    PriorBookAccum=prior_book_accum,
+                    PriorTaxAccum=prior_tax_accum,
+                    Status=selected['status'],
+                    CreatedAt=now,
+                    UpdatedAt=now,
+                )
+                db.session.add(asset)
+            else:
+                asset.SourceTable = source_table
+                asset.SourceId = source_id
+                asset.Company = selected['company']
+                asset.AssetName = selected['asset_name'].strip()
+                asset.AssetIdentifier = selected['asset_identifier'].strip()
+                asset.AssetAccount = selected['asset_account'].strip()
+                asset.AccumDepAccount = selected['accum_dep_account'].strip()
+                asset.DepExpenseAccount = selected['dep_expense_account'].strip()
+                asset.InServiceDate = in_service
+                asset.CostBasis = cost_basis
+                asset.SalvageValue = salvage_value
+                asset.BookMethod = selected['book_method']
+                asset.BookLifeMonths = book_life_months
+                asset.TaxMethod = selected['tax_method']
+                asset.TaxClass = selected['tax_class'].strip()
+                asset.TaxLifeMonths = tax_life_months
+                asset.Section179 = section179
+                asset.BonusDepreciation = bonus_depreciation
+                asset.PriorBookAccum = prior_book_accum
+                asset.PriorTaxAccum = prior_tax_accum
+                asset.Status = selected['status']
+                asset.UpdatedAt = now
+            db.session.commit()
+            selected['asset_id'] = str(asset.id)
+            err.append(f'Depreciation asset {asset.AssetName} saved.')
+
+    source_options = []
+    for item in Vehicles.query.order_by(Vehicles.Unit, Vehicles.id).all():
+        source_options.append({
+            'value': f'Vehicles:{item.id}',
+            'label': source_label('Vehicles', item.id),
+        })
+    for item in Autos.query.order_by(Autos.Jo, Autos.id).limit(200).all():
+        source_options.append({
+            'value': f'Autos:{item.id}',
+            'label': source_label('Autos', item.id),
+        })
+
+    companies = [
+        item[0] for item in db.session.query(Accounts.Co)
+        .filter(Accounts.Co.isnot(None))
+        .distinct()
+        .order_by(Accounts.Co)
+        .all()
+    ]
+    asset_accounts = Accounts.query.filter(
+        (Accounts.Type.in_(['Asset', 'Bank', 'Exch'])) |
+        (Accounts.Category == 'Assets')
+    ).order_by(Accounts.Co, Accounts.Name).all()
+    accum_accounts = Accounts.query.filter(
+        (Accounts.Type.in_(['Asset', 'Current Liability', 'Equity'])) |
+        (Accounts.Name.contains('Depreciation'))
+    ).order_by(Accounts.Co, Accounts.Name).all()
+    expense_accounts = Accounts.query.filter(
+        Accounts.Type == 'Expense'
+    ).order_by(Accounts.Co, Accounts.Name).all()
+
+    assets = DepreciationAsset.query.order_by(DepreciationAsset.Company, DepreciationAsset.AssetName).all()
+    for asset in assets:
+        asset.cost_fmt = money(asset.CostBasis)
+        asset.book_accum_fmt = money(sum(row['depreciation'] for row in schedule_rows(asset, 'book')))
+        asset.tax_accum_fmt = money(sum(row['depreciation'] for row in schedule_rows(asset, 'tax')))
+        asset.source_label = source_label(asset.SourceTable, asset.SourceId)
+
+    selected_asset = DepreciationAsset.query.get(selected.get('asset_id') or 0)
+    book_schedule = schedule_rows(selected_asset, 'book') if selected_asset is not None else []
+    tax_schedule = schedule_rows(selected_asset, 'tax') if selected_asset is not None else []
+
+    return render_template(
+        'depreciation_schedules.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        selected=selected,
+        source_options=source_options,
+        companies=companies,
+        asset_accounts=asset_accounts,
+        accum_accounts=accum_accounts,
+        expense_accounts=expense_accounts,
+        assets=assets,
+        book_schedule=book_schedule,
+        tax_schedule=tax_schedule,
+        err='\n'.join(err),
     )
 
 
