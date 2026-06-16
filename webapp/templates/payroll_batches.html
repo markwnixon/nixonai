@@ -10,10 +10,16 @@
     </div>
 
     <form action="{{ url_for('main.PayrollBatches') }}" method="post">
+        <input type="hidden" name="edit_payroll_journal_id" value="{{ selected.edit_payroll_journal_id }}">
         <div class="row">
             <div class="col-lg-4 mb-3">
                 <div class="border rounded p-3">
                     <h5>Payroll Batch</h5>
+                    {% if selected.edit_payroll_journal_id %}
+                        <div class="alert alert-info py-2" role="alert">
+                            Editing selected payroll batch
+                        </div>
+                    {% endif %}
                     <div class="form-group">
                         <label for="pay_date">Pay Date</label>
                         <input type="date" class="form-control" id="pay_date" name="pay_date" value="{{ selected.pay_date }}">
@@ -194,10 +200,17 @@
                     <button type="submit" name="preview_payroll" value="1" class="btn btn-primary btn-block">
                         Preview Payroll Batch
                     </button>
-                    <button type="submit" name="record_payroll" value="1" class="btn btn-success btn-block"
-                            onclick="return confirm('Record this payroll batch to the general ledger?');">
-                        Record Payroll Batch
-                    </button>
+                    {% if selected.edit_payroll_journal_id %}
+                        <button type="submit" name="update_payroll_batch" value="1" class="btn btn-success btn-block"
+                                onclick="return confirm('Save changes to this payroll batch?');">
+                            Save Payroll Batch Changes
+                        </button>
+                    {% else %}
+                        <button type="submit" name="record_payroll" value="1" class="btn btn-success btn-block"
+                                onclick="return confirm('Record this payroll batch to the general ledger?');">
+                            Record Payroll Batch
+                        </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -242,40 +255,57 @@
 
     <hr>
     <h5>Recent Payroll Batches</h5>
-    <div class="table-responsive">
-        <table id="dtPayrollBatches" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
-            <thead class="thead-light">
-                <tr>
-                    <th>Date</th>
-                    <th>Tcode</th>
-                    <th>Journal</th>
-                    <th>People</th>
-                    <th>Memo</th>
-                    <th class="text-right">Gross</th>
-                    <th class="text-right">Employer Tax</th>
-                    <th class="text-right">Net Withdrawal</th>
-                    <th class="text-right">Tax Withdrawal</th>
-                    <th class="text-right">Bank Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for batch in recent_batches %}
+    <form action="{{ url_for('main.PayrollBatches') }}" method="post">
+        <div class="mb-2">
+            <button type="submit" name="load_payroll_batch" value="1" class="btn btn-primary btn-sm">Edit Selected Batch</button>
+            <button type="submit" name="delete_payroll_batch" value="1" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Delete the selected payroll batch?');">
+                Delete Selected Batch
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table id="dtPayrollBatches" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                <thead class="thead-light">
                     <tr>
-                        <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
-                        <td>{{ batch.tcode }}</td>
-                        <td>{{ batch.journal_id }}</td>
-                        <td title="{{ batch.people_text }}">{{ batch.people_count }}</td>
-                        <td>{{ batch.memo }}</td>
-                        <td class="text-right">{{ batch.gross_fmt }}</td>
-                        <td class="text-right">{{ batch.employer_tax_fmt }}</td>
-                        <td class="text-right">{{ batch.net_fmt }}</td>
-                        <td class="text-right">{{ batch.tax_withdrawal_fmt }}</td>
-                        <td class="text-right">{{ batch.bank_total_fmt }}</td>
+                        <th></th>
+                        <th>Date</th>
+                        <th>Tcode</th>
+                        <th>Journal</th>
+                        <th>People</th>
+                        <th>Memo</th>
+                        <th class="text-right">Gross</th>
+                        <th class="text-right">Employer Tax</th>
+                        <th class="text-right">Net Withdrawal</th>
+                        <th class="text-right">Tax Withdrawal</th>
+                        <th class="text-right">Bank Total</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    {% for batch in recent_batches %}
+                        <tr>
+                            <td class="text-center">
+                                <input type="radio" name="selected_payroll_journal_id" value="{{ batch.journal_id }}"
+                                       {% if selected.edit_payroll_journal_id == batch.journal_id %}checked{% endif %}>
+                            </td>
+                            <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                            <td>{{ batch.tcode }}</td>
+                            <td>{{ batch.journal_id }}</td>
+                            <td title="{{ batch.people_text }}">{{ batch.people_count }}</td>
+                            <td>
+                                {{ batch.memo }}
+                                {% if batch.reconciled %}<span class="badge badge-secondary ml-1">Reconciled</span>{% endif %}
+                            </td>
+                            <td class="text-right">{{ batch.gross_fmt }}</td>
+                            <td class="text-right">{{ batch.employer_tax_fmt }}</td>
+                            <td class="text-right">{{ batch.net_fmt }}</td>
+                            <td class="text-right">{{ batch.tax_withdrawal_fmt }}</td>
+                            <td class="text-right">{{ batch.bank_total_fmt }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -335,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
     $('#dtPayrollBatches').DataTable({
-        "aaSorting": [[0, "desc"]],
+        "aaSorting": [[1, "desc"]],
         "scrollX": true,
         "scrollY": 350,
         "stateSave": true,

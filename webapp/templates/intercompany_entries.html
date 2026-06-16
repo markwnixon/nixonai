@@ -10,10 +10,16 @@
     </div>
 
     <form action="{{ url_for('main.IntercompanyEntries') }}" method="post">
+        <input type="hidden" name="edit_transfer_journal_id" value="{{ selected.edit_transfer_journal_id }}">
         <div class="row">
             <div class="col-lg-4 mb-3">
                 <div class="border rounded p-3 mb-3">
                     <h5>Account Transfer</h5>
+                    {% if selected.edit_transfer_journal_id %}
+                        <div class="alert alert-info py-2" role="alert">
+                            Editing selected transfer
+                        </div>
+                    {% endif %}
                     <div class="form-group">
                         <label for="transfer_date">Date</label>
                         <input type="date" class="form-control" id="transfer_date" name="transfer_date" value="{{ selected.transfer_date }}">
@@ -74,7 +80,7 @@
                     </div>
                     <button type="submit" name="create_transfer" value="1" class="btn btn-success btn-block"
                             onclick="return confirm('Record this account transfer?');">
-                        Record Transfer
+                        {% if selected.edit_transfer_journal_id %}Save Transfer Changes{% else %}Record Transfer{% endif %}
                     </button>
                 </div>
             </div>
@@ -100,10 +106,18 @@
                 {% endif %}
 
                 <h5>Recent Entries and Transfers</h5>
+                <div class="mb-2">
+                    <button type="submit" name="load_transfer" value="1" class="btn btn-primary btn-sm">Edit Selected Transfer</button>
+                    <button type="submit" name="delete_transfer" value="1" class="btn btn-danger btn-sm"
+                            onclick="return confirm('Delete the selected account transfer?');">
+                        Delete Selected Transfer
+                    </button>
+                </div>
                 <div class="table-responsive mb-4">
                     <table id="dtIntercompanyRecent" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
                         <thead class="thead-light">
                             <tr>
+                                <th></th>
                                 <th>Date</th>
                                 <th>Kind</th>
                                 <th>Tcode</th>
@@ -118,6 +132,12 @@
                         <tbody>
                             {% for item in recent_entries %}
                                 <tr>
+                                    <td class="text-center">
+                                        {% if item.source_table == 'AccountTransfer' %}
+                                            <input type="radio" name="selected_transfer_journal_id" value="{{ item.journal_id }}"
+                                                   {% if selected.edit_transfer_journal_id == item.journal_id %}checked{% endif %}>
+                                        {% endif %}
+                                    </td>
                                     <td>{% if item.date %}{{ item.date.strftime('%Y-%m-%d') }}{% endif %}</td>
                                     <td>{{ item.entry_kind }}</td>
                                     <td>{{ item.tcode }}</td>
@@ -125,7 +145,10 @@
                                     <td>{{ item.source }}</td>
                                     <td>{{ item.ref or '' }}</td>
                                     <td class="text-right">{{ item.amount_fmt }}</td>
-                                    <td>{% if item.balanced %}Yes{% else %}No{% endif %}</td>
+                                    <td>
+                                        {% if item.balanced %}Yes{% else %}No{% endif %}
+                                        {% if item.reconciled %}<span class="badge badge-secondary ml-1">Reconciled</span>{% endif %}
+                                    </td>
                                     <td>{{ item.memo or '' }}</td>
                                 </tr>
                             {% endfor %}
@@ -205,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
     filterTransferAccounts();
 
     $('#dtIntercompanyRecent').DataTable({
-        order: [[0, 'desc']],
+        order: [[1, 'desc']],
         pageLength: 25
     });
     $('#dtDueBalances').DataTable({

@@ -702,6 +702,43 @@ def IntercompanyEntries():
             build_transfer_line(amount, False, due_in_to_company, from_account, 'IL', tcode, entry_date, ref),
         ], []
 
+    def transfer_lines_for_journal(journal_id):
+        if not journal_id:
+            return []
+        return Gledger.query.filter(
+            (Gledger.JournalId == journal_id) &
+            (Gledger.SourceTable == 'AccountTransfer')
+        ).order_by(Gledger.JournalSeq, Gledger.id).all()
+
+    def has_final_reconciliation(lines):
+        return any(line.Reconciled not in [None, 0, 25] for line in lines)
+
+    def transfer_selection_from_lines(lines):
+        debit_line = next((line for line in lines if line.Type == 'XD'), None)
+        credit_line = next((line for line in lines if line.Type == 'XC'), None)
+        if debit_line is None or credit_line is None:
+            return None
+
+        line_date = debit_line.Date or credit_line.Date
+        line_types = [line.Type for line in lines]
+        company_codes = {line.Com for line in lines if line.Com}
+        owner_transfer_treatment = ''
+        if 'OD' in line_types or 'OC' in line_types:
+            owner_transfer_treatment = 'equity'
+        elif 'N' in company_codes and len(company_codes) > 1:
+            owner_transfer_treatment = 'loan'
+
+        return {
+            'edit_transfer_journal_id': debit_line.JournalId or credit_line.JournalId or '',
+            'transfer_date': line_date.strftime('%Y-%m-%d') if line_date else datetime.date.today().strftime('%Y-%m-%d'),
+            'transfer_from_account_id': str(credit_line.Aid or ''),
+            'transfer_to_account_id': str(debit_line.Aid or ''),
+            'transfer_amount': money(debit_line.Debit or credit_line.Credit or 0).replace('$', ''),
+            'transfer_ref': debit_line.Ref or credit_line.Ref or '',
+            'transfer_memo': debit_line.JournalMemo or credit_line.JournalMemo or '',
+            'owner_transfer_treatment': owner_transfer_treatment,
+        }
+
     selected = {
         'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
         'entry_type': request.values.get('entry_type', 'Expense'),
@@ -715,6 +752,7 @@ def IntercompanyEntries():
         'transfer_ref': request.values.get('transfer_ref', ''),
         'transfer_memo': request.values.get('transfer_memo', ''),
         'owner_transfer_treatment': request.values.get('owner_transfer_treatment', ''),
+        'edit_transfer_journal_id': request.values.get('edit_transfer_journal_id', ''),
         'amount': request.values.get('amount', ''),
         'source': request.values.get('source', ''),
         'ref': request.values.get('ref', ''),
@@ -828,6 +866,34 @@ def IntercompanyEntries():
                         'memo': '',
                     }
 
+    if request.method == 'POST' and request.values.get('load_transfer'):
+        journal_id = request.values.get('selected_transfer_journal_id', '').strip()
+        lines = transfer_lines_for_journal(journal_id)
+        if not lines:
+            err.append('Choose an account transfer to edit.')
+        else:
+            transfer_selected = transfer_selection_from_lines(lines)
+            if transfer_selected is None:
+                err.append('The selected transfer could not be loaded because its ledger lines are incomplete.')
+            else:
+                selected.update(transfer_selected)
+                msg = f'Loaded transfer {lines[0].Tcode} for editing.'
+
+    if request.method == 'POST' and request.values.get('delete_transfer'):
+        journal_id = request.values.get('selected_transfer_journal_id', '').strip()
+        lines = transfer_lines_for_journal(journal_id)
+        if not lines:
+            err.append('Choose an account transfer to delete.')
+        elif has_final_reconciliation(lines):
+            err.append('This transfer has been reconciled. Reopen the reconciliation statement before deleting it.')
+        else:
+            tcode = lines[0].Tcode
+            for line in lines:
+                db.session.delete(line)
+            db.session.commit()
+            selected['edit_transfer_journal_id'] = ''
+            msg = f'Deleted account transfer {tcode}.'
+
     if request.method == 'POST' and request.values.get('create_transfer'):
         transfer_date = parse_date(request.values.get('transfer_date'))
         amount = cents(request.values.get('transfer_amount'))
@@ -836,6 +902,8 @@ def IntercompanyEntries():
         ref = request.values.get('transfer_ref', '').strip()
         memo = request.values.get('transfer_memo', '').strip()
         owner_transfer_treatment = request.values.get('owner_transfer_treatment', '').strip()
+        edit_journal_id = request.values.get('edit_transfer_journal_id', '').strip()
+        existing_transfer_lines = transfer_lines_for_journal(edit_journal_id) if edit_journal_id else []
 
         if transfer_date is None:
             err.append('Enter a valid transfer date.')
@@ -854,15 +922,27 @@ def IntercompanyEntries():
                 err.append('The transfer accounts must be different.')
             if from_account.Co != to_account.Co and 'N' in [from_account.Co, to_account.Co] and owner_transfer_treatment not in ['loan', 'equity']:
                 err.append('Choose whether this owner transfer is repayable or owner equity.')
+        if edit_journal_id and not existing_transfer_lines:
+            err.append('The transfer being edited could not be found.')
+        if existing_transfer_lines and has_final_reconciliation(existing_transfer_lines):
+            err.append('This transfer has been reconciled. Reopen the reconciliation statement before editing it.')
 
         if not err:
-            tcode = newjo('XF', transfer_date.strftime('%Y-%m-%d'))
-            journal_id = f'TRANSFER-{tcode}'
+            if existing_transfer_lines:
+                tcode = existing_transfer_lines[0].Tcode
+                journal_id = existing_transfer_lines[0].JournalId or f'TRANSFER-{tcode}'
+            else:
+                tcode = newjo('XF', transfer_date.strftime('%Y-%m-%d'))
+                journal_id = f'TRANSFER-{tcode}'
             journal_memo = memo or f'Transfer from {from_account.Name} to {to_account.Name}'
             lines, transfer_err = transfer_journal_lines(amount, from_account, to_account, tcode, transfer_date, ref, owner_transfer_treatment)
             if transfer_err:
                 err.extend(transfer_err)
             else:
+                for existing_line in existing_transfer_lines:
+                    db.session.delete(existing_line)
+                if existing_transfer_lines:
+                    db.session.flush()
                 post_err = post_balanced_journal(
                     lines,
                     journal_id=journal_id,
@@ -873,7 +953,7 @@ def IntercompanyEntries():
                 if post_err:
                     err.extend(post_err)
                 else:
-                    msg = f'Recorded account transfer {tcode}.'
+                    msg = f'Updated account transfer {tcode}.' if existing_transfer_lines else f'Recorded account transfer {tcode}.'
                     selected.update({
                         'transfer_date': datetime.date.today().strftime('%Y-%m-%d'),
                         'transfer_from_account_id': '',
@@ -882,6 +962,7 @@ def IntercompanyEntries():
                         'transfer_ref': '',
                         'transfer_memo': '',
                         'owner_transfer_treatment': '',
+                        'edit_transfer_journal_id': '',
                     })
 
     setup_warnings = []
@@ -931,6 +1012,7 @@ def IntercompanyEntries():
         item = journal_map.setdefault(key, {
             'journal_id': key,
             'entry_kind': 'Transfer' if line.SourceTable == 'AccountTransfer' else 'Intercompany',
+            'source_table': line.SourceTable,
             'date': line.Date,
             'tcode': line.Tcode,
             'memo': line.JournalMemo,
@@ -940,10 +1022,15 @@ def IntercompanyEntries():
             'debit': 0,
             'credit': 0,
             'bank_amount': 0,
+            'reconciled': False,
         })
+        if line.SourceTable == 'AccountTransfer':
+            item['entry_kind'] = 'Transfer'
         item['companies'].add(line.Com)
         item['debit'] += line.Debit or 0
         item['credit'] += line.Credit or 0
+        if line.Reconciled not in [None, 0, 25]:
+            item['reconciled'] = True
         if line.Type in ['PC', 'DD', 'XD', 'XC']:
             item['bank_amount'] = (line.Debit or line.Credit or 0)
     recent_entries = sorted(journal_map.values(), key=lambda item: item['date'] or datetime.datetime.min, reverse=True)
@@ -3705,6 +3792,76 @@ def PayrollBatches():
 
     company_code = cmpdata[10]
     today_value = datetime.date.today().strftime('%Y-%m-%d')
+
+    def payroll_lines_for_journal(journal_id):
+        if not journal_id:
+            return []
+        return Gledger.query.filter(
+            (Gledger.JournalId == journal_id) &
+            (Gledger.SourceTable == 'PayrollBatch') &
+            (Gledger.Com == company_code)
+        ).order_by(Gledger.JournalSeq, Gledger.id).all()
+
+    def payroll_has_final_reconciliation(lines):
+        return any(line.Reconciled not in [None, 0, 25] for line in lines)
+
+    def payroll_bills_for_journal(journal_id):
+        return Bills.query.filter(
+            (Bills.Temp1 == 'PayrollBatch') &
+            (Bills.Temp2 == journal_id) &
+            (Bills.Co == company_code)
+        ).all()
+
+    def payroll_selection_from_lines(lines):
+        if not lines:
+            return None, []
+        pc_line = next((line for line in lines if line.Type == 'PC'), None)
+        tax_line = next((line for line in lines if line.Type == 'XC'), None)
+        first_line = lines[0]
+        line_date = first_line.Date
+        provider = pc_line.Source if pc_line is not None else ''
+        ref = first_line.Ref or ''
+        bank_account = pc_line.Account if pc_line is not None else ''
+        tax_withdrawal = tax_line.Credit if tax_line is not None else 0
+
+        grouped_rows = {}
+        for line in lines:
+            if line.Type not in ['PW', 'PT']:
+                continue
+            row = grouped_rows.setdefault(line.Tcode, {
+                'employee': line.Source or '',
+                'wage_account': selected['wage_account'],
+                'tax_account': selected['tax_account'],
+                'gross_pay': '',
+                'net_pay': '',
+                'employer_tax': '',
+                'gross_cents': 0,
+                'net_cents': 0,
+                'employer_tax_cents': 0,
+            })
+            if line.Type == 'PW':
+                row['wage_account'] = line.Account
+                row['gross_cents'] = line.Debit or 0
+                row['gross_pay'] = money(line.Debit or 0).replace('$', '')
+            elif line.Type == 'PT':
+                row['tax_account'] = line.Account
+                row['employer_tax_cents'] = line.Debit or 0
+                row['employer_tax'] = money(line.Debit or 0).replace('$', '')
+
+        selection = {
+            'pay_date': line_date.strftime('%Y-%m-%d') if line_date else today_value,
+            'provider': provider or '',
+            'ref': ref,
+            'bank_account': bank_account,
+            'tax_withdrawal': money(tax_withdrawal).replace('$', ''),
+            'memo': first_line.JournalMemo or '',
+            'edit_payroll_journal_id': first_line.JournalId or '',
+        }
+        rows = list(grouped_rows.values()) or [
+            {'employee': '', 'wage_account': selected['wage_account'], 'tax_account': selected['tax_account'], 'gross_pay': '', 'net_pay': '', 'employer_tax': '', 'gross_cents': 0, 'net_cents': 0, 'employer_tax_cents': 0}
+        ]
+        return selection, rows
+
     err = []
     selected = {
         'pay_date': request.values.get('pay_date', today_value),
@@ -3715,6 +3872,7 @@ def PayrollBatches():
         'tax_account': request.values.get('tax_account', ''),
         'tax_withdrawal': request.values.get('tax_withdrawal', ''),
         'memo': request.values.get('memo', ''),
+        'edit_payroll_journal_id': request.values.get('edit_payroll_journal_id', ''),
     }
 
     bank_accounts = Accounts.query.filter(
@@ -3909,6 +4067,82 @@ def PayrollBatches():
         if not people_rows:
             people_rows = [{'employee': '', 'wage_account': selected['wage_account'], 'tax_account': selected['tax_account'], 'gross_pay': '', 'net_pay': '', 'employer_tax': '', 'gross_cents': 0, 'net_cents': 0, 'employer_tax_cents': 0}]
 
+    if request.method == 'POST' and request.values.get('load_payroll_batch') is not None:
+        journal_id = request.values.get('selected_payroll_journal_id', '').strip()
+        lines = payroll_lines_for_journal(journal_id)
+        selection, loaded_rows = payroll_selection_from_lines(lines)
+        if selection is None:
+            err.append('Choose a payroll batch to edit.')
+        else:
+            selected.update(selection)
+            people_rows = loaded_rows
+            err.append(f'Loaded payroll batch {lines[0].Tcode} for editing.')
+
+    if request.method == 'POST' and request.values.get('delete_payroll_batch') is not None:
+        journal_id = request.values.get('selected_payroll_journal_id', '').strip()
+        lines = payroll_lines_for_journal(journal_id)
+        if not lines:
+            err.append('Choose a payroll batch to delete.')
+        elif payroll_has_final_reconciliation(lines):
+            err.append('This payroll batch has been reconciled. Reopen the reconciliation statement before deleting it.')
+        else:
+            tcode = lines[0].Tcode
+            for bill in payroll_bills_for_journal(journal_id):
+                db.session.delete(bill)
+            for line in lines:
+                db.session.delete(line)
+            db.session.commit()
+            selected['edit_payroll_journal_id'] = ''
+            err.append(f'Deleted payroll batch {tcode}.')
+
+    if request.method == 'POST' and request.values.get('update_payroll_batch') is not None:
+        journal_id = selected['edit_payroll_journal_id'].strip()
+        lines = payroll_lines_for_journal(journal_id)
+        try:
+            pay_date = datetime.datetime.strptime(selected['pay_date'], '%Y-%m-%d')
+        except:
+            pay_date = None
+            err.append('Pay date is invalid')
+        bank = Accounts.query.filter(
+            (Accounts.Name == selected['bank_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        if not lines:
+            err.append('The payroll batch being edited could not be found.')
+        elif payroll_has_final_reconciliation(lines):
+            err.append('This payroll batch has been reconciled. Reopen the reconciliation statement before editing it.')
+        if bank is None:
+            err.append('Bank account is required')
+
+        if not err:
+            source = selected['provider'].strip() or 'Payroll'
+            memo = selected['memo'].strip() or f'Payroll batch {lines[0].Tcode}'
+            ref = selected['ref'].strip() or None
+            for line in lines:
+                line.Date = pay_date
+                line.Ref = ref
+                line.JournalMemo = memo
+                line.PostedAt = datetime.datetime.now()
+                if line.Type in ['PC', 'XC']:
+                    line.Account = bank.Name
+                    line.Aid = bank.id
+                    line.Source = source if line.Type == 'PC' else f'{source} payroll taxes'
+                if line.Type in ['PW', 'PT']:
+                    line.Sid = bank.id
+            for bill in payroll_bills_for_journal(journal_id):
+                bill.Ref = ref
+                bill.Date = pay_date
+                bill.pDate = pay_date
+                bill.dDate = pay_date
+                bill.pAccount = bank.Name
+                bill.PacctList = bank.Name
+                bill.Memo = memo[:50]
+                bill.MemoList = memo[:200]
+                bill.PdateList = pay_date.strftime('%Y-%m-%d') if pay_date else None
+            db.session.commit()
+            err.append(f'Updated payroll batch {lines[0].Tcode}.')
+            selected['edit_payroll_journal_id'] = ''
+
     gross_pay = sum(row['gross_cents'] for row in people_rows)
     net_pay = sum(row['net_cents'] for row in people_rows)
     employer_tax = sum(row['employer_tax_cents'] for row in people_rows)
@@ -4081,12 +4315,15 @@ def PayrollBatches():
             'tcode': line.Tcode or '',
             'date': line.Date,
             'memo': line.JournalMemo or '',
+            'reconciled': False,
             'gross': 0,
             'employer_tax': 0,
             'net': 0,
             'tax_withdrawal': 0,
             'people': set(),
         })
+        if line.Reconciled not in [None, 0, 25]:
+            group['reconciled'] = True
         if line.Type == 'PW':
             group['gross'] += line.Debit or 0
             if line.Source:
