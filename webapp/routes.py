@@ -2663,7 +2663,8 @@ def Banking():
 def BankingPaymentDetail():
     def cents_from_value(value):
         try:
-            return int(round(float(str(value).replace(',', '').replace('$', '')) * 100))
+            clean = str(value).replace(',', '').replace('$', '').strip()
+            return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
         except:
             return 0
 
@@ -2776,7 +2777,8 @@ def ReceiveByAccount():
 
     def money_to_cents(value):
         try:
-            return int(round(float(str(value).replace('$', '').replace(',', '').strip()) * 100))
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
         except:
             return 0
 
@@ -3368,7 +3370,7 @@ def GeneralDeposits():
     def money_to_cents(value):
         try:
             clean = str(value).replace('$', '').replace(',', '').strip()
-            return int(round(float(clean) * 100))
+            return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
         except:
             return 0
 
@@ -3662,7 +3664,7 @@ def PayrollBatches():
     def money_to_cents(value):
         try:
             clean = str(value).replace('$', '').replace(',', '').strip()
-            return int(round(float(clean) * 100))
+            return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
         except:
             return 0
 

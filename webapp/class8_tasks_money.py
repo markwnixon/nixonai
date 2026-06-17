@@ -17,6 +17,17 @@ from webapp.class8_tasks_gledger import gledger_write, get_company
 
 import usaddress
 from datetime import timedelta, date
+from decimal import Decimal
+
+
+def cents(value):
+    try:
+        clean = str(value).replace('$', '').replace(',', '').strip()
+        if clean in ['', 'None', 'none']:
+            clean = '0'
+        return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
+    except:
+        return 0
 
 def addr2break(adv):
     ai = ''
@@ -1015,7 +1026,7 @@ def income_record(jopaylist, err):
     co = get_company(pid)
     cc = jo[0]
     print(f'About to write the income total payment in a multi payment with amount {amt_total}')
-    amt_int = int(float(amt_total)*100)
+    amt_int = cents(amt_total)
     input_paymnt = PaymentsRec(Amount=amt_int, Account=depoacct, Source=co, Type=paymethod, Com=cc, Recorded=dt, Date=paidon, Ref=payref)
     db.session.add(input_paymnt)
     db.session.commit()
