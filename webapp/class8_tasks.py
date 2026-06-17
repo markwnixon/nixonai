@@ -27,6 +27,7 @@ import subprocess
 #from func_cal import calmodalupdate
 import json
 import numbers
+from decimal import Decimal, ROUND_HALF_UP
 
 #Python functions that require database access
 from webapp.class8_utils import *
@@ -45,6 +46,48 @@ def delete_bill_ledger_entries(bill):
         return 0
     row_ids = [row.id for row in rows]
     return Gledger.query.filter(Gledger.id.in_(row_ids)).delete(synchronize_session=False)
+
+
+def cents(value):
+    try:
+        clean = str(value).replace('$', '').replace(',', '').strip()
+        if clean in ['', 'None', 'none']:
+            clean = '0'
+        return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    except:
+        return 0
+
+
+def repair_bill_ledger_rounding(company_code=None):
+    query = Bills.query.filter(Bills.Status == 'Paid')
+    if company_code:
+        query = query.filter(Bills.Co == company_code)
+
+    repaired = 0
+    for bill in query.all():
+        bill_amount = cents(bill.bAmount)
+        payment_amount = cents(bill.pAmount2 if bill.iflag and bill.pAmount2 else bill.pAmount)
+        for row in bill_ledger_entries(bill):
+            if row.Reconciled not in [None, 0, 25]:
+                continue
+            if row.Type in ['ED', 'EC']:
+                expected = bill_amount
+            elif row.Type in ['PD', 'PC', 'QD', 'QC']:
+                expected = payment_amount
+            else:
+                continue
+            if expected <= 0:
+                continue
+            current = row.Debit or row.Credit or 0
+            if current != expected and abs(current - expected) <= 1:
+                if row.Debit:
+                    row.Debit = expected
+                else:
+                    row.Credit = expected
+                repaired += 1
+    if repaired:
+        db.session.commit()
+    return repaired
 
 
 def bill_ledger_entries(bill):
@@ -2507,6 +2550,17 @@ def Table_maker(genre):
                 inputdata.append(hdat.Name)
             return inputdata
 
+        if not session.get('bill_rounding_repair_checked'):
+            repaired_rows = repair_bill_ledger_rounding(companydata()[10])
+            session['bill_rounding_repair_checked'] = 1
+            if repaired_rows:
+                repair_message = f'Corrected {repaired_rows} one-cent bill ledger rounding difference(s).'
+                if isinstance(err, list):
+                    err.append(repair_message)
+                elif err:
+                    err = f'{err}\n{repair_message}'
+                else:
+                    err = repair_message
         holdvec[100] = expense_totals()
         holdvec.extend([None] * 6)
         holdvec[101] = get_vendor_fills()

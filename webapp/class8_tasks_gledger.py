@@ -3,6 +3,17 @@ from webapp.models import Gledger, Invoices, JO, Income, Bills, Accounts, People
 import datetime
 from webapp.viewfuncs import stripper
 import json
+from decimal import Decimal, ROUND_HALF_UP
+
+
+def cents(value):
+    try:
+        clean = str(value).replace('$', '').replace(',', '').strip()
+        if clean in ['', 'None', 'none']:
+            clean = '0'
+        return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    except:
+        return 0
 
 
 def audit_journal_balance(journal_id):
@@ -158,7 +169,7 @@ def gledger_multi_job(bus,jolist,acctdb,acctcr):
         amt = 0
         for joget in jolist:
             odat = Orders.query.filter(Orders.Jo == joget).first()
-            amt = amt + int(float(odat.InvoTotal) * 100)
+            amt = amt + cents(odat.InvoTotal)
 
 
         acr = Accounts.query.filter((Accounts.Name == acctcr) & (Accounts.Co == cc)).first()
@@ -207,7 +218,7 @@ def gledger_app_write(sapp,jo,cofor,id1,id2,amt):
     acr = Accounts.query.get(id2)
     acctdb = adb.Name
     acctcr = acr.Name
-    amt = int(float(amt) * 100)
+    amt = cents(amt)
 
     gdat = Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == ad)).first()
     if gdat is not None:
@@ -243,7 +254,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
         if bus=='invoice':
             amtinvo = busvec[1]
-            amt = int(float(amtinvo) * 100)
+            amt = cents(amtinvo)
             acctdb='Accounts Receivable'
             acctcr = check_revenue_acct(fd)
             #acctcr='Revenues'
@@ -284,7 +295,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
         if bus=='income':
 
             amtpaid, paidon, payref, paymethod = busvec[1], busvec[2], busvec[3], busvec[4]
-            amt = int(float(amtpaid) * 100)
+            amt = cents(amtpaid)
             if 'Cash' in acctdb or 'Check' in acctdb or 'Mcheck' in acctdb or 'Undeposited' in acctdb:
                 acctdb='Undeposited Funds'
                 dtype = 'ID'
@@ -328,7 +339,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
         if bus=='deposit':
 
             odat=Orders.query.filter(Orders.Jo==jo).first()
-            amt=int(float(odat.PaidAmt)*100)
+            amt=cents(odat.PaidAmt)
             pid=odat.Bid
             date = odat.PaidDate
             co = get_company(pid)
@@ -379,7 +390,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
         if bus=='newbill':
             bdat=Bills.query.filter(Bills.Jo==jo).first()
-            amt=int(float(bdat.bAmount)*100)
+            amt=cents(bdat.bAmount)
             pid=bdat.Pid
             bdate = bdat.Date
             co = get_company(pid)
@@ -434,8 +445,8 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
             if iflag is not None:
                 if iflag > 0:
                     jo = jo + f'-{iflag}'
-                    amt = float(bdat.pAmount2)
-            amt=int(amt*100)
+                    amt = bdat.pAmount2
+            amt=cents(amt)
             journal_id = f'PAYBILL-{jo}'
 
             pid=bdat.Pid
@@ -501,7 +512,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
         if bus=='xfer':
             bdat=Bills.query.filter(Bills.Jo==jo).first()
-            amt=int(float(bdat.bAmount)*100)
+            amt=cents(bdat.bAmount)
             xdate = bdat.bDate
 
             adb=Accounts.query.filter((Accounts.Name==acctdb)).first() #the expense account
@@ -531,7 +542,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
         if bus=='dircharge':
             bdat=Bills.query.filter(Bills.Jo==jo).first()
-            amt=int(float(bdat.bAmount)*100)
+            amt=cents(bdat.bAmount)
             pid=bdat.Pid
             bdate = bdat.bDate
             co = get_company(pid)
@@ -561,7 +572,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
         if bus == 'purchase':
             bdat=Bills.query.filter(Bills.Jo==jo).first()
-            amt=int(float(bdat.bAmount)*100)
+            amt=cents(bdat.bAmount)
             pid=bdat.Pid
             bdate = bdat.bDate
             co = get_company(pid)
@@ -606,7 +617,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
             adata=Adjusting.query.filter( (Adjusting.Jo.contains(jo)) & (Adjusting.Moa != 0) ).all()
             for adat in adata:
-                amt=int(float(adat.Amta)*100)
+                amt=cents(adat.Amta)
                 tcode = f'{jo}-{str(adat.Moa)}'
                 bdate = adat.Date
 
