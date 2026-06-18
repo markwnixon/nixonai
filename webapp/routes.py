@@ -2958,10 +2958,10 @@ def ReceiveByAccount():
             original_ids = [int(row_id) for row_id in selected_ids.split(',') if row_id.strip()]
         except:
             err_list.append('Reloaded payment batch has invalid row data.')
-            return err_list
+            return err_list, selected_ids
         if not original_ids:
             err_list.append('Reload a payment batch before updating it.')
-            return err_list
+            return err_list, selected_ids
 
         old_debit_rows = Gledger.query.filter(
             (Gledger.id.in_(original_ids)) &
@@ -2970,7 +2970,7 @@ def ReceiveByAccount():
         ).all()
         if not old_debit_rows:
             err_list.append('Could not find the reloaded payment batch to update.')
-            return err_list
+            return err_list, selected_ids
 
         first = old_debit_rows[0]
         payment_ref_id = first.Sid
@@ -2982,10 +2982,10 @@ def ReceiveByAccount():
             pay_date_value = datetime.datetime.strptime(pay_date, '%Y-%m-%d')
         except:
             err_list.append('Payment date is invalid.')
-            return err_list
+            return err_list, selected_ids
         if not pay_method or not deposit_account:
             err_list.append('Choose payment method and deposit account before updating.')
-            return err_list
+            return err_list, selected_ids
 
         new_lines = {}
         for key in request.values:
@@ -2999,11 +2999,15 @@ def ReceiveByAccount():
             if order is None:
                 continue
             amount = money_to_cents(request.values.get(f'amount{order.id}', '0.00'))
-            if amount > 0:
+            if amount != 0:
                 new_lines[order.Jo] = (order, amount)
         if not new_lines:
-            err_list.append('Select at least one invoice with a positive received amount.')
-            return err_list
+            err_list.append('Select at least one invoice with a non-zero received amount.')
+            return err_list, selected_ids
+        updated_total_amount = sum(amount for order, amount in new_lines.values())
+        if updated_total_amount <= 0:
+            err_list.append('Updated payment batch total must be greater than zero.')
+            return err_list, selected_ids
 
         payment_record = PaymentsRec.query.get(payment_ref_id) if payment_ref_id else None
         if payment_record is None:
@@ -3042,7 +3046,7 @@ def ReceiveByAccount():
         ).first()
         if debit_account is None or credit_account is None:
             err_list.append('Required ledger accounts could not be found.')
-            return err_list
+            return err_list, selected_ids
 
         total_amount = 0
         recorded = datetime.datetime.now()
@@ -3104,8 +3108,14 @@ def ReceiveByAccount():
                 refresh_order_payment_status(order)
 
         db.session.commit()
+        updated_rows = Gledger.query.filter(
+            (Gledger.Sid == payment_ref_id) &
+            (Gledger.Type.in_(['DD', 'ID'])) &
+            (Gledger.Com == cmpdata[10])
+        ).order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
+        updated_ids = ','.join(str(row.id) for row in updated_rows)
         err_list.append(f'Updated reloaded payment batch {payment_ref_id} for ${total_amount / 100:,.2f}.')
-        return err_list
+        return err_list, updated_ids
 
     def reload_receive_batch(holdvec, selected_batches, err_list, use_posted_values=False):
         if len(selected_batches) != 1:
@@ -3259,10 +3269,10 @@ def ReceiveByAccount():
         completed = False
         err_list = []
         holdvec = [''] * 150
-        err_list = update_reloaded_receive_batch(err_list)
+        err_list, updated_batch_ids = update_reloaded_receive_batch(err_list)
         holdvec, err_list = reload_receive_batch(
             holdvec,
-            [request.values.get('reloaded_batch_ids')],
+            [updated_batch_ids or request.values.get('reloaded_batch_ids')],
             err_list,
             use_posted_values=True,
         )
