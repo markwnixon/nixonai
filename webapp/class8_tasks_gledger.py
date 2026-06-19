@@ -2,6 +2,7 @@ from webapp import db
 from webapp.models import Gledger, Invoices, JO, Income, Bills, Accounts, People, Focusareas, Deposits, Adjusting, Orders, PaymentsRec
 import datetime
 from webapp.viewfuncs import stripper
+from webapp.class8_utils import parse_financial_date
 import json
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -40,8 +41,24 @@ def post_balanced_journal(lines, journal_id=None, journal_memo=None, posted_by='
         for key in required:
             if line.get(key) is None:
                 err.append(f"Ledger line missing {key} for {line.get('tcode')} {line.get('type')}")
+        line_date = parse_financial_date(line.get('date'))
+        if line_date is None:
+            err.append(f"Ledger line has invalid date for {line.get('tcode')} {line.get('type')}")
+        else:
+            line['date'] = line_date
     if err:
         return err
+
+    for line in lines:
+        query = Gledger.query.filter(
+            (Gledger.Tcode == line['tcode']) &
+            (Gledger.Type == line['type'])
+        )
+        if line.get('match_aid', False):
+            query = query.filter(Gledger.Aid == line['aid'])
+        existing = query.first()
+        if existing is not None and existing.Reconciled not in [None, 0, 25]:
+            return [f"Cannot update reconciled ledger line {existing.Tcode} {existing.Type}. Reopen the reconciliation first."]
 
     try:
         posted_at = datetime.datetime.now()
@@ -450,7 +467,9 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
             journal_id = f'PAYBILL-{jo}'
 
             pid=bdat.Pid
-            pdate = bdat.pDate
+            pdate = parse_financial_date(bdat.pDate)
+            if pdate is None:
+                return [f'Paid date for bill {jo} is invalid. Use a four digit year such as 2026-02-09 before recording payment.']
             co = get_company(pid)
 
             acctdb = 'Accounts Payable'

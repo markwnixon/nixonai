@@ -7,6 +7,22 @@ import math
 from webapp.models import Orders
 today = datetime.datetime.today()
 
+
+def parse_financial_date(value):
+    if isinstance(value, datetime.datetime):
+        dt = value
+    elif isinstance(value, datetime.date):
+        dt = datetime.datetime.combine(value, datetime.time.min)
+    else:
+        try:
+            dt = datetime.datetime.strptime(str(value).strip(), '%Y-%m-%d')
+        except:
+            return None
+
+    if dt.year < 1900 or dt.year > 2100:
+        return None
+    return dt
+
 def sameall(lst):
     digfor = True
     for item in lst:
@@ -74,19 +90,31 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
 
     elif type == 'date':
         if isinstance(text, datetime.date):
-            #print('date is in datetime format')
-            status = 0
-            message = 'ok'
+            if parse_financial_date(text) is None:
+                status = 2
+                message = 'Error: Date year must be between 1900 and 2100'
+            else:
+                #print('date is in datetime format')
+                status = 0
+                message = 'ok'
         else:
             try:
                 dt = datetime.datetime.strptime(text,'%Y-%m-%d')
-                status = 0
-                message = 'ok'
-                #print(f'date {text} is text that can be converted')
+                if parse_financial_date(dt) is None:
+                    status = 2
+                    message = 'Error: Date year must be between 1900 and 2100'
+                else:
+                    status = 0
+                    message = 'ok'
+                    #print(f'date {text} is text that can be converted')
             except:
-                text = today.strftime('%Y-%m-%d')
-                status = 1
-                message = 'Warning: No date time entered so date set to today'
+                if hasinput(text):
+                    status = 2
+                    message = 'Error: Date must use YYYY-MM-DD format'
+                else:
+                    text = today.strftime('%Y-%m-%d')
+                    status = 1
+                    message = 'Warning: No date time entered so date set to today'
 
     elif type == 'float':
         try:
