@@ -23,7 +23,7 @@ import imaplib
 import ssl
 
 
-def send_mimemail(emaildata,emailsender):
+def send_mimemail(emaildata,emailsender, raise_errors=False):
 
     ourserver = websites['mailserver']
     #emaildata is packed as emaildata = [etitle, ebody, emailin1, emailin2, emailcc1, emailcc2]
@@ -96,14 +96,22 @@ def send_mimemail(emaildata,emailsender):
     except smtplib.SMTPConnectError as e:
         print(f"SMTP connection error: {e}")
         print("Possible causes: Incorrect server address or port, firewall issues, server not reachable.")
+        if raise_errors:
+            raise
     except socket.gaierror as e:
         print(f"Address resolution error: {e}")
         print("Possible causes: Incorrect hostname, no internet connection, DNS issues.")
+        if raise_errors:
+            raise
     except smtplib.SMTPServerDisconnected as e:
         print(f"SMTP server disconnected prematurely: {e}")
         print("Possible causes: Server issues, connection timeout.")
+        if raise_errors:
+            raise
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+        if raise_errors:
+            raise
 
 
 

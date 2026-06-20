@@ -29,6 +29,33 @@ class users(db.Model, UserMixin):
     def __repr__(self):
         return f"user('{self.name}','{self.username}', '{self.email}')"
 
+
+class ScacMfaSettings(db.Model):
+    __tablename__ = 'scac_mfa_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    scac_code = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    financial_mfa_required = db.Column(db.Boolean, nullable=False, default=False)
+    timeout_minutes = db.Column(db.Integer, nullable=False, default=720)
+    updated_by = db.Column(db.String(30))
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"ScacMfaSettings('{self.scac_code}', required={self.financial_mfa_required})"
+
+
+class UserMfa(db.Model):
+    __tablename__ = 'user_mfa'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
+    scac_code = db.Column(db.String(20), nullable=False, index=True)
+    totp_secret = db.Column(db.String(64), nullable=False)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    confirmed_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return f"UserMfa(user_id={self.user_id}, scac='{self.scac_code}', enabled={self.enabled})"
+
 class BotClient(db.Model):
     __tablename__ = 'bot_clients'
     id = db.Column(db.Integer, primary_key=True)

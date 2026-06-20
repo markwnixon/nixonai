@@ -97,6 +97,7 @@
                 {% if session['authority'] == 'superuser' %}
                     <a class="dropdown-item" href="{{ url_for('authenticate.register') }}">Create New User</a>
                     <a class="dropdown-item" href="{{ url_for('authenticate.register_bot') }}">Create New Bot Client</a>
+                    <a class="dropdown-item" href="{{ url_for('authenticate.mfa_settings') }}">Financial MFA Settings</a>
                 {% endif %}
 
             </div>

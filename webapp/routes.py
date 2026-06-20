@@ -8,6 +8,7 @@ from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
 from flask_login import login_required
 from sqlalchemy import func, text
+from webapp.financial_mfa import FINANCIAL_GENRES, financial_mfa_redirect, financial_mfa_required
 
 from decimal import Decimal
 
@@ -449,6 +450,10 @@ def Class8Main(genre):
     print('routes.py 237: The genre is',genre)
     if genre == 'Banking':
         return redirect(url_for('main.Banking'))
+    if genre in FINANCIAL_GENRES:
+        redirect_response = financial_mfa_redirect()
+        if redirect_response is not None:
+            return redirect_response
     genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup = Table_maker(genre)
     if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)
@@ -467,6 +472,7 @@ def Class8Main(genre):
 
 @main.route('/Revenue', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def Revenue():
     #print('Made it to the Revenue Data Center')
     title1,col1,data1,title2,col2,data2,title3,col3,data3,tabon = get_revenues()
@@ -475,6 +481,7 @@ def Revenue():
 
 @main.route('/IntercompanyEntries', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def IntercompanyEntries():
     company_names = {
         'K': 'One Stop Logistics',
@@ -1111,6 +1118,7 @@ def IntercompanyEntries():
 
 @main.route('/GeneralLedger', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def GeneralLedger():
     def parse_date(value):
         if not value:
@@ -1242,6 +1250,7 @@ def GeneralLedger():
 
 @main.route('/IncomeExpenseReview', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def IncomeExpenseReview():
     def parse_date(value):
         if not value:
@@ -1559,6 +1568,7 @@ def IncomeExpenseReview():
 
 @main.route('/BalanceSheet', methods=['GET'])
 @login_required
+@financial_mfa_required
 def BalanceSheet():
     def parse_date(value):
         if not value:
@@ -1760,6 +1770,7 @@ def BalanceSheet():
 
 @main.route('/OpeningBalances', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def OpeningBalances():
     def parse_date(value):
         try:
@@ -2013,6 +2024,7 @@ def OpeningBalances():
 
 @main.route('/CashFlowStatement', methods=['GET'])
 @login_required
+@financial_mfa_required
 def CashFlowStatement():
     def parse_date(value):
         if not value:
@@ -2191,6 +2203,7 @@ def CashFlowStatement():
 
 @main.route('/DepreciationSchedules', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def DepreciationSchedules():
     def ensure_depreciation_schema():
         if db.engine.dialect.name != 'mysql':
@@ -2566,6 +2579,7 @@ def DepreciationSchedules():
 
 @main.route('/Banking', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def Banking():
     from webapp.iso_Bank import isoBank
     odata, oder, err, modata, modlink, leftscreen, leftsize, today, now, docref, cache, acdata, thismuch, acctinfo, hv = isoBank()
@@ -2660,6 +2674,7 @@ def Banking():
 
 @main.route('/Banking/payment_detail', methods=['GET'])
 @login_required
+@financial_mfa_required
 def BankingPaymentDetail():
     def cents_from_value(value):
         try:
@@ -2733,6 +2748,7 @@ def BankingPaymentDetail():
 
 @main.route('/ReceiveByAccount', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def ReceiveByAccount():
     from webapp.class8_tasks import ReceiveByAccount_task
     from webapp.viewfuncs import d2s
@@ -3373,6 +3389,7 @@ def ReceiveByAccount():
 
 @main.route('/GeneralDeposits', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def GeneralDeposits():
     from webapp.class8_tasks_gledger import post_balanced_journal
     from webapp.viewfuncs import newjo
@@ -3667,6 +3684,7 @@ def GeneralDeposits():
 
 @main.route('/PayrollBatches', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def PayrollBatches():
     from webapp.class8_tasks_gledger import post_balanced_journal
     from webapp.viewfuncs import newjo
@@ -4473,6 +4491,7 @@ def QuoteMaker():
 
 @main.route('/ARMaker', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def ARMaker():
     from iso_AR import isoAR
     status, ardata, arsent, this_shipper, odata, sdata, task, emaildata, boxes, sboxes, tboxes, invoname, packname, pdat, emailsend, ar_emails_cust, rview, lookbacktime= isoAR()
@@ -4482,6 +4501,7 @@ def ARMaker():
 
 @main.route('/ARPayments', methods=['GET', 'POST'])
 @login_required
+@financial_mfa_required
 def ARPayments():
     from iso_Pay import isoPay
     status, this_id, odata, pdata, tot = isoPay()

@@ -1,4 +1,4 @@
-from flask import render_template, flash, redirect, url_for, session, Blueprint
+from flask import render_template, flash, redirect, url_for, session, Blueprint, request
 #from webapp import db, bcrypt
 
 from webapp.extensions import db, bcrypt
@@ -8,6 +8,14 @@ from webapp.models import users, BotClient
 from webapp.authenticate.forms import RegistrationForm, LoginForm, BotClientForm
 from flask_login import login_user, current_user, logout_user, login_required
 from webapp.CCC_system_setup import companydata, scac
+from webapp.financial_mfa import (
+    clear_financial_mfa_session,
+    get_mfa_settings,
+    mark_financial_mfa_verified,
+    send_financial_mfa_email,
+    verify_financial_email_code,
+)
+import datetime
 cmpdata = companydata()
 
 authenticate = Blueprint('authenticate',__name__)
@@ -27,6 +35,7 @@ def dray_login():
                 session['logged_in'] = True
                 session['username'] = thisuser.username
                 session['authority'] = thisuser.authority
+                clear_financial_mfa_session()
                 login_user(thisuser, remember=form.remember.data)
 
                 return redirect(url_for('main.EasyStart'))
@@ -59,6 +68,7 @@ def login():
                 session['logged_in'] = True
                 session['username'] = thisuser.username
                 session['authority'] = thisuser.authority
+                clear_financial_mfa_session()
                 login_user(thisuser, remember=form.remember.data)
                 return redirect(url_for('main.EasyStart'))
             else:
@@ -95,6 +105,74 @@ def register():
     else:
         flash(f'Do not have authority to register new users', 'danger')
         return redirect(url_for('main.EasyStart'))
+
+
+@authenticate.route('/mfa/financial/settings', methods=['GET', 'POST'])
+@login_required
+def mfa_settings():
+    if session.get('authority') != 'superuser':
+        flash('Do not have authority to manage MFA settings', 'danger')
+        return redirect(url_for('main.EasyStart'))
+
+    settings = get_mfa_settings(scac)
+    if request.method == 'POST':
+        settings.financial_mfa_required = request.values.get('financial_mfa_required') == 'on'
+        try:
+            timeout_minutes = int(request.values.get('timeout_minutes') or 720)
+        except:
+            timeout_minutes = 720
+        settings.timeout_minutes = max(15, min(timeout_minutes, 1440))
+        settings.updated_by = current_user.username
+        settings.updated_at = datetime.datetime.utcnow()
+        db.session.commit()
+        clear_financial_mfa_session()
+        flash('Financial MFA settings updated', 'success')
+        return redirect(url_for('authenticate.mfa_settings'))
+
+    return render_template(
+        'authenticate/mfa_settings.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        settings=settings,
+    )
+
+
+@authenticate.route('/mfa/financial/setup', methods=['GET', 'POST'])
+@login_required
+def mfa_setup():
+    next_url = request.values.get('next') or url_for('main.EasyStart')
+    flash('Financial MFA uses the email address on your user account.', 'info')
+    return redirect(url_for('authenticate.mfa_verify', next=next_url))
+
+
+@authenticate.route('/mfa/financial/verify', methods=['GET', 'POST'])
+@login_required
+def mfa_verify():
+    settings = get_mfa_settings(scac)
+    next_url = request.values.get('next') or url_for('main.EasyStart')
+
+    if request.method == 'POST':
+        if request.values.get('resend_code') == '1':
+            sent, message = send_financial_mfa_email(force=True)
+            flash(message, 'success' if sent else 'danger')
+            return redirect(url_for('authenticate.mfa_verify', next=next_url))
+
+        code = request.values.get('code')
+        if verify_financial_email_code(code):
+            mark_financial_mfa_verified(settings)
+            flash('Financial MFA verified', 'success')
+            return redirect(next_url)
+        flash('MFA code was not valid or has expired', 'danger')
+    else:
+        sent, message = send_financial_mfa_email()
+        flash(message, 'success' if sent else 'danger')
+
+    return render_template(
+        'authenticate/mfa_verify.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        next_url=next_url,
+    )
 
 
 @authenticate.route('/register_bot', methods=['GET', 'POST'])
