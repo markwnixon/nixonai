@@ -1,14 +1,34 @@
-from flask import render_template, redirect, url_for, jsonify, request, send_file
+from flask import render_template, redirect, url_for, jsonify, request, send_file, flash
 from flask import Blueprint
 
 from webapp.extensions import db
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import func, text
 from webapp.financial_mfa import FINANCIAL_GENRES, financial_mfa_redirect, financial_mfa_required
+from webapp.plaid_integration import (
+    create_bill_from_plaid_transaction,
+    create_transfer_from_plaid_transaction,
+    create_link_token,
+    exchange_public_token,
+    ignore_plaid_transaction,
+    match_plaid_transaction_to_bill,
+    plaid_accounts_for_current_scac,
+    plaid_bill_match_options,
+    plaid_dashboard_data,
+    plaid_expense_account_options,
+    plaid_processed_transactions,
+    plaid_review_transactions,
+    plaid_transfer_account_options,
+    plaid_vendor_rule_lookup,
+    plaid_ready,
+    sync_item_transactions,
+    upsert_item_from_exchange,
+    update_item_status,
+)
 
 from decimal import Decimal
 
@@ -22,6 +42,22 @@ from urllib.parse import urlparse
 from webapp.viewfuncs import nonone, monvals, getmonths, newjo
 from webapp.class8_tasks_gledger import post_balanced_journal
 from webapp.class8_utils_email import email_template, info_mimemail, check_person, add_person
+from webapp.dispatch_calendar import (
+    calendar_events,
+    capacity_summary,
+    ensure_dispatch_calendar_tables,
+    filter_options,
+    move_event,
+    parse_date as dispatch_parse_date,
+    update_event,
+)
+from webapp.dispatch_kanban import (
+    ensure_dispatch_kanban_tables,
+    kanban_jobs,
+    kanban_options,
+    move_job as kanban_move_job,
+    update_job as kanban_update_job,
+)
 
 from webapp.class8_utils import *
 
@@ -89,6 +125,123 @@ def FileUpload():
     print(f'File {fileob.filename} uploaded as {filename2}')
 
     return "successful_upload"
+
+
+@main.route('/dispatch/planning-calendar', methods=['GET'])
+@login_required
+def DispatchPlanningCalendar():
+    ensure_dispatch_calendar_tables()
+    return render_template(
+        'dispatch_planning_calendar.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        options=filter_options(),
+    )
+
+
+@main.route('/dispatch/kanban', methods=['GET'])
+@login_required
+def DispatchKanban():
+    ensure_dispatch_kanban_tables()
+    return render_template(
+        'dispatch_kanban.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        options=kanban_options(),
+    )
+
+
+@main.route('/api/dispatch/calendar/events', methods=['GET'])
+@login_required
+def DispatchCalendarEvents():
+    start = dispatch_parse_date(request.args.get('start'))
+    end = dispatch_parse_date(request.args.get('end'))
+    filters = {
+        'driver': request.args.get('driver'),
+        'customer': request.args.get('customer'),
+        'status': request.args.get('status'),
+        'terminal': request.args.get('terminal'),
+        'search': request.args.get('search'),
+        'range': request.args.get('range'),
+    }
+    events = calendar_events(start=start, end=end, filters=filters)
+    return jsonify(events)
+
+
+@main.route('/api/dispatch/calendar/capacity', methods=['GET'])
+@login_required
+def DispatchCalendarCapacity():
+    start = dispatch_parse_date(request.args.get('start'))
+    end = dispatch_parse_date(request.args.get('end'))
+    filters = {
+        'driver': request.args.get('driver'),
+        'customer': request.args.get('customer'),
+        'status': request.args.get('status'),
+        'terminal': request.args.get('terminal'),
+        'search': request.args.get('search'),
+        'range': request.args.get('range'),
+    }
+    return jsonify(capacity_summary(start=start, end=end, filters=filters))
+
+
+@main.route('/api/dispatch/calendar/event/<int:order_id>/move', methods=['POST'])
+@login_required
+def DispatchCalendarMove(order_id):
+    payload = request.get_json(silent=True) or {}
+    result, status_code = move_event(order_id, payload.get('start'), username=current_user.username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/calendar/event/<int:order_id>/update', methods=['POST'])
+@login_required
+def DispatchCalendarUpdate(order_id):
+    payload = request.get_json(silent=True) or {}
+    result, status_code = update_event(order_id, payload, username=current_user.username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/jobs', methods=['GET'])
+@login_required
+def DispatchKanbanJobs():
+    filters = {
+        'company': request.args.get('company'),
+        'driver': request.args.get('driver'),
+        'customer': request.args.get('customer'),
+        'terminal': request.args.get('terminal'),
+        'status': request.args.get('status'),
+        'range': request.args.get('range'),
+    }
+    return jsonify(kanban_jobs(filters=filters))
+
+
+@main.route('/api/dispatch/kanban/options', methods=['GET'])
+@login_required
+def DispatchKanbanOptions():
+    return jsonify(kanban_options())
+
+
+@main.route('/api/dispatch/kanban/job/<int:order_id>/move', methods=['POST'])
+@login_required
+def DispatchKanbanMove(order_id):
+    payload = request.get_json(silent=True) or {}
+    username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
+    result, status_code = kanban_move_job(
+        order_id,
+        payload.get('workflow_status'),
+        username=username,
+        override_pin=bool(payload.get('override_pin')),
+        reason=payload.get('reason'),
+    )
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/job/<int:order_id>/update', methods=['POST'])
+@login_required
+def DispatchKanbanUpdate(order_id):
+    payload = request.get_json(silent=True) or {}
+    username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
+    result, status_code = kanban_update_job(order_id, payload, username=username)
+    return jsonify(result), status_code
 
 @main.route('/chartdata', methods=['GET', 'POST'])
 def chartdata():
@@ -2670,6 +2823,185 @@ def Banking():
         hv=hv,
         bank_rows=bank_rows,
     )
+
+
+@main.route('/PlaidConnections', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def PlaidConnections():
+    ready, plaid_env = plaid_ready()
+    err = []
+
+    if request.method == 'POST':
+        action = request.values.get('action')
+        if action == 'map_accounts':
+            for plaid_account in plaid_accounts_for_current_scac():
+                local_id = request.values.get(f'local_account_{plaid_account.id}')
+                try:
+                    plaid_account.LocalAccountId = int(local_id) if local_id else None
+                except:
+                    plaid_account.LocalAccountId = None
+                PlaidTransaction.query.filter_by(PlaidAccountId=plaid_account.id).update(
+                    {'LocalAccountId': plaid_account.LocalAccountId},
+                    synchronize_session=False,
+                )
+            db.session.commit()
+            flash('Plaid account mappings updated.', 'success')
+            return redirect(url_for('main.PlaidConnections'))
+
+        if action == 'sync_item':
+            item_id = request.values.get('item_id')
+            item = PlaidItem.query.get(item_id)
+            if item is None:
+                flash('Plaid connection not found.', 'danger')
+                return redirect(url_for(
+                    'main.PlaidConnections',
+                    sync_item_id=item_id or '',
+                    sync_status='danger',
+                    sync_message='Plaid connection not found.',
+                ))
+            else:
+                try:
+                    update_item_status(item)
+                    added, modified, removed = sync_item_transactions(item)
+                    message = f'Added {added}, modified {modified}, removed {removed}.'
+                    flash(f'Plaid sync complete. {message}', 'success')
+                    return redirect(url_for(
+                        'main.PlaidConnections',
+                        sync_item_id=item.id,
+                        sync_status='success',
+                        sync_message=message,
+                    ))
+                except Exception as exc:
+                    message = f'Plaid sync failed: {exc}'
+                    flash(message, 'danger')
+                    return redirect(url_for(
+                        'main.PlaidConnections',
+                        sync_item_id=item.id,
+                        sync_status='danger',
+                        sync_message=message,
+                    ))
+
+        if action == 'create_bill_from_plaid':
+            tx_id = request.values.get('transaction_id')
+            expense_account_id = request.values.get('expense_account_id')
+            vendor_name = request.values.get('vendor_name')
+            err, bill = create_bill_from_plaid_transaction(
+                tx_id,
+                expense_account_id,
+                vendor_name,
+                current_user.username,
+            )
+            if err:
+                flash(' '.join(err), 'danger')
+            else:
+                flash(f'Created bill payment {bill.Jo} from Plaid transaction.', 'success')
+            return redirect(url_for('main.PlaidConnections'))
+
+        if action == 'match_bill_from_plaid':
+            tx_id = request.values.get('transaction_id')
+            bill_id = request.values.get('bill_id')
+            expense_account_id = request.values.get('expense_account_id')
+            vendor_name = request.values.get('vendor_name')
+            err = match_plaid_transaction_to_bill(
+                tx_id,
+                bill_id,
+                expense_account_id,
+                vendor_name,
+                current_user.username,
+            )
+            if err:
+                flash(' '.join(err), 'danger')
+            else:
+                flash('Plaid transaction matched to existing bill payment.', 'success')
+            return redirect(url_for('main.PlaidConnections'))
+
+        if action == 'create_transfer_from_plaid':
+            tx_id = request.values.get('transaction_id')
+            other_account_id = request.values.get('other_account_id')
+            owner_transfer_treatment = request.values.get('owner_transfer_treatment')
+            err, tcode = create_transfer_from_plaid_transaction(
+                tx_id,
+                other_account_id,
+                owner_transfer_treatment,
+                current_user.username,
+            )
+            if err:
+                flash(' '.join(err), 'danger')
+            else:
+                flash(f'Created account transfer {tcode} from Plaid transaction.', 'success')
+            return redirect(url_for('main.PlaidConnections'))
+
+        if action == 'ignore_plaid_transaction':
+            tx_id = request.values.get('transaction_id')
+            note = request.values.get('review_note')
+            err = ignore_plaid_transaction(tx_id, current_user.username, note)
+            if err:
+                flash(' '.join(err), 'danger')
+            else:
+                flash('Plaid transaction marked ignored.', 'success')
+            return redirect(url_for('main.PlaidConnections'))
+
+    items, plaid_accounts, transactions, local_accounts, plaid_account_lookup, mapping_options = plaid_dashboard_data()
+    review_transactions = plaid_review_transactions()
+    expense_account_options = plaid_expense_account_options()
+    transfer_account_options = plaid_transfer_account_options()
+    vendor_rule_lookup = plaid_vendor_rule_lookup(review_transactions)
+    bill_match_options = plaid_bill_match_options(review_transactions)
+    processed_transactions = plaid_processed_transactions()
+    sync_result = {
+        'item_id': request.args.get('sync_item_id'),
+        'status': request.args.get('sync_status'),
+        'message': request.args.get('sync_message'),
+    }
+    return render_template(
+        'plaid_connections.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        ready=ready,
+        plaid_env=plaid_env,
+        items=items,
+        plaid_accounts=plaid_accounts,
+        transactions=transactions,
+        local_accounts=local_accounts,
+        plaid_account_lookup=plaid_account_lookup,
+        mapping_options=mapping_options,
+        review_transactions=review_transactions,
+        expense_account_options=expense_account_options,
+        transfer_account_options=transfer_account_options,
+        vendor_rule_lookup=vendor_rule_lookup,
+        bill_match_options=bill_match_options,
+        processed_transactions=processed_transactions,
+        sync_result=sync_result,
+        err=err,
+    )
+
+
+@main.route('/PlaidConnections/link_token', methods=['POST'])
+@login_required
+@financial_mfa_required
+def PlaidLinkToken():
+    try:
+        data = create_link_token(current_user.id, current_user.username)
+        return jsonify({'link_token': data.get('link_token')})
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@main.route('/PlaidConnections/exchange_public_token', methods=['POST'])
+@login_required
+@financial_mfa_required
+def PlaidExchangePublicToken():
+    payload = request.get_json(silent=True) or {}
+    public_token = payload.get('public_token')
+    if not public_token:
+        return jsonify({'error': 'Missing public token'}), 400
+    try:
+        access_token, item_id = exchange_public_token(public_token)
+        item = upsert_item_from_exchange(access_token, item_id)
+        return jsonify({'ok': True, 'item_id': item.ItemId, 'institution_name': item.InstitutionName})
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
 
 
 @main.route('/Banking/payment_detail', methods=['GET'])

@@ -2001,6 +2001,83 @@ class Accounts(db.Model):
         self.Co = Co
         self.QBmap = QBmap
         self.Shared = Shared
+
+
+class PlaidItem(db.Model):
+    __tablename__ = 'plaid_items'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Scac = db.Column('Scac', db.String(20), nullable=False, index=True)
+    ItemId = db.Column('ItemId', db.String(128), unique=True, nullable=False, index=True)
+    AccessToken = db.Column('AccessToken', db.String(512), nullable=False)
+    InstitutionId = db.Column('InstitutionId', db.String(64))
+    InstitutionName = db.Column('InstitutionName', db.String(150))
+    Products = db.Column('Products', db.Text)
+    AvailableProducts = db.Column('AvailableProducts', db.Text)
+    TransactionsCursor = db.Column('TransactionsCursor', db.Text)
+    LastSyncAt = db.Column('LastSyncAt', db.DateTime)
+    LastSuccessfulUpdate = db.Column('LastSuccessfulUpdate', db.DateTime)
+    ItemError = db.Column('ItemError', db.Text)
+    Active = db.Column('Active', db.Boolean, nullable=False, default=True)
+    CreatedAt = db.Column('CreatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+    UpdatedAt = db.Column('UpdatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PlaidAccount(db.Model):
+    __tablename__ = 'plaid_accounts'
+    id = db.Column('id', db.Integer, primary_key=True)
+    PlaidItemId = db.Column('PlaidItemId', db.Integer, nullable=False, index=True)
+    AccountId = db.Column('AccountId', db.String(128), unique=True, nullable=False, index=True)
+    LocalAccountId = db.Column('LocalAccountId', db.Integer, index=True)
+    Name = db.Column('Name', db.String(150))
+    OfficialName = db.Column('OfficialName', db.String(200))
+    Mask = db.Column('Mask', db.String(10))
+    Type = db.Column('Type', db.String(45))
+    Subtype = db.Column('Subtype', db.String(45))
+    CurrentBalance = db.Column('CurrentBalance', db.Integer)
+    AvailableBalance = db.Column('AvailableBalance', db.Integer)
+    IsoCurrencyCode = db.Column('IsoCurrencyCode', db.String(10))
+    Active = db.Column('Active', db.Boolean, nullable=False, default=True)
+    CreatedAt = db.Column('CreatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+    UpdatedAt = db.Column('UpdatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PlaidTransaction(db.Model):
+    __tablename__ = 'plaid_transactions'
+    id = db.Column('id', db.Integer, primary_key=True)
+    TransactionId = db.Column('TransactionId', db.String(128), unique=True, nullable=False, index=True)
+    PlaidItemId = db.Column('PlaidItemId', db.Integer, nullable=False, index=True)
+    PlaidAccountId = db.Column('PlaidAccountId', db.Integer, nullable=False, index=True)
+    LocalAccountId = db.Column('LocalAccountId', db.Integer, index=True)
+    Date = db.Column('Date', db.Date)
+    AuthorizedDate = db.Column('AuthorizedDate', db.Date)
+    Name = db.Column('Name', db.String(400))
+    MerchantName = db.Column('MerchantName', db.String(200))
+    Amount = db.Column('Amount', db.Integer)
+    Pending = db.Column('Pending', db.Boolean, nullable=False, default=False)
+    PaymentChannel = db.Column('PaymentChannel', db.String(45))
+    TransactionType = db.Column('TransactionType', db.String(45))
+    CategoryPrimary = db.Column('CategoryPrimary', db.String(100))
+    CategoryDetailed = db.Column('CategoryDetailed', db.String(150))
+    Status = db.Column('Status', db.String(30), nullable=False, default='new')
+    BillId = db.Column('BillId', db.Integer)
+    GledgerId = db.Column('GledgerId', db.Integer)
+    ReviewNote = db.Column('ReviewNote', db.String(250))
+    ReviewedAt = db.Column('ReviewedAt', db.DateTime)
+    ReviewedBy = db.Column('ReviewedBy', db.String(30))
+    RawJson = db.Column('RawJson', db.Text)
+    CreatedAt = db.Column('CreatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+    UpdatedAt = db.Column('UpdatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PlaidVendorRule(db.Model):
+    __tablename__ = 'plaid_vendor_rules'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Scac = db.Column('Scac', db.String(20), nullable=False, index=True)
+    MerchantKey = db.Column('MerchantKey', db.String(200), nullable=False, index=True)
+    VendorName = db.Column('VendorName', db.String(50))
+    ExpenseAccountId = db.Column('ExpenseAccountId', db.Integer)
+    CreatedAt = db.Column('CreatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+    UpdatedAt = db.Column('UpdatedAt', db.DateTime, nullable=False, default=datetime.utcnow)
         
  
 class Portlog(db.Model):
