@@ -1,7 +1,7 @@
 import sqlalchemy.sql
 
 from webapp import db
-from webapp.models import Orders, Invoices, People, Services, Drops, SumInv, Interchange, PaymentsRec
+from webapp.models import Accounts, Gledger, Orders, Invoices, People, Services, Drops, SumInv, Interchange, PaymentsRec
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac
 from webapp.class8_utils_email import etemplate_truck, emaildata_update, invoice_mimemail, etemplate_suminv
@@ -1032,13 +1032,78 @@ def income_record(jopaylist, err):
     db.session.commit()
     refid = input_paymnt.id  # this links the total payment to the applied payment for the job
 
+    if 'Cash' in depoacct or 'Check' in depoacct or 'Mcheck' in depoacct or 'Undeposited' in depoacct:
+        deposit_account_name = 'Undeposited Funds'
+        deposit_type = 'ID'
+    else:
+        deposit_account_name = depoacct
+        deposit_type = 'DD'
+    deposit_account = Accounts.query.filter((Accounts.Name == deposit_account_name) & (Accounts.Co == cc)).first()
+    ar_account = Accounts.query.filter((Accounts.Name == 'Accounts Receivable') & (Accounts.Co == cc)).first()
+    if deposit_account is None:
+        err.append(f'Error: Do not have an Account:{deposit_account_name} for Company:{cc}')
+        return err, False
+    if ar_account is None:
+        err.append(f'Error: Do not have an Account:Accounts Receivable for Company:{cc}')
+        return err, False
 
-    for jopay in jopaylist:
+    journal_id = f'RP-{cc}-{refid}'
+    batch_debit = Gledger(
+        Debit=amt_int,
+        Credit=0,
+        Account=deposit_account_name,
+        Aid=deposit_account.id,
+        Source=co,
+        Sid=refid,
+        Type=deposit_type,
+        Tcode=journal_id,
+        Com=cc,
+        Recorded=dt,
+        Reconciled=0,
+        Date=paidon,
+        Ref=payref,
+        JournalId=journal_id,
+        JournalSeq=1,
+        JournalMemo=f'Received payment batch {payref or refid}',
+        PostedBy='receive_by_account',
+        PostedAt=dt,
+        SourceTable='ReceivePaymentBatch',
+        SourceId=refid,
+    )
+    db.session.add(batch_debit)
+    db.session.commit()
+
+    for seq, jopay in enumerate(jopaylist, start=2):
         #print(jopay)
         jo, amtpaid, paidon, payref, paymethod, depoacct, amt_total = [jopay[i] for i in range(7)]
-        #print(jo, amtpaid, paidon, payref, paymethod, depoacct)
-        adderr = gledger_write(['income', amtpaid, paidon,  payref, paymethod], jo, depoacct, 0, refid)
-        if adderr == []:
+        amt = cents(amtpaid)
+        odat = Orders.query.filter(Orders.Jo == jo).first()
+        if odat is not None:
+            co = get_company(odat.Bid)
+            input_credit = Gledger(
+                Debit=0,
+                Credit=amt,
+                Account='Accounts Receivable',
+                Aid=ar_account.id,
+                Source=co,
+                Sid=refid,
+                Type='IC',
+                Tcode=jo,
+                Com=cc,
+                Recorded=dt,
+                Reconciled=0,
+                Date=paidon,
+                Ref=payref,
+                JournalId=journal_id,
+                JournalSeq=seq,
+                JournalMemo=f'Received payment allocation {payref or refid}',
+                PostedBy='receive_by_account',
+                PostedAt=dt,
+                SourceTable='ReceivePaymentAllocation',
+                SourceId=refid,
+            )
+            db.session.add(input_credit)
+            db.session.commit()
             odat = Orders.query.filter(Orders.Jo == jo).first()
             if odat is not None:
                 #Successful add to ledger so now can update the database for the amount paid
@@ -1087,12 +1152,10 @@ def income_record(jopaylist, err):
                 if idata != []:
                     success = True
                     for idat in idata:
-                        idat.Status = 'P'
+                        idat.Status = 'P' if baldue <= .01 else 'Partial'
                     db.session.commit()
                 else:
                     err.append(f'Invoice data not found for {jo}')
-            else:
-                err.append(f'Order data not found for {jo}')
         else:
-            for addline in adderr: err.append(addline)
+            err.append(f'Order data not found for {jo}')
     return err, success

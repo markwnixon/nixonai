@@ -126,6 +126,7 @@ Receive Payments for Account: {{ co }} &nbsp; &nbsp;
                 <th style="font-weight:bold">Container Type</th>
                 <th style="font-weight:bold">Chk</th>
                 <th style="font-weight:bold">Invoice Amount</th>
+                <th style="font-weight:bold">Balance Due</th>
                 <th style="font-weight:bold">SumInv</th>
                 <th style="font-weight:bold">Amount Received</th>
 
@@ -160,6 +161,7 @@ Receive Payments for Account: {{ co }} &nbsp; &nbsp;
                     <td align="center" class="{{atc1}}">{{ data.Type }}</td>
                     <td align="center" ><input class="align-bottom" {% if checks[jx]==1 %} checked {% endif %} type="checkbox" name="oder{{data.id}}" value="{{data.id}}"></td>
                     <td align="center"  class="{{atc1}}">{{ invts[jx] }}</td>
+                    <td align="center"  class="{{atc1}}">{{ data.BalDue or invts[jx] }}</td>
                     <td align="center"  class="{{atc1}}">{{ data.Label }}</td>
 
                     <td align="center" class="{{atc1}}"><input class="form-control form-control-sm" type="text" value="{{ amthere }}" name="amount{{ data.id }}"></td>
@@ -171,5 +173,4 @@ Receive Payments for Account: {{ co }} &nbsp; &nbsp;
 
     </div>
 </div>
-
 

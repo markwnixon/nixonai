@@ -146,10 +146,8 @@ def Order_Addresses_Update(sid):
         #Dont mess with gate dates once pulls start
         idat = Interchange.query.filter(Interchange.Jo == odat.Jo).first()
         if idat is None:
-            d2 = d3 + timedelta(1)
-            d1 = d3 - timedelta(1)
-            if odat.Date is None: odat.Date = d1
-            if odat.Date2 is None: odat.Date2 = d2
+            odat.Date = d3
+            odat.Date2 = d3
         db.session.commit()
 
 
@@ -4789,7 +4787,8 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
 
     #Determine unique shippers:
     comps = []
-    tjobs = Orders.query.filter( ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date > stopdate) ).all()
+    receivable_statuses = [2, 3, 4, 6, 7]
+    tjobs = Orders.query.filter(Orders.Istat.in_(receivable_statuses) & (Orders.Date > stopdate)).all()
     for job in tjobs:
         com = job.Shipper
         if com not in comps:
@@ -4804,7 +4803,7 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
         holdvec[7] = request.values.get('thisdate')
 
     #This is the relevant data for selection
-    odata = Orders.query.filter((Orders.Shipper == co) & ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) & (Orders.Date > stopdate)).all()
+    odata = Orders.query.filter((Orders.Shipper == co) & Orders.Istat.in_(receivable_statuses) & (Orders.Date > stopdate)).all()
     lenod = len(odata)
     if lenod < 1:
         if co is None:
@@ -4837,7 +4836,10 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
             if idat is not None:
                 invototal = idat.Total
                 invts[jx] = invototal
-                amts[jx] = invototal
+                if odat.Istat == 4 and hasvalue(odat.BalDue):
+                    amts[jx] = d2s(odat.BalDue)
+                else:
+                    amts[jx] = invototal
 
             ckon = request.values.get('oder'+str(odat.id))
             if ckon is not None:
@@ -4866,7 +4868,10 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
             if idat is not None:
                 invototal = idat.Total
                 invts[jx] = invototal
-                amts[jx] = invototal
+                if odat.Istat == 4 and hasvalue(odat.BalDue):
+                    amts[jx] = d2s(odat.BalDue)
+                else:
+                    amts[jx] = invototal
     if checkall is not None: thechecks = [1]*len(odata)
     holdvec[3] = thechecks
     holdvec[4] = d2s(invotot)

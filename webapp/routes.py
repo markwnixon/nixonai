@@ -3039,6 +3039,36 @@ def BankingPaymentDetail():
             header['date'] = ledger_line.Date.strftime('%Y-%m-%d')
             header['source'] = ledger_line.Source or ''
             header['ref'] = ledger_line.Ref or ''
+        if ledger_line.SourceTable == 'ReceivePaymentBatch' and ledger_line.Sid:
+            allocation_rows = Gledger.query.filter(
+                (Gledger.Sid == ledger_line.Sid) &
+                (Gledger.Type == 'IC') &
+                (Gledger.Com == ledger_line.Com)
+            ).order_by(Gledger.JournalSeq.asc(), Gledger.id.asc()).all()
+            received_total += ledger_line.Debit or 0
+            for allocation in allocation_rows:
+                order = Orders.query.filter(Orders.Jo == allocation.Tcode).first()
+                invoice = Invoices.query.filter(Invoices.Jo == allocation.Tcode).first()
+                invo_cents = cents_from_value(invoice.Total if invoice is not None else (order.InvoTotal if order is not None else 0))
+                received_cents = allocation.Credit or 0
+                balance_cents = invo_cents - received_cents
+                invoice_total += invo_cents
+                balance_total += balance_cents
+                detail_rows.append({
+                    'ledger_id': allocation.id,
+                    'jo': allocation.Tcode or '',
+                    'order_id': order.id if order is not None else '',
+                    'shipper': order.Shipper if order is not None else allocation.Source,
+                    'container': order.Container if order is not None else '',
+                    'invoice': money(invo_cents),
+                    'received': money(received_cents),
+                    'balance': money(balance_cents),
+                    'balance_cents': balance_cents,
+                    'pay_ref': allocation.Ref or ledger_line.Ref,
+                    'paid_date': allocation.Date.strftime('%Y-%m-%d') if allocation.Date is not None else '',
+                    'manual': False,
+                })
+            continue
         order = Orders.query.filter(Orders.Jo == ledger_line.Tcode).first()
         income = Deposits.query.filter(Deposits.Jo == ledger_line.Tcode).first()
         invoice = Invoices.query.filter(Invoices.Jo == ledger_line.Tcode).first()
@@ -3264,9 +3294,9 @@ def ReceiveByAccount():
     def refresh_order_payment_status(order):
         payment_rows = Gledger.query.filter(
             (Gledger.Tcode == order.Jo) &
-            (Gledger.Type.in_(['DD', 'ID']))
+            (Gledger.Type == 'IC')
         ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
-        paid_cents = sum(row.Debit or 0 for row in payment_rows)
+        paid_cents = sum(row.Credit or 0 for row in payment_rows)
         latest = payment_rows[0] if payment_rows else None
         invoice = Invoices.query.filter(Invoices.Jo == order.Jo).first()
         invoice_total = 0.0
@@ -3281,10 +3311,10 @@ def ReceiveByAccount():
         if latest is not None:
             pay_record = PaymentsRec.query.get(latest.Sid) if latest.Sid else None
             order.PaidDate = latest.Date
-            order.PaidAmt = d2s(float(latest.Debit or 0) / 100)
+            order.PaidAmt = d2s(float(latest.Credit or 0) / 100)
             order.PayRef = latest.Ref
             order.PayMeth = pay_record.Type if pay_record is not None else order.PayMeth
-            order.PayAcct = latest.Account
+            order.PayAcct = pay_record.Account if pay_record is not None else order.PayAcct
             order.QBi = latest.Sid
         else:
             order.PaidDate = None
@@ -3322,6 +3352,7 @@ def ReceiveByAccount():
 
         first = old_debit_rows[0]
         payment_ref_id = first.Sid
+        selected_payment_ref_ids = {row.Sid for row in old_debit_rows if row.Sid}
         pay_date = request.values.get('thisdate')
         pay_ref = request.values.get('thisref')
         pay_method = request.values.get('paymethod')
@@ -3373,15 +3404,14 @@ def ReceiveByAccount():
             db.session.flush()
             payment_ref_id = payment_record.id
 
-        old_jos = {row.Tcode for row in old_debit_rows if row.Tcode}
+        old_credit_rows = Gledger.query.filter(
+            (Gledger.Sid == payment_ref_id) &
+            (Gledger.Type == 'IC') &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        old_jos = {row.Tcode for row in old_credit_rows if row.Tcode} or {row.Tcode for row in old_debit_rows if row.Tcode and not str(row.Tcode).startswith('RP-')}
         new_jos = set(new_lines.keys())
         affected_jos = old_jos | new_jos
-        for jo in old_jos - new_jos:
-            Gledger.query.filter(
-                (Gledger.Tcode == jo) &
-                (Gledger.Type.in_(['DD', 'ID', 'IC'])) &
-                (Gledger.Sid == payment_ref_id)
-            ).delete(synchronize_session=False)
 
         dtype = 'ID' if deposit_account in ['Undeposited Funds'] or pay_method in ['Cash', 'Check'] else 'DD'
         debit_account = Accounts.query.filter(
@@ -3398,49 +3428,74 @@ def ReceiveByAccount():
 
         total_amount = 0
         recorded = datetime.datetime.now()
+        journal_id = f'RP-{cmpdata[10]}-{payment_ref_id}'
+        Gledger.query.filter(
+            (Gledger.Sid == payment_ref_id) &
+            (Gledger.Type.in_(['DD', 'ID', 'IC'])) &
+            (Gledger.Com == cmpdata[10])
+        ).delete(synchronize_session=False)
+        if selected_payment_ref_ids:
+            Gledger.query.filter(
+                (Gledger.Sid.in_(selected_payment_ref_ids)) &
+                (Gledger.Type.in_(['DD', 'ID', 'IC'])) &
+                (Gledger.Com == cmpdata[10])
+            ).delete(synchronize_session=False)
+            PaymentsRec.query.filter(
+                (PaymentsRec.id.in_([ref_id for ref_id in selected_payment_ref_ids if ref_id != payment_ref_id])) &
+                (PaymentsRec.Com == cmpdata[10])
+            ).delete(synchronize_session=False)
+
         for jo, (order, amount) in new_lines.items():
             total_amount += amount
-            Gledger.query.filter(
-                (Gledger.Tcode == jo) &
-                (Gledger.Type.in_(['DD', 'ID'])) &
-                (Gledger.Sid == payment_ref_id) &
-                (Gledger.Type != dtype)
-            ).delete(synchronize_session=False)
-            debit_line = Gledger.query.filter(
-                (Gledger.Tcode == jo) &
-                (Gledger.Type == dtype) &
-                (Gledger.Sid == payment_ref_id)
-            ).first()
-            if debit_line is None:
-                debit_line = Gledger(0, 0, deposit_account, debit_account.id, order.Shipper, payment_ref_id, dtype, jo, cmpdata[10], recorded, 0, pay_date_value, pay_ref)
-                db.session.add(debit_line)
-            debit_line.Debit = amount
-            debit_line.Credit = 0
-            debit_line.Account = deposit_account
-            debit_line.Aid = debit_account.id
-            debit_line.Source = order.Shipper
-            debit_line.Sid = payment_ref_id
-            debit_line.Recorded = recorded
-            debit_line.Date = pay_date_value
-            debit_line.Ref = pay_ref
+        first_order = next(iter(new_lines.values()))[0]
+        debit_line = Gledger(
+            Debit=total_amount,
+            Credit=0,
+            Account=deposit_account,
+            Aid=debit_account.id,
+            Source=first_order.Shipper,
+            Sid=payment_ref_id,
+            Type=dtype,
+            Tcode=journal_id,
+            Com=cmpdata[10],
+            Recorded=recorded,
+            Reconciled=0,
+            Date=pay_date_value,
+            Ref=pay_ref,
+            JournalId=journal_id,
+            JournalSeq=1,
+            JournalMemo=f'Received payment batch {pay_ref or payment_ref_id}',
+            PostedBy='receive_by_account',
+            PostedAt=recorded,
+            SourceTable='ReceivePaymentBatch',
+            SourceId=payment_ref_id,
+        )
+        db.session.add(debit_line)
 
-            credit_line = Gledger.query.filter(
-                (Gledger.Tcode == jo) &
-                (Gledger.Type == 'IC') &
-                (Gledger.Sid == payment_ref_id)
-            ).first()
-            if credit_line is None:
-                credit_line = Gledger(0, 0, 'Accounts Receivable', credit_account.id, order.Shipper, payment_ref_id, 'IC', jo, cmpdata[10], recorded, 0, pay_date_value, pay_ref)
-                db.session.add(credit_line)
-            credit_line.Debit = 0
-            credit_line.Credit = amount
-            credit_line.Account = 'Accounts Receivable'
-            credit_line.Aid = credit_account.id
-            credit_line.Source = order.Shipper
-            credit_line.Sid = payment_ref_id
-            credit_line.Recorded = recorded
-            credit_line.Date = pay_date_value
-            credit_line.Ref = pay_ref
+        for seq, (jo, (order, amount)) in enumerate(new_lines.items(), start=2):
+            credit_line = Gledger(
+                Debit=0,
+                Credit=amount,
+                Account='Accounts Receivable',
+                Aid=credit_account.id,
+                Source=order.Shipper,
+                Sid=payment_ref_id,
+                Type='IC',
+                Tcode=jo,
+                Com=cmpdata[10],
+                Recorded=recorded,
+                Reconciled=0,
+                Date=pay_date_value,
+                Ref=pay_ref,
+                JournalId=journal_id,
+                JournalSeq=seq,
+                JournalMemo=f'Received payment allocation {pay_ref or payment_ref_id}',
+                PostedBy='receive_by_account',
+                PostedAt=recorded,
+                SourceTable='ReceivePaymentAllocation',
+                SourceId=payment_ref_id,
+            )
+            db.session.add(credit_line)
 
         payment_record.Amount = total_amount
         payment_record.Account = deposit_account
@@ -3466,12 +3521,15 @@ def ReceiveByAccount():
         return err_list, updated_ids
 
     def reload_receive_batch(holdvec, selected_batches, err_list, use_posted_values=False):
-        if len(selected_batches) != 1:
-            err_list.append('Select exactly one received payment batch to reload.')
+        selected_batches = [batch for batch in dict.fromkeys(selected_batches) if batch]
+        if not selected_batches:
+            err_list.append('Select one or more received payment rows to reload.')
             return holdvec, err_list
-
         try:
-            row_ids = [int(row_id) for row_id in selected_batches[0].split(',') if row_id.strip()]
+            row_ids = []
+            for selected_batch in selected_batches:
+                row_ids.extend([int(row_id) for row_id in selected_batch.split(',') if row_id.strip()])
+            row_ids = list(dict.fromkeys(row_ids))
         except:
             err_list.append('Selected payment batch has invalid row data.')
             return holdvec, err_list
@@ -3489,6 +3547,24 @@ def ReceiveByAccount():
             return holdvec, err_list
 
         first = batch_rows[0]
+        batch_signature = (
+            first.Date.strftime('%Y-%m-%d') if first.Date else '',
+            first.Source or '',
+            first.Ref or '',
+            first.Account or '',
+            first.Type or '',
+        )
+        for row in batch_rows[1:]:
+            row_signature = (
+                row.Date.strftime('%Y-%m-%d') if row.Date else '',
+                row.Source or '',
+                row.Ref or '',
+                row.Account or '',
+                row.Type or '',
+            )
+            if row_signature != batch_signature:
+                err_list.append('Selected payment rows must have the same date, source, reference, account, and type to reload together.')
+                return holdvec, err_list
         customer = first.Source or ''
         pay_date = first.Date.strftime('%Y-%m-%d') if first.Date else datetime.date.today().strftime('%Y-%m-%d')
         pay_ref = first.Ref or ''
@@ -3503,23 +3579,33 @@ def ReceiveByAccount():
             deposit_account = request.values.get('acctfordeposit') or deposit_account
             pay_method = request.values.get('paymethod') or pay_method
 
+        allocation_rows = []
+        if first.SourceTable == 'ReceivePaymentBatch' and first.Sid:
+            allocation_rows = Gledger.query.filter(
+                (Gledger.Sid == first.Sid) &
+                (Gledger.Type == 'IC') &
+                (Gledger.Com == cmpdata[10])
+            ).order_by(Gledger.JournalSeq.asc(), Gledger.id.asc()).all()
+        payment_detail_rows = allocation_rows or batch_rows
+
         lookbacktime, stopdate = receive_order_stopdate()
+        receivable_statuses = [2, 3, 4, 6, 7]
         open_orders = Orders.query.filter(
             (Orders.Shipper == customer) &
-            ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) &
+            (Orders.Istat.in_(receivable_statuses)) &
             (Orders.Date > stopdate)
         ).order_by(Orders.Date.desc(), Orders.id.desc()).all()
 
-        by_jo = {row.Tcode: row for row in batch_rows if row.Tcode}
+        by_jo = {row.Tcode: row for row in payment_detail_rows if row.Tcode}
         current_ids = {order.id for order in open_orders}
-        for row in batch_rows:
+        for row in payment_detail_rows:
             order = Orders.query.filter(Orders.Jo == row.Tcode).first()
             if order is not None and order.id not in current_ids:
                 open_orders.append(order)
                 current_ids.add(order.id)
 
         tjobs = Orders.query.filter(
-            ((Orders.Istat == 2) | (Orders.Istat == 3) | (Orders.Istat == 6) | (Orders.Istat == 7)) &
+            (Orders.Istat.in_(receivable_statuses)) &
             (Orders.Date > stopdate)
         ).all()
         comps = sorted({job.Shipper for job in tjobs if job.Shipper})
@@ -3545,7 +3631,7 @@ def ReceiveByAccount():
                 if posted_amount is not None:
                     amts[index] = cents_to_money(money_to_cents(posted_amount))
                 elif payment_row is not None:
-                    amts[index] = cents_to_money(payment_row.Debit)
+                    amts[index] = cents_to_money((payment_row.Credit or 0) if payment_row.Type == 'IC' else (payment_row.Debit or 0))
                 elif invoice is not None:
                     amts[index] = invoice.Total
 
@@ -3561,7 +3647,7 @@ def ReceiveByAccount():
                         pass
             elif payment_row is not None:
                 checks[index] = 1
-                amts[index] = cents_to_money(payment_row.Debit)
+                amts[index] = cents_to_money((payment_row.Credit or 0) if payment_row.Type == 'IC' else (payment_row.Debit or 0))
                 try:
                     invotot += float(invts[index])
                 except:
@@ -3601,7 +3687,7 @@ def ReceiveByAccount():
         holdvec[12] = invts
         holdvec[13] = 1 if paytot > 0 and deposit_account else 0
         holdvec[14] = pay_method
-        holdvec[21] = selected_batches[0]
+        holdvec[21] = ','.join(str(row_id) for row_id in row_ids)
         holdvec[20] = lookbacktime
         err_list.append(f'Reloaded payment batch for {customer} dated {pay_date}. Review amounts, then preview or record.')
         return holdvec, err_list

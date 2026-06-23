@@ -93,10 +93,16 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% set seen_batch_ids = [] %}
                     {% for batch in recent_batches %}
                         <tr>
                             <td class="text-center align-middle">
-                                <input class="align-middle" type="checkbox" name="payment_batch" value="{{ batch.id_value }}">
+                                {% if batch.id_value in seen_batch_ids %}
+                                    <input class="align-middle" type="checkbox" disabled title="This row is already included in the grouped receipt above.">
+                                {% else %}
+                                    {% set _ = seen_batch_ids.append(batch.id_value) %}
+                                    <input class="align-middle" type="checkbox" name="payment_batch" value="{{ batch.id_value }}">
+                                {% endif %}
                             </td>
                             <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
                             <td>{{ batch.source }}</td>
