@@ -1,0 +1,113 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Opening Balances</h2>
+            <p class="text-muted">Set starting balances for balance sheet accounts without entering all historical transactions.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.OpeningBalances') }}" method="post">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label for="company">Company</label>
+                <select class="form-control form-control-sm" id="company" name="company" onchange="this.form.submit()">
+                    {% for company in companies %}
+                        <option value="{{ company }}" {% if selected.company == company %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="opening_date">Opening Date</label>
+                <input type="date" class="form-control form-control-sm" id="opening_date" name="opening_date" value="{{ selected.opening_date }}" onchange="this.form.submit()">
+            </div>
+            <div class="col-md-3">
+                <label>Journal</label>
+                <div class="form-control form-control-sm bg-light">{{ totals.journal_id }}</div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" name="save_opening_balances" value="1" class="btn btn-success btn-sm btn-block"
+                        onclick="return confirm('Replace the opening balance journal for this company and date?');">
+                    Save Opening Balances
+                </button>
+            </div>
+        </div>
+
+        {% if err %}
+            <div class="alert alert-info" role="alert">
+                <pre class="mb-0">{{ err }}</pre>
+            </div>
+        {% endif %}
+
+        <div class="row mb-3">
+            <div class="col-md-3 mb-2">
+                <div class="border rounded p-3">
+                    <div class="text-muted">Existing Rows</div>
+                    <h4>{{ totals.rows }}</h4>
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="border rounded p-3">
+                    <div class="text-muted">Entered Debits</div>
+                    <h4>{{ totals.debits }}</h4>
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="border rounded p-3">
+                    <div class="text-muted">Entered Credits</div>
+                    <h4>{{ totals.credits }}</h4>
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="border rounded p-3">
+                    <div class="text-muted">Opening Equity Offset</div>
+                    <h4>{{ totals.offset }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="dtOpeningBalances" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Section</th>
+                        <th>Account</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th class="text-right">Opening Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in account_rows %}
+                        <tr>
+                            <td>{{ account.section }}</td>
+                            <td>{{ account.name }}</td>
+                            <td>{{ account.type }}</td>
+                            <td>{{ account.category }}</td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm text-right" name="balance_{{ account.id }}" value="{{ account.balance }}" placeholder="0.00">
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable || !document.getElementById('dtOpeningBalances')) {
+        return;
+    }
+    $('#dtOpeningBalances').DataTable({
+        aaSorting: [[0, 'asc'], [1, 'asc']],
+        scrollX: true,
+        paging: false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}

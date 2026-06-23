@@ -1,0 +1,168 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Balance Sheet</h2>
+            <p class="text-muted">Read-only balance sheet summary from general ledger asset, liability, and equity accounts.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.BalanceSheet') }}" method="get" class="mb-3">
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-3">
+                <label for="as_of">As Of</label>
+                <input type="date" class="form-control form-control-sm" id="as_of" name="as_of" value="{{ filters.as_of }}">
+            </div>
+            <div class="form-group col-md-3">
+                <label for="com">Company</label>
+                <select class="form-control form-control-sm" id="com" name="com">
+                    <option value="">All</option>
+                    {% for company in companies %}
+                        <option value="{{ company }}" {% if filters.com == company %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm btn-block">Apply</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row mb-3">
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Assets</div>
+                <h4>{{ totals.assets }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Liabilities</div>
+                <h4>{{ totals.liabilities }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Equity</div>
+                <h4>{{ totals.equity }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3 {% if totals.balanced %}border-success{% else %}border-danger{% endif %}">
+                <div class="text-muted">Difference</div>
+                <h4>{{ totals.difference }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <h5>Summary By Section</h5>
+    <div class="table-responsive mb-4">
+        <table id="dtBalanceSection" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Section</th>
+                    <th class="text-right">Balance</th>
+                    <th class="text-right">Accounts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in section_summaries %}
+                    <tr>
+                        <td>{{ item.section }}</td>
+                        <td class="text-right">{{ item.balance_fmt }}</td>
+                        <td class="text-right">{{ item.accounts }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Summary By Category</h5>
+    <div class="table-responsive mb-4">
+        <table id="dtBalanceCategory" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Section</th>
+                    <th>Category</th>
+                    <th>Subcategory</th>
+                    <th class="text-right">Balance</th>
+                    <th class="text-right">Accounts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in category_summaries %}
+                    <tr>
+                        <td>{{ item.section }}</td>
+                        <td>{{ item.category }}</td>
+                        <td>{{ item.subcategory }}</td>
+                        <td class="text-right">{{ item.balance_fmt }}</td>
+                        <td class="text-right">{{ item.accounts }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Summary By Account</h5>
+    <div class="table-responsive">
+        <table id="dtBalanceAccount" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Section</th>
+                    <th>Company</th>
+                    <th>Account</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Subcategory</th>
+                    <th class="text-right">Debits</th>
+                    <th class="text-right">Credits</th>
+                    <th class="text-right">Balance</th>
+                    <th class="text-right">Rows</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in account_summaries %}
+                    <tr>
+                        <td>{{ item.section }}</td>
+                        <td>{{ item.company }}</td>
+                        <td>{{ item.account }}</td>
+                        <td>{{ item.type }}</td>
+                        <td>{{ item.category }}</td>
+                        <td>{{ item.subcategory }}</td>
+                        <td class="text-right">{{ item.debit_fmt }}</td>
+                        <td class="text-right">{{ item.credit_fmt }}</td>
+                        <td class="text-right">{{ item.balance_fmt }}</td>
+                        <td class="text-right">{{ item.rows }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable) {
+        return;
+    }
+    $('#dtBalanceSection').DataTable({
+        paging: false,
+        searching: false,
+        info: false
+    });
+    $('#dtBalanceCategory').DataTable({
+        aaSorting: [[0, 'asc'], [1, 'asc'], [2, 'asc']],
+        scrollX: true,
+        paging: false
+    });
+    $('#dtBalanceAccount').DataTable({
+        aaSorting: [[0, 'asc'], [1, 'asc'], [2, 'asc']],
+        scrollX: true,
+        paging: false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}

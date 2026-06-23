@@ -1,0 +1,270 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Depreciation Schedules</h2>
+            <p class="text-muted">Link operational assets to book and tax depreciation schedules.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.DepreciationSchedules') }}" method="post">
+        <input type="hidden" name="current_asset_id" value="{{ selected.asset_id }}">
+        <div class="row">
+            <div class="col-lg-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>{% if selected.asset_id %}Edit Asset{% else %}Asset Setup{% endif %}</h5>
+                    <div class="form-group">
+                        <label for="source">Operational Asset</label>
+                        <select class="form-control form-control-sm" id="source" name="source">
+                            <option value="">Choose operational asset</option>
+                            {% for option in source_options %}
+                                <option value="{{ option.value }}" {% if selected.source == option.value %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" name="use_source" value="1" class="btn btn-outline-secondary btn-sm mt-1">Use Selected Asset</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="company">Company</label>
+                        <select class="form-control form-control-sm" id="company" name="company">
+                            {% for company in companies %}
+                                <option value="{{ company }}" {% if selected.company == company %}selected{% endif %}>{{ company }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="asset_name">Asset Name</label>
+                        <input type="text" class="form-control form-control-sm" id="asset_name" name="asset_name" value="{{ selected.asset_name }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="asset_identifier">Identifier</label>
+                        <input type="text" class="form-control form-control-sm" id="asset_identifier" name="asset_identifier" value="{{ selected.asset_identifier }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="in_service_date">In-Service Date</label>
+                        <input type="date" class="form-control form-control-sm" id="in_service_date" name="in_service_date" value="{{ selected.in_service_date }}">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="cost_basis">Cost Basis</label>
+                            <input type="text" class="form-control form-control-sm text-right" id="cost_basis" name="cost_basis" value="{{ selected.cost_basis }}">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="salvage_value">Salvage</label>
+                            <input type="text" class="form-control form-control-sm text-right" id="salvage_value" name="salvage_value" value="{{ selected.salvage_value }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="asset_account">Asset Account</label>
+                        <select class="form-control form-control-sm" id="asset_account" name="asset_account">
+                            <option value="">Choose account</option>
+                            {% for account in asset_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.asset_account == account.Name %}selected{% endif %}>{{ account.Co }} - {{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="accum_dep_account">Accumulated Depreciation</label>
+                        <select class="form-control form-control-sm" id="accum_dep_account" name="accum_dep_account">
+                            <option value="">Choose account</option>
+                            {% for account in accum_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.accum_dep_account == account.Name %}selected{% endif %}>{{ account.Co }} - {{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="dep_expense_account">Depreciation Expense</label>
+                        <select class="form-control form-control-sm" id="dep_expense_account" name="dep_expense_account">
+                            <option value="">Choose account</option>
+                            {% for account in expense_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.dep_expense_account == account.Name %}selected{% endif %}>{{ account.Co }} - {{ account.Name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <h6>Book Depreciation</h6>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="book_method">Method</label>
+                            <select class="form-control form-control-sm" id="book_method" name="book_method">
+                                <option value="Straight Line" {% if selected.book_method == 'Straight Line' %}selected{% endif %}>Straight Line</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="book_life_months">Life Months</label>
+                            <input type="number" class="form-control form-control-sm text-right" id="book_life_months" name="book_life_months" value="{{ selected.book_life_months }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="prior_book_accum">Prior Book Accumulated Depreciation</label>
+                        <input type="text" class="form-control form-control-sm text-right" id="prior_book_accum" name="prior_book_accum" value="{{ selected.prior_book_accum }}">
+                    </div>
+
+                    <h6>Tax Depreciation</h6>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="tax_method">Method</label>
+                            <select class="form-control form-control-sm" id="tax_method" name="tax_method">
+                                <option value="Straight Line" {% if selected.tax_method == 'Straight Line' %}selected{% endif %}>Straight Line</option>
+                                <option value="MACRS Placeholder" {% if selected.tax_method == 'MACRS Placeholder' %}selected{% endif %}>MACRS Placeholder</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="tax_life_months">Life Months</label>
+                            <input type="number" class="form-control form-control-sm text-right" id="tax_life_months" name="tax_life_months" value="{{ selected.tax_life_months }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="tax_class">Tax Class</label>
+                        <input type="text" class="form-control form-control-sm" id="tax_class" name="tax_class" value="{{ selected.tax_class }}" placeholder="5-year, 7-year, etc.">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="section179">Section 179</label>
+                            <input type="text" class="form-control form-control-sm text-right" id="section179" name="section179" value="{{ selected.section179 }}">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="bonus_depreciation">Bonus</label>
+                            <input type="text" class="form-control form-control-sm text-right" id="bonus_depreciation" name="bonus_depreciation" value="{{ selected.bonus_depreciation }}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="prior_tax_accum">Prior Tax Accumulated Depreciation</label>
+                        <input type="text" class="form-control form-control-sm text-right" id="prior_tax_accum" name="prior_tax_accum" value="{{ selected.prior_tax_accum }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select class="form-control form-control-sm" id="status" name="status">
+                            <option value="Active" {% if selected.status == 'Active' %}selected{% endif %}>Active</option>
+                            <option value="Disposed" {% if selected.status == 'Disposed' %}selected{% endif %}>Disposed</option>
+                            <option value="Inactive" {% if selected.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+                    <button type="submit" name="save_asset" value="1" class="btn btn-success btn-block">Save Asset</button>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                {% if err %}
+                    <div class="alert alert-info" role="alert">
+                        <pre class="mb-0">{{ err }}</pre>
+                    </div>
+                {% endif %}
+
+                <h5>Depreciation Assets</h5>
+                <button type="submit" name="load_asset" value="1" class="btn btn-primary btn-sm mb-2">Edit Selected</button>
+                <div class="table-responsive mb-4">
+                    <table id="dtDepreciationAssets" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                        <thead class="thead-light">
+                            <tr>
+                                <th></th>
+                                <th>Company</th>
+                                <th>Asset</th>
+                                <th>Source</th>
+                                <th>Identifier</th>
+                                <th>Status</th>
+                                <th class="text-right">Cost</th>
+                                <th class="text-right">Book Accum</th>
+                                <th class="text-right">Tax Accum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in assets %}
+                                <tr>
+                                    <td class="text-center"><input type="radio" name="asset_id" value="{{ asset.id }}" {% if selected.asset_id|string == asset.id|string %}checked{% endif %}></td>
+                                    <td>{{ asset.Company }}</td>
+                                    <td>{{ asset.AssetName }}</td>
+                                    <td>{{ asset.source_label }}</td>
+                                    <td>{{ asset.AssetIdentifier or '' }}</td>
+                                    <td>{{ asset.Status }}</td>
+                                    <td class="text-right">{{ asset.cost_fmt }}</td>
+                                    <td class="text-right">{{ asset.book_accum_fmt }}</td>
+                                    <td class="text-right">{{ asset.tax_accum_fmt }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Book Schedule</h5>
+                        <div class="table-responsive">
+                            <table id="dtBookDepreciation" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Year</th>
+                                        <th class="text-right">Depreciation</th>
+                                        <th class="text-right">Accumulated</th>
+                                        <th class="text-right">Net Basis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in book_schedule %}
+                                        <tr>
+                                            <td>{{ row.year }}</td>
+                                            <td class="text-right">{{ row.depreciation_fmt }}</td>
+                                            <td class="text-right">{{ row.accumulated_fmt }}</td>
+                                            <td class="text-right">{{ row.basis_fmt }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Tax Schedule</h5>
+                        <div class="table-responsive">
+                            <table id="dtTaxDepreciation" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Year</th>
+                                        <th class="text-right">Depreciation</th>
+                                        <th class="text-right">Accumulated</th>
+                                        <th class="text-right">Tax Basis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in tax_schedule %}
+                                        <tr>
+                                            <td>{{ row.year }}</td>
+                                            <td class="text-right">{{ row.depreciation_fmt }}</td>
+                                            <td class="text-right">{{ row.accumulated_fmt }}</td>
+                                            <td class="text-right">{{ row.basis_fmt }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable) {
+        return;
+    }
+    $('#dtDepreciationAssets').DataTable({
+        aaSorting: [[1, 'asc'], [2, 'asc']],
+        scrollX: true,
+        pageLength: 25
+    });
+    $('#dtBookDepreciation').DataTable({
+        paging: false,
+        searching: false,
+        info: false
+    });
+    $('#dtTaxDepreciation').DataTable({
+        paging: false,
+        searching: false,
+        info: false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}

@@ -1,0 +1,432 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="container-fluid plaid-page">
+    {% include 'includes/_messages.html' %}
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-1">Plaid Connections</h3>
+            <div class="text-muted">Environment: {{ plaid_env }}</div>
+        </div>
+        <button id="plaid-link-button" type="button" class="btn btn-primary" {% if not ready %}disabled{% endif %}>
+            Connect Bank Account
+        </button>
+    </div>
+
+    {% if not ready %}
+        <div class="alert alert-warning">Plaid client id and secret are not configured for {{ scac }}.</div>
+    {% endif %}
+
+    <div id="plaid-message" class="alert d-none" role="alert"></div>
+
+    <div class="row">
+        <div class="col-lg-5 mb-4">
+            <h5>Connections</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered">
+                    <thead>
+                    <tr>
+                        <th>Institution</th>
+                        <th>Status</th>
+                        <th>Last Sync</th>
+                        <th>Result</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td>
+                                <div>{{ item.InstitutionName or item.ItemId }}</div>
+                                <small class="text-muted">{{ item.InstitutionId or '' }}</small>
+                            </td>
+                            <td>{% if item.Active %}Active{% else %}Inactive{% endif %}</td>
+                            <td>{% if item.LastSyncAt %}{{ item.LastSyncAt.strftime('%Y-%m-%d %H:%M') }}{% else %}<span class="text-muted">Never</span>{% endif %}</td>
+                            <td>
+                                {% if sync_result.item_id == item.id|string and sync_result.message %}
+                                    <span class="badge badge-{{ sync_result.status or 'secondary' }}">{{ sync_result.message }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="POST" action="" class="plaid-sync-form">
+                                    <input type="hidden" name="action" value="sync_item">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary plaid-sync-button">Sync</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">No Plaid connections yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-lg-7 mb-4">
+            <h5>Account Mapping</h5>
+            <form method="POST" action="">
+                <input type="hidden" name="action" value="map_accounts">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-bordered">
+                        <thead>
+                        <tr>
+                            <th>Plaid Account</th>
+                            <th>Type</th>
+                            <th>Balance</th>
+                            <th>Chart Account</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for account in plaid_accounts %}
+                            <tr>
+                                <td>
+                                    <div>{{ account.Name }}{% if account.Mask %} ****{{ account.Mask }}{% endif %}</div>
+                                    <small class="text-muted">{{ account.OfficialName or account.AccountId }}</small>
+                                </td>
+                                <td>{{ account.Type }} / {{ account.Subtype }}</td>
+                                <td class="text-right">
+                                    {% if account.CurrentBalance is not none %}
+                                        ${{ "%.2f"|format(account.CurrentBalance / 100) }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <select class="form-control form-control-sm" name="local_account_{{ account.id }}">
+                                        <option value="">Not mapped</option>
+                                        {% for option in mapping_options %}
+                                            <option value="{{ option.id }}" {% if account.LocalAccountId == option.id %}selected{% endif %}>
+                                                {{ option.Co }} - {{ option.Name }} ({{ option.Type }})
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-center text-muted">Connect an account to map it.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if plaid_accounts %}
+                    <button type="submit" class="btn btn-primary">Save Mapping</button>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <h5>Bank Transaction Review</h5>
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-striped table-bordered">
+            <thead>
+            <tr>
+                <th>Date</th>
+                <th>Payment Account</th>
+                <th>Vendor</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Expense Account</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for tx in review_transactions %}
+                {% set local = local_accounts.get(tx.LocalAccountId) if tx.LocalAccountId else none %}
+                {% set rule = vendor_rule_lookup.get(tx.id) %}
+                {% set vendor_name = rule.VendorName if rule and rule.VendorName else tx.MerchantName or tx.Name or '' %}
+                {% set match_options = bill_match_options.get(tx.id, []) %}
+                <tr class="plaid-review-row" data-local-co="{{ local.Co if local else '' }}" data-can-bill="{% if tx.Amount is not none and tx.Amount > 0 %}1{% else %}0{% endif %}">
+                    <td>{% if tx.Date %}{{ tx.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                    <td>{% if local %}{{ local.Name }}{% endif %}</td>
+                    <td>
+                        <input form="plaid-bill-{{ tx.id }}" type="text" name="vendor_name" class="form-control form-control-sm" value="{{ vendor_name }}">
+                    </td>
+                    <td>{{ tx.Name }}</td>
+                    <td class="text-right">${{ "%.2f"|format((tx.Amount or 0) / 100) }}</td>
+                    <td>
+                        <select class="form-control form-control-sm plaid-review-choice">
+                            <option value="">Select expense account</option>
+                            <optgroup label="Expense accounts">
+                                {% for option in expense_account_options %}
+                                    {% if local is none or option.Co == local.Co %}
+                                        <option value="bill:{{ option.id }}" {% if rule and rule.ExpenseAccountId == option.id %}selected{% endif %}>
+                                            {{ option.Co }} - {{ option.Name }}
+                                        </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            {% if match_options %}
+                                <optgroup label="Match existing bill">
+                                    {% for bill in match_options %}
+                                        <option value="match:{{ bill.id }}">
+                                            {{ bill.Jo }} - {{ bill.Company }} - {{ bill.pDate.strftime('%Y-%m-%d') if bill.pDate else '' }}
+                                        </option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endif %}
+                            <optgroup label="Transfer to/from account">
+                                {% for account in transfer_account_options %}
+                                    {% if local is none or account.id != local.id %}
+                                        <option value="transfer:{{ account.id }}" data-co="{{ account.Co }}">
+                                            {{ account.Co }} - {{ account.Name }} ({{ account.Type }})
+                                        </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </td>
+                    <td>
+                        <form id="plaid-bill-{{ tx.id }}" method="POST" action="" class="d-inline">
+                            <input type="hidden" name="action" value="create_bill_from_plaid">
+                            <input type="hidden" name="transaction_id" value="{{ tx.id }}">
+                            <input type="hidden" name="expense_account_id" class="plaid-expense-account-input">
+                            <button type="submit" class="btn btn-sm btn-primary plaid-create-bill-button" {% if tx.Amount is none or tx.Amount <= 0 %}disabled{% endif %}>Create Bill</button>
+                        </form>
+                        <form method="POST" action="" class="d-inline plaid-match-form d-none">
+                            <input type="hidden" name="action" value="match_bill_from_plaid">
+                            <input type="hidden" name="transaction_id" value="{{ tx.id }}">
+                            <input type="hidden" name="bill_id" class="plaid-match-bill-input">
+                            <button type="submit" class="btn btn-sm btn-outline-primary plaid-match-button">Match Bill</button>
+                        </form>
+                        <form method="POST" action="" class="d-inline plaid-transfer-form d-none">
+                            <input type="hidden" name="action" value="create_transfer_from_plaid">
+                            <input type="hidden" name="transaction_id" value="{{ tx.id }}">
+                            <input type="hidden" name="other_account_id" class="plaid-transfer-account-input">
+                            <select name="owner_transfer_treatment" class="form-control form-control-sm plaid-owner-transfer-select d-none mb-1">
+                                <option value="">Owner type if needed</option>
+                                <option value="loan">Loan / repayable</option>
+                                <option value="equity">Owner equity withdrawal / contribution</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-success plaid-transfer-button">Transfer</button>
+                        </form>
+                        <form method="POST" action="" class="d-inline">
+                            <input type="hidden" name="action" value="ignore_plaid_transaction">
+                            <input type="hidden" name="transaction_id" value="{{ tx.id }}">
+                            <input type="hidden" name="review_note" value="Ignored from transaction review">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Ignore</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-center text-muted">No mapped bank withdrawals are waiting for review.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Processed Plaid Transactions</h5>
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-striped table-bordered">
+            <thead>
+            <tr>
+                <th>Date</th>
+                <th>Account</th>
+                <th>Name</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Result</th>
+                <th>Reviewed</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for tx in processed_transactions %}
+                {% set local = local_accounts.get(tx.LocalAccountId) if tx.LocalAccountId else none %}
+                <tr>
+                    <td>{% if tx.Date %}{{ tx.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                    <td>{% if local %}{{ local.Name }}{% endif %}</td>
+                    <td>{{ tx.MerchantName or tx.Name }}</td>
+                    <td class="text-right">${{ "%.2f"|format((tx.Amount or 0) / 100) }}</td>
+                    <td>{{ tx.Status }}</td>
+                    <td>
+                        {{ tx.ReviewNote or '' }}
+                        {% if tx.BillId %}
+                            <small class="text-muted">Bill ID {{ tx.BillId }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if tx.ReviewedAt %}{{ tx.ReviewedAt.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+                        {% if tx.ReviewedBy %}<small class="text-muted">{{ tx.ReviewedBy }}</small>{% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-center text-muted">No Plaid transactions have been processed yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Recent Downloaded Transactions</h5>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-bordered plaid-transactions">
+            <thead>
+            <tr>
+                <th>Date</th>
+                <th>Account</th>
+                <th>Name</th>
+                <th>Merchant</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Category</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for tx in transactions %}
+                {% set local = local_accounts.get(tx.LocalAccountId) if tx.LocalAccountId else none %}
+                {% set plaid_account = plaid_account_lookup.get(tx.PlaidAccountId) if tx.PlaidAccountId else none %}
+                <tr>
+                    <td>{% if tx.Date %}{{ tx.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                    <td>
+                        {% if local %}
+                            {{ local.Name }}
+                        {% else %}
+                            <div><span class="text-muted">Unmapped</span></div>
+                            {% if plaid_account %}
+                                <small class="text-muted">
+                                    {{ plaid_account.Name }}{% if plaid_account.Mask %} ****{{ plaid_account.Mask }}{% endif %}
+                                </small>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>{{ tx.Name }}</td>
+                    <td>{{ tx.MerchantName or '' }}</td>
+                    <td class="text-right">${{ "%.2f"|format((tx.Amount or 0) / 100) }}</td>
+                    <td>
+                        {{ tx.Status }}
+                        {% if tx.Pending %}<span class="badge badge-warning">Pending</span>{% endif %}
+                    </td>
+                    <td>{{ tx.CategoryPrimary or '' }}{% if tx.CategoryDetailed %}: {{ tx.CategoryDetailed }}{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-center text-muted">No downloaded transactions yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const button = document.getElementById('plaid-link-button');
+    const message = document.getElementById('plaid-message');
+
+    function showMessage(text, kind) {
+        message.className = 'alert alert-' + kind;
+        message.textContent = text;
+        message.classList.remove('d-none');
+    }
+
+    if (!button) {
+        return;
+    }
+
+    document.querySelectorAll('.plaid-sync-form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            const syncButton = form.querySelector('.plaid-sync-button');
+            if (syncButton) {
+                syncButton.disabled = true;
+                syncButton.textContent = 'Syncing...';
+            }
+        });
+    });
+
+    document.querySelectorAll('.plaid-review-row').forEach(function (row) {
+        const choice = row.querySelector('.plaid-review-choice');
+        const billForm = row.querySelector('#plaid-bill-' + (row.querySelector('[name="transaction_id"]') || {}).value);
+        const billButton = row.querySelector('.plaid-create-bill-button');
+        const expenseInput = row.querySelector('.plaid-expense-account-input');
+        const matchForm = row.querySelector('.plaid-match-form');
+        const matchInput = row.querySelector('.plaid-match-bill-input');
+        const transferForm = row.querySelector('.plaid-transfer-form');
+        const transferInput = row.querySelector('.plaid-transfer-account-input');
+        const ownerSelect = row.querySelector('.plaid-owner-transfer-select');
+        const canBill = row.dataset.canBill === '1';
+        const localCo = row.dataset.localCo || '';
+
+        function setHidden(element, hidden) {
+            if (element) {
+                element.classList.toggle('d-none', hidden);
+            }
+        }
+
+        function updateReviewAction() {
+            const selected = choice.options[choice.selectedIndex];
+            const value = choice.value || '';
+            const parts = value.split(':');
+            const kind = parts[0] || '';
+            const id = parts[1] || '';
+            const transferCo = selected ? (selected.dataset.co || '') : '';
+            const ownerInvolved = kind === 'transfer' && localCo && transferCo && localCo !== transferCo && (localCo === 'N' || transferCo === 'N');
+
+            setHidden(billForm, kind !== '' && kind !== 'bill');
+            setHidden(matchForm, kind !== 'match');
+            setHidden(transferForm, kind !== 'transfer');
+            setHidden(ownerSelect, !ownerInvolved);
+
+            if (expenseInput) {
+                expenseInput.value = kind === 'bill' ? id : '';
+            }
+            if (matchInput) {
+                matchInput.value = kind === 'match' ? id : '';
+            }
+            if (transferInput) {
+                transferInput.value = kind === 'transfer' ? id : '';
+            }
+            if (ownerSelect && !ownerInvolved) {
+                ownerSelect.value = '';
+            }
+            if (billButton) {
+                billButton.disabled = !(kind === 'bill' && id && canBill);
+            }
+        }
+
+        if (choice) {
+            choice.addEventListener('change', updateReviewAction);
+            updateReviewAction();
+        }
+    });
+
+    button.addEventListener('click', function () {
+        button.disabled = true;
+        fetch('{{ url_for("main.PlaidLinkToken") }}', {method: 'POST'})
+            .then(response => response.json().then(data => ({ok: response.ok, data: data})))
+            .then(result => {
+                if (!result.ok || !result.data.link_token) {
+                    throw new Error(result.data.error || 'Could not create Plaid Link token');
+                }
+                const handler = Plaid.create({
+                    token: result.data.link_token,
+                    onSuccess: function (public_token) {
+                        fetch('{{ url_for("main.PlaidExchangePublicToken") }}', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({public_token: public_token})
+                        })
+                        .then(response => response.json().then(data => ({ok: response.ok, data: data})))
+                        .then(exchangeResult => {
+                            if (!exchangeResult.ok) {
+                                throw new Error(exchangeResult.data.error || 'Could not exchange Plaid token');
+                            }
+                            window.location.reload();
+                        })
+                        .catch(error => {
+                            button.disabled = false;
+                            showMessage(error.message, 'danger');
+                        });
+                    },
+                    onExit: function () {
+                        button.disabled = false;
+                    }
+                });
+                handler.open();
+            })
+            .catch(error => {
+                button.disabled = false;
+                showMessage(error.message, 'danger');
+            });
+    });
+});
+</script>
+{% endblock %}

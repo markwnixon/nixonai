@@ -1,0 +1,150 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Statement of Cash Flows</h2>
+            <p class="text-muted">Cash movement grouped from general ledger cash account activity.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.CashFlowStatement') }}" method="get" class="mb-3">
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-2">
+                <label for="date_from">From</label>
+                <input type="date" class="form-control form-control-sm" id="date_from" name="date_from" value="{{ filters.date_from }}">
+            </div>
+            <div class="form-group col-md-2">
+                <label for="date_to">To</label>
+                <input type="date" class="form-control form-control-sm" id="date_to" name="date_to" value="{{ filters.date_to }}">
+            </div>
+            <div class="form-group col-md-2">
+                <label for="com">Company</label>
+                <select class="form-control form-control-sm" id="com" name="com">
+                    <option value="">All</option>
+                    {% for company in companies %}
+                        <option value="{{ company }}" {% if filters.com == company %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="cash_account">Cash Account</label>
+                <select class="form-control form-control-sm" id="cash_account" name="cash_account">
+                    <option value="">All cash accounts</option>
+                    {% for account in cash_accounts %}
+                        <option value="{{ account.Name }}" {% if filters.cash_account == account.Name %}selected{% endif %}>
+                            {{ account.Co }} - {{ account.Name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm btn-block">Apply</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row mb-3">
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Beginning Cash</div>
+                <h4>{{ totals.beginning_cash }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Net Cash Change</div>
+                <h4>{{ totals.net_change }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Ending Cash</div>
+                <h4>{{ totals.ending_cash }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="border rounded p-3">
+                <div class="text-muted">Internal Transfers</div>
+                <h4>{{ totals.transfers }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <h5>Cash Flow Summary</h5>
+    <div class="table-responsive mb-4">
+        <table id="dtCashFlowSummary" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Section</th>
+                    <th class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in section_summaries %}
+                    <tr>
+                        <td>{{ item.section }}</td>
+                        <td class="text-right">{{ item.amount_fmt }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Cash Flow Detail</h5>
+    <div class="table-responsive">
+        <table id="dtCashFlowDetail" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+            <thead class="thead-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Section</th>
+                    <th>Class</th>
+                    <th>Cash Account</th>
+                    <th>Offset Account</th>
+                    <th>Source</th>
+                    <th>Ref</th>
+                    <th>Journal</th>
+                    <th>Memo</th>
+                    <th class="text-right">Cash Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in detail_rows %}
+                    <tr>
+                        <td>{% if item.date %}{{ item.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                        <td>{{ item.section }}</td>
+                        <td>{{ item.classification }}</td>
+                        <td>{{ item.cash_accounts }}</td>
+                        <td>{{ item.offset_accounts }}</td>
+                        <td>{{ item.source }}</td>
+                        <td>{{ item.ref }}</td>
+                        <td>{{ item.journal }}</td>
+                        <td>{{ item.memo }}</td>
+                        <td class="text-right">{{ item.amount_fmt }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable) {
+        return;
+    }
+    $('#dtCashFlowSummary').DataTable({
+        paging: false,
+        searching: false,
+        info: false
+    });
+    $('#dtCashFlowDetail').DataTable({
+        aaSorting: [[0, 'asc']],
+        scrollX: true,
+        paging: false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}

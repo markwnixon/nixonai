@@ -1,0 +1,159 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dispatch_kanban.css') }}">
+
+<div class="dispatch-kanban-page"
+     data-jobs-url="{{ url_for('main.DispatchKanbanJobs') }}"
+     data-move-url-template="{{ url_for('main.DispatchKanbanMove', order_id=0) }}"
+     data-update-url-template="{{ url_for('main.DispatchKanbanUpdate', order_id=0) }}">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-1">Dispatch Kanban Board</h3>
+            <div class="text-muted">Active container workflow for {{ scac }} dispatch</div>
+        </div>
+        <div id="dispatch-kanban-message" class="alert d-none mb-0 py-2"></div>
+    </div>
+
+    <div class="dispatch-kanban-filter-bar mb-3">
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-2">
+                <label for="kanban-filter-company">Company</label>
+                <select id="kanban-filter-company" class="form-control form-control-sm kanban-filter">
+                    <option value="">All</option>
+                    {% for company in options.companies %}
+                        <option value="{{ company }}">{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="kanban-filter-driver">Driver</label>
+                <select id="kanban-filter-driver" class="form-control form-control-sm kanban-filter">
+                    <option value="">All drivers</option>
+                    {% for driver in options.drivers %}
+                        <option value="{{ driver.Name }}">{{ driver.Name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="kanban-filter-customer">Customer</label>
+                <select id="kanban-filter-customer" class="form-control form-control-sm kanban-filter">
+                    <option value="">All customers</option>
+                    {% for customer in options.customers %}
+                        <option value="{{ customer }}">{{ customer }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="kanban-filter-terminal">Terminal/Port</label>
+                <select id="kanban-filter-terminal" class="form-control form-control-sm kanban-filter">
+                    <option value="">All terminals</option>
+                    {% for terminal in options.terminals %}
+                        <option value="{{ terminal }}">{{ terminal }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="kanban-filter-status">Status</label>
+                <select id="kanban-filter-status" class="form-control form-control-sm kanban-filter">
+                    <option value="">All active statuses</option>
+                    {% for column in options.columns %}
+                        <option value="{{ column.key }}">{{ column.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="kanban-filter-range">Range</label>
+                <select id="kanban-filter-range" class="form-control form-control-sm kanban-filter">
+                    <option value="all_active">Recent Active</option>
+                    <option value="today">Today</option>
+                    <option value="tomorrow">Tomorrow</option>
+                    <option value="7">Next 7 Days</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div id="dispatch-kanban-board" class="dispatch-kanban-board"></div>
+</div>
+
+<div class="modal fade" id="dispatch-kanban-modal" tabindex="-1" role="dialog" aria-labelledby="dispatch-kanban-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form id="dispatch-kanban-form">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dispatch-kanban-modal-title">Dispatch Job</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="kanban-modal-order-id">
+                    <div id="kanban-modal-summary" class="dispatch-kanban-summary mb-3"></div>
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="kanban-modal-status">Workflow Status</label>
+                            <select id="kanban-modal-status" class="form-control">
+                                {% for column in options.columns %}
+                                    <option value="{{ column.key }}">{{ column.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="kanban-modal-driver">Driver</label>
+                            <select id="kanban-modal-driver" class="form-control">
+                                <option value="">Unassigned</option>
+                                {% for driver in options.drivers %}
+                                    <option value="{{ driver.Name }}">{{ driver.Name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="kanban-modal-truck">Truck</label>
+                            <select id="kanban-modal-truck" class="form-control">
+                                <option value="">Unassigned</option>
+                                {% for truck in options.trucks %}
+                                    <option value="{{ truck.Unit }}">{{ truck.Unit }}{% if truck.Type %} - {{ truck.Type }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-3">
+                            <label for="kanban-modal-date">Scheduled Date</label>
+                            <input type="date" id="kanban-modal-date" class="form-control">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="kanban-modal-time">Scheduled Time</label>
+                            <input type="time" id="kanban-modal-time" class="form-control">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="kanban-modal-pin">PIN Reference</label>
+                            <input type="text" id="kanban-modal-pin" class="form-control">
+                        </div>
+                        <div class="form-group col-md-3">
+                            <label for="kanban-modal-billing">Billing Status</label>
+                            <input type="text" id="kanban-modal-billing" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="kanban-modal-notes">Notes</label>
+                        <textarea id="kanban-modal-notes" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="kanban-modal-override-pin">
+                        <label class="form-check-label" for="kanban-modal-override-pin">Allow PIN Ready without PIN</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Job</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/dispatch_kanban.js') }}"></script>
+{% endblock %}
