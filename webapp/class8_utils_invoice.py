@@ -857,7 +857,8 @@ def writechecks(sids,pmeth):
     addr1 = pdat.Addr1
     addr2 = pdat.Addr2
 
-    amount_num = d2s(amount)
+    is_refund = amount < 0
+    amount_num = d2s(abs(amount))
     bank = bdat.pAccount
     amount_text = get_check_words(amount_num)
     # #print(amount_text)
@@ -939,6 +940,8 @@ def writechecks(sids,pmeth):
     item12 = [datestr, payref, btype, bcat, bsubcat, bacct]
     item21 = ['BillNo', 'Amount', 'Check Made Out To', 'From Acct']
     item22 = [billno, amount_num, payee, bank]
+    if is_refund:
+        item21 = ['BillNo', 'Refund Amount', 'Refund From', 'Deposit Acct']
     if multi:
         itemheads = ['BillRef', 'Amount', 'Type', 'Category', 'Subcategory', 'Account']
         itemeachs = []

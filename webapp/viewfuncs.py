@@ -2590,6 +2590,7 @@ def check_multi_line(jo):
             # Remove any previous payments to individual accounts as this check about to be paid for all
             Gledger.query.filter( (Gledger.Tcode == bjo) & (Gledger.Type == 'PD') ).delete()
             Gledger.query.filter( (Gledger.Tcode == bjo) & (Gledger.Type == 'PC') ).delete()
+            Gledger.query.filter( (Gledger.Tcode == bjo) & (Gledger.Type == 'DD') ).delete()
     else:
         total = float(bdat.pAmount)
     db.session.commit()
@@ -2713,7 +2714,6 @@ def run_adjustments():
 
     from gledger_write import gledger_write
     gledger_write('adjusting',jo,adat.Expense,adat.Asset)
-
 
 
 

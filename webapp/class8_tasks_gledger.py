@@ -17,6 +17,14 @@ def cents(value):
         return 0
 
 
+def debit_credit_for_signed_amount(amount, normal_debit=True):
+    """Return positive debit/credit columns, reversing sides for refunds/credits."""
+    clean_amount = abs(amount or 0)
+    if amount >= 0:
+        return (clean_amount, 0) if normal_debit else (0, clean_amount)
+    return (0, clean_amount) if normal_debit else (clean_amount, 0)
+
+
 def audit_journal_balance(journal_id):
     lines = Gledger.query.filter(Gledger.JournalId == journal_id).all()
     debit_total = sum(line.Debit or 0 for line in lines)
@@ -408,6 +416,8 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
         if bus=='newbill':
             bdat=Bills.query.filter(Bills.Jo==jo).first()
             amt=cents(bdat.bAmount)
+            expense_debit, expense_credit = debit_credit_for_signed_amount(amt, normal_debit=True)
+            payable_debit, payable_credit = debit_credit_for_signed_amount(amt, normal_debit=False)
             pid=bdat.Pid
             bdate = bdat.Date
             co = get_company(pid)
@@ -422,23 +432,25 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
 
                 gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type=='ED')).first()
                 if gdat is not None:
-                    gdat.Debit=amt
+                    gdat.Debit=expense_debit
+                    gdat.Credit=expense_credit
                     gdat.Recorded=dt
                     gdat.Date=bdate
                     gdat.Account=acctdb
                     gdat.Sid = pid
                 else:
-                    input1 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type='ED',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=bdate,Ref=bdat.Ref)
+                    input1 = Gledger(Debit=expense_debit,Credit=expense_credit,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type='ED',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=bdate,Ref=bdat.Ref)
                     db.session.add(input1)
                 db.session.commit()
 
                 gdat = Gledger.query.filter((Gledger.Tcode==jo) &  (Gledger.Type=='EC')).first()
                 if gdat is not None:
-                    gdat.Credit=amt
+                    gdat.Debit=payable_debit
+                    gdat.Credit=payable_credit
                     gdat.Recorded=dt
                     gdat.Date=bdate
                 else:
-                    input2 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='EC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=bdate,Ref=bdat.Ref)
+                    input2 = Gledger(Debit=payable_debit,Credit=payable_credit,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='EC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=bdate,Ref=bdat.Ref)
                     db.session.add(input2)
                 db.session.commit()
 
@@ -464,6 +476,8 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
                     jo = jo + f'-{iflag}'
                     amt = bdat.pAmount2
             amt=cents(amt)
+            refund = amt < 0
+            post_amt = abs(amt)
             journal_id = f'PAYBILL-{jo}'
 
             pid=bdat.Pid
@@ -497,34 +511,34 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
                     return [f'Cannot locate due-to account for {newcc} in {cc}']
 
                 err = post_balanced_journal([
-                    {'debit': amt, 'credit': 0, 'account': adat1.Name, 'aid': adat1.id, 'source': co,
+                    {'debit': 0 if refund else post_amt, 'credit': post_amt if refund else 0, 'account': adat1.Name, 'aid': adat1.id, 'source': co,
                      'sid': pid, 'type': 'PD', 'tcode': jo, 'com': newcc, 'recorded': dt,
                      'date': pdate, 'ref': bdat.Ref, 'match_aid': True},
-                    {'debit': 0, 'credit': amt, 'account': acctcr, 'aid': acr.id, 'source': co,
-                     'sid': pid, 'type': 'PC', 'tcode': jo, 'com': cc, 'recorded': dt,
+                    {'debit': post_amt if refund else 0, 'credit': 0 if refund else post_amt, 'account': acctcr, 'aid': acr.id, 'source': co,
+                     'sid': pid, 'type': 'DD' if refund else 'PC', 'tcode': jo, 'com': cc, 'recorded': dt,
                      'date': pdate, 'ref': bdat.Ref},
-                    {'debit': amt, 'credit': 0, 'account': acctdb, 'aid': adb.id, 'source': co,
+                    {'debit': 0 if refund else post_amt, 'credit': post_amt if refund else 0, 'account': acctdb, 'aid': adb.id, 'source': co,
                      'sid': pid, 'type': 'QD', 'tcode': jo, 'com': cc, 'recorded': dt,
                      'date': pdate, 'ref': bdat.Ref, 'match_aid': True},
-                    {'debit': 0, 'credit': amt, 'account': adat2.Name, 'aid': adat2.id, 'source': co,
+                    {'debit': post_amt if refund else 0, 'credit': 0 if refund else post_amt, 'account': adat2.Name, 'aid': adat2.id, 'source': co,
                      'sid': pid, 'type': 'QC', 'tcode': jo, 'com': cc, 'recorded': dt,
                      'date': pdate, 'ref': bdat.Ref},
                 ], journal_id=journal_id,
-                    journal_memo=f'Pay bill {jo} to {co} from {acctcr}',
+                    journal_memo=f'{"Receive refund for" if refund else "Pay"} bill {jo} to {co} from {acctcr}',
                     source_table='Bills', source_id=bdat.id)
                 if err:
                     return err
 
             else:
                 err = post_balanced_journal([
-                    {'debit': amt, 'credit': 0, 'account': acctdb, 'aid': adb.id, 'source': co,
+                    {'debit': 0 if refund else post_amt, 'credit': post_amt if refund else 0, 'account': acctdb, 'aid': adb.id, 'source': co,
                      'sid': pid, 'type': 'PD', 'tcode': jo, 'com': cc, 'recorded': dt,
                      'date': pdate, 'ref': bdat.Ref, 'match_aid': True},
-                    {'debit': 0, 'credit': amt, 'account': acctcr, 'aid': acr.id, 'source': co,
-                     'sid': pid, 'type': 'PC', 'tcode': jo, 'com': cc, 'recorded': dt,
+                    {'debit': post_amt if refund else 0, 'credit': 0 if refund else post_amt, 'account': acctcr, 'aid': acr.id, 'source': co,
+                     'sid': pid, 'type': 'DD' if refund else 'PC', 'tcode': jo, 'com': cc, 'recorded': dt,
                      'date': pdate, 'ref': bdat.Ref},
                 ], journal_id=journal_id,
-                    journal_memo=f'Pay bill {jo} to {co} from {acctcr}',
+                    journal_memo=f'{"Receive refund for" if refund else "Pay"} bill {jo} to {co} from {acctcr}',
                     source_table='Bills', source_id=bdat.id)
                 if err:
                     return err
