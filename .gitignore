@@ -29,9 +29,13 @@ env/
 webapp/CCC_system_setup.py
 db_dumps/
 local_runtime/
-webapp/static/css/
+webapp/static/css/*
 webapp/static/font/
-webapp/static/js/
+webapp/static/js/*
+!webapp/static/css/dispatch_planning_calendar.css
+!webapp/static/css/dispatch_kanban.css
+!webapp/static/js/dispatch_planning_calendar.js
+!webapp/static/js/dispatch_kanban.js
 webapp/static/OSLM/
 webapp/templates/companysite/OSLM/
 
