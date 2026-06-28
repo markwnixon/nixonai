@@ -1,0 +1,99 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="container-fluid mt-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+        <div>
+            <h3 class="mb-1">Port Closure Calendar</h3>
+            <div class="text-muted">Maintain anticipated and updated port closure dates for {{ selected_year }}.</div>
+        </div>
+        <div>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('main.DispatchPlanningCalendar') }}">Back to Dispatch Calendar</a>
+        </div>
+    </div>
+
+    {% if err %}
+        <div class="alert alert-warning">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="form-inline">
+                <label class="mr-2" for="port-closure-year">Year</label>
+                <select id="port-closure-year" name="year" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+                    {% for year in years %}
+                        <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+                <noscript><button type="submit" class="btn btn-sm btn-primary">Load</button></noscript>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Add Closure Date</div>
+        <div class="card-body">
+            <form method="post" class="form-row align-items-end">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="year" value="{{ selected_year }}">
+                <div class="form-group col-md-3">
+                    <label for="new-closure-date">Date</label>
+                    <input id="new-closure-date" class="form-control" type="date" name="closure_date" required>
+                </div>
+                <div class="form-group col-md-7">
+                    <label for="new-closure-reason">Reason</label>
+                    <input id="new-closure-reason" class="form-control" type="text" name="reason" placeholder="Holiday, weather, terminal notice, etc.">
+                </div>
+                <div class="form-group col-md-2">
+                    <button type="submit" class="btn btn-primary btn-block">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">{{ selected_year }} Closure Dates</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 180px;">Date</th>
+                        <th>Reason</th>
+                        <th style="width: 190px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for closure in closures %}
+                        <tr>
+                            <td colspan="3">
+                                <form method="post" class="form-row align-items-center mb-0">
+                                    <input type="hidden" name="closure_id" value="{{ closure.id }}">
+                                    <input type="hidden" name="year" value="{{ selected_year }}">
+                                    <div class="col-md-2">
+                                        <input class="form-control form-control-sm" type="date" name="closure_date" value="{{ closure.Date.strftime('%Y-%m-%d') if closure.Date else '' }}" required>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <input class="form-control form-control-sm" type="text" name="reason" value="{{ closure.Reason or '' }}">
+                                    </div>
+                                    <div class="col-md-2 text-right">
+                                        <button type="submit" name="action" value="update" class="btn btn-sm btn-outline-primary">Update</button>
+                                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="text-muted">No port closure dates have been entered for {{ selected_year }}.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
