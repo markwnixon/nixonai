@@ -54,19 +54,22 @@
     function renderCard(job) {
         const card = document.createElement('div');
         card.className = 'dispatch-kanban-card';
+        if (job.drop_pick_pulled) {
+            card.classList.add('dispatch-kanban-card-dp-pulled');
+        }
         card.dataset.id = job.id;
         card.dataset.status = job.workflow_status;
+        const dateLine = job.hold_status
+            ? `LFD: ${escapeHtml(job.last_free_day || '-')}`
+            : `Delivery: ${escapeHtml(job.scheduled_delivery_date || job.required_delivery_date || '-')} ${escapeHtml(job.scheduled_delivery_time || '')}`;
         card.innerHTML = `
             <div class="dispatch-kanban-card-title">${escapeHtml(cardTitle(job))}</div>
             <div class="dispatch-kanban-card-line">${escapeHtml(job.customer || job.shipper || 'No customer')}</div>
-            <div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml(job.steamship_line || 'No steamship line')}</div>
-            <div class="dispatch-kanban-card-line">${escapeHtml(job.pickup_terminal || 'No pickup terminal')}</div>
+            <div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml([job.steamship_line, job.container_type].filter(Boolean).join(' | ') || 'No steamship line')}</div>
             <div class="dispatch-kanban-card-line">${escapeHtml(job.delivery_location || 'No delivery location')}</div>
-            <div class="dispatch-kanban-card-line">Delivery: ${escapeHtml(job.scheduled_delivery_date || job.required_delivery_date || '-')} ${escapeHtml(job.scheduled_delivery_time || '')}</div>
-            <div class="dispatch-kanban-card-line">Pull: ${escapeHtml(job.pull_date || '-')} | Return: ${escapeHtml(job.return_date || '-')}</div>
-            <div class="dispatch-kanban-card-line">LFD: ${escapeHtml(job.last_free_day || '-')} | ${escapeHtml(job.pin_status || 'PIN unknown')}</div>
-            <div class="dispatch-kanban-card-line">Driver: ${escapeHtml(job.driver || 'Unassigned')} | Truck: ${escapeHtml(job.truck || '-')}</div>
-            <div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml(job.billing_status || 'Billing unknown')}</div>
+            ${job.hold_status ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.hold_status)}</div>` : ''}
+            <div class="dispatch-kanban-card-line">${dateLine}</div>
+            ${job.hold_status ? '' : `<div class="dispatch-kanban-card-line">Pull: ${escapeHtml(job.pull_date || '-')} | Return: ${escapeHtml(job.return_date || '-')}</div>`}
         `;
         card.addEventListener('click', () => openModal(job.id));
         return card;
@@ -187,7 +190,10 @@
                 <dt>Delivery</dt><dd>${escapeHtml(job.scheduled_delivery_date || job.required_delivery_date || '-')} ${escapeHtml(job.scheduled_delivery_time || '')}</dd>
                 <dt>Pull</dt><dd>${escapeHtml(job.pull_date || '-')}</dd>
                 <dt>Return</dt><dd>${escapeHtml(job.return_date || '-')}</dd>
+                <dt>Ship Arrive</dt><dd>${escapeHtml(job.ship_arrive_date || '-')}</dd>
+                <dt>Due Back</dt><dd>${escapeHtml(job.due_back_date || '-')}</dd>
                 <dt>Last Free Day</dt><dd>${escapeHtml(job.last_free_day || '-')}</dd>
+                <dt>Hold/Exam</dt><dd>${escapeHtml(job.hold_status || '-')}</dd>
                 <dt>PIN</dt><dd>${escapeHtml(job.pin_status || '-')}</dd>
             </dl>
         `;

@@ -9,7 +9,8 @@
     background: #f8fafc;
 }
 
-.dispatch-filter-bar label {
+.dispatch-filter-bar label,
+.dispatch-note-panel label {
     font-size: 0.78rem;
     font-weight: 600;
     margin-bottom: 3px;
@@ -17,6 +18,18 @@
 
 #dispatch-calendar {
     min-height: 720px;
+}
+
+.dispatch-event-modal-dialog {
+    max-width: 75vw;
+}
+
+@media (max-width: 991.98px) {
+    .dispatch-event-modal-dialog {
+        max-width: 96vw;
+        margin-left: auto;
+        margin-right: auto;
+    }
 }
 
 .dispatch-capacity-strip {
@@ -45,6 +58,40 @@
     width: 18px;
     height: 12px;
     border-radius: 3px;
+}
+
+.dispatch-note-panel {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 12px;
+    background: #fff;
+}
+
+.dispatch-note-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dispatch-note-chip {
+    border: 1px solid #d4dae1;
+    border-radius: 6px;
+    background: #f8fafc;
+    padding: 5px 8px;
+    text-align: left;
+    min-width: 180px;
+    font-size: 0.78rem;
+    color: #222;
+}
+
+.dispatch-note-chip strong,
+.dispatch-note-chip span,
+.dispatch-note-chip small {
+    display: block;
+}
+
+.dispatch-note-chip small {
+    color: #606975;
 }
 
 .dispatch-legend-outline {
@@ -103,6 +150,62 @@
     color: #fff;
 }
 
+.fc-event.dispatch-returned-split-booking,
+.dispatch-legend-swatch.dispatch-returned-split-booking {
+    background-color: #8b3fa8;
+    color: #fff;
+}
+
+.dispatch-calendar-page.dispatch-show-invoiced .fc-event.dispatch-invoiced {
+    background-color: #8fd19e;
+    color: #102315;
+}
+
+.dispatch-calendar-page.dispatch-show-invoiced .fc-event.dispatch-paid {
+    background-color: #137333;
+    color: #fff;
+}
+
+.dispatch-legend-swatch.dispatch-invoiced {
+    background-color: #8fd19e;
+}
+
+.dispatch-legend-swatch.dispatch-paid {
+    background-color: #137333;
+}
+
+.fc-event.dispatch-special-note {
+    border: 0;
+    padding: 2px 4px;
+}
+
+.fc-event.dispatch-note-driver_off,
+.dispatch-legend-swatch.dispatch-note-driver-off,
+.dispatch-note-chip-driver_off {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.fc-event.dispatch-note-port_closed,
+.dispatch-legend-swatch.dispatch-note-port-closed,
+.dispatch-note-chip-port_closed {
+    background-color: #b00020;
+    color: #fff;
+}
+
+.fc-event.dispatch-note-port_early_close,
+.dispatch-legend-swatch.dispatch-note-port-early-close,
+.dispatch-note-chip-port_early_close {
+    background-color: #d97706;
+    color: #fff;
+}
+
+.dispatch-note-chip-driver_off small,
+.dispatch-note-chip-port_closed small,
+.dispatch-note-chip-port_early_close small {
+    color: rgba(255, 255, 255, 0.84);
+}
+
 .fc-event.dispatch-lfd-near,
 .dispatch-legend-outline.dispatch-lfd-near {
     border: 2px solid #d97706;
@@ -111,6 +214,18 @@
 
 .fc-event.dispatch-lfd-past,
 .dispatch-legend-outline.dispatch-lfd-past {
+    border: 2px solid #b00020;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.fc-event.dispatch-due-back-near,
+.dispatch-legend-outline.dispatch-due-back-near {
+    border: 2px solid #00a1a7;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.fc-event.dispatch-due-back-past,
+.dispatch-legend-outline.dispatch-due-back-past {
     border: 2px solid #b00020;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
 }

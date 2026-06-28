@@ -36,6 +36,7 @@ Trucking_genre = {'table': 'Orders',
                   'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver', 'Dray Transfer'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out', 'Dray Out', 'Dray In'],
                   'delivery_types': ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder'],
+                  'hold_types': ['', 'ECCES', 'Line Hold', 'Custom Hold', 'Other Hold', 'Line and Customs Hold'],
                   'document_profiles'  : {
                                         'Custom' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
                                         'Custom-Invoice' : ['Invoice', 'Proofs', 'Gate Tickets', 'Source'],
@@ -194,6 +195,7 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ['Package', 'PK', 'Package', 'text', None, 0, 'ok', 'cL', None, 'Docs'],
                                 ['PaidInvoice', 'PI', 'PaidInvoice', None, 'text', 0, 'ok', 'cL', None, 'Docs'],
                                 ['Date3', 'Delivery', 'Delivery Date', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                                ['HoldType', 'Hold', 'Hold', 'select', 'hold_types', 0, 'ok', 'cc', None, 'Job'],
                                 ['Delivery', 'Dtype', 'Select Delivery Type', 'select', 'delivery_types', 0, 'ok', 'cc', None, 'Job'],
                                ['Time3', 'DelTime', 'DelTime', 'timepicker1', 'time', 0, 'ok', 'cc', None, 'Job'],
                                ['HaulType', 'HaulType', 'Select Haul Type', 'select', 'haul_types', 0, 'ok', 'cl', None, 'Job'],
@@ -266,6 +268,7 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ['Time3', None],
                                 ['Driver', None],
                                 ['Truck', None],
+                                ['HoldType', ''],
                                 ['Description', '']
                                  ],
                 'ncdefaults': [
@@ -290,6 +293,7 @@ Orders_setup = {'name' : 'Trucking Job',
                                 ['Time3', None],
                                 ['Driver', None],
                                 ['Truck', None],
+                                ['HoldType', ''],
                                 ['Description', '']
                             ],
                 'colorfilter': ['Hstat','Istat'],
@@ -1156,119 +1160,6 @@ Autos_setup = {'name' : 'Auto Job',
 
                                     }
                 }
-
-
-Planning_genre =   {'table': 'Orders',
-                  'genre_tables': ['Orders', 'Ships', 'Imports', 'Exports', 'PortClosed'],
-                  'genre_tables_on': ['on', 'off', 'off', 'off'],
-                  'quick_buttons': ['New Job', 'Edit Item', 'Update Planner', 'Mark Delivered'],
-                  'table_filters': [{'Date Filter': ['Week Before Last', 'Last Week', 'This Week', 'Next Week', 'Week After Next']},
-                                    {'Delivery Filter': ['Unscheduled', 'Yesterday', 'Today', 'Tomorrow', 'This Week', 'Next Week', 'This Month', 'Show All']},
-                                    {'Haul Filter': ['Not Started', 'In-Progress', 'Incomplete', 'Completed',
-                                                     'Show All']},
-                                    {'Color Filter': ['Haul', 'Status', 'Both']},
-                                    {'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
-                  'task_boxes': [{'Adding': ['New Job', 'New From Copy', 'New Port Closure']},
-                                 {'Editing': ['Edit Item', 'Date+1', 'Date-1', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
-                                                 'Inv-1', 'Inv Emailed', 'Set Col To']},
-                                 {'View Docs': ['Purchase Receipt', 'Tow BOL', 'Title', 'Invoice',
-                                                'Paid Invoice', 'Package']},
-                                 {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment']},
-                                 {'Tasks': ['Street Turn', 'Unpulled Containers']}],
-                  'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
-                                      '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"', '40\' UT 9\'6\"', '40\' UT 8\'6\"',
-                                      '53\' Dry', 'LCL', 'RORO'],
-                  'delivery_types': ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder'],
-                  'pickupdata': ['Baltimore Seagirt', 'CSX Rail', 'East Coast CES', 'Belts'],
-                  'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver', 'Dray Transfer'],
-                  'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out'],
-                  'document_profiles'  : {
-                                        'Custom' : ['Source', 'Proofs', 'Invoice', 'Gate Tickets'],
-                                        'Signed Load Con' : ['Source','0','0','0'],
-                                        'Update w/Source'   : ['Source','0','0','0'],
-                                        'Update w/Proof'    : ['Proofs','0','0','0'],
-                                        'Update w/Invoice'    : ['Invoice','0','0','0'],
-                                        'Paid Invoice'    : ['Invoice','0','0','0'],
-                                        'Update w/Gate' : ['Gate Tickets','0','0','0'],
-                                        'Completed IP' : ['Invoice', 'Proofs','0','0'],
-                                        'Completed IPS' : ['Invoice', 'Proofs', 'Source','0'],
-                                        'Completed IPSG' : ['Invoice', 'Proofs', 'Source', 'Gate Tickets']
-                                      },
-                  'image_stamps': {
-                      'X': ['x.png', 'stamps', .2],
-                      'Check': ['check.png', 'stamps', .5],
-                      'Paid': ['paid.png', 'stamps', 1]
-                  },
-                  'signature_stamps': {
-                      'Mark': ['mark.png', 'signatures', .2],
-                      'Norma': ['norma.png', 'signatures', .2]
-                  },
-                  'task_mapping': {'Job':'Orders', 'Customer':'Customers', 'Service':'Services', 'Interchange':'Interchange',
-                                   'Source':'CT', 'Proof':'CT', 'View':'CT'},
-                  'task_box_map': {
-                                    'Quick' :
-                                        {
-                                            'New Job' : ['Table_Selected', 'New', 'Newjobs'],
-                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
-                                            'Update Planner' : ['Table_Selected', 'UpdatePlanner', 'Newjobs'],
-                                            'Mark Delivered' : ['Single_Item_Selection', 'MarkDelivered', 'MarkDelivered']
-                                        },
-                                    'Adding':
-                                        {
-                                         'New Job': ['Table_Selected', 'New', 'Newjobs'],
-                                         'New Port Closure' : ['Table_Selected', 'New', 'PortClosed'],
-                                         'New From Copy' : ['Single_Item_Selection', 'NewCopy', '']
-                                         },
-
-                                    'Editing':
-                                        {
-                                         'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
-                                         'Match': ['Two_Item_Selection', 'Match', ''],
-                                         'Accept': ['All_Item_Selection', 'Accept', ''],
-                                         'Date+1': ['All_Item_Selection', 'Status', 'Date+1'],
-                                         'Date-1': ['All_Item_Selection', 'Status', 'Date-1'],
-                                         'Haul+1': ['All_Item_Selection', 'Status', 'Haul+1'],
-                                         'Haul-1': ['All_Item_Selection', 'Status', 'Haul-1'],
-                                         'Haul Done': ['All_Item_Selection', 'Status', 'Haul Done'],
-                                         'Inv+1': ['All_Item_Selection', 'Status', 'Inv+1'],
-                                         'Inv-1': ['All_Item_Selection', 'Status', 'Inv-1'],
-                                         'Inv Emailed': ['All_Item_Selection', 'Status', 'Inv Emailed'],
-                                         'Set Col To': ['All_Item_Selection', 'SetCol', '']
-                                        },
-
-                                    'Money Flow':
-                                        {
-                                         'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
-                                         'Edit Summary Inv' : ['One_Table_Multi_Item_Selection', 'MakeSummary', 'Invoice'],
-                                         'Send Package' : ['Single_Item_Selection', 'MakePackage', 'Package'],
-                                         'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
-                                         'Receive by Acct' : ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'ReceiveByAccount', '']
-                                        },
-
-                                    'View Docs':
-                                        {
-                                         'Purchase Receipt' : ['Single_Item_Selection', 'View', 'Source'],
-                                         'Tow BOL' : ['Single_Item_Selection', 'View', 'Proof'],
-                                         'Title' : ['Single_Item_Selection', 'View', 'TitleDoc'],
-                                         'Invoice' : ['Single_Item_Selection', 'View', 'Invoice'],
-                                         'Paid Invoice' : ['Single_Item_Selection', 'View', 'PaidInvoice'],
-                                         'Package' : ['Single_Item_Selection', 'View', 'Package']
-                                         },
-
-                                    'Undo':
-                                        {
-                                          'Delete Item': ['All_Item_Selection', 'Undo', 'Delete'],
-                                          'Undo Invoice': ['All_Item_Selection', 'Undo', 'Invoice'],
-                                          'Undo Payment': ['All_Item_Selection', 'Undo', 'Payment']
-                                        },
-                                    'Tasks':
-                                        {
-                                          'Street Turn': ['No_Selection_Plus_Display', 'Street_Turn', 'None'],
-                                          'Unpulled Containers': ['No_Selection_Plus_Display', 'Unpulled_Containers', 'None']
-                                        }
-
-                                    }
-                    }
 
 PortClosed_setup = {'name' : 'PortClosed',
                   'table': 'PortClosed',

@@ -5,9 +5,24 @@
     <div class="row">
         <div class="col-sm-12">
             <h2>General Ledger</h2>
-            <p class="text-muted">Read-only ledger review with journal balance checks.</p>
+            <p class="text-muted">Ledger review with journal balance checks and controlled admin corrections.</p>
         </div>
     </div>
+
+    {% if err %}
+        <div class="alert alert-warning">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if msg %}
+        <div class="alert alert-info">
+            {% for item in msg %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
 
     <form action="{{ url_for('main.GeneralLedger') }}" method="get" class="mb-3">
         <div class="form-row">
@@ -91,41 +106,72 @@
         </div>
     </div>
 
-    <h4>Journal Summary</h4>
-    <div class="table-responsive mb-4">
-        <table class="table table-sm table-striped table-bordered">
-            <thead class="thead-light">
-                <tr>
-                    <th>Date</th>
-                    <th>Journal ID</th>
-                    <th>Rows</th>
-                    <th>Source</th>
-                    <th>Memo</th>
-                    <th class="text-right">Debit</th>
-                    <th class="text-right">Credit</th>
-                    <th class="text-right">Variance</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for journal in journal_summaries %}
+    <form action="{{ url_for('main.GeneralLedger') }}" method="post" class="mb-4">
+        <input type="hidden" name="account" value="{{ filters.account }}">
+        <input type="hidden" name="com" value="{{ filters.com }}">
+        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+        <input type="hidden" name="limit" value="{{ filters.limit }}">
+        <input type="hidden" name="journal_id" value="{{ filters.journal_id }}">
+        <input type="hidden" name="tcode" value="{{ filters.tcode }}">
+        {% if filters.unbalanced %}
+            <input type="hidden" name="unbalanced" value="{{ filters.unbalanced }}">
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 class="mb-0">Journal Summary</h4>
+            <div>
+                <button type="submit" name="review_journal" value="1" class="btn btn-outline-primary btn-sm">Review Selected</button>
+                <button type="submit" name="delete_journal" value="1" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this ledger journal and undo the supported source transaction? Reconciled entries will be blocked.');">Delete Selected</button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-bordered">
+                <thead class="thead-light">
                     <tr>
-                        <td>{% if journal.date %}{{ journal.date.strftime('%Y-%m-%d') }}{% endif %}</td>
-                        <td>{{ journal.journal_id }}</td>
-                        <td>{{ journal.rows }}</td>
-                        <td>{{ journal.source }}{% if journal.source_id %} #{{ journal.source_id }}{% endif %}</td>
-                        <td>{{ journal.memo }}</td>
-                        <td class="text-right">{{ journal.debit_fmt }}</td>
-                        <td class="text-right">{{ journal.credit_fmt }}</td>
-                        <td class="text-right {% if journal.balanced %}text-success{% else %}text-danger{% endif %}">{{ journal.variance_fmt }}</td>
-                        <td>{% if journal.balanced %}Balanced{% else %}<span class="text-danger font-weight-bold">Review</span>{% endif %}</td>
+                        <th>Select</th>
+                        <th>Date</th>
+                        <th>Journal ID</th>
+                        <th>Rows</th>
+                        <th>Source</th>
+                        <th>Memo</th>
+                        <th class="text-right">Debit</th>
+                        <th class="text-right">Credit</th>
+                        <th class="text-right">Variance</th>
+                        <th>Status</th>
                     </tr>
-                {% else %}
-                    <tr><td colspan="9" class="text-center text-muted">No journal rows found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    {% for journal in journal_summaries %}
+                        <tr>
+                            <td class="align-middle text-center">
+                                <input type="checkbox" name="selected_journal_key" value="{{ journal.selection_key }}" {% if selected_key == journal.selection_key %}checked{% endif %}>
+                            </td>
+                            <td>{% if journal.date %}{{ journal.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                            <td>{{ journal.journal_id }}</td>
+                            <td>{{ journal.rows }}</td>
+                            <td>{{ journal.source }}{% if journal.source_id %} #{{ journal.source_id }}{% endif %}</td>
+                            <td>{{ journal.memo }}</td>
+                            <td class="text-right">{{ journal.debit_fmt }}</td>
+                            <td class="text-right">{{ journal.credit_fmt }}</td>
+                            <td class="text-right {% if journal.balanced %}text-success{% else %}text-danger{% endif %}">{{ journal.variance_fmt }}</td>
+                            <td>
+                                {% if journal.reconciled %}
+                                    <span class="text-danger font-weight-bold">Reconciled</span>
+                                {% elif journal.balanced %}
+                                    Balanced
+                                {% else %}
+                                    <span class="text-danger font-weight-bold">Review</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="10" class="text-center text-muted">No journal rows found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 
     <h4>Ledger Detail</h4>
     <div class="table-responsive">
@@ -173,5 +219,138 @@
             </tbody>
         </table>
     </div>
+
+    {% if selected_summary %}
+        <style>
+            #ledgerReviewModal .modal-dialog {
+                max-width: 75vw;
+            }
+            @media (max-width: 991.98px) {
+                #ledgerReviewModal .modal-dialog {
+                    max-width: 96vw;
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+            }
+        </style>
+        <div class="modal fade" id="ledgerReviewModal" tabindex="-1" role="dialog" aria-labelledby="ledgerReviewModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="ledgerReviewModalLabel">Selected Journal Detail</h5>
+                            <div class="text-muted small">
+                                {{ selected_summary.journal_id }} · {{ selected_summary.rows }} rows ·
+                                Debits {{ selected_summary.debit }} · Credits {{ selected_summary.credit }} ·
+                                Variance {{ selected_summary.variance }}
+                                {% if selected_summary.bill_count %} · Related bills {{ selected_summary.bill_count }}{% endif %}
+                            </div>
+                        </div>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            {% if selected_summary.reconciled %}
+                                <span class="badge badge-danger">Reconciliation locked</span>
+                            {% elif selected_summary.balanced %}
+                                <span class="badge badge-success">Balanced</span>
+                            {% else %}
+                                <span class="badge badge-warning">Out of balance</span>
+                            {% endif %}
+                        </div>
+                        {% if selected_summary.reconciled %}
+                            <div class="alert alert-warning">
+                                These transactions have been reconciled. The entire statement must be unreconciled before changes can be made.
+                            </div>
+                        {% endif %}
+                        {% if selected_summary.receive_payment_locked %}
+                            <div class="alert alert-warning">
+                                This deposit is tied to received customer/job payments. Undo it from Receive Payments so the job payment records and general ledger stay in agreement.
+                            </div>
+                        {% endif %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Date</th>
+                                        <th>Seq</th>
+                                        <th>Tcode</th>
+                                        <th>Type</th>
+                                        <th>Co</th>
+                                        <th>Account</th>
+                                        <th class="text-right">Debit</th>
+                                        <th class="text-right">Credit</th>
+                                        <th>Source</th>
+                                        <th>Reconciled</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in selected_lines %}
+                                        <tr>
+                                            <td>{{ entry.id }}</td>
+                                            <td>{% if entry.Date %}{{ entry.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                            <td>{{ entry.JournalSeq or '' }}</td>
+                                            <td>{{ entry.Tcode or '' }}</td>
+                                            <td>{{ entry.Type or '' }}</td>
+                                            <td>{{ entry.Com or '' }}</td>
+                                            <td>{{ entry.Account or '' }}</td>
+                                            <td class="text-right">{{ entry.debit_fmt }}</td>
+                                            <td class="text-right">{{ entry.credit_fmt }}</td>
+                                            <td>{{ entry.SourceTable or entry.Source or '' }}{% if entry.SourceId or entry.Sid %} #{{ entry.SourceId or entry.Sid }}{% endif %}</td>
+                                            <td>{% if entry.Reconciled not in [None, 0, 25] %}<span class="text-danger">{{ entry.Reconciled }}</span>{% else %}Open{% endif %}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        {% if selected_summary.reconciled %}
+                            <span class="text-danger mr-auto">Delete is locked until the reconciliation statement is reopened.</span>
+                        {% else %}
+                            {% if selected_summary.can_delete_payment or selected_summary.can_delete_bill %}
+                                <form action="{{ url_for('main.GeneralLedger') }}" method="post" class="mr-auto mb-0">
+                                    <input type="hidden" name="account" value="{{ filters.account }}">
+                                    <input type="hidden" name="com" value="{{ filters.com }}">
+                                    <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                                    <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                                    <input type="hidden" name="limit" value="{{ filters.limit }}">
+                                    <input type="hidden" name="journal_id" value="{{ filters.journal_id }}">
+                                    <input type="hidden" name="tcode" value="{{ filters.tcode }}">
+                                    {% if filters.unbalanced %}
+                                        <input type="hidden" name="unbalanced" value="{{ filters.unbalanced }}">
+                                    {% endif %}
+                                    <input type="hidden" name="selected_journal_key" value="{{ selected_key }}">
+                                    {% if selected_summary.can_delete_payment %}
+                                        <button type="submit" name="delete_journal" value="1" class="btn btn-danger" onclick="return confirm('Delete only the selected payment/deposit ledger journal and undo the supported source transaction?');">Delete Payment Only</button>
+                                    {% endif %}
+                                    {% if selected_summary.can_delete_bill %}
+                                        <button type="submit" name="delete_bill_and_payment" value="1" class="btn btn-outline-danger ml-2" onclick="return confirm('Delete the bill itself and all related bill/payment ledger rows?');">Delete Bill and Payment</button>
+                                    {% endif %}
+                                </form>
+                            {% else %}
+                                {% if selected_summary.receive_payment_locked %}
+                                    <span class="text-danger mr-auto">Use Receive Payments to undo this item.</span>
+                                {% else %}
+                                    <span class="text-danger mr-auto">Delete is not available for this ledger source from General Ledger.</span>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                if (window.jQuery && jQuery.fn.modal) {
+                    jQuery('#ledgerReviewModal').modal('show');
+                }
+            });
+        </script>
+    {% endif %}
 </div>
 {% endblock %}

@@ -78,7 +78,16 @@
     color: #6c757d;
 }
 
-.dispatch-kanban-card[data-status="needs_pin"] {
+.dispatch-kanban-card-warning {
+    color: #9a3412;
+    font-weight: 700;
+}
+
+.dispatch-kanban-card[data-status="on_call"] {
+    border-left-color: #ea580c;
+}
+
+.dispatch-kanban-card[data-status="port_today"] {
     border-left-color: #d97706;
 }
 
@@ -86,23 +95,36 @@
     border-left-color: #0f766e;
 }
 
+.dispatch-kanban-card[data-status="pin_assigned"],
 .dispatch-kanban-card[data-status="pin_ready"],
 .dispatch-kanban-card[data-status="ready_to_dispatch"],
 .dispatch-kanban-card[data-status="assigned"] {
     border-left-color: #198754;
 }
 
+.dispatch-kanban-card[data-status="drop_pick"] {
+    border-left-color: #64748b;
+}
+
+.dispatch-kanban-card.dispatch-kanban-card-dp-pulled {
+    border-left-color: #0d6efd;
+    background: #eef6ff;
+}
+
 .dispatch-kanban-card[data-status="in_progress"] {
     border-left-color: #0d6efd;
 }
 
-.dispatch-kanban-card[data-status="delivered"],
+.dispatch-kanban-card[data-status="delivered"] {
+    border-left-color: #0d6efd;
+}
+
 .dispatch-kanban-card[data-status="invoice_ready"] {
     border-left-color: #6f42c1;
 }
 
 .dispatch-kanban-card[data-status="completed"] {
-    border-left-color: #20c997;
+    border-left-color: #6f42c1;
 }
 
 .sortable-ghost {

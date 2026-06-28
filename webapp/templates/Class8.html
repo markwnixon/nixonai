@@ -95,7 +95,6 @@
 
                                 {% if showit == 'on' %}
                                     {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
-                                    {%  if genre == 'Planning' %} {% include 'includes/_plancolorcode.html' %} {% endif %}
                                 {% endif %}
                         </div>
                         <div class="col-sm-8" align = "center">
@@ -126,7 +125,6 @@
                         {% include 'includes/_controlpanelheader.html' %}
                         {% if showit == 'on' %}
                             {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
-                            {%  if genre == 'Planning' %} {% include 'includes/_plancolorcode.html' %} {% endif %}
                         {%  endif %}
                         {% if genre == 'Billing' %}
                         <br>
@@ -211,14 +209,6 @@
 
 </div>
 </div>
-
-{% if genre == 'Planning' %}
-    {% set caldata = holdvec[100] %}
-    {% set jolist = caldata[9] %}
-    {% for jo in jolist %}
-        <input type = "hidden" name ="jo{{ loop.index }}" value= "{{jo}}"> jo{{ loop.index }} is {{ jo }}<br>
-    {% endfor %}
-{% endif %}
 
 <input type = "hidden" name ="genre" value= "{{genre}}"><br>
 <input type = "hidden" name ="oder" value= "{{oder}}"><br>

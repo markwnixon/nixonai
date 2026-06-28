@@ -1,13 +1,13 @@
-from flask import render_template, redirect, url_for, jsonify, request, send_file, flash
+from flask import abort, render_template, redirect, url_for, jsonify, request, send_file, flash, session
 from flask import Blueprint
 
 from webapp.extensions import db
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
 from flask_login import login_required, current_user
-from sqlalchemy import func, text
+from sqlalchemy import func, inspect, or_, text
 from webapp.financial_mfa import FINANCIAL_GENRES, financial_mfa_redirect, financial_mfa_required
 from webapp.plaid_integration import (
     create_bill_from_plaid_transaction,
@@ -32,7 +32,7 @@ from webapp.plaid_integration import (
 
 from decimal import Decimal
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from twilio.twiml.messaging_response import MessagingResponse
 from webapp.messager import msg_analysis
@@ -44,11 +44,14 @@ from webapp.class8_tasks_gledger import post_balanced_journal
 from webapp.class8_utils_email import email_template, info_mimemail, check_person, add_person
 from webapp.dispatch_calendar import (
     calendar_events,
+    calendar_notes,
     capacity_summary,
+    delete_calendar_note,
     ensure_dispatch_calendar_tables,
     filter_options,
     move_event,
     parse_date as dispatch_parse_date,
+    save_calendar_note,
     update_event,
 )
 from webapp.dispatch_kanban import (
@@ -139,6 +142,409 @@ def DispatchPlanningCalendar():
     )
 
 
+@main.route('/dispatch/port-closures', methods=['GET', 'POST'])
+@login_required
+def DispatchPortClosures():
+    selected_year = request.values.get('year') or str(date.today().year)
+    try:
+        selected_year_int = int(selected_year)
+    except:
+        selected_year_int = date.today().year
+    err = []
+    if request.method == 'POST':
+        action = request.values.get('action')
+        closure_id = request.values.get('closure_id')
+        closure_date = dispatch_parse_date(request.values.get('closure_date'))
+        reason = (request.values.get('reason') or '').strip()
+        if action in ['add', 'update'] and closure_date is None:
+            err.append('Closure date is required.')
+        elif action == 'add':
+            existing = PortClosed.query.filter(PortClosed.Date == closure_date).first()
+            if existing is None:
+                db.session.add(PortClosed(Date=closure_date, Reason=reason or 'Port closed'))
+            else:
+                existing.Reason = reason or existing.Reason or 'Port closed'
+            db.session.commit()
+            return redirect(url_for('main.DispatchPortClosures', year=closure_date.year))
+        elif action == 'update':
+            closure = PortClosed.query.get(closure_id)
+            if closure is None:
+                err.append('Port closure row was not found.')
+            else:
+                closure.Date = closure_date
+                closure.Reason = reason or 'Port closed'
+                db.session.commit()
+                return redirect(url_for('main.DispatchPortClosures', year=closure_date.year))
+        elif action == 'delete':
+            closure = PortClosed.query.get(closure_id)
+            if closure is not None:
+                row_year = closure.Date.year if closure.Date else selected_year_int
+                db.session.delete(closure)
+                db.session.commit()
+                return redirect(url_for('main.DispatchPortClosures', year=row_year))
+        else:
+            err.append('Choose a valid port closure action.')
+
+    year_start = date(selected_year_int, 1, 1)
+    year_end = date(selected_year_int, 12, 31)
+    closures = PortClosed.query.filter(
+        (PortClosed.Date >= year_start) &
+        (PortClosed.Date <= year_end)
+    ).order_by(PortClosed.Date.asc(), PortClosed.id.asc()).all()
+    years = list(range(selected_year_int - 2, selected_year_int + 4))
+    return render_template(
+        'dispatch_port_closures.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        closures=closures,
+        selected_year=selected_year_int,
+        years=years,
+        err=err,
+    )
+
+
+def ensure_admin_payroll_calendar_table():
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS admin_payroll_calendar (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            RunDate DATE,
+            PayDate DATE NOT NULL,
+            Driver VARCHAR(100) NOT NULL,
+            GrossCents INT NOT NULL DEFAULT 0,
+            NetCents INT NOT NULL DEFAULT 0,
+            Notes TEXT,
+            CreatedBy VARCHAR(45),
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_admin_payroll_calendar_date (PayDate),
+            INDEX idx_admin_payroll_calendar_driver (Driver)
+        )
+    """))
+    db.session.commit()
+    columns = [column['name'] for column in inspect(db.engine).get_columns('admin_payroll_calendar')]
+    if 'RunDate' not in columns:
+        db.session.execute(text('ALTER TABLE admin_payroll_calendar ADD COLUMN RunDate DATE NULL'))
+        db.session.commit()
+    rows_missing_run_date = db.session.execute(text("""
+        SELECT id, PayDate
+        FROM admin_payroll_calendar
+        WHERE RunDate IS NULL AND PayDate IS NOT NULL
+    """)).mappings().all()
+    for row in rows_missing_run_date:
+        pay_date = row.get('PayDate')
+        db.session.execute(text("""
+            UPDATE admin_payroll_calendar
+            SET RunDate = :run_date
+            WHERE id = :row_id
+        """), {
+            'run_date': pay_date - timedelta(days=2),
+            'row_id': row.get('id'),
+        })
+    if rows_missing_run_date:
+        db.session.commit()
+
+
+def parse_money_cents(value):
+    clean = str(value or '').replace('$', '').replace(',', '').strip()
+    if not clean:
+        return 0
+    return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
+
+
+def format_cents(cents):
+    cents = int(cents or 0)
+    return f'${Decimal(cents) / Decimal("100"):,.2f}'
+
+
+def nth_weekday(year_value, month_value, weekday_value, occurrence):
+    first_day = date(year_value, month_value, 1)
+    offset = (weekday_value - first_day.weekday()) % 7
+    return first_day + timedelta(days=offset + (occurrence - 1) * 7)
+
+
+def last_weekday(year_value, month_value, weekday_value):
+    if month_value == 12:
+        last_day = date(year_value + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = date(year_value, month_value + 1, 1) - timedelta(days=1)
+    offset = (last_day.weekday() - weekday_value) % 7
+    return last_day - timedelta(days=offset)
+
+
+def observed_holiday(actual_date):
+    if actual_date.weekday() == 5:
+        return actual_date - timedelta(days=1)
+    if actual_date.weekday() == 6:
+        return actual_date + timedelta(days=1)
+    return actual_date
+
+
+def federal_holidays(year_value):
+    fixed_holidays = [
+        ("New Year's Day", date(year_value, 1, 1)),
+        ('Juneteenth', date(year_value, 6, 19)),
+        ('Independence Day', date(year_value, 7, 4)),
+        ('Veterans Day', date(year_value, 11, 11)),
+        ('Christmas Day', date(year_value, 12, 25)),
+    ]
+    holiday_rows = [
+        ('Martin Luther King Jr. Day', nth_weekday(year_value, 1, 0, 3)),
+        ("Washington's Birthday", nth_weekday(year_value, 2, 0, 3)),
+        ('Memorial Day', last_weekday(year_value, 5, 0)),
+        ('Labor Day', nth_weekday(year_value, 9, 0, 1)),
+        ('Columbus Day', nth_weekday(year_value, 10, 0, 2)),
+        ('Thanksgiving Day', nth_weekday(year_value, 11, 3, 4)),
+    ]
+    for name, actual in fixed_holidays:
+        holiday_rows.append((name, observed_holiday(actual)))
+    return sorted({
+        holiday_date: holiday_name
+        for holiday_name, holiday_date in holiday_rows
+        if holiday_date.year == year_value
+    }.items())
+
+
+def holiday_in_pay_week(pay_date, holiday_dates):
+    if not pay_date:
+        return None
+    week_start = pay_date - timedelta(days=pay_date.weekday())
+    week_end = week_start + timedelta(days=6)
+    for holiday_date, holiday_name in holiday_dates:
+        if week_start <= holiday_date <= week_end:
+            return {'date': holiday_date, 'name': holiday_name}
+    return None
+
+
+def recommended_run_date(pay_date, has_holiday):
+    if not pay_date:
+        return None
+    week_start = pay_date - timedelta(days=pay_date.weekday())
+    return week_start + timedelta(days=1 if has_holiday else 2)
+
+
+@main.route('/AdminCalendar', methods=['GET', 'POST'])
+@login_required
+def AdminCalendar():
+    ensure_admin_payroll_calendar_table()
+    today_local = date.today()
+    selected_year = request.values.get('year') or str(today_local.year)
+    selected_month = request.values.get('month') or str(today_local.month)
+    err = []
+    try:
+        selected_year_int = int(selected_year)
+    except:
+        selected_year_int = today_local.year
+    try:
+        selected_month_int = int(selected_month)
+        if selected_month_int < 1 or selected_month_int > 12:
+            selected_month_int = today_local.month
+    except:
+        selected_month_int = today_local.month
+
+    if request.method == 'POST':
+        action = request.values.get('action')
+        row_id = request.values.get('row_id')
+        run_date = dispatch_parse_date(request.values.get('run_date'))
+        pay_date = dispatch_parse_date(request.values.get('pay_date'))
+        driver = (request.values.get('driver') or '').strip()
+        gross_cents = 0
+        net_cents = 0
+        notes = (request.values.get('notes') or '').strip()
+        if action in ['add', 'update']:
+            try:
+                gross_cents = parse_money_cents(request.values.get('gross_amount'))
+                net_cents = parse_money_cents(request.values.get('net_amount'))
+            except:
+                err.append('Payroll amounts must be valid numbers.')
+            if run_date is None:
+                err.append('Payroll run date is required.')
+            if pay_date is None:
+                err.append('Driver pay date is required.')
+            if not driver:
+                err.append('Driver is required.')
+            if gross_cents < 0 or net_cents < 0:
+                err.append('Payroll amounts cannot be negative.')
+            if run_date and pay_date and run_date > pay_date:
+                err.append('Payroll run date cannot be after the driver pay date.')
+
+        if not err and action == 'add':
+            db.session.execute(text("""
+                INSERT INTO admin_payroll_calendar
+                    (RunDate, PayDate, Driver, GrossCents, NetCents, Notes, CreatedBy, CreatedAt, UpdatedAt)
+                VALUES
+                    (:run_date, :pay_date, :driver, :gross_cents, :net_cents, :notes, :created_by, :created_at, :updated_at)
+            """), {
+                'run_date': run_date,
+                'pay_date': pay_date,
+                'driver': driver,
+                'gross_cents': gross_cents,
+                'net_cents': net_cents,
+                'notes': notes,
+                'created_by': getattr(current_user, 'username', None),
+                'created_at': datetime.datetime.utcnow(),
+                'updated_at': datetime.datetime.utcnow(),
+            })
+            db.session.commit()
+            return redirect(url_for('main.AdminCalendar', year=pay_date.year, month=pay_date.month))
+        if not err and action == 'update':
+            existing = db.session.execute(
+                text('SELECT id FROM admin_payroll_calendar WHERE id = :row_id'),
+                {'row_id': row_id},
+            ).first()
+            if existing is None:
+                err.append('Payroll calendar row was not found.')
+            else:
+                db.session.execute(text("""
+                    UPDATE admin_payroll_calendar
+                    SET RunDate = :run_date,
+                        PayDate = :pay_date,
+                        Driver = :driver,
+                        GrossCents = :gross_cents,
+                        NetCents = :net_cents,
+                        Notes = :notes,
+                        UpdatedAt = :updated_at
+                    WHERE id = :row_id
+                """), {
+                    'row_id': row_id,
+                    'run_date': run_date,
+                    'pay_date': pay_date,
+                    'driver': driver,
+                    'gross_cents': gross_cents,
+                    'net_cents': net_cents,
+                    'notes': notes,
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.commit()
+                return redirect(url_for('main.AdminCalendar', year=pay_date.year, month=pay_date.month))
+        if action == 'delete':
+            row = db.session.execute(
+                text('SELECT PayDate FROM admin_payroll_calendar WHERE id = :row_id'),
+                {'row_id': row_id},
+            ).mappings().first()
+            if row is not None:
+                row_date = row.get('PayDate') or date(selected_year_int, selected_month_int, 1)
+                db.session.execute(
+                    text('DELETE FROM admin_payroll_calendar WHERE id = :row_id'),
+                    {'row_id': row_id},
+                )
+                db.session.commit()
+                return redirect(url_for('main.AdminCalendar', year=row_date.year, month=row_date.month))
+        elif action not in ['add', 'update']:
+            err.append('Choose a valid payroll calendar action.')
+
+    month_start = date(selected_year_int, selected_month_int, 1)
+    if selected_month_int == 12:
+        month_end = date(selected_year_int + 1, 1, 1)
+    else:
+        month_end = date(selected_year_int, selected_month_int + 1, 1)
+    year_start = date(selected_year_int, 1, 1)
+    year_end = date(selected_year_int + 1, 1, 1)
+
+    rows = db.session.execute(text("""
+        SELECT id, RunDate, PayDate, Driver, GrossCents, NetCents, Notes
+        FROM admin_payroll_calendar
+        WHERE (PayDate >= :month_start AND PayDate < :month_end)
+           OR (RunDate >= :month_start AND RunDate < :month_end)
+        ORDER BY PayDate, RunDate, Driver, id
+    """), {
+        'month_start': month_start,
+        'month_end': month_end,
+    }).mappings().all()
+    year_rows = db.session.execute(text("""
+        SELECT id, RunDate, PayDate, Driver, GrossCents, NetCents, Notes
+        FROM admin_payroll_calendar
+        WHERE (PayDate >= :year_start AND PayDate < :year_end)
+           OR (RunDate >= :year_start AND RunDate < :year_end)
+        ORDER BY PayDate, RunDate, Driver, id
+    """), {
+        'year_start': year_start,
+        'year_end': year_end,
+    }).mappings().all()
+    driver_totals = {}
+    for row in year_rows:
+        bucket = driver_totals.setdefault(row.get('Driver') or 'Unassigned', {'gross': 0, 'net': 0, 'count': 0})
+        bucket['gross'] += int(row.get('GrossCents') or 0)
+        bucket['net'] += int(row.get('NetCents') or 0)
+        bucket['count'] += 1
+
+    holidays = federal_holidays(selected_year_int)
+    holiday_events = [{
+        'id': f'holiday-{holiday_date.strftime("%Y%m%d")}',
+        'title': holiday_name,
+        'start': holiday_date.strftime('%Y-%m-%d'),
+        'allDay': True,
+        'classNames': ['admin-calendar-holiday'],
+        'extendedProps': {
+            'event_type': 'holiday',
+            'holiday_name': holiday_name,
+        },
+    } for holiday_date, holiday_name in holidays]
+    events = []
+    table_rows = []
+    for row in year_rows:
+        warning = holiday_in_pay_week(row.get('PayDate'), holidays)
+        suggested = recommended_run_date(row.get('PayDate'), bool(warning))
+        base_props = {
+            'driver': row.get('Driver') or '',
+            'gross': format_cents(row.get('GrossCents')),
+            'net': format_cents(row.get('NetCents')),
+            'notes': row.get('Notes') or '',
+            'holiday_warning': bool(warning),
+            'holiday_name': warning['name'] if warning else '',
+            'holiday_date': warning['date'].strftime('%Y-%m-%d') if warning else '',
+            'recommended_run_date': suggested.strftime('%Y-%m-%d') if suggested else '',
+        }
+        if row.get('RunDate'):
+            events.append({
+                'id': f"run-{row.get('id')}",
+                'title': f"Run payroll: {row.get('Driver')}",
+                'start': row.get('RunDate').strftime('%Y-%m-%d'),
+                'allDay': True,
+                'classNames': ['admin-calendar-payroll-run', 'admin-calendar-payroll-warning'] if warning else ['admin-calendar-payroll-run'],
+                'extendedProps': dict(base_props, event_type='run', row_id=row.get('id')),
+            })
+        if row.get('PayDate'):
+            events.append({
+                'id': f"pay-{row.get('id')}",
+                'title': f"Pay driver: {row.get('Driver')}",
+                'start': row.get('PayDate').strftime('%Y-%m-%d'),
+                'allDay': True,
+                'classNames': ['admin-calendar-payroll-pay', 'admin-calendar-payroll-warning'] if warning else ['admin-calendar-payroll-pay'],
+                'extendedProps': dict(base_props, event_type='pay', row_id=row.get('id')),
+            })
+    events.extend(holiday_events)
+    for row in rows:
+        warning = holiday_in_pay_week(row.get('PayDate'), holidays)
+        suggested = recommended_run_date(row.get('PayDate'), bool(warning))
+        row_dict = dict(row)
+        row_dict['HolidayWarning'] = warning
+        row_dict['RecommendedRunDate'] = suggested
+        table_rows.append(row_dict)
+    drivers = Drivers.query.filter((Drivers.Active == 1) | (Drivers.Active == None)).order_by(Drivers.Name).all()
+    driver_names = [driver.Name for driver in drivers]
+    years = list(range(selected_year_int - 2, selected_year_int + 4))
+    months = [(index, date(2000, index, 1).strftime('%B')) for index in range(1, 13)]
+    return render_template(
+        'admin_calendar.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        err=err,
+        rows=table_rows,
+        events=events,
+        holidays=holidays,
+        drivers=drivers,
+        driver_names=driver_names,
+        selected_year=selected_year_int,
+        selected_month=selected_month_int,
+        years=years,
+        months=months,
+        driver_totals=driver_totals,
+        format_cents=format_cents,
+        initial_date=month_start.strftime('%Y-%m-%d'),
+        initial_run_date=recommended_run_date(month_start, False).strftime('%Y-%m-%d'),
+    )
+
+
 @main.route('/dispatch/kanban', methods=['GET'])
 @login_required
 def DispatchKanban():
@@ -197,6 +603,29 @@ def DispatchCalendarMove(order_id):
 def DispatchCalendarUpdate(order_id):
     payload = request.get_json(silent=True) or {}
     result, status_code = update_event(order_id, payload, username=current_user.username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/calendar/notes', methods=['GET'])
+@login_required
+def DispatchCalendarNotes():
+    start = dispatch_parse_date(request.args.get('start'))
+    end = dispatch_parse_date(request.args.get('end'))
+    return jsonify(calendar_notes(start=start, end=end))
+
+
+@main.route('/api/dispatch/calendar/note', methods=['POST'])
+@login_required
+def DispatchCalendarNoteSave():
+    payload = request.get_json(silent=True) or {}
+    result, status_code = save_calendar_note(payload, username=current_user.username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/calendar/note/<int:note_id>/delete', methods=['POST'])
+@login_required
+def DispatchCalendarNoteDelete(note_id):
+    result, status_code = delete_calendar_note(note_id)
     return jsonify(result), status_code
 
 
@@ -603,6 +1032,10 @@ def Class8Main(genre):
     print('routes.py 237: The genre is',genre)
     if genre == 'Banking':
         return redirect(url_for('main.Banking'))
+    if genre == 'Planning':
+        return redirect(url_for('main.DispatchPlanningCalendar'))
+    if genre == 'Calendar':
+        return redirect(url_for('main.AdminCalendar'))
     if genre in FINANCIAL_GENRES:
         redirect_response = financial_mfa_redirect()
         if redirect_response is not None:
@@ -1273,6 +1706,9 @@ def IntercompanyEntries():
 @login_required
 @financial_mfa_required
 def GeneralLedger():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+
     def parse_date(value):
         if not value:
             return None
@@ -1284,6 +1720,185 @@ def GeneralLedger():
     def money(value):
         return "${:,.2f}".format((value or 0) / 100)
 
+    def open_reconciliation_value(value):
+        return value in [None, 0, 25]
+
+    def selected_ledger_lines(selection_key):
+        if not selection_key:
+            return []
+        if selection_key.startswith('legacy-'):
+            try:
+                line_id = int(selection_key.replace('legacy-', '', 1))
+            except ValueError:
+                return []
+            line = Gledger.query.get(line_id)
+            return [line] if line is not None else []
+        return Gledger.query.filter(
+            Gledger.JournalId == selection_key
+        ).order_by(Gledger.JournalSeq.asc(), Gledger.id.asc()).all()
+
+    def line_is_reconciled(line):
+        return not open_reconciliation_value(line.Reconciled)
+
+    def format_selected_lines(lines):
+        for line in lines:
+            line.debit_fmt = money(line.Debit)
+            line.credit_fmt = money(line.Credit)
+        return lines
+
+    def bill_for_ledger_line(line):
+        if line.SourceTable == 'Bills' and line.SourceId:
+            bill = Bills.query.get(line.SourceId)
+            if bill is not None:
+                return bill
+        if line.Tcode:
+            return Bills.query.filter(Bills.Jo == line.Tcode).first()
+        return None
+
+    def bills_for_ledger_lines(lines):
+        bills = []
+        for line in lines:
+            bill = bill_for_ledger_line(line)
+            if bill is not None and bill.id not in [item.id for item in bills]:
+                bills.append(bill)
+        return bills
+
+    def bill_related_ledger_lines(bills):
+        filters_for_bills = []
+        for bill in bills:
+            if not bill or not bill.Jo:
+                continue
+            filters_for_bills.extend([
+                Gledger.Tcode == bill.Jo,
+                Gledger.Tcode.like(f'{bill.Jo}-%'),
+                Gledger.JournalId == f'PAYBILL-{bill.Jo}',
+                Gledger.JournalId.like(f'PAYBILL-{bill.Jo}-%'),
+                (Gledger.SourceTable == 'Bills') & (Gledger.SourceId == bill.id),
+            ])
+        if not filters_for_bills:
+            return []
+        return Gledger.query.filter(or_(*filters_for_bills)).order_by(
+            Gledger.Date.asc(),
+            Gledger.JournalId.asc(),
+            Gledger.JournalSeq.asc(),
+            Gledger.id.asc(),
+        ).all()
+
+    def ledger_source_tables(lines):
+        return {line.SourceTable for line in lines if line.SourceTable}
+
+    def has_bill_payment_lines(lines):
+        return any(line.Type in ['PC', 'PD', 'QD', 'QC'] or (line.JournalId or '').startswith('PAYBILL-') for line in lines)
+
+    def selected_review_context(lines):
+        source_tables = ledger_source_tables(lines)
+        bills = bills_for_ledger_lines(lines)
+        review_lines = bill_related_ledger_lines(bills) if bills else lines
+        review_source_tables = ledger_source_tables(review_lines)
+        receive_payment_locked = bool(review_source_tables.intersection({
+            'ReceivePaymentBatch',
+            'ReceivePaymentAllocation',
+            'CounterDepositItem',
+        }))
+        can_delete_payment = bool(
+            lines and not receive_payment_locked and (
+                ('Bills' in source_tables and has_bill_payment_lines(lines)) or
+                source_tables == {'PayrollBatch'} or
+                (source_tables and source_tables.issubset({'ManualDeposit', 'AccountTransfer', 'IntercompanyEntry'})) or
+                (not source_tables and has_bill_payment_lines(lines))
+            )
+        )
+        can_delete_bill = bool(bills and not receive_payment_locked)
+        return {
+            'lines': review_lines,
+            'bills': bills,
+            'can_delete_payment': can_delete_payment,
+            'can_delete_bill': can_delete_bill,
+            'receive_payment_locked': receive_payment_locked,
+            'all_reconciled_locked': any(line_is_reconciled(line) for line in review_lines),
+        }
+
+    def reset_bill_payment(bill):
+        bill.Status = None
+        bill.pDate = None
+        bill.pDate2 = None
+        bill.pAmount = None
+        bill.pAmount2 = None
+        bill.pMulti = None
+        bill.pAccount = None
+        bill.Check = None
+        bill.PmtList = None
+        bill.PacctList = None
+        bill.RefList = None
+        bill.MemoList = None
+        bill.PdateList = None
+        bill.CheckList = None
+        bill.MethList = None
+        bill.Pcache = None
+        bill.pMeth = None
+        bill.QBi = None
+
+    def delete_selected_ledger_lines(lines, delete_scope='payment'):
+        if not lines:
+            return False, 'Choose a journal to delete.'
+        reconciled_lines = [line for line in lines if line_is_reconciled(line)]
+        if reconciled_lines:
+            return False, 'This ledger transaction has been reconciled. Reopen the reconciliation statement before editing or deleting it.'
+
+        source_tables = ledger_source_tables(lines)
+        journal_id = lines[0].JournalId
+
+        if source_tables == {'PayrollBatch'}:
+            for bill in Bills.query.filter(
+                (Bills.Temp1 == 'PayrollBatch') &
+                (Bills.Temp2 == journal_id)
+            ).all():
+                db.session.delete(bill)
+            for line in lines:
+                db.session.delete(line)
+            db.session.commit()
+            return True, 'Deleted the payroll batch ledger journal and payroll bill records.'
+
+        if source_tables and source_tables.issubset({'ManualDeposit', 'AccountTransfer', 'IntercompanyEntry'}):
+            for line in lines:
+                db.session.delete(line)
+            db.session.commit()
+            return True, 'Deleted the selected ledger journal.'
+
+        if 'Bills' in source_tables or (not source_tables and has_bill_payment_lines(lines)):
+            bills = bills_for_ledger_lines(lines)
+            if not bills:
+                return False, 'The bill payment could not be matched to a bill record, so no changes were made.'
+            if delete_scope == 'bill':
+                all_bill_lines = bill_related_ledger_lines(bills)
+                reconciled_bill_lines = [line for line in all_bill_lines if line_is_reconciled(line)]
+                if reconciled_bill_lines:
+                    return False, 'One or more related bill ledger rows have been reconciled. Reopen the reconciliation statement before deleting the bill.'
+                for line in all_bill_lines:
+                    db.session.delete(line)
+                for bill in bills:
+                    db.session.delete(bill)
+                db.session.commit()
+                return True, f'Deleted {len(bills)} bill item(s) and all related bill/payment ledger rows.'
+            if not has_bill_payment_lines(lines):
+                return False, 'Only bill payment ledger journals can be deleted here. Bill entry/accrual rows should be corrected from Bill Payments.'
+            for bill in bills:
+                reset_bill_payment(bill)
+            for line in lines:
+                db.session.delete(line)
+            db.session.commit()
+            return True, f'Deleted the bill payment journal and reopened {len(bills)} bill item(s).'
+
+        source_name = ', '.join(sorted(source_tables)) if source_tables else 'legacy ledger rows'
+        return False, f'{source_name} is review-only from General Ledger. Correct or delete it from its source workflow.'
+
+    err = []
+    msg = []
+    selected_key = ''
+    selected_lines = []
+    selected_context = None
+    selected_summary = None
+
     filters = {
         'account': request.values.get('account', '').strip(),
         'tcode': request.values.get('tcode', '').strip(),
@@ -1294,6 +1909,35 @@ def GeneralLedger():
         'unbalanced': request.values.get('unbalanced', ''),
         'limit': request.values.get('limit', '500').strip() or '500',
     }
+
+    if request.method == 'POST':
+        selections = [item for item in request.form.getlist('selected_journal_key') if item]
+        if len(selections) != 1:
+            err.append('Choose one ledger journal to review or delete.')
+        else:
+            selected_key = selections[0]
+            selected_lines = selected_ledger_lines(selected_key)
+            if request.form.get('delete_bill_and_payment') is not None:
+                ok, text = delete_selected_ledger_lines(selected_lines, delete_scope='bill')
+                if ok:
+                    msg.append(text)
+                    selected_key = ''
+                    selected_lines = []
+                else:
+                    err.append(text)
+            elif request.form.get('delete_journal') is not None:
+                ok, text = delete_selected_ledger_lines(selected_lines, delete_scope='payment')
+                if ok:
+                    msg.append(text)
+                    selected_key = ''
+                    selected_lines = []
+                else:
+                    err.append(text)
+            elif request.form.get('review_journal') is not None:
+                if selected_lines:
+                    msg.append('Loaded the selected ledger journal for review.')
+                else:
+                    err.append('The selected ledger journal could not be found.')
 
     try:
         limit = min(max(int(filters['limit']), 1), 5000)
@@ -1340,6 +1984,7 @@ def GeneralLedger():
     for entry in entries:
         key = entry.JournalId or f"legacy-{entry.id}"
         item = journal_map.setdefault(key, {
+            'selection_key': key,
             'journal_id': entry.JournalId or '(legacy row)',
             'date': entry.Date,
             'memo': entry.JournalMemo or '',
@@ -1348,10 +1993,13 @@ def GeneralLedger():
             'debit': 0,
             'credit': 0,
             'rows': 0,
+            'reconciled': False,
         })
         item['debit'] += entry.Debit or 0
         item['credit'] += entry.Credit or 0
         item['rows'] += 1
+        if line_is_reconciled(entry):
+            item['reconciled'] = True
         if entry.Date and (not item['date'] or entry.Date > item['date']):
             item['date'] = entry.Date
 
@@ -1369,6 +2017,30 @@ def GeneralLedger():
     for entry in entries:
         entry.debit_fmt = money(entry.Debit)
         entry.credit_fmt = money(entry.Credit)
+
+    if selected_lines:
+        selected_context = selected_review_context(selected_lines)
+        selected_review_lines = selected_context['lines']
+    else:
+        selected_review_lines = []
+    selected_lines = format_selected_lines(selected_review_lines)
+    if selected_lines:
+        selected_debit = sum(line.Debit or 0 for line in selected_lines)
+        selected_credit = sum(line.Credit or 0 for line in selected_lines)
+        selected_summary = {
+            'journal_id': selected_lines[0].JournalId or '(legacy row)',
+            'rows': len(selected_lines),
+            'debit': money(selected_debit),
+            'credit': money(selected_credit),
+            'variance': money(selected_debit - selected_credit),
+            'balanced': selected_debit == selected_credit,
+            'reconciled': any(line_is_reconciled(line) for line in selected_lines),
+            'can_delete_payment': bool(selected_context and selected_context['can_delete_payment']),
+            'can_delete_bill': bool(selected_context and selected_context['can_delete_bill']),
+            'receive_payment_locked': bool(selected_context and selected_context['receive_payment_locked']),
+            'all_reconciled_locked': bool(selected_context and selected_context['all_reconciled_locked']),
+            'bill_count': len(selected_context['bills']) if selected_context else 0,
+        }
 
     accounts = Accounts.query.order_by(Accounts.Name).all()
     companies = [
@@ -1398,6 +2070,11 @@ def GeneralLedger():
         filters=filters,
         totals=totals,
         journal_summaries=journal_summaries,
+        selected_key=selected_key,
+        selected_lines=selected_lines,
+        selected_summary=selected_summary,
+        err=err,
+        msg=msg,
     )
 
 

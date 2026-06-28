@@ -12,26 +12,30 @@ from webapp.dispatch_calendar import (
     parse_date,
     upsert_schedule,
 )
-from webapp.models import Drivers, Orders, Pins, Vehicles
+from webapp.models import Drivers, Imports, Orders, Pins, Vehicles
 
 
 KANBAN_COLUMNS = [
     ('new_orders', 'New Orders'),
-    ('needs_review', 'Needs Review'),
+    ('on_call', 'On Call'),
     ('upcoming_deliveries', 'Upcoming Deliveries'),
-    ('needs_pin', 'Needs PIN'),
-    ('pin_ready', 'PIN Ready'),
+    ('port_today', 'Port Today'),
+    ('drop_pick', 'Drop-Pick'),
+    ('pin_assigned', 'PIN Assigned'),
     ('in_progress', 'In Progress'),
     ('delivered', 'Delivered'),
-    ('invoice_ready', 'Invoice Ready'),
     ('completed', 'Completed'),
+    ('invoice_ready', 'Invoice Ready'),
 ]
 
 KANBAN_STATUS_LABELS = dict(KANBAN_COLUMNS)
 KANBAN_STATUS_KEYS = {key for key, label in KANBAN_COLUMNS}
 LEGACY_STATUS_MAP = {
-    'ready_to_dispatch': 'pin_ready',
-    'assigned': 'pin_ready',
+    'needs_review': 'on_call',
+    'needs_pin': 'port_today',
+    'pin_ready': 'pin_assigned',
+    'ready_to_dispatch': 'pin_assigned',
+    'assigned': 'pin_assigned',
 }
 
 
@@ -125,6 +129,44 @@ def pin_lookup_for_orders(orders):
     return lookup
 
 
+def import_lookup_for_orders(orders):
+    keys = set()
+    for order in orders:
+        for value in [order.Jo, order.BOL, order.Booking, order.Container]:
+            value = clean_text(value)
+            if value:
+                keys.add(value)
+    if not keys:
+        return {}
+    imports = Imports.query.filter(or_(
+        Imports.Jo.in_(keys),
+        Imports.BOL.in_(keys),
+        Imports.Container.in_(keys),
+    )).limit(5000).all()
+    lookup = {}
+    for import_row in imports:
+        for key_name, value in [
+            ('jo', import_row.Jo),
+            ('bol', import_row.BOL),
+            ('container', import_row.Container),
+        ]:
+            key = (key_name, clean_text(value))
+            if key[1] and key not in lookup:
+                lookup[key] = import_row
+    return lookup
+
+
+def import_from_lookup(order, import_lookup):
+    for key in [
+        ('jo', clean_text(order.Jo)),
+        ('bol', clean_text(order.BOL) or clean_text(order.Booking)),
+        ('container', clean_text(order.Container)),
+    ]:
+        if key[1] and key in import_lookup:
+            return import_lookup[key]
+    return None
+
+
 def pin_from_lookup(order, pin_lookup):
     container = clean_text(order.Container)
     booking = clean_text(order.Booking)
@@ -167,6 +209,13 @@ def pin_status_for_order(order, state=None, pin=None):
 
 def has_pin(order, state=None, pin=None):
     return bool(pin_reference_for_order(order, state, pin))
+
+
+def pin_is_for_today(pin, today=None):
+    if pin is None:
+        return False
+    pin_date = order_date(getattr(pin, 'Date', None))
+    return bool(pin_date and pin_date == (today or datetime.date.today()))
 
 
 def billing_status_for_order(order, state=None):
@@ -226,6 +275,40 @@ def kanban_scheduled_datetime(order, schedule=None):
     return None
 
 
+def is_import_order(order):
+    return 'import' in clean_text(getattr(order, 'HaulType', '')).lower()
+
+
+def is_drop_pick_order(order):
+    haul_type = clean_text(getattr(order, 'HaulType', '')).lower()
+    return 'dp' in haul_type or 'drop' in haul_type
+
+
+def next_week_start(today=None):
+    today = today or datetime.date.today()
+    return today + datetime.timedelta(days=(7 - today.weekday()))
+
+
+def week_end(today=None):
+    today = today or datetime.date.today()
+    return today + datetime.timedelta(days=(6 - today.weekday()))
+
+
+def next_business_day(day):
+    current = day + datetime.timedelta(days=1)
+    while current.weekday() >= 5:
+        current = current + datetime.timedelta(days=1)
+    return current
+
+
+def pin_planning_cutoff(now=None):
+    now = now or datetime.datetime.now()
+    close_time = datetime.time(16, 30)
+    if now.time() >= close_time:
+        return next_business_day(now.date())
+    return now.date()
+
+
 def kanban_delivery_location(order):
     return clean_text(order.Dropblock2) or clean_text(order.Company2) or clean_text(order.Delivery)
 
@@ -274,11 +357,55 @@ def has_container_identity(order):
     return bool(clean_text(order.Container) or clean_text(order.Booking))
 
 
-def is_upcoming_delivery(order):
+def confirmed_delivery(order, schedule=None):
+    return bool(
+        kanban_scheduled_datetime(order, schedule) and
+        (clean_text(getattr(order, 'Delivery', '')) or clean_text(getattr(order, 'Time3', '')))
+    )
+
+
+def is_upcoming_delivery(order, schedule=None):
+    target = kanban_scheduled_datetime(order, schedule)
+    return bool(target and target.date() > pin_planning_cutoff())
+
+
+def is_new_future_import(order):
+    return bool(is_import_order(order) and order_date(getattr(order, 'Date6', None)) and order_date(getattr(order, 'Date6', None)) >= next_week_start())
+
+
+def has_exam_or_hold(order, import_row=None):
+    return bool(clean_text(getattr(order, 'HoldType', '')))
+
+
+def scheduled_this_week(order, schedule=None):
+    target = kanban_scheduled_datetime(order, schedule)
+    if target is None:
+        return False
     today = datetime.date.today()
-    delivery_date = order_date(order.Date3)
-    pull_date = order_date(order.Date)
-    return bool((delivery_date and delivery_date > today) or (pull_date and pull_date > today))
+    return today <= target.date() <= week_end(today)
+
+
+def has_delivery_proof(order):
+    proof = clean_text(getattr(order, 'Proof', ''))
+    return bool(
+        (proof and proof.lower() != 'none required') or
+        clean_text(getattr(order, 'Proof2', '')) or
+        clean_text(getattr(order, 'DrvProof', '')) or
+        int_value(getattr(order, 'DelStat', 0)) > 0
+    )
+
+
+def proof_none_required(order):
+    return clean_text(getattr(order, 'Proof', '')).lower() == 'none required'
+
+
+def ready_to_invoice_documents(order):
+    return has_delivery_proof(order) or proof_none_required(order)
+
+
+def scheduled_for_today(order, schedule=None):
+    target = kanban_scheduled_datetime(order, schedule)
+    return bool(target and target.date() == datetime.date.today())
 
 
 def is_active_kanban_order(order, workflow_status):
@@ -288,39 +415,53 @@ def is_active_kanban_order(order, workflow_status):
     status_text = (order.Status or '').lower()
     if any(term in status_text for term in ['cancel', 'closed', 'void']):
         return False
-    return workflow_status != 'completed'
+    return True
 
 
 def active_trucks_available():
     return Vehicles.query.filter((Vehicles.Active == 1) & (Vehicles.Type == 'Tractor')).count() > 0
 
 
-def derived_workflow_status(order, state=None, pin=None):
+def derived_workflow_status(order, state=None, pin=None, schedule=None, import_row=None):
     # Kanban mapping from existing Class8 fields:
-    # - dispatch_kanban_state.WorkflowStatus wins once dispatch has touched the card.
+    # - Physical movement and hold/exam flags can override an older saved workflow state.
     # - Orders.Hstat drives physical container progress: 0 unpulled, 1 pulled/in progress, 2 returned.
-    # - Delivered means returned to port but not invoiced yet: Hstat == 2 and Istat < 1.
+    # - Delivered means POD/manual delivery confirmation before the box is returned.
+    # - Completed means the container has been returned to port.
     # - Orders.Istat is shown as billing status only; it should not complete dispatch workflow.
-    # - PIN status comes from Pins rows or the Kanban PinReference override.
-    if state and clean_text(state.get('WorkflowStatus')):
-        return normalize_workflow_status(state.get('WorkflowStatus'))
-
+    # - PIN Assigned is only for a matching Pins row dated today, and physical progress wins.
+    saved_status = normalize_workflow_status(state.get('WorkflowStatus')) if state and clean_text(state.get('WorkflowStatus')) else ''
     hstat = int_value(order.Hstat)
 
-    if returned_not_invoiced(order):
-        return 'delivered'
     if returned_or_delivered(order):
+        if ready_to_invoice_documents(order):
+            return 'invoice_ready'
         return 'completed'
+    if saved_status == 'delivered':
+        return 'delivered'
+    if is_drop_pick_order(order):
+        return 'drop_pick'
+    if has_delivery_proof(order):
+        return 'delivered'
     if hstat == 1:
         return 'in_progress'
-    if clean_text(order.Driver):
-        return 'pin_ready'
-    if has_container_identity(order) and is_upcoming_delivery(order):
+    if has_exam_or_hold(order, import_row):
+        return 'on_call'
+    if pin_is_for_today(pin):
+        return 'pin_assigned'
+    if scheduled_for_today(order, schedule):
+        return 'port_today'
+    if saved_status and saved_status != 'pin_assigned':
+        return saved_status
+    if confirmed_delivery(order, schedule):
+        planned = kanban_scheduled_datetime(order, schedule)
+        if planned and planned.date() <= pin_planning_cutoff():
+            return 'port_today'
         return 'upcoming_deliveries'
-    if has_pin(order, state, pin):
-        return 'pin_ready'
+    if is_new_future_import(order):
+        return 'new_orders'
     if has_container_identity(order):
-        return 'needs_pin'
+        return 'new_orders'
     return 'new_orders'
 
 
@@ -371,27 +512,27 @@ def filtered_orders(filters=None):
     state_map = state_rows_for_orders(order_ids)
     schedule_map = schedule_rows_for_orders(order_ids)
     pin_lookup = pin_lookup_for_orders(orders)
+    import_lookup = import_lookup_for_orders(orders)
     output = []
     range_filter = clean_text(filters.get('range'))
     for order in orders:
         state = state_map.get(order.id)
         schedule = schedule_map.get(order.id)
         pin = pin_from_lookup(order, pin_lookup)
-        workflow_status = derived_workflow_status(order, state, pin)
-        if workflow_status == 'completed' and status_filter != 'completed':
-            continue
+        import_row = import_from_lookup(order, import_lookup)
+        workflow_status = derived_workflow_status(order, state, pin, schedule, import_row)
         if status_filter in KANBAN_STATUS_KEYS and workflow_status != status_filter:
             continue
         if not is_active_kanban_order(order, workflow_status):
             continue
         if not order_matches_range(order, range_filter, schedule):
             continue
-        output.append((order, state, workflow_status, schedule, pin))
+        output.append((order, state, workflow_status, schedule, pin, import_row))
     return output
 
 
-def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=None):
-    workflow_status = workflow_status or derived_workflow_status(order, state, pin)
+def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=None, import_row=None):
+    workflow_status = workflow_status or derived_workflow_status(order, state, pin, schedule, import_row)
     planned = kanban_scheduled_datetime(order, schedule)
     pin_status = pin_status_for_order(order, state, pin)
     return {
@@ -400,6 +541,7 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'workflow_label': KANBAN_STATUS_LABELS.get(workflow_status, workflow_status),
         'jo': order.Jo,
         'container': order.Container or '',
+        'container_type': order.Type or '',
         'booking': order.Booking or '',
         'customer': order.Shipper or order.Company or '',
         'shipper': order.Shipper or '',
@@ -412,7 +554,12 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'scheduled_delivery_time': planned.strftime('%H:%M') if planned and planned.time() != datetime.time.min else '',
         'pull_date': format_date(order.Date),
         'return_date': format_date(order.Date2),
-        'last_free_day': format_date(order.Date4),
+        'last_free_day': format_date(order.Date5),
+        'ship_arrive_date': format_date(order.Date6),
+        'due_back_date': format_date(order.Date7),
+        'hold_status': clean_text(getattr(order, 'HoldType', '')),
+        'is_drop_pick': is_drop_pick_order(order),
+        'drop_pick_pulled': is_drop_pick_order(order) and int_value(order.Hstat) >= 1,
         'pin_status': pin_status,
         'pin_reference': pin_reference_for_order(order, state, pin),
         'driver': order.Driver or '',
@@ -427,8 +574,10 @@ def kanban_jobs(filters=None):
     ensure_dispatch_kanban_tables()
     jobs_by_status = {key: [] for key, label in KANBAN_COLUMNS}
     total_jobs = 0
-    for order, state, workflow_status, schedule, pin in filtered_orders(filters):
-        jobs_by_status.setdefault(workflow_status, []).append(kanban_job_card(order, state, workflow_status, schedule, pin))
+    for order, state, workflow_status, schedule, pin, import_row in filtered_orders(filters):
+        jobs_by_status.setdefault(workflow_status, []).append(
+            kanban_job_card(order, state, workflow_status, schedule, pin, import_row)
+        )
         total_jobs += 1
     return {
         'total_jobs': total_jobs,
@@ -457,8 +606,8 @@ def validate_status_move(order, new_status, state=None, override_pin=False):
     new_status = normalize_workflow_status(new_status)
     if new_status not in KANBAN_STATUS_KEYS:
         return 'Unknown workflow status.'
-    if new_status == 'pin_ready' and not has_pin(order, state) and not override_pin:
-        return 'Moving to PIN Ready requires a PIN or explicit override.'
+    if new_status == 'pin_assigned' and not has_pin(order, state) and not override_pin:
+        return 'Moving to PIN Assigned requires a PIN or explicit override.'
     if new_status == 'in_progress':
         if not clean_text(order.Driver):
             return 'Moving to In Progress requires an assigned driver.'
@@ -524,7 +673,7 @@ def move_job(order_id, new_status, username=None, override_pin=False, reason=Non
     state = state_row(order.id)
     error = validate_status_move(order, new_status, state, override_pin=override_pin)
     if error:
-        status = 409 if 'PIN Ready' in error else 400
+        status = 409 if 'PIN Assigned' in error else 400
         return {'ok': False, 'error': error, 'requires_override': status == 409}, status
     upsert_state(order, new_status, username=username, reason=reason)
     return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), new_status)}, 200
@@ -607,5 +756,4 @@ def kanban_options():
         {'key': '7', 'label': 'Next 7 Days'},
         {'key': 'all_active', 'label': 'Recent Active'},
     ]
-    options['companies'] = ['K', 'J', 'N']
     return options

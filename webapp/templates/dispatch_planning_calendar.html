@@ -8,11 +8,18 @@
      data-events-url="{{ url_for('main.DispatchCalendarEvents') }}"
      data-capacity-url="{{ url_for('main.DispatchCalendarCapacity') }}"
      data-move-url-template="{{ url_for('main.DispatchCalendarMove', order_id=0) }}"
-     data-update-url-template="{{ url_for('main.DispatchCalendarUpdate', order_id=0) }}">
+     data-update-url-template="{{ url_for('main.DispatchCalendarUpdate', order_id=0) }}"
+     data-notes-url="{{ url_for('main.DispatchCalendarNotes') }}"
+     data-note-save-url="{{ url_for('main.DispatchCalendarNoteSave') }}"
+     data-note-delete-url-template="{{ url_for('main.DispatchCalendarNoteDelete', note_id=0) }}"
+     data-port-closures-url="{{ url_for('main.DispatchPortClosures') }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <div>
             <h3 class="mb-1">Dispatch Planning Calendar</h3>
             <div class="text-muted">Capacity planning for {{ scac }} container deliveries</div>
+        </div>
+        <div class="mr-3">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.DispatchPortClosures') }}">Port Closure Calendar</a>
         </div>
         <div id="dispatch-calendar-message" class="alert d-none mb-0 py-2"></div>
     </div>
@@ -69,6 +76,12 @@
                 <label for="dispatch-filter-search">Container / Booking</label>
                 <input id="dispatch-filter-search" class="form-control form-control-sm dispatch-filter" type="search" placeholder="Container, booking, JO">
             </div>
+            <div class="form-group col-md-2">
+                <div class="custom-control custom-checkbox mt-md-4">
+                    <input type="checkbox" class="custom-control-input dispatch-filter" id="dispatch-filter-show-invoiced">
+                    <label class="custom-control-label" for="dispatch-filter-show-invoiced">Show invoiced/paid</label>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -76,8 +89,70 @@
         <span><i class="dispatch-legend-swatch dispatch-unpulled"></i>Unpulled</span>
         <span><i class="dispatch-legend-swatch dispatch-pulled"></i>Pulled</span>
         <span><i class="dispatch-legend-swatch dispatch-returned"></i>Returned</span>
-        <span><i class="dispatch-legend-outline dispatch-lfd-near"></i>LFD near</span>
-        <span><i class="dispatch-legend-outline dispatch-lfd-past"></i>LFD passed</span>
+        <span><i class="dispatch-legend-swatch dispatch-returned-split-booking"></i>Returned, different booking</span>
+        <span><i class="dispatch-legend-swatch dispatch-invoiced"></i>Invoiced</span>
+        <span><i class="dispatch-legend-swatch dispatch-paid"></i>Paid</span>
+        <span><i class="dispatch-legend-swatch dispatch-note-driver-off"></i>Driver off</span>
+        <span><i class="dispatch-legend-swatch dispatch-note-port-closed"></i>Port closed</span>
+        <span><i class="dispatch-legend-swatch dispatch-note-port-early-close"></i>Early close</span>
+        <span><i class="dispatch-legend-outline dispatch-lfd-near"></i>LFD/cutoff near</span>
+        <span><i class="dispatch-legend-outline dispatch-lfd-past"></i>LFD/cutoff passed</span>
+        <span><i class="dispatch-legend-outline dispatch-due-back-near"></i>Due back near</span>
+        <span><i class="dispatch-legend-outline dispatch-due-back-past"></i>Due back passed</span>
+    </div>
+
+    <div class="dispatch-note-panel mb-3">
+        <form id="dispatch-note-form">
+            <input type="hidden" id="dispatch-note-id">
+            <div class="form-row align-items-end">
+                <div class="form-group col-md-2">
+                    <label for="dispatch-note-date">Date</label>
+                    <input type="date" id="dispatch-note-date" class="form-control form-control-sm" required>
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="dispatch-note-end-date">End Date</label>
+                    <input type="date" id="dispatch-note-end-date" class="form-control form-control-sm">
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="dispatch-note-type">Note Type</label>
+                    <select id="dispatch-note-type" class="form-control form-control-sm">
+                        <option value="driver_off">Driver off</option>
+                        <option value="port_closed">Port closed</option>
+                        <option value="port_early_close">Port closes early</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-2 dispatch-note-driver-field">
+                    <label for="dispatch-note-driver">Driver</label>
+                    <select id="dispatch-note-driver" class="form-control form-control-sm">
+                        <option value="">Choose driver</option>
+                        {% for driver in options.drivers %}
+                            <option value="{{ driver.Name }}">{{ driver.Name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-2 dispatch-note-port-field">
+                    <label for="dispatch-note-port">Port / Terminal</label>
+                    <input type="text" id="dispatch-note-port" class="form-control form-control-sm" value="Baltimore Seagirt">
+                </div>
+                <div class="form-group col-md-1 dispatch-note-time-field">
+                    <label for="dispatch-note-close-time">Close Time</label>
+                    <input type="time" id="dispatch-note-close-time" class="form-control form-control-sm">
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="dispatch-note-text">Note</label>
+                    <input type="text" id="dispatch-note-text" class="form-control form-control-sm" placeholder="Reason or dispatch note">
+                </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center justify-content-between">
+                <div class="text-muted small">Click a calendar day to set the note date. Port closed notes also update the port closure table.</div>
+                <div>
+                    <button type="button" id="dispatch-note-clear" class="btn btn-sm btn-outline-secondary">Clear</button>
+                    <button type="button" id="dispatch-note-delete" class="btn btn-sm btn-outline-danger d-none">Delete</button>
+                    <button type="submit" class="btn btn-sm btn-primary">Save Note</button>
+                </div>
+            </div>
+        </form>
+        <div id="dispatch-note-list" class="dispatch-note-list mt-2"></div>
     </div>
 
     <div id="dispatch-capacity-strip" class="dispatch-capacity-strip mb-3"></div>
@@ -85,7 +160,7 @@
 </div>
 
 <div class="modal fade" id="dispatch-event-modal" tabindex="-1" role="dialog" aria-labelledby="dispatch-event-modal-title" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog dispatch-event-modal-dialog" role="document">
         <div class="modal-content">
             <form id="dispatch-event-form">
                 <div class="modal-header">
@@ -133,6 +208,47 @@
                         <div class="form-group col-md-8">
                             <label for="dispatch-modal-notes">Planning Notes</label>
                             <textarea class="form-control" id="dispatch-modal-notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="border-top pt-3 mt-2">
+                        <h6 class="mb-2">Order Dates</h6>
+                        <div class="form-row">
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-pull-date">Pull</label>
+                                <input type="date" class="form-control" id="dispatch-modal-pull-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-return-date">Return</label>
+                                <input type="date" class="form-control" id="dispatch-modal-return-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-delivery-date">Delivery</label>
+                                <input type="date" class="form-control" id="dispatch-modal-delivery-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-delivery-time">Del Time</label>
+                                <input type="text" class="form-control" id="dispatch-modal-delivery-time" placeholder="08:00 or 8:00 AM">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-first-available-date">1st Avail</label>
+                                <input type="date" class="form-control" id="dispatch-modal-first-available-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-port-deadline-date">LFD / Cutoff</label>
+                                <input type="date" class="form-control" id="dispatch-modal-port-deadline-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2 dispatch-date-ship-arrive-field">
+                                <label for="dispatch-modal-ship-arrive-date">Ship Arrive</label>
+                                <input type="date" class="form-control" id="dispatch-modal-ship-arrive-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2">
+                                <label for="dispatch-modal-due-back-date">Due Back</label>
+                                <input type="date" class="form-control" id="dispatch-modal-due-back-date">
+                            </div>
+                            <div class="form-group col-md-3 col-lg-2 dispatch-date-dp-field">
+                                <label for="dispatch-modal-secondary-action-date">DP Date</label>
+                                <input type="date" class="form-control" id="dispatch-modal-secondary-action-date">
+                            </div>
                         </div>
                     </div>
                 </div>

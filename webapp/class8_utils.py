@@ -497,18 +497,6 @@ def colorcode(table, incol):
         elif incol == 8: return 'light-green font-weight-bold'
         elif incol == 4: return 'black text-white font-weight-bold'
         else: return 'white font-weight-bold'
-    elif table == 'Newjobs':
-        if incol == 9: return 'teal text-white font-weight-bold'
-        elif incol == 5: return 'green text-white font-weight-bold'
-        elif incol == 3: return'amber font-weight-bold'
-        elif incol == 2: return'purple text-white font-weight-bold'
-        elif incol == 1: return 'blue text-white font-weight-bold'
-        elif incol == -1: return 'yellow font-weight-bold'
-        elif incol == 6: return 'grey white-text font-weight-bold'
-        elif incol == 7: return 'orange font-weight-bold'
-        elif incol == 8: return 'light-green font-weight-bold'
-        elif incol == 4: return 'black text-white font-weight-bold'
-        else: return 'white font-weight-bold'
     elif table == 'Interchange':
         if incol == 'IO': return 'blue-text font-weight-bold'
         elif incol == 'BBBBBB': return'amber font-weight-bold'

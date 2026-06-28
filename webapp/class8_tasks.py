@@ -1,7 +1,7 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, Newjobs, Ships, Imports, Exports, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail
@@ -116,10 +116,21 @@ def Review_Drop(dropblock):
         return dropblock
 
 def due_back(date):
-    dw = date.weekday()
-    da = 3
-    if dw > 1: da = 5
-    return date + timedelta(days=da)
+    if date is None:
+        return None
+    current = date
+    added = 0
+    while added < 4:
+        current = current + timedelta(days=1)
+        day_value = current.date() if isinstance(current, datetime.datetime) else current
+        if day_value.weekday() >= 5:
+            continue
+        day_start = datetime.datetime.combine(day_value, datetime.time.min)
+        day_end = day_start + timedelta(days=1)
+        if PortClosed.query.filter((PortClosed.Date >= day_start) & (PortClosed.Date < day_end)).first() is not None:
+            continue
+        added += 1
+    return current
 
 def short_date(date):
     if date is not None:  return date.strftime("%m-%d")
@@ -1993,49 +2004,6 @@ def Table_maker(genre):
         #print(f'driver upload at top is {driver_upload}')
         #print(f'taskon at top is {taskon}')
 
-        if genre == 'Planning':
-            for filter in table_filters:
-                for key, value in filter.items():
-                    tfilters[key] = request.values.get(key)
-                    #print('planner filter set 1', key, tfilters[key])
-            dlist = table_filters[0]['Date Filter']
-
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
-
-            if not userchange:
-                pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-                if resetmod is None:
-                    err.append(f'User {username} has control of calendar data')
-                else:
-                    err.append(f'User {username} now has control of calendar data')
-            else:
-                reupdate = 0
-                if resetmod is None:
-                    err.append('Another User Has Charge of Calendar Data')
-                    err.append('Hit Reset Calendar to Take Ownership of Modifications')
-                else:
-                    err.append(f'User {username} now has control of calendar data')
-
-            if reupdate:
-                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
-
-            if task_iter == 0:
-                pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
-                #print(f'Starting POST of genre {genre} with view of jolist: {jolist}')
-            else:
-                jolist = []
-                for jp in range(1, 5):
-                    jox = f'jo{jp}'
-                    jo = request.values.get(jox)
-                    if jo is not None: jolist.append(jo)
-
-                #print(f'Starting POST of genre {genre} with return of jolist: {jolist}')
-                pdiovec, pdipvec, pdeovec, pdepvec = initialize_calendar_checks(pdio, pdip, pdeo, pdep, jolist)
-            # Set Orders table to checks used in calendar whether or not the Order table is on...
-            checked_data = cal_to_orders(jolist, checked_data)
-
-
-
         #print(f'Method is POST with tasktype {tasktype}, taskon {taskon}, task_focus {task_focus}, task_iter {task_iter}')
 
         #Gather filter settings to keep them set as desired
@@ -2055,7 +2023,6 @@ def Table_maker(genre):
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
 
             if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
-            pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
 
         else:
 
@@ -2066,8 +2033,6 @@ def Table_maker(genre):
             # However, we must convert the calendar into the order data if using the calendar.
             genre_tables_on = checked_tables(genre_tables)
             tables_on = [ix for jx, ix in enumerate(genre_tables) if genre_tables_on[jx] == 'on']
-            if genre == 'Planning':
-                if 'Orders' not in tables_on: tables_on.append('Orders')
 
             #print(f'The tables on: {tables_on} with task {taskon}')
 
@@ -2118,7 +2083,6 @@ def Table_maker(genre):
 
                 if tfilters['Color Filter'] == 'Haul':
                     Orders_setup['colorfilter'] = ['Hstat']
-                    #Newjobs_setup['colorfilter'] = ['Hstat']
                 elif tfilters['Color Filter'] == 'Invoice':
                     Orders_setup['colorfilter'] = ['Istat']
                 elif tfilters['Color Filter'] == 'Both':
@@ -2142,32 +2106,6 @@ def Table_maker(genre):
         taskon, task_iter, task_focus, tasktype = None, None, None, None
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
-        if genre == 'Planning':
-            #print(f'Executing the Calendar first time thru....')
-            tfilters = {'Shipper Filter': None, 'Date Filter': 'This Week', 'Pay Filter': None, 'Haul Filter': None,
-                        'Color Filter': 'Both', 'Viewer': '8x4'}
-            # holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, busdays]
-            dlist = table_filters[0]['Date Filter']
-            pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
-            if not userchange:
-                pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-                if resetmod is None:
-                    err.append(f'User {username} has control of calendar data')
-                else:
-                    err.append(f'User {username} now has control of calendar data')
-            else:
-                reupdate = 0
-                if resetmod is None:
-                    err.append('Another User Has Charge of Calendar Data')
-                    err.append('Hit Reset Calendar to Take Ownership of Modifications')
-                else:
-                    err.append(f'User {username} now has control of calendar data')
-
-
-            if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
-            pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [], []]
-            jolist = []
-
 ###########All done in this section##################################################################################################################
     # Execute these parts whether it is a Post or Not:
     # genre_data = [genre,genre_tables,genre_tables_on,contypes]
@@ -2180,12 +2118,10 @@ def Table_maker(genre):
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
-    if genre == 'Planning': checked_data = cal_to_orders(jolist, checked_data)
 
     # Remove the checks during reset of tables
     if resethit is not None or resetmod is not None:
         for check in checked_data:  check[2] = []
-        pdiovec, pdipvec, pdeovec, pdepvec = [[], [], [], [], [], []], [[], [], [], [], [], []], [[], [], [], [], [],[]], [[], [], [], [], [], []]
 
     # Execute the task here if a task is on...,,,,
     if hasvalue(taskon):
@@ -2200,28 +2136,6 @@ def Table_maker(genre):
             else:
                 #print(f'ongoing task: the tables on are: {tables_on} with task {taskon}')
                 jscripts, taskon, task_iter, task_focus, tboxes, viewport = reset_state_soft(task_boxes)
-
-            if genre == 'Planning':
-                # If the tesk is completed and we never left the calendar then keep the checks we used
-                #Reset the calendar
-                dlist = table_filters[0]['Date Filter']
-                pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
-                if not userchange:
-                    pdio, pdip, pdeo, pdep, reupdate = update_calendar_form(pdio, pdip, pdeo, pdep)
-                    if resetmod is None:
-                        err.append(f'User {username} has control of calendar data')
-                    else:
-                        err.append(f'User {username} now has control of calendar data')
-                else:
-                    reupdate = 0
-                    if resetmod is None:
-                        err.append('Another User Has Charge of Calendar Data')
-                        err.append('Hit Reset Calendar to Take Ownership of Modifications')
-                    else:
-                        err.append(f'User {username} now has control of calendar data')
-
-                if reupdate: pdio, pdip, pdeo, pdep, busdays, pdic, pdec, pmon, userchange, do = create_cal_data(tfilters, dlist, username, resetmod)
-                pdiovec, pdipvec, pdeovec, pdepvec, jolist = get_calendar_checks(pdio, pdip, pdeo, pdep)
 
             tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on, tabletitle, tfilters, jscripts)
         else:
@@ -2460,17 +2374,6 @@ def Table_maker(genre):
 
     holdvec[80] = request.values.get('showcolorstable')
 
-    if genre == 'Planning':
-        #print(f'The length of holdvec is {len(holdvec)}')
-        #print(f'Sending over jolist = {jolist}')
-        cal_labels = []
-        for bday in busdays:
-            bdat = PortClosed.query.filter(PortClosed.Date == bday).first()
-            if bdat is None: cal_labels.append(bday)
-            else: cal_labels.append(bdat.Reason)
-        holdvec[100] = [pdio, pdip, pdeo, pdep, pdiovec, pdipvec, pdeovec, pdepvec, cal_labels, jolist, pdic, pdec, pmon, do]
-        #print(f'Holdvec[100] = {holdvec[100]}')
-
     #print(checked_data)
     if genre == 'Billing':
         # Get all expense data for current year to present at the panel
@@ -2691,6 +2594,11 @@ def get_dbdata(table_setup, tfilters):
     for odat in odata:
         data1id.append(odat.id)
         datarow = [0] * len(entrydata)
+        hold_row_color = (
+            table == 'Orders' and
+            hasattr(odat, 'HoldType') and
+            hasinput(odat.HoldType)
+        )
         if color_selector is not None:
             for kx, selector in enumerate(color_selector):
                 color_selector_value = getattr(odat, selector)
@@ -2702,6 +2610,9 @@ def get_dbdata(table_setup, tfilters):
             color_selector_value = 0
             rowcolors1.append(colorcode(table, color_selector_value))
             rowcolors2.append(colorcode(table, color_selector_value))
+        if hold_row_color:
+            rowcolors1[-1] = 'dispatch-hold-row font-weight-bold'
+            rowcolors2[-1] = 'dispatch-hold-row font-weight-bold'
 
         for jx, colist in enumerate(entrydata):
             co = colist[0]
@@ -2931,131 +2842,6 @@ def check_appears(tablesetup, entry, htold):
     else:
         #Reset to original table data
         return entry[3], entry[4]
-
-def UpdatePlanner_task(tablesetup, task_iter):
-    completed = True
-    holdvec = [''] * 60
-    err = [f"Running UpdatePlanner task with task_iter {task_iter} using {tablesetup['table']}"]
-    form_show = tablesetup['form show']['New']
-    form_checks = tablesetup['form checks']['New']
-    #print(f'Entering UpdatePlanner Task with task iter {task_iter}')
-    entrydata = tablesetup['entry data']
-    # Set some date criteria:
-    today = datetime.datetime.today()
-    today = today.date()
-    cutoff = today - timedelta(7)
-    cuthigh = today + timedelta(7)
-    tomorrow = today + timedelta(1)
-    lookbackto = today - timedelta(30)
-
-
-    # Add jobs from the Orders database that are not in the planner:
-    odata = Orders.query.filter((Orders.Hstat < 2) & (Orders.Date > lookbackto)).all()
-    for odat in odata:
-        jo = odat.Jo
-        #print(f'Looking for jo {jo}')
-        ndat = Newjobs.query.filter(Newjobs.Jo == jo).first()
-        if ndat is None:
-            # Need to add this order to the newjobs data.
-            #print(odat.Source, odat.Company, odat.Company2)
-            input = Newjobs(Status=1, Jo=jo, Shipper=odat.Shipper, HaulType=odat.HaulType, Release=odat.Booking,
-                            Bookingin=None, Container=odat.Container,
-                            Type=odat.Type, Pickup=odat.Company, Delivery=odat.Company2, Ship=None, Date=odat.Date,
-                            Date2=odat.Date2, Date3=None,
-                            Date4=None, Date5=None, Date6=None, Date7=None, Time2='', Time3=None, Source=odat.Source,
-                            Portbyday=None,
-                            Scache=odat.Scache, Pcache=0, Truck=odat.Truck, Driver=odat.Driver, Hstat=odat.Hstat,
-                            SSL=None, Changes='')
-            db.session.add(input)
-            db.session.commit()
-            #print(f'Added Jo {jo} to Newjobs')
-
-
-    ndata = Newjobs.query.filter(Newjobs.Status<8).all()
-    for ndat in ndata:
-        jo = ndat.Jo
-        status = ndat.Status
-        ship = ndat.Ship
-        ht = ndat.HaulType
-        sdat = Ships.query.filter(Ships.Ship == ship).first()
-        if sdat is None:
-            ndat.Status = 0
-        else:
-            win1 = ndat.Date3
-            win2 = ndat.Date4
-
-            odat = Orders.query.filter(Orders.Jo == jo).first()
-            if odat is not None:
-                ndat.Hstat = odat.Hstat
-                hstat = odat.Hstat
-            # Now push the planning along
-            ts = -1
-            if sdat is not None: ts = 0
-            # Check if delivery set:
-            del_date = ndat.Date2
-            del_time = ndat.Time2
-            if del_date is not None and del_time is not None:
-                if ts == 0: ts = 1
-
-            if 'Import' in ht:
-                shiparrival = sdat.Date
-                ndays = shiparrival - today
-                ndays = ndays.days
-                #print(f'Today is {today} and the ship arrives {shiparrival} which is in {ndays} days')
-                if ndays < 3: #ship arrives within 3 days
-                    ts = 2
-                if win1 is not None:
-                    ndays1 = win1 - today
-                    ndays1 = ndays1.days
-                    if ndays1 <= 0: ts = 3
-                if win2 is not None:
-                    ndays2 = win2 - today
-                    ndays2 = ndays2.days
-                    if ndays2 <= 0: ts = 4
-                if del_date is not None and del_time is not None:
-                    if ts == 3: ts = 5 #Both active and planned delivery date
-                    if ts == 4 and hstat > 0: ts = 5
-                proof = odat.Proof
-                if proof is not None and hstat == 1: ts = 6
-                if hstat == 1:
-                    #check to see how long container out
-                    pulled = odat.Date
-                    ndays3 = pulled - today
-                    ndays3 = ndays3.days
-                    if ndays3 <= 0: ts = 7
-                if hstat > 1 and proof is not None: ts = 8
-
-            if 'Export' in ht:
-                if win1 is not None:
-                    ndays1 = win1 - today
-                    ndays1 = ndays1.days
-                    if ndays1 > 4: ts = 1
-                    elif ndays1 > 0: ts = 2
-                    elif ndays1 <= 0: ts = 3
-                if win2 is not None:
-                    ndays2 = win2 - today
-                    ndays2 = ndays2.days
-                    if ndays2 <= 0: ts = 4
-                if del_date is not None and del_time is not None:
-                    if ts == 3: ts = 5 #Both active and planned delivery date
-                    if ts == 4 and hstat > 0: ts = 5
-                proof = odat.Proof
-                if proof is not None and hstat == 1: ts = 6
-                if hstat == 1:
-                    #check to see how long container out
-                    pulled = odat.Date
-                    ndays3 = pulled - today
-                    ndays3 = ndays3.days
-                    if ndays3 <= 0: ts = 7
-                if hstat > 1 and proof is not None: ts = 8
-
-        ndat.Status = ts
-        db.session.commit()
-
-    return holdvec, entrydata, err, completed
-
-
-
 
 def New_task(tablesetup, task_iter):
     completed = False

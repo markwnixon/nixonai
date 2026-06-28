@@ -51,6 +51,7 @@
                                     {% elif entry[4] == 'expdata' %}{% set klist = holdvec[102] %}
                                     {% elif entry[4] == 'codata' %}{% set klist = keydata.codata %}
                                     {% elif entry[4] == 'delivery_types' %}{% set klist = genre_data['delivery_types'] %}
+                                    {% elif entry[4] == 'hold_types' %}{% set klist = genre_data['hold_types'] %}
                                     {% elif entry[4] == 'terminaldata' %}{% set klist = keydata.terminaldata %}
                                 {% endif %}
 
