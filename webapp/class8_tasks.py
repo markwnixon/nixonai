@@ -2611,8 +2611,8 @@ def get_dbdata(table_setup, tfilters):
             rowcolors1.append(colorcode(table, color_selector_value))
             rowcolors2.append(colorcode(table, color_selector_value))
         if hold_row_color:
-            rowcolors1[-1] = 'dispatch-hold-row font-weight-bold'
-            rowcolors2[-1] = 'dispatch-hold-row font-weight-bold'
+            rowcolors1[-1] = 'pink lighten-5 font-weight-bold'
+            rowcolors2[-1] = 'pink lighten-5 font-weight-bold'
 
         for jx, colist in enumerate(entrydata):
             co = colist[0]
