@@ -36,6 +36,7 @@ webapp/static/js/*
 !webapp/static/css/dispatch_kanban.css
 !webapp/static/js/dispatch_planning_calendar.js
 !webapp/static/js/dispatch_kanban.js
+webapp/static/NEVO/
 webapp/static/OSLM/
 webapp/templates/companysite/OSLM/
 
