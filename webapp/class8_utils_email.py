@@ -17,6 +17,7 @@ from webapp.CCC_system_setup import usernames as em
 from webapp import db
 from webapp.models import People, Orders, Ardata
 from webapp.viewfuncs import stripper, hasinput
+from webapp.email_log import log_outgoing_email_for_orders
 
 import datetime
 
@@ -33,6 +34,28 @@ def accounting_sender_key():
     if em.get('acct') and passwords.get('acct'):
         return 'acct'
     return 'invo'
+
+
+def dispatch_sender_key():
+    dispatch_email = em.get('disp')
+    if hasinput(dispatch_email) and '@' in dispatch_email and passwords.get('disp'):
+        return 'disp'
+    return 'serv'
+
+
+def set_email_cc(emaildata, cc1='', cc2=''):
+    emaildata = list(emaildata)
+    emaildata[4] = cc1 if hasinput(cc1) else ''
+    emaildata[5] = cc2 if hasinput(cc2) else ''
+    return emaildata
+
+
+def require_invoice_cc(emaildata):
+    return set_email_cc(emaildata, em.get('invo', ''), '')
+
+
+def require_rate_con_cc(emaildata):
+    return set_email_cc(emaildata, em.get('invo', ''), em.get('acct', ''))
 
 
 def recipient_first_name(email_value, fallback):
@@ -339,6 +362,7 @@ def etemplate_truck(eprof,odat):
         emailcc1 = em['invo']
         emailcc2 = ''
         if eprof == 'Request Rate Con':
+            emailcc2 = em.get('acct', '')
             first_name = recipient_first_name(emailin1, odat.Shipper)
             ebody = f'Dear {first_name},\n\nThis invoice package is enclosed for your review.  We need an updated rate con for our final submittal.  Please send the requested rate con as soon as possible. Thanks in advance.\n\nSincerely,\n\n{signature}'
         outname = f'Package_{odat.Jo}.pdf'
@@ -652,7 +676,7 @@ def email_app(pdat):
     
     #os.remove(newfile)
 
-def update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids):
+def update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids, message_id=''):
     today = current_today()
     jolist = []
     conlist = []
@@ -684,6 +708,17 @@ def update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath,
                    Customer=shipper, Container=ncl, Date1=today, Datelist=None, From=emailfrom, Box='SENT')
     db.session.add(input)
     db.session.commit()
+    log_outgoing_email_for_orders(
+        sids,
+        etitle,
+        ebody,
+        eto,
+        ecc,
+        emailfrom,
+        attachment_name=docref,
+        attachment_send_name=newfile,
+        message_id=message_id,
+    )
 
 def invoice_mimemail(docref, err, lastpath, sids):
     cdata = companydata()
@@ -714,7 +749,10 @@ def invoice_mimemail(docref, err, lastpath, sids):
         shutil.copy(cfrom,newfile)
 
     #emailto = "export@firsteaglelogistics.com"
-    sender_key = accounting_sender_key()
+    emaildata = require_invoice_cc([etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, docref, newfile, lastpath])
+    etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, docref, newfile, lastpath = emaildata
+
+    sender_key = dispatch_sender_key()
     emailfrom = em[sender_key]
     username = em[sender_key]
     password = passwords[sender_key]
@@ -743,7 +781,8 @@ def invoice_mimemail(docref, err, lastpath, sids):
     msg["CC"] = cclist
     msg["Subject"] = etitle
     msg['Date'] = formatdate()
-    msg['Message-ID'] = make_msgid(domain=from_dom)
+    message_id = make_msgid(domain=from_dom)
+    msg['Message-ID'] = message_id
 
     ebody = ebody.replace('\n', '<br>')
 
@@ -773,11 +812,11 @@ def invoice_mimemail(docref, err, lastpath, sids):
 
     server.quit()
 
-    update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids)
+    update_ardata(etitle, ebody, eto, ecc, docref, newfile, emailfrom, lastpath, sids, message_id=message_id)
 
     return err
 
-def info_mimemail(emaildata, sids):
+def info_mimemail(emaildata, sids, sender_key=None):
     err=[]
     cdata = companydata()
     company_info = f'{cdata[2]}<br>{cdata[8]}<br>{cdata[16]}<br><br>{cdata[13]}<br><br>{cdata[14]}<br><br>{cdata[15]}'
@@ -789,7 +828,8 @@ def info_mimemail(emaildata, sids):
     etitle, ebody, emailin1, emailin2, emailcc1, emailcc2, sourcename, sendname, folder = emaildata
 
     #emailto = "export@firsteaglelogistics.com"
-    sender_key = accounting_sender_key()
+    if sender_key is None:
+        sender_key = accounting_sender_key()
     emailfrom = em[sender_key]
     username = em[sender_key]
     password = passwords[sender_key]
@@ -820,7 +860,8 @@ def info_mimemail(emaildata, sids):
     msg["CC"] = cclist
     msg["Subject"] = etitle
     msg['Date'] = formatdate()
-    msg['Message-ID'] = make_msgid(domain=from_dom)
+    message_id = make_msgid(domain=from_dom)
+    msg['Message-ID'] = message_id
 
     ebody = ebody.replace('\n', '<br>')
 
@@ -856,7 +897,7 @@ def info_mimemail(emaildata, sids):
 
     server.quit()
 
-    update_ardata(etitle, ebody, eto, ecc, sourcename, sendname, emailfrom, 'vPackage', sids)
+    update_ardata(etitle, ebody, eto, ecc, sourcename, sendname, emailfrom, 'vPackage', sids, message_id=message_id)
 
     return err
 

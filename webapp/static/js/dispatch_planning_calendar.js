@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 5000);
     }
 
+
     function endpoint(template, id) {
         return template.replace('/0/', '/' + id + '/');
     }

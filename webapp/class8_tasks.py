@@ -4,7 +4,7 @@ from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accou
                           SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
-from webapp.class8_utils_email import etemplate_truck, info_mimemail
+from webapp.class8_utils_email import etemplate_truck, info_mimemail, dispatch_sender_key, require_invoice_cc, require_rate_con_cc
 from webapp.class8_dicts import *
 #Trucking_genre, Auto_genre, Orders_setup, Interchange_setup, Customers_setup, Services_setup, Summaries_setup, Autos_setup, Billing_genre, Bills_setup
 from webapp.class8_utils_manifest import makemanifest
@@ -3712,6 +3712,8 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
                 setattr(dat, f'{task_focus}', filename1)
                 if thistable == 'Orders': setattr(dat, sname, bn)
+                if thistable == 'Orders' and task_focus == 'RateCon':
+                    dat.RCneeded = 3
                 if thistable == 'Interchange':
                     setattr(dat, sname, bn)
                     setattr(dat, 'Other', 'File Upload Manually')
@@ -4198,7 +4200,17 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             else:
                 emaildata = get_company(eprof, odat)
             if email_requested:
-                info_mimemail(emaildata, [sid])
+                sender_key = None
+                if eprof == 'Request Rate Con':
+                    emaildata = require_rate_con_cc(emaildata)
+                    sender_key = dispatch_sender_key()
+                elif eprof == 'Custom-Invoice':
+                    emaildata = require_invoice_cc(emaildata)
+                    sender_key = dispatch_sender_key()
+                info_mimemail(emaildata, [sid], sender_key=sender_key)
+                if eprof == 'Request Rate Con':
+                    odat.RCneeded = 2
+                    db.session.commit()
 
         holdvec[15] = stamplist
         #holdvec[4] = emaildata

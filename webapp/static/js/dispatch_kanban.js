@@ -14,6 +14,7 @@
     const jobsById = new Map();
     let columns = [];
 
+
     function showMessage(text, type) {
         message.textContent = text;
         message.className = `alert alert-${type || 'info'} mb-0 py-2`;
@@ -195,6 +196,7 @@
                 <dt>Last Free Day</dt><dd>${escapeHtml(job.last_free_day || '-')}</dd>
                 <dt>Hold/Exam</dt><dd>${escapeHtml(job.hold_status || '-')}</dd>
                 <dt>PIN</dt><dd>${escapeHtml(job.pin_status || '-')}</dd>
+                <dt>Proof</dt><dd>${job.proof_none_required ? 'No Proof Needed' : escapeHtml(job.proof || job.proof2 || job.driver_proof || '-')}</dd>
             </dl>
         `;
         setSelectValue('kanban-modal-status', job.workflow_status);
@@ -206,6 +208,7 @@
         document.getElementById('kanban-modal-billing').value = job.billing_status || '';
         document.getElementById('kanban-modal-notes').value = job.notes || '';
         document.getElementById('kanban-modal-override-pin').checked = false;
+        document.getElementById('kanban-modal-no-proof-needed').checked = Boolean(job.proof_none_required);
         modal.modal('show');
     }
 
@@ -222,6 +225,7 @@
             billing_status: document.getElementById('kanban-modal-billing').value,
             notes: document.getElementById('kanban-modal-notes').value,
             override_pin: document.getElementById('kanban-modal-override-pin').checked,
+            no_proof_needed: document.getElementById('kanban-modal-no-proof-needed').checked,
         };
         const {response, data} = await postJson(endpoint(updateUrlTemplate, jobId), payload);
         if (!response.ok || !data.ok) {

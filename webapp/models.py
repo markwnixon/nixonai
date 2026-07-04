@@ -629,6 +629,7 @@ class Orders(db.Model):
     Payments = db.Column('Payments', db.String(45))
     Quote = db.Column('Quote', db.String(100))
     RateCon = db.Column('RateCon', db.String(100))
+    RCneeded = db.Column('RCneeded', db.Integer, default=0)
     Rcache = db.Column('Rcache', db.Integer)
     Proof2 = db.Column('Proof2', db.String(100))
     Pcache2 = db.Column('Pcache2', db.Integer)
@@ -652,7 +653,7 @@ class Orders(db.Model):
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
                  Date4, Date5, Date6, Date7, Date8, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
                  Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap, SSCO, Ship, Voyage, UserMod, DelStat,
-                 DrvProof, DrvSeal, D1cache, D2cache, HoldType=None):
+                 DrvProof, DrvSeal, D1cache, D2cache, HoldType=None, RCneeded=0):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -724,6 +725,7 @@ class Orders(db.Model):
         self.Payments = Payments
         self.Quote = Quote
         self.RateCon = RateCon
+        self.RCneeded = RCneeded
         self.Rcache = Rcache
         self.Proof2 = Proof2
         self.Pcache2 = Pcache2

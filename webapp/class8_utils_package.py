@@ -23,6 +23,13 @@ from PyPDF2 import PdfReader
 from webapp.page_merger import pagemergerx
 from PIL import Image
 
+
+NO_PROOF_MARKERS = ['none required', 'no proof needed']
+
+
+def proof_is_marker(value):
+    return str(value or '').strip().lower() in NO_PROOF_MARKERS
+
 def call_stamp(odat, task_iter):
     stampdata = []
     if task_iter > 1:
@@ -212,11 +219,12 @@ def get_doclist(odat, dockind):
                     #print('No invoice exists')
             if thisdoc == 'Proofs':
                 try:
-                    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
-                    #print('Looking for proof file:', fa)
-                    if os.path.isfile(fa):
-                        packitems.append(fa)
-                        fexist[jx] = 1
+                    if not proof_is_marker(odat.Proof):
+                        fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
+                        #print('Looking for proof file:', fa)
+                        if os.path.isfile(fa):
+                            packitems.append(fa)
+                            fexist[jx] = 1
                 except:
                     #print('Proof file 1 does not exist')
                     fexist[jx] = 0
@@ -276,7 +284,7 @@ def getdocs(odat):
     if os.path.isfile(fa):
         dockind.append('Invoice')
     #Check for Proof
-    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
+    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}') if not proof_is_marker(odat.Proof) else ''
     fa2 = addpath(f'static/{scac}/data/vProof/{odat.Proof2}')
     if os.path.isfile(fa) or os.path.isfile(fa2):
         dockind.append('Proofs')

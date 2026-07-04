@@ -61,6 +61,14 @@ from webapp.dispatch_kanban import (
     move_job as kanban_move_job,
     update_job as kanban_update_job,
 )
+from webapp.collection_kanban import (
+    collection_email_logs,
+    collection_jobs,
+    collection_options,
+    log_collection_call,
+    send_collection_email,
+    update_collection_job,
+)
 
 from webapp.class8_utils import *
 
@@ -671,6 +679,74 @@ def DispatchKanbanUpdate(order_id):
     username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
     result, status_code = kanban_update_job(order_id, payload, username=username)
     return jsonify(result), status_code
+
+
+@main.route('/financial/collection-kanban', methods=['GET'])
+@login_required
+@financial_mfa_required
+def CollectionKanban():
+    return render_template(
+        'collection_kanban.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        options=collection_options(),
+    )
+
+
+@main.route('/api/financial/collection-kanban/jobs', methods=['GET'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanJobs():
+    filters = {
+        'customer': request.args.get('customer'),
+        'status': request.args.get('status'),
+        'range': request.args.get('range'),
+        'search': request.args.get('search'),
+    }
+    return jsonify(collection_jobs(filters=filters))
+
+
+@main.route('/api/financial/collection-kanban/job/<int:order_id>/update', methods=['POST'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanUpdate(order_id):
+    payload = request.get_json(silent=True) or {}
+    result, status_code = update_collection_job(order_id, payload)
+    return jsonify(result), status_code
+
+
+@main.route('/api/financial/collection-kanban/job/<int:order_id>/emails', methods=['GET'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanEmails(order_id):
+    result, status_code = collection_email_logs(order_id)
+    return jsonify(result), status_code
+
+
+@main.route('/api/financial/collection-kanban/job/<int:order_id>/email', methods=['POST'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanSendEmail(order_id):
+    payload = request.get_json(silent=True) or {}
+    result, status_code = send_collection_email(order_id, payload)
+    return jsonify(result), status_code
+
+
+@main.route('/api/financial/collection-kanban/job/<int:order_id>/call', methods=['POST'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanLogCall(order_id):
+    payload = request.get_json(silent=True) or {}
+    username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'collection'
+    result, status_code = log_collection_call(order_id, payload, username=username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/financial/collection-kanban/options', methods=['GET'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanOptions():
+    return jsonify(collection_options())
 
 @main.route('/chartdata', methods=['GET', 'POST'])
 def chartdata():

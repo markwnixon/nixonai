@@ -1,0 +1,144 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/collection_kanban.css') }}">
+
+<div class="collection-kanban-page"
+     data-jobs-url="{{ url_for('main.CollectionKanbanJobs') }}"
+     data-update-url-template="{{ url_for('main.CollectionKanbanUpdate', order_id=0) }}"
+     data-emails-url-template="{{ url_for('main.CollectionKanbanEmails', order_id=0) }}"
+     data-send-email-url-template="{{ url_for('main.CollectionKanbanSendEmail', order_id=0) }}"
+     data-log-call-url-template="{{ url_for('main.CollectionKanbanLogCall', order_id=0) }}">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-1">Collection Kanban</h3>
+            <div class="text-muted">Financial workflow for {{ scac }} receivables</div>
+        </div>
+        <div id="collection-kanban-message" class="alert d-none mb-0 py-2"></div>
+    </div>
+
+    <div class="collection-kanban-filter-bar mb-3">
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-3">
+                <label for="collection-filter-search">Search</label>
+                <input id="collection-filter-search" class="form-control form-control-sm collection-filter"
+                       type="search" placeholder="JO, container, booking, invoice, customer">
+            </div>
+            <div class="form-group col-md-3">
+                <label for="collection-filter-customer">Customer</label>
+                <select id="collection-filter-customer" class="form-control form-control-sm collection-filter">
+                    <option value="">All customers</option>
+                    {% for customer in options.customers %}
+                        <option value="{{ customer }}">{{ customer }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="collection-filter-status">Stage</label>
+                <select id="collection-filter-status" class="form-control form-control-sm collection-filter">
+                    <option value="">All stages</option>
+                    {% for column in options.columns %}
+                        <option value="{{ column.key }}">{{ column.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label for="collection-filter-range">View</label>
+                <select id="collection-filter-range" class="form-control form-control-sm collection-filter">
+                    {% for range in options.ranges %}
+                        <option value="{{ range.key }}">{{ range.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
+                <button id="collection-kanban-refresh" type="button" class="btn btn-sm btn-outline-primary btn-block">Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="collection-kanban-summary-line mb-2">
+        <span id="collection-kanban-count">0 jobs</span>
+        <span id="collection-kanban-total">$0.00 open</span>
+    </div>
+
+    <div id="collection-kanban-board" class="collection-kanban-board"></div>
+</div>
+
+<div class="modal fade" id="collection-kanban-modal" tabindex="-1" role="dialog" aria-labelledby="collection-kanban-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="collection-kanban-modal-title">Receivable</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="collection-kanban-modal-summary" class="collection-kanban-detail"></div>
+                <form id="collection-kanban-form" class="mt-3">
+                    <input type="hidden" id="collection-modal-order-id">
+                    <div class="form-row align-items-end">
+                        <div class="form-group col-md-8">
+                            <label for="collection-modal-rate-con-stage">Rate Con Status</label>
+                            <select id="collection-modal-rate-con-stage" class="form-control">
+                                <option value="0">0 - No rate con</option>
+                                <option value="1">1 - Needs rate con</option>
+                                <option value="2">2 - Request sent</option>
+                                <option value="3">3 - Received / ready</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+                <div class="collection-kanban-email-history mt-3">
+                    <div class="collection-kanban-email-title">Communication History</div>
+                    <div id="collection-kanban-email-list" class="collection-kanban-email-list text-muted">Select a card to load communication history.</div>
+                    <form id="collection-email-form" class="collection-kanban-communication-form mt-3">
+                        <div class="collection-kanban-email-title">Send Email</div>
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="collection-email-to">To</label>
+                                <input id="collection-email-to" class="form-control form-control-sm" type="text">
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="collection-email-cc">Cc</label>
+                                <input id="collection-email-cc" class="form-control form-control-sm" type="text">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="collection-email-subject">Subject</label>
+                            <input id="collection-email-subject" class="form-control form-control-sm" type="text">
+                        </div>
+                        <div class="form-group">
+                            <label for="collection-email-body">Message</label>
+                            <textarea id="collection-email-body" class="form-control form-control-sm" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary">Send Email</button>
+                    </form>
+                    <form id="collection-call-form" class="collection-kanban-communication-form mt-3">
+                        <div class="collection-kanban-email-title">Log Phone Call</div>
+                        <div class="form-group">
+                            <label for="collection-call-contact">Contact</label>
+                            <input id="collection-call-contact" class="form-control form-control-sm" type="text">
+                        </div>
+                        <div class="form-group">
+                            <label for="collection-call-notes">Notes</label>
+                            <textarea id="collection-call-notes" class="form-control form-control-sm" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Log Call</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="collection-kanban-receive-link" class="btn btn-outline-primary" href="{{ url_for('main.ReceiveByAccount') }}">Receive Payments</a>
+                <a id="collection-kanban-ar-link" class="btn btn-outline-secondary" href="{{ url_for('main.ARMaker') }}">Accounts Receivable</a>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/collection_kanban.js') }}"></script>
+{% endblock %}

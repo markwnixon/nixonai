@@ -1,0 +1,217 @@
+.collection-kanban-filter-bar {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 12px 12px 0;
+    background: #f8fafc;
+}
+
+.collection-kanban-filter-bar label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.collection-kanban-summary-line {
+    display: flex;
+    gap: 14px;
+    color: #495057;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.collection-kanban-board {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+}
+
+.collection-kanban-column {
+    min-width: 285px;
+    max-width: 285px;
+    background: #f3f5f7;
+    border: 1px solid #d7dde3;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 255px);
+}
+
+.collection-kanban-column-header {
+    padding: 8px 10px;
+    border-bottom: 1px solid #d7dde3;
+    background: #fff;
+    border-radius: 6px 6px 0 0;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 8px;
+    align-items: center;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+.collection-kanban-column-total {
+    grid-column: 1 / -1;
+    color: #6c757d;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.collection-kanban-list {
+    padding: 8px;
+    overflow-y: auto;
+    min-height: 120px;
+}
+
+.collection-kanban-card {
+    background: #fff;
+    border: 1px solid #d9dee4;
+    border-left: 4px solid #6c757d;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.collection-kanban-card-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+
+.collection-kanban-card-line {
+    font-size: 0.8rem;
+    color: #343a40;
+    line-height: 1.25;
+}
+
+.collection-kanban-card-muted {
+    color: #6c757d;
+}
+
+.collection-kanban-card-warning {
+    color: #9a3412;
+    font-weight: 700;
+}
+
+.collection-kanban-card[data-status="completed_not_invoiced"] {
+    border-left-color: #6c757d;
+}
+
+.collection-kanban-card[data-status="needs_rate_con"] {
+    border-left-color: #dc3545;
+}
+
+.collection-kanban-card[data-status="rate_con_requested"] {
+    border-left-color: #fd7e14;
+}
+
+.collection-kanban-card[data-status="rate_con_received"] {
+    border-left-color: #0d6efd;
+}
+
+.collection-kanban-card[data-status="ready_to_send"] {
+    border-left-color: #0d6efd;
+}
+
+.collection-kanban-card[data-status="sent_current"] {
+    border-left-color: #198754;
+}
+
+.collection-kanban-card[data-status="over_30"] {
+    border-left-color: #f59f00;
+}
+
+.collection-kanban-card[data-status="over_60"] {
+    border-left-color: #fd7e14;
+}
+
+.collection-kanban-card[data-status="bad_debts"] {
+    border-left-color: #dc3545;
+}
+
+.collection-kanban-card[data-status="partial_paid"] {
+    border-left-color: #6f42c1;
+}
+
+.collection-kanban-detail {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 10px;
+    background: #f8fafc;
+}
+
+.collection-kanban-detail dl {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 5px 10px;
+    margin: 0;
+}
+
+.collection-kanban-detail dt {
+    font-weight: 600;
+}
+
+.collection-kanban-detail dd {
+    margin: 0;
+}
+
+#collection-kanban-form {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 10px 10px 0;
+}
+
+.collection-kanban-email-history {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fff;
+}
+
+.collection-kanban-email-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.collection-kanban-email-item {
+    border-top: 1px solid #edf0f2;
+    padding: 8px 0;
+}
+
+.collection-kanban-email-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.collection-kanban-email-subject {
+    font-weight: 700;
+    color: #212529;
+}
+
+.collection-kanban-email-meta {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.collection-kanban-email-body {
+    margin-top: 4px;
+    white-space: pre-wrap;
+    font-size: 0.82rem;
+    color: #343a40;
+}
+
+.collection-kanban-communication-form {
+    border-top: 1px solid #edf0f2;
+    padding-top: 10px;
+}
+
+.collection-kanban-communication-form label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+}

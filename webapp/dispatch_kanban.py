@@ -25,7 +25,6 @@ KANBAN_COLUMNS = [
     ('in_progress', 'In Progress'),
     ('delivered', 'Delivered'),
     ('completed', 'Completed'),
-    ('invoice_ready', 'Invoice Ready'),
 ]
 
 KANBAN_STATUS_LABELS = dict(KANBAN_COLUMNS)
@@ -388,15 +387,14 @@ def scheduled_this_week(order, schedule=None):
 def has_delivery_proof(order):
     proof = clean_text(getattr(order, 'Proof', ''))
     return bool(
-        (proof and proof.lower() != 'none required') or
+        (proof and proof.lower() not in ['none required', 'no proof needed']) or
         clean_text(getattr(order, 'Proof2', '')) or
-        clean_text(getattr(order, 'DrvProof', '')) or
-        int_value(getattr(order, 'DelStat', 0)) > 0
+        clean_text(getattr(order, 'DrvProof', ''))
     )
 
 
 def proof_none_required(order):
-    return clean_text(getattr(order, 'Proof', '')).lower() == 'none required'
+    return clean_text(getattr(order, 'Proof', '')).lower() in ['none required', 'no proof needed']
 
 
 def ready_to_invoice_documents(order):
@@ -427,7 +425,8 @@ def derived_workflow_status(order, state=None, pin=None, schedule=None, import_r
     # - Physical movement and hold/exam flags can override an older saved workflow state.
     # - Orders.Hstat drives physical container progress: 0 unpulled, 1 pulled/in progress, 2 returned.
     # - Delivered means POD/manual delivery confirmation before the box is returned.
-    # - Completed means the container has been returned to port.
+    # - Completed means the container has been returned to port and proof exists,
+    #   or Proof is marked "No Proof Needed" / "None Required".
     # - Orders.Istat is shown as billing status only; it should not complete dispatch workflow.
     # - PIN Assigned is only for a matching Pins row dated today, and physical progress wins.
     saved_status = normalize_workflow_status(state.get('WorkflowStatus')) if state and clean_text(state.get('WorkflowStatus')) else ''
@@ -435,7 +434,7 @@ def derived_workflow_status(order, state=None, pin=None, schedule=None, import_r
 
     if returned_or_delivered(order):
         if ready_to_invoice_documents(order):
-            return 'invoice_ready'
+            return 'completed'
         return 'completed'
     if saved_status == 'delivered':
         return 'delivered'
@@ -565,6 +564,11 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'driver': order.Driver or '',
         'truck': order.Truck or '',
         'billing_status': billing_status_for_order(order, state),
+        'proof': clean_text(getattr(order, 'Proof', '')),
+        'proof2': clean_text(getattr(order, 'Proof2', '')),
+        'driver_proof': clean_text(getattr(order, 'DrvProof', '')),
+        'proof_none_required': proof_none_required(order),
+        'has_delivery_proof': has_delivery_proof(order),
         'order_status': order.Status or '',
         'notes': state.get('Notes') if state else '',
     }
@@ -613,8 +617,11 @@ def validate_status_move(order, new_status, state=None, override_pin=False):
             return 'Moving to In Progress requires an assigned driver.'
         if active_trucks_available() and not clean_text(order.Truck):
             return 'Moving to In Progress requires an assigned truck.'
-    if new_status == 'invoice_ready' and not returned_or_delivered(order):
-        return 'Moving to Invoice Ready requires delivered status.'
+    if new_status == 'completed':
+        if not returned_or_delivered(order):
+            return 'Moving to Completed requires the container to be returned.'
+        if not ready_to_invoice_documents(order):
+            return 'Moving to Completed requires proof, or mark No Proof Needed.'
     return None
 
 
@@ -685,11 +692,15 @@ def update_job(order_id, data, username=None):
         return {'ok': False, 'error': 'Order not found.'}, 404
     state = state_row(order.id)
     workflow_status = normalize_workflow_status(data.get('workflow_status')) or derived_workflow_status(order, state)
-    old_fields = {'Driver': order.Driver, 'Truck': order.Truck, 'Status': order.Status}
+    old_fields = {'Driver': order.Driver, 'Truck': order.Truck, 'Status': order.Status, 'Proof': order.Proof}
 
     order.Driver = clean_text(data.get('driver'))
     order.Truck = clean_text(data.get('truck'))
     order.Status = clean_text(data.get('order_status')) or order.Status
+    if bool(data.get('no_proof_needed')):
+        order.Proof = 'No Proof Needed'
+    elif proof_none_required(order):
+        order.Proof = None
     order.UserMod = username
     db.session.commit()
 
@@ -728,7 +739,7 @@ def update_job(order_id, data, username=None):
     )
     audit_status_change(order.id, 'order_fields', 'order_fields', username, str({
         'old': old_fields,
-        'new': {'Driver': order.Driver, 'Truck': order.Truck, 'Status': order.Status},
+        'new': {'Driver': order.Driver, 'Truck': order.Truck, 'Status': order.Status, 'Proof': order.Proof},
     }))
     db.session.commit()
     return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), workflow_status)}, 200
