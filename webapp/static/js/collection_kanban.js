@@ -13,9 +13,11 @@
         const jobsUrl = page.dataset.jobsUrl;
         const updateUrlTemplate = page.dataset.updateUrlTemplate;
         const emailsUrlTemplate = page.dataset.emailsUrlTemplate;
-        const sendEmailUrlTemplate = page.dataset.sendEmailUrlTemplate;
+        const rateConUploadUrlTemplate = page.dataset.rateConUploadUrlTemplate;
+        const packageLaunchUrl = page.dataset.packageLaunchUrl;
         const logCallUrlTemplate = page.dataset.logCallUrlTemplate;
         const jobsById = new Map();
+        let activeJob = null;
         let searchTimer = null;
 
         function escapeHtml(value) {
@@ -57,6 +59,9 @@
         function renderCard(job) {
             const card = document.createElement('div');
             card.className = 'collection-kanban-card';
+            if (job.payment_repair_needed) {
+                card.classList.add('collection-kanban-card-repair');
+            }
             card.dataset.id = job.id;
             card.dataset.status = job.status;
             card.innerHTML = `
@@ -67,6 +72,7 @@
                 <div class="collection-kanban-card-line">${escapeHtml(job.customer || 'No customer')}</div>
                 <div class="collection-kanban-card-line collection-kanban-card-muted">JO ${escapeHtml(job.jo || '-')} | Inv ${escapeHtml(job.invoice || '-')}</div>
                 <div class="collection-kanban-card-line">Total $${escapeHtml(job.invoice_total)} | Paid $${escapeHtml(job.paid_amount)}</div>
+                ${job.payment_repair_needed ? `<div class="collection-kanban-card-line collection-kanban-card-repair-text">Repair: expected due $${escapeHtml(job.expected_balance_due)}</div>` : ''}
                 <div class="collection-kanban-card-line">Invoice: ${escapeHtml(job.invoice_date || '-')} ${job.invoice_age !== '' ? `(${escapeHtml(job.invoice_age)} days)` : ''}</div>
                 ${job.rate_con_needed ? `<div class="collection-kanban-card-line collection-kanban-card-warning">${escapeHtml(job.rate_con_status)}</div>` : ''}
             `;
@@ -138,6 +144,15 @@
             return {response, data};
         }
 
+        async function postForm(url, formData) {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await response.json();
+            return {response, data};
+        }
+
         function renderEmails(emails) {
             const target = document.getElementById('collection-kanban-email-list');
             if (!emails || !emails.length) {
@@ -184,6 +199,7 @@
             if (!job) {
                 return;
             }
+            activeJob = job;
             document.getElementById('collection-modal-order-id').value = job.id;
             document.getElementById('collection-kanban-modal-title').textContent = `${cardIdentity(job)} | ${job.customer || ''}`;
             document.getElementById('collection-kanban-modal-summary').innerHTML = `
@@ -191,6 +207,7 @@
                     <dt>Stage</dt><dd>${escapeHtml(job.status_label || '-')}</dd>
                     <dt>Customer</dt><dd>${escapeHtml(job.customer || '-')}</dd>
                     <dt>JO</dt><dd>${escapeHtml(job.jo || '-')}</dd>
+                    <dt>Order</dt><dd>${escapeHtml(job.order_number || '-')}</dd>
                     <dt>Container</dt><dd>${escapeHtml(job.container || '-')}</dd>
                     <dt>Booking</dt><dd>${escapeHtml(job.booking || '-')}</dd>
                     <dt>Delivery</dt><dd>${escapeHtml(job.delivery_location || '-')}</dd>
@@ -199,17 +216,66 @@
                     <dt>Invoice Total</dt><dd>$${escapeHtml(job.invoice_total || '0.00')}</dd>
                     <dt>Paid</dt><dd>$${escapeHtml(job.paid_amount || '0.00')}</dd>
                     <dt>Balance Due</dt><dd>$${escapeHtml(job.balance_due || '0.00')}</dd>
-                    <dt>Rate Con</dt><dd>${job.rate_con_needed ? escapeHtml(`${job.rate_con_status}${job.rate_con_file ? ` | ${job.rate_con_file}` : ''}`) : 'Not required'}</dd>
+                    <dt>Pay Check</dt><dd>${job.payment_repair_needed ? `<span class="text-danger font-weight-bold">Repair needed. Expected due $${escapeHtml(job.expected_balance_due || '0.00')}</span>` : 'OK'}</dd>
+                    <dt>Rate Con</dt><dd>${Number(job.rate_con_stage || 0) > 0 ? escapeHtml(`${job.rate_con_status}${job.rate_con_file ? ` | ${job.rate_con_file}` : ''}`) : 'Not required'}</dd>
                     <dt>Paid Date</dt><dd>${escapeHtml(job.paid_date || '-')}</dd>
                     <dt>Payment Ref</dt><dd>${escapeHtml(job.pay_ref || '-')}</dd>
                     <dt>Payment Method</dt><dd>${escapeHtml(job.pay_method || '-')}</dd>
                 </dl>
             `;
             document.getElementById('collection-modal-rate-con-stage').value = String(job.rate_con_stage || 0);
-            document.getElementById('collection-email-to').value = job.email_to || '';
-            document.getElementById('collection-email-cc').value = job.email_cc || '';
-            document.getElementById('collection-email-subject').value = `Follow up on ${job.jo || cardIdentity(job)}`;
-            document.getElementById('collection-email-body').value = '';
+            const rateConUploadRow = document.getElementById('collection-rate-con-upload-row');
+            const rateConFile = document.getElementById('collection-rate-con-file');
+            const rateConStatus = document.getElementById('collection-rate-con-upload-status');
+            const rateConViewLink = document.getElementById('collection-rate-con-view-link');
+            rateConFile.value = '';
+            if (Number(job.rate_con_stage || 0) > 0) {
+                rateConUploadRow.classList.remove('d-none');
+            } else {
+                rateConUploadRow.classList.add('d-none');
+            }
+            rateConStatus.textContent = job.rate_con_file
+                ? `Current RC: ${job.rate_con_file}`
+                : 'Upload a PDF rate con for this order.';
+            if (job.rate_con_view_url) {
+                rateConViewLink.href = job.rate_con_view_url;
+                rateConViewLink.classList.remove('d-none');
+            } else {
+                rateConViewLink.href = '#';
+                rateConViewLink.classList.add('d-none');
+            }
+            document.getElementById('collection-modal-email-jp').value = job.emailjp || '';
+            document.getElementById('collection-modal-email-oa').value = job.emailoa || '';
+            const sendPackagePanel = document.getElementById('collection-send-package-panel');
+            const sendPackageTitle = document.getElementById('collection-send-package-title');
+            const sendPackageHelp = document.getElementById('collection-send-package-help');
+            const sendPackageButton = document.getElementById('collection-send-package-button');
+            if (['completed_not_invoiced', 'ready_to_send'].includes(job.status) || job.email_mode === 'rate_con') {
+                sendPackagePanel.classList.remove('d-none');
+                if (job.email_mode === 'rate_con') {
+                    sendPackageTitle.textContent = 'Email Rate Con Request';
+                    sendPackageHelp.textContent = 'Open this job in Truck Job Manager - Money Flow - Send Package with Request Rate Con selected for review and email confirmation.';
+                    sendPackageButton.textContent = 'Email Rate Con Request';
+                    sendPackageButton.dataset.profile = 'Request Rate Con';
+                } else {
+                    sendPackageTitle.textContent = 'Send Package';
+                    sendPackageHelp.textContent = 'Open this job in Truck Job Manager - Money Flow - Send Package for package review and email confirmation.';
+                    sendPackageButton.textContent = 'Open Send Package';
+                    sendPackageButton.dataset.profile = '';
+                }
+            } else {
+                sendPackagePanel.classList.add('d-none');
+                sendPackageButton.dataset.profile = '';
+            }
+            const paymentLinksVisible = ['sent_current', 'over_30', 'over_60', 'partial_paid', 'bad_debts'].includes(job.status);
+            const receiveLink = document.getElementById('collection-kanban-receive-link');
+            const receiveParams = new URLSearchParams({
+                collection_receive_order_id: job.id,
+                callfrom: 'collection_kanban'
+            });
+            receiveLink.href = `${packageLaunchUrl}?${receiveParams.toString()}`;
+            receiveLink.classList.toggle('d-none', !paymentLinksVisible);
+            document.getElementById('collection-kanban-ar-link').classList.toggle('d-none', !paymentLinksVisible);
             document.getElementById('collection-call-contact').value = job.customer || '';
             document.getElementById('collection-call-notes').value = '';
             loadEmails(job.id);
@@ -228,11 +294,45 @@
             });
         });
         document.getElementById('collection-kanban-refresh').addEventListener('click', loadBoard);
+        document.getElementById('collection-rate-con-upload-button').addEventListener('click', async () => {
+            const jobId = document.getElementById('collection-modal-order-id').value;
+            const fileInput = document.getElementById('collection-rate-con-file');
+            if (!fileInput.files || !fileInput.files.length) {
+                showMessage('Choose a PDF rate con to upload.', 'warning');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('rate_con', fileInput.files[0]);
+            const {response, data} = await postForm(endpoint(rateConUploadUrlTemplate, jobId), formData);
+            if (!response.ok || !data.ok) {
+                showMessage(data.error || 'Unable to upload rate con.', 'warning');
+                return;
+            }
+            jobsById.set(String(jobId), data.job);
+            activeJob = data.job;
+            showMessage('Rate con uploaded and marked received.', 'success');
+            openModal(jobId);
+            loadBoard();
+        });
+        document.getElementById('collection-send-package-button').addEventListener('click', async () => {
+            const jobId = document.getElementById('collection-modal-order-id').value;
+            const profile = document.getElementById('collection-send-package-button').dataset.profile || '';
+            const params = new URLSearchParams({
+                collection_package_order_id: jobId,
+                callfrom: 'collection_kanban'
+            });
+            if (profile) {
+                params.set('collection_package_profile', profile);
+            }
+            window.location.href = `${packageLaunchUrl}?${params.toString()}`;
+        });
         document.getElementById('collection-kanban-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const jobId = document.getElementById('collection-modal-order-id').value;
             const payload = {
                 rate_con_stage: document.getElementById('collection-modal-rate-con-stage').value,
+                emailjp: document.getElementById('collection-modal-email-jp').value,
+                emailoa: document.getElementById('collection-modal-email-oa').value,
             };
             const {response, data} = await postJson(endpoint(updateUrlTemplate, jobId), payload);
             if (!response.ok || !data.ok) {
@@ -242,24 +342,6 @@
             modal.modal('hide');
             showMessage('Collection item saved.', 'success');
             loadBoard();
-        });
-        document.getElementById('collection-email-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const jobId = document.getElementById('collection-modal-order-id').value;
-            const payload = {
-                to_emails: document.getElementById('collection-email-to').value,
-                cc_emails: document.getElementById('collection-email-cc').value,
-                subject: document.getElementById('collection-email-subject').value,
-                body: document.getElementById('collection-email-body').value,
-            };
-            const {response, data} = await postJson(endpoint(sendEmailUrlTemplate, jobId), payload);
-            if (!response.ok || !data.ok) {
-                showMessage(data.error || 'Unable to send email.', 'warning');
-                return;
-            }
-            document.getElementById('collection-email-body').value = '';
-            showMessage('Email sent and logged.', 'success');
-            renderEmails(data.emails || []);
         });
         document.getElementById('collection-call-form').addEventListener('submit', async (event) => {
             event.preventDefault();

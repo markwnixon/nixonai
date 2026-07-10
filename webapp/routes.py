@@ -68,6 +68,7 @@ from webapp.collection_kanban import (
     log_collection_call,
     send_collection_email,
     update_collection_job,
+    upload_collection_rate_con,
 )
 
 from webapp.class8_utils import *
@@ -732,6 +733,14 @@ def CollectionKanbanSendEmail(order_id):
     return jsonify(result), status_code
 
 
+@main.route('/api/financial/collection-kanban/job/<int:order_id>/rate-con', methods=['POST'])
+@login_required
+@financial_mfa_required
+def CollectionKanbanUploadRateCon(order_id):
+    result, status_code = upload_collection_rate_con(order_id, request.files.get('rate_con'))
+    return jsonify(result), status_code
+
+
 @main.route('/api/financial/collection-kanban/job/<int:order_id>/call', methods=['POST'])
 @login_required
 @financial_mfa_required
@@ -1116,8 +1125,16 @@ def Class8Main(genre):
         redirect_response = financial_mfa_redirect()
         if redirect_response is not None:
             return redirect_response
+    if (
+        request.method == 'POST'
+        and request.values.get('Return') is not None
+        and request.values.get('callfrom') == 'collection_kanban'
+    ):
+        return redirect(url_for('main.CollectionKanban'))
     genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
     taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup = Table_maker(genre)
+    if viewport and viewport[0] == 'redirect_collection_kanban':
+        return redirect(url_for('main.CollectionKanban'))
     if taskon == 'New': err, viewport = checkfor_fileupload(err, task_iter, viewport)
 
     rightsize = 12 - leftsize

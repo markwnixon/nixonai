@@ -7,7 +7,8 @@
      data-jobs-url="{{ url_for('main.CollectionKanbanJobs') }}"
      data-update-url-template="{{ url_for('main.CollectionKanbanUpdate', order_id=0) }}"
      data-emails-url-template="{{ url_for('main.CollectionKanbanEmails', order_id=0) }}"
-     data-send-email-url-template="{{ url_for('main.CollectionKanbanSendEmail', order_id=0) }}"
+     data-rate-con-upload-url-template="{{ url_for('main.CollectionKanbanUploadRateCon', order_id=0) }}"
+     data-package-launch-url="{{ url_for('main.Class8Main', genre='Trucking') }}"
      data-log-call-url-template="{{ url_for('main.CollectionKanbanLogCall', order_id=0) }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <div>
@@ -77,6 +78,16 @@
                 <div id="collection-kanban-modal-summary" class="collection-kanban-detail"></div>
                 <form id="collection-kanban-form" class="mt-3">
                     <input type="hidden" id="collection-modal-order-id">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="collection-modal-email-jp">Primary Broker Email</label>
+                            <input id="collection-modal-email-jp" class="form-control form-control-sm" type="text">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="collection-modal-email-oa">Support Broker Email</label>
+                            <input id="collection-modal-email-oa" class="form-control form-control-sm" type="text">
+                        </div>
+                    </div>
                     <div class="form-row align-items-end">
                         <div class="form-group col-md-8">
                             <label for="collection-modal-rate-con-stage">Rate Con Status</label>
@@ -91,32 +102,31 @@
                             <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
                         </div>
                     </div>
+                    <div id="collection-rate-con-upload-row" class="form-row align-items-end d-none">
+                        <div class="form-group col-md-7">
+                            <label for="collection-rate-con-file">Upload New RC</label>
+                            <input id="collection-rate-con-file" class="form-control-file" type="file" accept="application/pdf,.pdf">
+                            <small id="collection-rate-con-upload-status" class="form-text text-muted">Upload a PDF rate con for this order.</small>
+                        </div>
+                        <div class="form-group col-md-3">
+                            <button id="collection-rate-con-upload-button" type="button" class="btn btn-outline-primary btn-block">Upload New RC</button>
+                        </div>
+                        <div class="form-group col-md-2 text-md-right">
+                            <a id="collection-rate-con-view-link" class="btn btn-outline-secondary btn-block d-none"
+                               href="#" target="_blank" rel="noopener">View RC</a>
+                        </div>
+                    </div>
                 </form>
+                <div id="collection-send-package-panel" class="collection-kanban-communication-form mt-3 d-none">
+                    <div id="collection-send-package-title" class="collection-kanban-email-title">Send Package</div>
+                    <p id="collection-send-package-help" class="text-muted small mb-2">
+                        Open this job in Truck Job Manager - Money Flow - Send Package for package review and email confirmation.
+                    </p>
+                    <button id="collection-send-package-button" type="button" class="btn btn-sm btn-primary">Open Send Package</button>
+                </div>
                 <div class="collection-kanban-email-history mt-3">
                     <div class="collection-kanban-email-title">Communication History</div>
                     <div id="collection-kanban-email-list" class="collection-kanban-email-list text-muted">Select a card to load communication history.</div>
-                    <form id="collection-email-form" class="collection-kanban-communication-form mt-3">
-                        <div class="collection-kanban-email-title">Send Email</div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="collection-email-to">To</label>
-                                <input id="collection-email-to" class="form-control form-control-sm" type="text">
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="collection-email-cc">Cc</label>
-                                <input id="collection-email-cc" class="form-control form-control-sm" type="text">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="collection-email-subject">Subject</label>
-                            <input id="collection-email-subject" class="form-control form-control-sm" type="text">
-                        </div>
-                        <div class="form-group">
-                            <label for="collection-email-body">Message</label>
-                            <textarea id="collection-email-body" class="form-control form-control-sm" rows="3"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Send Email</button>
-                    </form>
                     <form id="collection-call-form" class="collection-kanban-communication-form mt-3">
                         <div class="collection-kanban-email-title">Log Phone Call</div>
                         <div class="form-group">

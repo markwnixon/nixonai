@@ -16,6 +16,8 @@ from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
 from webapp.InterchangeFuncs import Order_Container_Update, Gate_Update
 from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Exports_Pulled_task, Exports_Returned_task, Exports_Bk_Diff_task
+from webapp.shipper_email_update import order_email_context, update_active_shipper_emails
+from webapp.shipper_rc_update import order_rc_context, update_active_shipper_rc_needed
 import os
 import ntpath
 from requests import get
@@ -627,6 +629,66 @@ def run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, e
             tablesetup = None
 
     return holdvec, entrydata, err, completed, viewport, tablesetup
+
+
+def Update_Emails_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    completed = False
+    err = []
+    entrydata = []
+    viewport = ['tables'] + ['0'] * 5
+    holdvec = [''] * 120
+    if thistable != 'Orders':
+        return holdvec, entrydata, ['Update Emails must start from one selected order.'], viewport, True
+    context = order_email_context(sid)
+    if context is None:
+        return holdvec, entrydata, ['Selected order does not have a shipper with active jobs.'], viewport, True
+    selected_shipper = context['shipper']
+    if request.values.get('update_email_cancel') is not None:
+        return holdvec, entrydata, ['Update Emails task cancelled.'], viewport, True
+    if request.values.get('update_email_save') is not None:
+        result = update_active_shipper_emails(selected_shipper, request.values)
+        if result.get('ok'):
+            return holdvec, entrydata, [f'Updated email contacts on {result.get("updated", 0)} active job(s) for {selected_shipper}.'], viewport, True
+        else:
+            err = [result.get('error') or 'Unable to update shipper emails.']
+    else:
+        err = [f'Loaded email contacts from selected order {context["selected_jo"]}.']
+    holdvec[1] = selected_shipper
+    holdvec[2] = context
+    holdvec[80] = request.values.get('showcolorstable') or ''
+    return holdvec, entrydata, err, viewport, completed
+
+
+def Update_RC_Needed_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    completed = False
+    err = []
+    entrydata = []
+    viewport = ['tables'] + ['0'] * 5
+    holdvec = [''] * 120
+    if thistable != 'Orders':
+        return holdvec, entrydata, ['Update RC Needed must start from one selected order.'], viewport, True
+    context = order_rc_context(sid)
+    if context is None:
+        return holdvec, entrydata, ['Selected order does not have a shipper with active jobs.'], viewport, True
+    selected_shipper = context['shipper']
+    if request.values.get('update_rc_cancel') is not None:
+        return holdvec, entrydata, ['Update RC Needed task cancelled.'], viewport, True
+    if request.values.get('update_rc_save') is not None:
+        result = update_active_shipper_rc_needed(selected_shipper, request.values.get('rc_needed_stage'))
+        if result.get('ok'):
+            return holdvec, entrydata, [
+                f'Updated RC needed status on {result.get("updated", 0)} active job(s) for {selected_shipper}. '
+                f'Skipped {result.get("skipped", 0)} job(s) already in RC request/received workflow.'
+            ], viewport, True
+        else:
+            err = [result.get('error') or 'Unable to update RC needed status.']
+    else:
+        err = [f'Loaded RC needed status from selected order {context["selected_jo"]}.']
+    holdvec[1] = selected_shipper
+    holdvec[2] = context
+    holdvec[80] = request.values.get('showcolorstable') or ''
+    return holdvec, entrydata, err, viewport, completed
+
 
 def get_address_details(address):
     #print(address)
@@ -1984,6 +2046,8 @@ def Table_maker(genre):
     err, tabletitle, checked_data, jscripts = [], [], [], []
     viewport = ['tables'] + ['0']*5
     tfilters, tboxes = {}, {}
+    launch_package_order_id = None
+    launch_receive_order_id = None
     returnhit = None
     driver_upload = None
     truck_upload = None
@@ -2104,6 +2168,36 @@ def Table_maker(genre):
         tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 45 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both', 'Viewer': '8x4'}
         jscripts = ['dtTrucking']
         taskon, task_iter, task_focus, tasktype = None, None, None, None
+        package_order_id = request.args.get('collection_package_order_id')
+        receive_order_id = request.args.get('collection_receive_order_id')
+        if genre == 'Trucking' and package_order_id:
+            try:
+                launch_package_order_id = int(package_order_id)
+            except (TypeError, ValueError):
+                launch_package_order_id = None
+            if launch_package_order_id and Orders.query.get(launch_package_order_id) is not None:
+                taskon = 'MakePackage'
+                task_focus = 'Package'
+                task_iter = 0
+                tasktype = 'Single_Item_Selection'
+                tboxes['Money Flow'] = 'Send Package'
+            else:
+                launch_package_order_id = None
+                err.append('The selected collection job could not be opened for package review.')
+        elif genre == 'Trucking' and receive_order_id:
+            try:
+                launch_receive_order_id = int(receive_order_id)
+            except (TypeError, ValueError):
+                launch_receive_order_id = None
+            if launch_receive_order_id and Orders.query.get(launch_receive_order_id) is not None:
+                taskon = 'ReceivePay'
+                task_focus = 'PayInvoice'
+                task_iter = 0
+                tasktype = 'Single_Item_Selection'
+                tboxes['Money Flow'] = 'Receive Payment'
+            else:
+                launch_receive_order_id = None
+                err.append('The selected collection job could not be opened for receive payment.')
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
 ###########All done in this section##################################################################################################################
@@ -2118,6 +2212,10 @@ def Table_maker(genre):
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
+    if launch_package_order_id:
+        checked_data = [['Orders', 1, [launch_package_order_id]]]
+    if launch_receive_order_id:
+        checked_data = [['Orders', 1, [launch_receive_order_id]]]
 
     # Remove the checks during reset of tables
     if resethit is not None or resetmod is not None:
@@ -2127,6 +2225,9 @@ def Table_maker(genre):
     if hasvalue(taskon):
         holdvec, entrydata, err, completed, viewport, tablesetup = run_the_task(genre, taskon, task_focus, tasktype, task_iter, checked_data, err)
         if completed:
+            if viewport and viewport[0] == 'redirect_collection_kanban':
+                return genre_data, table_data, err, leftsize, tabletitle, table_filters, task_boxes, tfilters, tboxes, jscripts,\
+                taskon, task_focus, task_iter, tasktype, holdvec, keydata, entrydata, username, checked_data, viewport, tablesetup
             # If complete set the task on to none
             taskon = None
             if tables_on == []:
@@ -4147,6 +4248,15 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     err = [f"Running Package task with task_iter {task_iter} using {tablesetup['table']}"]
     completed = False
     viewport = ['0'] * 6
+    callfrom = request.values.get('callfrom') or request.args.get('callfrom') or 'truck_job_manager'
+    if request.args.get('collection_package_order_id') and not request.values.get('callfrom'):
+        callfrom = 'collection_kanban'
+
+    def return_viewport():
+        if callfrom == 'collection_kanban':
+            return ['redirect_collection_kanban', '0', '0', '0', '0', '0']
+        return ['0'] * 6
+
     document_profiles = eval(f"{genre}_genre['document_profiles']")
     document_stamps = eval(f"{genre}_genre['image_stamps']")
     document_signatures = eval(f"{genre}_genre['signature_stamps']")
@@ -4166,6 +4276,8 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     holdvec[7] = doc_profile_names
     holdvec[10] = doc_stamps
     holdvec[11] = doc_signatures
+    if len(holdvec) > 16:
+        holdvec[16] = callfrom
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -4173,16 +4285,19 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
     nextquery = f"{table}.query.get({sid})"
     odat = eval(nextquery)
 
-    returnhit = request.values.get('Finished')
-    if returnhit is not None: completed = True
+    returnhit = request.values.get('Finished') or request.values.get('Return')
+    if returnhit is not None:
+        completed = True
+        viewport = return_viewport()
     else:
 
         if task_iter == 0:
             dockind = getdocs(odat)
-            if 'Invoice' in dockind:
-                eprof = 'Custom-Invoice'
+            requested_profile = request.args.get('collection_package_profile')
+            if requested_profile in doc_profile_names:
+                eprof = requested_profile
             else:
-                eprof = 'Custom'
+                eprof = 'Custom-Invoice'
             emaildata = get_company(eprof, odat)
             stamplist, stampdata = get_last_used_stamps(odat)
             email_requested = 0
@@ -4230,8 +4345,10 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
 
         err.append(f'Viewing {docref} on iteration {task_iter}')
         err.append('Hit Finished to End Viewing and Return to Table View')
-        finished = request.values.get('Finished')
-        if finished is not None: completed = True
+        finished = request.values.get('Finished') or request.values.get('Return')
+        if finished is not None:
+            completed = True
+            viewport = return_viewport()
 
         if email_requested:
             #print('Exiting after email requested completed')
@@ -4240,6 +4357,7 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 odat.Istat = 3
                 db.session.commit()
             completed = True
+            viewport = return_viewport()
 
     return holdvec, entrydata, err, viewport, completed
 
@@ -4393,6 +4511,15 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     completed = False
     slead = None
     viewport = ['0'] * 6
+    callfrom = request.values.get('callfrom') or request.args.get('callfrom') or 'truck_job_manager'
+    if request.args.get('collection_receive_order_id') and not request.values.get('callfrom'):
+        callfrom = 'collection_kanban'
+
+    def return_viewport():
+        if callfrom == 'collection_kanban':
+            return ['redirect_collection_kanban', '0', '0', '0', '0', '0']
+        return ['0'] * 6
+
     document_profiles = eval(f"{genre}_genre['document_profiles']")
     document_stamps = eval(f"{genre}_genre['image_stamps']")
     document_signatures = eval(f"{genre}_genre['signature_stamps']")
@@ -4409,10 +4536,13 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     hiddendata = tablesetup['hidden data']
     numitems = len(entrydata)
     holdvec = [''] * numitems
+    if len(holdvec) <= 16:
+        holdvec.extend([''] * (17 - len(holdvec)))
     holdvec[7] = doc_profile_names
     holdvec[10] = doc_stamps
     holdvec[11] = doc_signatures
     holdvec[12] = task_iter
+    holdvec[16] = callfrom
 
     filter = tablesetup['filter']
     filterval = tablesetup['filterval']
@@ -4433,6 +4563,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
     returnhit = request.values.get('Finished')
     if returnhit is not None:
         completed = True
+        viewport = return_viewport()
     else:
         if task_iter == 0:
             eprof = 'Paid Invoice'
@@ -4524,6 +4655,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                 if success:
                     if email_requested: info_mimemail(emaildata, [sid])
                     completed = True
+                    viewport = return_viewport()
 
             else:
                 jopaylist = []
@@ -4543,8 +4675,11 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                     if success:
                         if email_requested: info_mimemail(emaildata, [sid])
                         completed = True
+                        viewport = return_viewport()
                 else: err.append('Could not process paid invoice')
 
+        if completed and callfrom == 'collection_kanban':
+            return holdvec, entrydata, err, return_viewport(), completed
 
         viewport[0] = 'split panel left'
         viewport[1] = 'email setup'

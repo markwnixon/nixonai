@@ -1,16 +1,22 @@
 import datetime
+import os
 import smtplib
 from decimal import Decimal, InvalidOperation
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
+from urllib.parse import quote
 
 from sqlalchemy import and_, or_
 
-from webapp.CCC_system_setup import passwords, websites
+from webapp.CCC_system_setup import addpath, passwords, scac, tpath, websites
 from webapp.CCC_system_setup import usernames as em
 from webapp import db
-from webapp.class8_utils_email import accounting_sender_key
+from webapp.class8_utils_email import (
+    accounting_sender_key,
+)
 from webapp.email_log import email_logs_for_order, log_outgoing_order_email, log_phone_call
 from webapp.models import Orders
 from webapp.viewfuncs import hasinput
@@ -20,7 +26,6 @@ COLLECTION_COLUMNS = [
     ('completed_not_invoiced', 'Completed Not Invoiced'),
     ('needs_rate_con', 'Needs Rate Con'),
     ('rate_con_requested', 'Rate Con Requested'),
-    ('rate_con_received', 'Rate Con Received'),
     ('ready_to_send', 'Ready To Send'),
     ('sent_current', 'Sent Current'),
     ('over_30', 'Over 30'),
@@ -42,6 +47,22 @@ def email_list(value):
         return []
     values = str(value).replace(';', ',').split(',')
     return [clean_text(item) for item in values if '@' in clean_text(item)]
+
+
+def unique_emails(values):
+    output = []
+    seen = set()
+    for value in values:
+        items = value if isinstance(value, (list, tuple, set)) else email_list(value)
+        for email in items:
+            email = clean_text(email)
+            if '@' not in email:
+                continue
+            key = email.lower()
+            if key not in seen:
+                output.append(email)
+                seen.add(key)
+    return output
 
 
 def money_value(value):
@@ -120,12 +141,41 @@ def rate_con_label(order):
     return 'Not required'
 
 
+def is_rate_con_followup(order):
+    return rate_con_stage(order) in [1, 2]
+
+
+def collection_email_defaults(order):
+    broker_email = clean_text(order.Emailjp)
+    support_broker_email = clean_text(order.Emailoa)
+    ap_email = clean_text(order.Emailap)
+    if is_rate_con_followup(order):
+        return {
+            'email_to': ', '.join(unique_emails([broker_email])),
+            'email_cc': ', '.join(unique_emails([support_broker_email])),
+            'email_mode': 'rate_con',
+        }
+    return {
+        'email_to': ', '.join(unique_emails([ap_email, broker_email, support_broker_email])),
+        'email_cc': '',
+        'email_mode': 'collection',
+    }
+
+
+def update_order_broker_emails(order, data):
+    emailjp = clean_text(data.get('emailjp'))
+    emailoa = clean_text(data.get('emailoa'))
+    if emailjp or 'emailjp' in data:
+        order.Emailjp = emailjp or None
+    if emailoa or 'emailoa' in data:
+        order.Emailoa = emailoa or None
+
+
 def balance_due(order):
-    bal_due = money_value(getattr(order, 'BalDue', None))
-    if bal_due:
-        return bal_due
+    if hasinput(getattr(order, 'BalDue', None)):
+        return money_value(getattr(order, 'BalDue', None))
     invoice_total = money_value(getattr(order, 'InvoTotal', None))
-    paid = money_value(getattr(order, 'PaidAmt', None))
+    paid = paid_amount(order)
     if invoice_total or paid:
         return invoice_total - paid
     return Decimal('0.00')
@@ -135,23 +185,40 @@ def paid_amount(order):
     return money_value(getattr(order, 'PaidAmt', None))
 
 
+def payment_repair_needed(order):
+    if not hasinput(getattr(order, 'BalDue', None)):
+        return False
+    invoice_total = money_value(getattr(order, 'InvoTotal', None))
+    paid = money_value(getattr(order, 'PaidAmt', None))
+    reported_due = money_value(getattr(order, 'BalDue', None))
+    expected_due = invoice_total - paid
+    return abs(reported_due - expected_due) > Decimal('0.01')
+
+
+def expected_balance_due(order):
+    return money_value(getattr(order, 'InvoTotal', None)) - money_value(getattr(order, 'PaidAmt', None))
+
+
 def collection_status(order, today=None):
     istat = int_value(order.Istat, -1)
+    hstat = int_value(order.Hstat, 0)
     bal_due = balance_due(order)
     paid = paid_amount(order)
     age = days_since(order.InvoDate, today)
 
-    if istat in [4, 5, 8, 9] or (money_value(order.InvoTotal) and bal_due <= Decimal('0.00')):
+    if istat in [5, 8, 9]:
         return 'paid'
-    if paid > Decimal('0.00') and bal_due > Decimal('0.00'):
+    if istat == 4:
         return 'partial_paid'
+    if hstat < 2 and istat < 1:
+        return 'not_ready'
     if rate_con_needed(order):
         return 'needs_rate_con'
     if rate_con_requested(order):
         return 'rate_con_requested'
-    if rate_con_received(order) and istat < 1:
-        return 'rate_con_received'
     if istat < 1:
+        if rate_con_received(order):
+            return 'ready_to_send'
         return 'completed_not_invoiced'
     if istat in [1, 2, 6]:
         return 'ready_to_send'
@@ -189,14 +256,94 @@ def invoice_ref(order):
     return clean_text(order.Invoice) or clean_text(order.Package)
 
 
+def is_export_order(order):
+    haul_type = clean_text(getattr(order, 'HaulType', '')).lower()
+    return 'export' in haul_type
+
+
+def collection_reference(order):
+    load_number = clean_text(getattr(order, 'Order', ''))
+    if load_number:
+        return load_number
+    container = clean_text(order.Container)
+    primary_ref = clean_text(order.Booking) if is_export_order(order) else clean_text(order.BOL)
+    fallback_ref = clean_text(order.BOL) if is_export_order(order) else clean_text(order.Booking)
+    reference = primary_ref or fallback_ref
+    parts = [part for part in [reference, container] if part]
+    return ' / '.join(parts) or clean_text(order.Jo)
+
+
+def collection_subject_reference(order):
+    order_number = clean_text(getattr(order, 'Order', ''))
+    reference = collection_reference(order)
+    if not reference:
+        return ''
+    first_word = order_number.lower().split(maxsplit=1)[0] if order_number else ''
+    if first_word in ['load', 'pro']:
+        return reference
+    return f'Order {reference}'
+
+
+def collection_subject(order):
+    reference = collection_subject_reference(order) or clean_text(order.Jo)
+    prefix = 'Rate con follow up for' if is_rate_con_followup(order) else 'Follow up on'
+    return f'{prefix} {reference}'
+
+
+def safe_filename_part(value, fallback='order'):
+    text = clean_text(value) or fallback
+    safe_text = ''.join(char if char.isalnum() or char in ['-', '_'] else '_' for char in text)
+    return safe_text.strip('_') or fallback
+
+
+def invoice_package_name(order):
+    package = os.path.basename(clean_text(order.Package))
+    return package
+
+
+def invoice_package_path(order):
+    package = invoice_package_name(order)
+    if not package:
+        return ''
+    path = addpath(f'static/{scac}/data/vPackage/{package}')
+    return path if os.path.isfile(path) else ''
+
+
+def invoice_package_send_name(order):
+    return f'{safe_filename_part(order.Container, clean_text(order.Jo) or "order")}_invoice_package.pdf'
+
+
+def invoice_package_view_url(order):
+    package = invoice_package_name(order)
+    if not package or not invoice_package_path(order):
+        return ''
+    return f'/static/{scac}/data/vPackage/{quote(package)}'
+
+
+def rate_con_view_url(order):
+    rate_con = os.path.basename(clean_text(order.RateCon))
+    if not rate_con:
+        return ''
+    path = addpath(tpath('Orders-RateCon', rate_con))
+    if not os.path.isfile(path):
+        return ''
+    return f'/static/{scac}/data/vRateCon/{quote(rate_con)}'
+
+
 def collection_card(order):
     status = collection_status(order)
     paid = paid_amount(order)
     due = balance_due(order)
+    repair_needed = payment_repair_needed(order)
     invoice_age = days_since(order.InvoDate)
+    email_defaults = collection_email_defaults(order)
+    package_path = invoice_package_path(order)
     return {
         'id': order.id,
         'jo': clean_text(order.Jo),
+        'order_number': clean_text(order.Order),
+        'collection_reference': collection_reference(order),
+        'default_email_subject': collection_subject(order),
         'status': status,
         'status_label': COLLECTION_STATUS_LABELS.get(status, status),
         'customer': clean_text(order.Shipper) or clean_text(order.Company),
@@ -209,6 +356,8 @@ def collection_card(order):
         'invoice_total': money_text(order.InvoTotal),
         'paid_amount': money_text(paid),
         'balance_due': money_text(due),
+        'expected_balance_due': money_text(expected_balance_due(order)),
+        'payment_repair_needed': repair_needed,
         'rate_con_needed': rate_con_required(order),
         'rate_con_stage': rate_con_stage(order),
         'rate_con_status': rate_con_label(order),
@@ -216,24 +365,40 @@ def collection_card(order):
         'rate_con_requested': rate_con_requested(order),
         'rate_con_received': rate_con_received(order),
         'rate_con_file': clean_text(order.RateCon),
+        'rate_con_view_url': rate_con_view_url(order),
         'delivery_date': format_date(order.Date3),
         'returned_date': format_date(order.Date2),
         'istat': int_value(order.Istat, -1),
         'pay_ref': clean_text(order.PayRef),
         'pay_method': clean_text(order.PayMeth),
         'paid_date': format_date(order.PaidDate),
-        'email_to': clean_text(order.Emailjp) or clean_text(order.Emailap) or clean_text(order.Emailoa),
-        'email_cc': clean_text(order.Emailap) if clean_text(order.Emailap) != clean_text(order.Emailjp) else '',
+        'email_to': email_defaults['email_to'],
+        'email_cc': email_defaults['email_cc'],
+        'email_mode': email_defaults['email_mode'],
+        'emailjp': clean_text(order.Emailjp),
+        'emailoa': clean_text(order.Emailoa),
+        'emailap': clean_text(order.Emailap),
+        'package_file': invoice_package_name(order),
+        'package_available': bool(package_path),
+        'package_view_url': invoice_package_view_url(order),
+        'package_send_name': invoice_package_send_name(order) if package_path else '',
     }
 
 
 def filtered_orders(filters=None):
     filters = filters or {}
     query = Orders.query
+    query = query.filter(or_(Orders.Istat <= 4, Orders.Istat.is_(None)))
     query = query.filter(or_(
         Orders.Istat >= 1,
-        Orders.RCneeded > 0,
+        and_(Orders.Hstat >= 2, Orders.RCneeded > 0),
         and_(Orders.Hstat >= 2, or_(Orders.Istat < 1, Orders.Istat.is_(None))),
+    ))
+    cutoff = datetime.datetime.combine(datetime.date.today() - datetime.timedelta(days=730), datetime.time.min)
+    query = query.filter(or_(
+        Orders.InvoDate >= cutoff,
+        Orders.Date3 >= cutoff,
+        Orders.Date2 >= cutoff,
     ))
 
     customer = clean_text(filters.get('customer'))
@@ -254,7 +419,14 @@ def filtered_orders(filters=None):
             Orders.Package.ilike(pattern),
         ))
 
-    orders = query.order_by(Orders.InvoDate.desc(), Orders.Date3.desc(), Orders.id.desc()).limit(1500).all()
+    order_by = (Orders.InvoDate.desc(), Orders.Date3.desc(), Orders.id.desc())
+    orders = query.order_by(*order_by).limit(1500).all()
+    if not search:
+        # Rate-con jobs are often not invoiced yet, so invoice-date ordering can push them past
+        # the general board cap. Always include them before the Python status grouping below.
+        seen_ids = {order.id for order in orders}
+        rate_con_orders = query.filter(Orders.Hstat >= 2, Orders.RCneeded > 0).order_by(*order_by).all()
+        orders.extend(order for order in rate_con_orders if order.id not in seen_ids)
     status_filter = clean_text(filters.get('status'))
     range_filter = clean_text(filters.get('range')) or 'open'
     output = []
@@ -307,6 +479,7 @@ def update_collection_job(order_id, data):
     if rc_stage not in [0, 1, 2, 3]:
         return {'ok': False, 'error': 'Rate con stage must be 0, 1, 2, or 3.'}, 400
     order.RCneeded = rc_stage
+    update_order_broker_emails(order, data)
     db.session.commit()
     return {'ok': True, 'job': collection_card(order)}, 200
 
@@ -322,8 +495,19 @@ def send_collection_email(order_id, data):
     order = Orders.query.get(order_id)
     if order is None:
         return {'ok': False, 'error': 'Order not found.'}, 404
+    update_order_broker_emails(order, data)
     to_emails = email_list(data.get('to_emails'))
     cc_emails = email_list(data.get('cc_emails'))
+    if is_rate_con_followup(order):
+        if not hasinput(order.Emailjp) and to_emails:
+            order.Emailjp = to_emails[0]
+        if not hasinput(order.Emailoa) and cc_emails:
+            order.Emailoa = cc_emails[0]
+        broker_emails = unique_emails([order.Emailjp])
+        support_broker_emails = unique_emails([order.Emailoa])
+        ap_email_keys = {email.lower() for email in email_list(order.Emailap)}
+        to_emails = [email for email in unique_emails([to_emails, broker_emails]) if email.lower() not in ap_email_keys]
+        cc_emails = [email for email in unique_emails([cc_emails, support_broker_emails]) if email.lower() not in ap_email_keys]
     subject = clean_text(data.get('subject'))
     body = clean_text(data.get('body'))
     if not to_emails:
@@ -332,6 +516,17 @@ def send_collection_email(order_id, data):
         return {'ok': False, 'error': 'Subject is required.'}, 400
     if not body:
         return {'ok': False, 'error': 'Email body is required.'}, 400
+
+    include_package = bool(data.get('include_package'))
+    attachment_path = ''
+    attachment_source_name = ''
+    attachment_send_name = ''
+    if include_package:
+        attachment_path = invoice_package_path(order)
+        if not attachment_path:
+            return {'ok': False, 'error': 'Invoice package is not available for this order.'}, 400
+        attachment_source_name = invoice_package_name(order)
+        attachment_send_name = invoice_package_send_name(order)
 
     sender_key = accounting_sender_key()
     emailfrom = em[sender_key]
@@ -347,6 +542,13 @@ def send_collection_email(order_id, data):
     message_id = make_msgid(domain=from_domain)
     msg['Message-ID'] = message_id
     msg.attach(MIMEText(body.replace('\n', '<br>'), 'html'))
+    if attachment_path:
+        with open(attachment_path, 'rb') as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', 'attachment', filename=attachment_send_name)
+        msg.attach(part)
 
     host, port = websites['mailserver'].split(':')
     server = smtplib.SMTP(host, port)
@@ -364,8 +566,47 @@ def send_collection_email(order_id, data):
         emailfrom,
         message_id=message_id,
         email_type='manual_email',
+        attachment_name=attachment_source_name,
+        attachment_send_name=attachment_send_name,
     )
     return {'ok': True, 'emails': email_logs_for_order(order_id)}, 200
+
+
+def upload_collection_rate_con(order_id, uploaded_file):
+    order = Orders.query.get(order_id)
+    if order is None:
+        return {'ok': False, 'error': 'Order not found.'}, 404
+    if uploaded_file is None or not clean_text(getattr(uploaded_file, 'filename', '')):
+        return {'ok': False, 'error': 'Choose a PDF rate con to upload.'}, 400
+
+    _name, extension = os.path.splitext(uploaded_file.filename)
+    if extension.lower() != '.pdf':
+        return {'ok': False, 'error': 'Rate con upload must be a PDF file.'}, 400
+
+    try:
+        current_cache = int(order.Rcache or 0)
+    except (TypeError, ValueError):
+        current_cache = 0
+    next_cache = current_cache + 1 if order.RateCon else current_cache
+    jo_part = safe_filename_part(order.Jo, f'order_{order.id}')
+    filename = f'RateCon_{jo_part}_c{next_cache}.pdf'
+    output_path = addpath(tpath('Orders-RateCon', filename))
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    uploaded_file.save(output_path)
+
+    if order.RateCon:
+        old_path = addpath(tpath('Orders-RateCon', os.path.basename(clean_text(order.RateCon))))
+        if old_path != output_path and os.path.isfile(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+
+    order.RateCon = filename
+    order.Rcache = next_cache
+    order.RCneeded = 3
+    db.session.commit()
+    return {'ok': True, 'job': collection_card(order)}, 200
 
 
 def log_collection_call(order_id, data, username=''):

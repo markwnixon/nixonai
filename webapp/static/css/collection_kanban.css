@@ -98,6 +98,17 @@
     font-weight: 700;
 }
 
+.collection-kanban-card.collection-kanban-card-repair {
+    background: #fff1f2;
+    border-color: #dc3545;
+    border-left-color: #dc3545;
+}
+
+.collection-kanban-card-repair-text {
+    color: #b02a37;
+    font-weight: 700;
+}
+
 .collection-kanban-card[data-status="completed_not_invoiced"] {
     border-left-color: #6c757d;
 }
@@ -147,8 +158,8 @@
 
 .collection-kanban-detail dl {
     display: grid;
-    grid-template-columns: 150px 1fr;
-    gap: 5px 10px;
+    grid-template-columns: 105px minmax(0, 1fr) 105px minmax(0, 1fr);
+    gap: 5px 12px;
     margin: 0;
 }
 
@@ -158,6 +169,14 @@
 
 .collection-kanban-detail dd {
     margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px) {
+    .collection-kanban-detail dl {
+        grid-template-columns: 105px minmax(0, 1fr);
+    }
 }
 
 #collection-kanban-form {

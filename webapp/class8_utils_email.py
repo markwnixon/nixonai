@@ -51,7 +51,7 @@ def set_email_cc(emaildata, cc1='', cc2=''):
 
 
 def require_invoice_cc(emaildata):
-    return set_email_cc(emaildata, em.get('invo', ''), '')
+    return set_email_cc(emaildata, em.get('invo', ''), emaildata[5] if len(emaildata) > 5 else '')
 
 
 def require_rate_con_cc(emaildata):
@@ -78,7 +78,7 @@ def clean_email(value):
 
 def order_email_defaults(odat, pdat=None, commit=True):
     if odat is None:
-        return '', '', ''
+        return '', '', '', ''
 
     if pdat is None:
         if getattr(odat, 'Bid', None):
@@ -102,11 +102,16 @@ def order_email_defaults(odat, pdat=None, commit=True):
             if emailap:
                 odat.Emailap = emailap
                 changed = True
+        if not emailoa:
+            emailoa = clean_email(getattr(pdat, 'Associate1', None))
+            if emailoa:
+                odat.Emailoa = emailoa
+                changed = True
 
     if changed and commit:
         db.session.commit()
 
-    return emailjp, emailoa, emailap
+    return emailjp, emailoa, emailap, emailoa
 
 
 def check_person(info):
@@ -231,7 +236,7 @@ def etemplate_truck(eprof,odat):
     pdat = People.query.get(bid)
     if pdat is None:
         pdat = People.query.filter(People.Company == shipper).first()
-    estatus, epod, eaccts = order_email_defaults(odat, pdat)
+    estatus, epod, eaccts, emailoa = order_email_defaults(odat, pdat)
 
     if eprof== 'eprof1':
         etitle = f'Update on Order: {od} | {keyval} | {con}'
@@ -359,8 +364,8 @@ def etemplate_truck(eprof,odat):
         aname = odat.Package
         emailin1 = estatus
         emailin2 = eaccts
-        emailcc1 = em['invo']
-        emailcc2 = ''
+        emailcc1 = em.get('invo', '')
+        emailcc2 = emailoa if eprof == 'Custom-Invoice' else ''
         if eprof == 'Request Rate Con':
             emailcc2 = em.get('acct', '')
             first_name = recipient_first_name(emailin1, odat.Shipper)

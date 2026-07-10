@@ -1,0 +1,87 @@
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Update Emails</h5>
+        <p class="text-muted small mb-3">Update broker and AP contacts on all active jobs for the selected order's shipper.</p>
+
+        {% set selected_shipper = holdvec[1] %}
+        {% set shipper_context = holdvec[2] %}
+
+        {% if shipper_context %}
+            {% set contact_values = shipper_context['values'] %}
+            <div class="alert alert-info py-2">
+                Selected {{ shipper_context.selected_jo }}{% if shipper_context.selected_container %} / {{ shipper_context.selected_container }}{% endif %}
+                for {{ shipper_context.shipper }}. This will update {{ shipper_context.active_count }} active job(s).
+                {% if shipper_context.no_order_emails %}
+                    No order emails defined, shipper has these emails defined:
+                    Status={{ shipper_context.shipper_emails.primary_broker_email or 'blank' }},
+                    POD={{ shipper_context.shipper_emails.support_broker_email or 'blank' }},
+                    AP={{ shipper_context.shipper_emails.ap_email or 'blank' }}.
+                    {% if not shipper_context.people_match_found %}
+                        No matching shipper record was found in People.
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="primary_broker_name">Primary Broker Name</label>
+                    <input id="primary_broker_name" name="primary_broker_name" class="form-control" type="text" maxlength="45" value="{{ contact_values.primary_broker_name }}">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="primary_broker_email">Primary Broker Email</label>
+                    <input id="primary_broker_email" name="primary_broker_email" class="form-control" type="email" maxlength="45" value="{{ contact_values.primary_broker_email }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="support_broker_name">Ops Support Broker Name</label>
+                    <input id="support_broker_name" name="support_broker_name" class="form-control" type="text" maxlength="45" value="{{ contact_values.support_broker_name }}">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="support_broker_email">Ops Support Broker Email</label>
+                    <input id="support_broker_email" name="support_broker_email" class="form-control" type="email" maxlength="45" value="{{ contact_values.support_broker_email }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="ap_name">AP Name</label>
+                    <input id="ap_name" name="ap_name" class="form-control" type="text" maxlength="45" value="{{ contact_values.ap_name }}">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="ap_email">AP Email</label>
+                    <input id="ap_email" name="ap_email" class="form-control" type="email" maxlength="45" value="{{ contact_values.ap_email }}">
+                </div>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="table table-sm table-striped">
+                    <thead>
+                    <tr>
+                        <th>JO</th>
+                        <th>Container</th>
+                        <th>Booking</th>
+                        <th>Delivery</th>
+                        <th>Location</th>
+                        <th>Hstat</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for job in shipper_context.jobs %}
+                        <tr>
+                            <td>{{ job.jo }}</td>
+                            <td>{{ job.container }}</td>
+                            <td>{{ job.booking }}</td>
+                            <td>{{ job.delivery_date }}</td>
+                            <td>{{ job.delivery_location }}</td>
+                            <td>{{ job.hstat }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-primary" name="update_email_save">Save To Active Jobs</button>
+        {% else %}
+            <div class="alert alert-warning py-2">No active jobs were found for the selected order's shipper.</div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-outline-secondary ml-2" name="update_email_cancel">Cancel</button>
+    </div>
+</div>

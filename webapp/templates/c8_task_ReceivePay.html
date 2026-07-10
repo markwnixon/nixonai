@@ -8,6 +8,8 @@
 {% set thisdepo = holdvec[2] %}
 {% set iter = holdvec[12] %}
 {% set paymeths = ['Cash', 'Check', 'Credit Card', 'Direct Deposit'] %}
+{% set callfrom = holdvec[16] if holdvec|length > 16 and holdvec[16] else 'truck_job_manager' %}
+<input type="hidden" name="callfrom" value="{{ callfrom }}">
 
 <div class="card">
     <div class="card-header">
