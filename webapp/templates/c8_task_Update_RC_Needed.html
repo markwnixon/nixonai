@@ -1,0 +1,72 @@
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Update RC Needed</h5>
+        <p class="text-muted small mb-3">
+            Update rate con requirement on active jobs for the selected order's shipper. Jobs already at request sent
+            or rate con received are shown below but will not be changed.
+        </p>
+
+        {% set rc_context = holdvec[2] %}
+
+        {% if rc_context %}
+            <div class="alert alert-info py-2">
+                Selected {{ rc_context.selected_jo }}{% if rc_context.selected_container %} / {{ rc_context.selected_container }}{% endif %}
+                for {{ rc_context.shipper }}. This will review {{ rc_context.active_count }} active job(s);
+                {{ rc_context.eligible_count }} can be updated and {{ rc_context.protected_count }} are protected.
+            </div>
+            <div class="form-row align-items-end">
+                <div class="form-group col-md-8">
+                    <label for="rc_needed_stage">Rate Con Requirement</label>
+                    <select id="rc_needed_stage" name="rc_needed_stage" class="form-control">
+                        {% if rc_context.selected_stage in [2, 3] %}
+                            <option value="" selected>Current selected order: {{ rc_context.selected_stage }} - {{ rc_context.stage_labels[rc_context.selected_stage] }}</option>
+                        {% endif %}
+                        <option value="0" {% if rc_context.selected_stage == 0 %}selected{% endif %}>0 - No Rate Con Needed</option>
+                        <option value="1" {% if rc_context.selected_stage == 1 %}selected{% endif %}>1 - Needs Rate Con</option>
+                    </select>
+                    {% if rc_context.selected_stage in [2, 3] %}
+                        <small class="form-text text-muted">
+                            Selected order is currently {{ rc_context.stage_labels[rc_context.selected_stage] }}.
+                            Bulk update choices are limited to 0 or 1.
+                        </small>
+                    {% endif %}
+                </div>
+                <div class="form-group col-md-4">
+                    <button type="submit" class="btn btn-primary btn-block" name="update_rc_save">Save To Eligible Jobs</button>
+                </div>
+            </div>
+            <div class="table-responsive mb-3">
+                <table class="table table-sm table-striped">
+                    <thead>
+                    <tr>
+                        <th>JO</th>
+                        <th>Container</th>
+                        <th>Booking</th>
+                        <th>Delivery</th>
+                        <th>Location</th>
+                        <th>RC Status</th>
+                        <th>Action</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for job in rc_context.jobs %}
+                        <tr>
+                            <td>{{ job.jo }}</td>
+                            <td>{{ job.container }}</td>
+                            <td>{{ job.booking }}</td>
+                            <td>{{ job.delivery_date }}</td>
+                            <td>{{ job.delivery_location }}</td>
+                            <td>{{ job.rc_stage }} - {{ job.rc_label }}</td>
+                            <td>{% if job.eligible %}Will update{% else %}Protected{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-warning py-2">No active jobs were found for the selected order's shipper.</div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-outline-secondary" name="update_rc_cancel">Cancel</button>
+    </div>
+</div>
