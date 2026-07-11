@@ -192,6 +192,29 @@
     background: #fff;
 }
 
+.collection-kanban-email-panel {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fff;
+}
+
+.collection-kanban-email-grid {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    gap: 4px 10px;
+    font-size: 0.85rem;
+}
+
+.collection-kanban-email-grid dt {
+    font-weight: 600;
+}
+
+.collection-kanban-email-grid dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 .collection-kanban-email-title {
     font-weight: 700;
     margin-bottom: 8px;

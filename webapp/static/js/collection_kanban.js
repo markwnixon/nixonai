@@ -246,8 +246,9 @@
                 rateConViewLink.href = '#';
                 rateConViewLink.classList.add('d-none');
             }
-            document.getElementById('collection-modal-email-jp').value = job.emailjp || '';
-            document.getElementById('collection-modal-email-oa').value = job.emailoa || '';
+            document.getElementById('collection-modal-email-jp').textContent = job.emailjp || '-';
+            document.getElementById('collection-modal-email-oa').textContent = job.emailoa || '-';
+            document.getElementById('collection-modal-email-ap').textContent = job.emailap || '-';
             const sendPackagePanel = document.getElementById('collection-send-package-panel');
             const sendPackageTitle = document.getElementById('collection-send-package-title');
             const sendPackageHelp = document.getElementById('collection-send-package-help');
@@ -329,14 +330,20 @@
             }
             window.location.href = `${packageLaunchUrl}?${params.toString()}`;
         });
+        document.getElementById('collection-update-emails-button').addEventListener('click', async () => {
+            const jobId = document.getElementById('collection-modal-order-id').value;
+            const params = new URLSearchParams({
+                collection_update_emails_order_id: jobId,
+                callfrom: 'collection_kanban'
+            });
+            window.location.href = `${packageLaunchUrl}?${params.toString()}`;
+        });
         document.getElementById('collection-kanban-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const jobId = document.getElementById('collection-modal-order-id').value;
             const payload = {
                 rate_con_stage: document.getElementById('collection-modal-rate-con-stage').value,
                 rate_con_amount: document.getElementById('collection-modal-rate-con-amount').value,
-                emailjp: document.getElementById('collection-modal-email-jp').value,
-                emailoa: document.getElementById('collection-modal-email-oa').value,
             };
             const {response, data} = await postJson(endpoint(updateUrlTemplate, jobId), payload);
             if (!response.ok || !data.ok) {

@@ -58,7 +58,9 @@ from webapp.dispatch_kanban import (
     ensure_dispatch_kanban_tables,
     kanban_jobs,
     kanban_options,
+    log_review as kanban_log_review,
     move_job as kanban_move_job,
+    review_logs_for_order as kanban_review_logs,
     update_job as kanban_update_job,
 )
 from webapp.collection_kanban import (
@@ -679,6 +681,22 @@ def DispatchKanbanUpdate(order_id):
     payload = request.get_json(silent=True) or {}
     username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
     result, status_code = kanban_update_job(order_id, payload, username=username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/job/<int:order_id>/reviews', methods=['GET'])
+@login_required
+def DispatchKanbanReviews(order_id):
+    result, status_code = kanban_review_logs(order_id)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/job/<int:order_id>/review', methods=['POST'])
+@login_required
+def DispatchKanbanLogReview(order_id):
+    payload = request.get_json(silent=True) or {}
+    username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
+    result, status_code = kanban_log_review(order_id, payload, username=username)
     return jsonify(result), status_code
 
 

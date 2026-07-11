@@ -11,6 +11,8 @@
     const jobsUrl = page.dataset.jobsUrl;
     const moveUrlTemplate = page.dataset.moveUrlTemplate;
     const updateUrlTemplate = page.dataset.updateUrlTemplate;
+    const reviewUrlTemplate = page.dataset.reviewUrlTemplate;
+    const logReviewUrlTemplate = page.dataset.logReviewUrlTemplate;
     const jobsById = new Map();
     let columns = [];
 
@@ -60,6 +62,18 @@
         }
         card.dataset.id = job.id;
         card.dataset.status = job.workflow_status;
+        if (job.workflow_status === 'new_orders') {
+            card.innerHTML = `
+                <div class="dispatch-kanban-card-title">${escapeHtml(cardTitle(job))}</div>
+                <div class="dispatch-kanban-card-line">${escapeHtml(job.customer || job.shipper || 'No customer')}</div>
+                <div class="dispatch-kanban-card-line">${escapeHtml(job.delivery_location || 'No delivery address')}</div>
+                <div class="dispatch-kanban-card-line">Ship Arrives: ${escapeHtml(job.ship_arrive_date || '-')}</div>
+                <div class="dispatch-kanban-card-line">Anticipated Pull: ${escapeHtml(job.pull_date || '-')}</div>
+                <div class="dispatch-kanban-card-line">LFD: ${escapeHtml(job.last_free_day || '-')}</div>
+            `;
+            card.addEventListener('click', () => openModal(job.id));
+            return card;
+        }
         const dateLine = job.hold_status
             ? `LFD: ${escapeHtml(job.last_free_day || '-')}`
             : `Delivery: ${escapeHtml(job.scheduled_delivery_date || job.required_delivery_date || '-')} ${escapeHtml(job.scheduled_delivery_time || '')}`;
@@ -150,6 +164,54 @@
         return {response, data};
     }
 
+    function renderReviews(reviews) {
+        const target = document.getElementById('kanban-review-list');
+        if (!reviews || !reviews.length) {
+            target.innerHTML = '<div class="text-muted">No review history yet.</div>';
+            return;
+        }
+        target.innerHTML = reviews.map((review) => {
+            const dateParts = [];
+            if (review.arrival_date) {
+                dateParts.push(`Arrives: ${escapeHtml(review.arrival_date)}`);
+            }
+            if (review.erd_date) {
+                dateParts.push(`ERD: ${escapeHtml(review.erd_date)}`);
+            }
+            if (review.cutoff_date) {
+                dateParts.push(`Cutoff: ${escapeHtml(review.cutoff_date)}`);
+            }
+            return `
+                <div class="dispatch-kanban-review-item">
+                    <div class="dispatch-kanban-review-meta">
+                        Review: ${escapeHtml(review.review_date || review.created_at || '')}
+                        ${review.review_type ? ` | ${escapeHtml(review.review_type)}` : ''}
+                        ${review.username ? ` | ${escapeHtml(review.username)}` : ''}
+                    </div>
+                    <div class="dispatch-kanban-review-meta">
+                        Shipline: ${escapeHtml(review.shipline || '-')}
+                        | Ship: ${escapeHtml(review.ship || '-')}
+                        | Voyage: ${escapeHtml(review.voyage || '-')}
+                        ${dateParts.length ? ` | ${dateParts.join(' | ')}` : ''}
+                    </div>
+                    <div class="dispatch-kanban-review-notes">${escapeHtml(review.notes || '')}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function loadReviews(jobId) {
+        const target = document.getElementById('kanban-review-list');
+        target.innerHTML = '<div class="text-muted">Loading review history...</div>';
+        const response = await fetch(endpoint(reviewUrlTemplate, jobId));
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            target.innerHTML = '<div class="text-danger">Unable to load review history.</div>';
+            return;
+        }
+        renderReviews(data.reviews || []);
+    }
+
     async function handleDrop(event) {
         const card = event.item;
         const jobId = card.dataset.id;
@@ -176,14 +238,32 @@
         field.value = value || '';
     }
 
+    function setModalGroupVisible(selector, visible) {
+        document.querySelectorAll(selector).forEach((element) => {
+            element.classList.toggle('d-none', !visible);
+        });
+    }
+
     function openModal(jobId) {
         const job = jobsById.get(String(jobId));
         if (!job) {
             return;
         }
+        const isNewOrder = job.workflow_status === 'new_orders';
         document.getElementById('kanban-modal-order-id').value = job.id;
         document.getElementById('dispatch-kanban-modal-title').textContent = cardTitle(job);
-        document.getElementById('kanban-modal-summary').innerHTML = `
+        const summaryHtml = isNewOrder ? `
+            <dl>
+                <dt>Customer</dt><dd>${escapeHtml(job.customer || job.shipper || '-')}</dd>
+                <dt>Delivery</dt><dd>${escapeHtml(job.delivery_location || '-')}</dd>
+                <dt>Shipline</dt><dd>${escapeHtml(job.shipline || job.steamship_line || '-')}</dd>
+                <dt>Ship</dt><dd>${escapeHtml(job.ship || '-')}</dd>
+                <dt>Voyage</dt><dd>${escapeHtml(job.voyage || '-')}</dd>
+                <dt>Ship Arrives</dt><dd>${escapeHtml(job.ship_arrive_date || '-')}</dd>
+                <dt>Ant. Pull</dt><dd>${escapeHtml(job.pull_date || '-')}</dd>
+                <dt>LFD</dt><dd>${escapeHtml(job.last_free_day || '-')}</dd>
+            </dl>
+        ` : `
             <dl>
                 <dt>Customer</dt><dd>${escapeHtml(job.customer || job.shipper || '-')}</dd>
                 <dt>Terminal</dt><dd>${escapeHtml(job.pickup_terminal || '-')}</dd>
@@ -199,6 +279,17 @@
                 <dt>Proof</dt><dd>${job.proof_none_required ? 'No Proof Needed' : escapeHtml(job.proof || job.proof2 || job.driver_proof || '-')}</dd>
             </dl>
         `;
+        document.getElementById('kanban-modal-summary').innerHTML = summaryHtml;
+        setModalGroupVisible('.kanban-modal-assignment-field', !isNewOrder);
+        setModalGroupVisible('.kanban-modal-pin-field', !isNewOrder);
+        setModalGroupVisible('.kanban-modal-billing-field', !isNewOrder);
+        const showReviewPanel = ['new_orders', 'on_call'].includes(job.workflow_status);
+        document.getElementById('kanban-review-panel').classList.toggle('d-none', !showReviewPanel);
+        document.getElementById('kanban-review-type').value = 'Daily Review';
+        document.getElementById('kanban-review-notes').value = '';
+        if (showReviewPanel) {
+            loadReviews(job.id);
+        }
         setSelectValue('kanban-modal-status', job.workflow_status);
         setSelectValue('kanban-modal-driver', job.driver);
         setSelectValue('kanban-modal-truck', job.truck);
@@ -235,6 +326,21 @@
         modal.modal('hide');
         showMessage('Dispatch job saved.', 'success');
         loadBoard();
+    });
+    document.getElementById('kanban-review-save').addEventListener('click', async () => {
+        const jobId = document.getElementById('kanban-modal-order-id').value;
+        const payload = {
+            review_type: document.getElementById('kanban-review-type').value,
+            notes: document.getElementById('kanban-review-notes').value,
+        };
+        const {response, data} = await postJson(endpoint(logReviewUrlTemplate, jobId), payload);
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to log review.', 'warning');
+            return;
+        }
+        document.getElementById('kanban-review-notes').value = '';
+        renderReviews(data.reviews || []);
+        showMessage('Review logged.', 'success');
     });
 
     document.querySelectorAll('.kanban-filter').forEach((field) => {

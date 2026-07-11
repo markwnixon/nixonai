@@ -636,6 +636,15 @@ def Update_Emails_task(genre, task_iter, tablesetup, task_focus, checked_data, t
     err = []
     entrydata = []
     viewport = ['tables'] + ['0'] * 5
+    callfrom = request.values.get('callfrom') or request.args.get('callfrom') or 'truck_job_manager'
+    if request.args.get('collection_update_emails_order_id') and not request.values.get('callfrom'):
+        callfrom = 'collection_kanban'
+
+    def return_viewport():
+        if callfrom == 'collection_kanban':
+            return ['redirect_collection_kanban', '0', '0', '0', '0', '0']
+        return ['tables'] + ['0'] * 5
+
     holdvec = [''] * 120
     if thistable != 'Orders':
         return holdvec, entrydata, ['Update Emails must start from one selected order.'], viewport, True
@@ -644,11 +653,13 @@ def Update_Emails_task(genre, task_iter, tablesetup, task_focus, checked_data, t
         return holdvec, entrydata, ['Selected order does not have a shipper with active jobs.'], viewport, True
     selected_shipper = context['shipper']
     if request.values.get('update_email_cancel') is not None:
-        return holdvec, entrydata, ['Update Emails task cancelled.'], viewport, True
+        return holdvec, entrydata, ['Update Emails task cancelled.'], return_viewport(), True
     if request.values.get('update_email_save') is not None:
-        result = update_active_shipper_emails(selected_shipper, request.values)
+        result = update_active_shipper_emails(selected_shipper, request.values, sid)
         if result.get('ok'):
-            return holdvec, entrydata, [f'Updated email contacts on {result.get("updated", 0)} active job(s) for {selected_shipper}.'], viewport, True
+            return holdvec, entrydata, [
+                f'Updated email contacts on selected job plus {result.get("active_updated", 0)} active job(s) for {selected_shipper}.'
+            ], return_viewport(), True
         else:
             err = [result.get('error') or 'Unable to update shipper emails.']
     else:
@@ -656,6 +667,7 @@ def Update_Emails_task(genre, task_iter, tablesetup, task_focus, checked_data, t
     holdvec[1] = selected_shipper
     holdvec[2] = context
     holdvec[80] = request.values.get('showcolorstable') or ''
+    holdvec[81] = callfrom
     return holdvec, entrydata, err, viewport, completed
 
 
@@ -2048,6 +2060,7 @@ def Table_maker(genre):
     tfilters, tboxes = {}, {}
     launch_package_order_id = None
     launch_receive_order_id = None
+    launch_update_emails_order_id = None
     returnhit = None
     driver_upload = None
     truck_upload = None
@@ -2170,6 +2183,7 @@ def Table_maker(genre):
         taskon, task_iter, task_focus, tasktype = None, None, None, None
         package_order_id = request.args.get('collection_package_order_id')
         receive_order_id = request.args.get('collection_receive_order_id')
+        update_emails_order_id = request.args.get('collection_update_emails_order_id')
         if genre == 'Trucking' and package_order_id:
             try:
                 launch_package_order_id = int(package_order_id)
@@ -2198,6 +2212,20 @@ def Table_maker(genre):
             else:
                 launch_receive_order_id = None
                 err.append('The selected collection job could not be opened for receive payment.')
+        elif genre == 'Trucking' and update_emails_order_id:
+            try:
+                launch_update_emails_order_id = int(update_emails_order_id)
+            except (TypeError, ValueError):
+                launch_update_emails_order_id = None
+            if launch_update_emails_order_id and Orders.query.get(launch_update_emails_order_id) is not None:
+                taskon = 'Update_Emails'
+                task_focus = 'UpdateEmails'
+                task_iter = 0
+                tasktype = 'Single_Item_Selection'
+                tboxes['Tasks'] = 'Update Emails'
+            else:
+                launch_update_emails_order_id = None
+                err.append('The selected collection job could not be opened for email updates.')
         if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
 
 ###########All done in this section##################################################################################################################
@@ -2216,6 +2244,8 @@ def Table_maker(genre):
         checked_data = [['Orders', 1, [launch_package_order_id]]]
     if launch_receive_order_id:
         checked_data = [['Orders', 1, [launch_receive_order_id]]]
+    if launch_update_emails_order_id:
+        checked_data = [['Orders', 1, [launch_update_emails_order_id]]]
 
     # Remove the checks during reset of tables
     if resethit is not None or resetmod is not None:
@@ -4325,10 +4355,12 @@ def MakePackage_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                 elif eprof == 'Custom-Invoice':
                     emaildata = require_invoice_cc(emaildata)
                     sender_key = dispatch_sender_key()
-                info_mimemail(emaildata, [sid], sender_key=sender_key)
+                email_err = info_mimemail(emaildata, [sid], sender_key=sender_key)
+                err.extend(email_err)
                 if eprof == 'Request Rate Con':
                     odat.RCneeded = 2
                     db.session.commit()
+                    err.append('Rate con request sent; RCneeded set to 2.')
 
         holdvec[15] = stamplist
         #holdvec[4] = emaildata

@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import or_, text
+from sqlalchemy import inspect, or_, text
 
 from webapp import db
 from webapp.dispatch_calendar import (
@@ -70,6 +70,38 @@ def ensure_dispatch_kanban_tables():
             INDEX idx_dispatch_kanban_audit_order (OrderId)
         )
     """))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS dispatch_kanban_review_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            OrderId INT NOT NULL,
+            ReviewDate DATE,
+            ReviewType VARCHAR(45),
+            Shipline VARCHAR(100),
+            Ship VARCHAR(100),
+            Voyage VARCHAR(100),
+            ArrivalDate DATE,
+            ERDDate DATE,
+            CutoffDate DATE,
+            Notes TEXT,
+            Username VARCHAR(45),
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_dispatch_kanban_review_order (OrderId),
+            INDEX idx_dispatch_kanban_review_created (CreatedAt)
+        )
+    """))
+    review_columns = {column['name'] for column in inspect(db.engine).get_columns('dispatch_kanban_review_log')}
+    review_column_defs = {
+        'ReviewDate': 'DATE',
+        'Shipline': 'VARCHAR(100)',
+        'Ship': 'VARCHAR(100)',
+        'Voyage': 'VARCHAR(100)',
+        'ArrivalDate': 'DATE',
+        'ERDDate': 'DATE',
+        'CutoffDate': 'DATE',
+    }
+    for column_name, column_def in review_column_defs.items():
+        if column_name not in review_columns:
+            db.session.execute(text(f'ALTER TABLE dispatch_kanban_review_log ADD COLUMN {column_name} {column_def}'))
     db.session.commit()
 
 
@@ -513,6 +545,7 @@ def filtered_orders(filters=None):
     pin_lookup = pin_lookup_for_orders(orders)
     import_lookup = import_lookup_for_orders(orders)
     output = []
+    status_updates = 0
     range_filter = clean_text(filters.get('range'))
     for order in orders:
         state = state_map.get(order.id)
@@ -520,6 +553,9 @@ def filtered_orders(filters=None):
         pin = pin_from_lookup(order, pin_lookup)
         import_row = import_from_lookup(order, import_lookup)
         workflow_status = derived_workflow_status(order, state, pin, schedule, import_row)
+        if clean_text(getattr(order, 'DisStatus', '')) != workflow_status:
+            order.DisStatus = workflow_status
+            status_updates += 1
         if status_filter in KANBAN_STATUS_KEYS and workflow_status != status_filter:
             continue
         if not is_active_kanban_order(order, workflow_status):
@@ -527,6 +563,8 @@ def filtered_orders(filters=None):
         if not order_matches_range(order, range_filter, schedule):
             continue
         output.append((order, state, workflow_status, schedule, pin, import_row))
+    if status_updates:
+        db.session.commit()
     return output
 
 
@@ -545,6 +583,9 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'customer': order.Shipper or order.Company or '',
         'shipper': order.Shipper or '',
         'steamship_line': order.SSCO or order.Ship or '',
+        'shipline': order.SSCO or '',
+        'ship': order.Ship or '',
+        'voyage': order.Voyage or '',
         'pickup_terminal': kanban_pickup_terminal(order),
         'delivery_location': kanban_delivery_location(order),
         'delivery_city_state': kanban_delivery_city_state(order),
@@ -587,6 +628,84 @@ def kanban_jobs(filters=None):
         'total_jobs': total_jobs,
         'columns': [{'key': key, 'label': label, 'jobs': jobs_by_status.get(key, [])} for key, label in KANBAN_COLUMNS],
     }
+
+
+def review_logs_for_order(order_id):
+    ensure_dispatch_kanban_tables()
+    order = Orders.query.get(order_id)
+    if order is None:
+        return {'ok': False, 'error': 'Order not found.'}, 404
+    rows = db.session.execute(
+        text("""
+            SELECT id, ReviewDate, ReviewType, Shipline, Ship, Voyage, ArrivalDate, ERDDate, CutoffDate,
+                   Notes, Username, CreatedAt
+            FROM dispatch_kanban_review_log
+            WHERE OrderId = :order_id
+            ORDER BY CreatedAt DESC, id DESC
+            LIMIT 50
+        """),
+        {'order_id': order_id},
+    ).mappings().all()
+    return {
+        'ok': True,
+        'reviews': [
+            {
+                'id': row.get('id'),
+                'review_date': format_date(row.get('ReviewDate')) or (
+                    row.get('CreatedAt').strftime('%Y-%m-%d') if row.get('CreatedAt') else ''
+                ),
+                'review_type': clean_text(row.get('ReviewType')),
+                'shipline': clean_text(row.get('Shipline')),
+                'ship': clean_text(row.get('Ship')),
+                'voyage': clean_text(row.get('Voyage')),
+                'arrival_date': format_date(row.get('ArrivalDate')),
+                'erd_date': format_date(row.get('ERDDate')),
+                'cutoff_date': format_date(row.get('CutoffDate')),
+                'notes': clean_text(row.get('Notes')),
+                'username': clean_text(row.get('Username')),
+                'created_at': row.get('CreatedAt').strftime('%Y-%m-%d %H:%M') if row.get('CreatedAt') else '',
+            }
+            for row in rows
+        ],
+    }, 200
+
+
+def log_review(order_id, data, username=None):
+    ensure_dispatch_kanban_tables()
+    order = Orders.query.get(order_id)
+    if order is None:
+        return {'ok': False, 'error': 'Order not found.'}, 404
+    notes = clean_text(data.get('notes'))
+    review_type = clean_text(data.get('review_type')) or 'Daily Review'
+    review_date = parse_date(data.get('review_date')) or datetime.date.today()
+    if not notes:
+        return {'ok': False, 'error': 'Review notes are required.'}, 400
+    db.session.execute(
+        text("""
+            INSERT INTO dispatch_kanban_review_log
+                (OrderId, ReviewDate, ReviewType, Shipline, Ship, Voyage, ArrivalDate, ERDDate, CutoffDate,
+                 Notes, Username, CreatedAt)
+            VALUES
+                (:order_id, :review_date, :review_type, :shipline, :ship, :voyage, :arrival_date, :erd_date,
+                 :cutoff_date, :notes, :username, :created_at)
+        """),
+        {
+            'order_id': order_id,
+            'review_date': review_date,
+            'review_type': review_type,
+            'shipline': clean_text(order.SSCO),
+            'ship': clean_text(order.Ship),
+            'voyage': clean_text(order.Voyage),
+            'arrival_date': order_date(order.Date6),
+            'erd_date': order_date(order.Date4) if not is_import_order(order) else None,
+            'cutoff_date': order_date(order.Date5) if not is_import_order(order) else None,
+            'notes': notes,
+            'username': username or 'dispatch',
+            'created_at': datetime.datetime.utcnow(),
+        },
+    )
+    db.session.commit()
+    return review_logs_for_order(order_id)
 
 
 def audit_status_change(order_id, old_status, new_status, username, reason=None):

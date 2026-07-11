@@ -159,23 +159,33 @@ def validate_contact_payload(payload):
     return values, errors
 
 
-def update_active_shipper_emails(shipper, payload):
+def update_active_shipper_emails(shipper, payload, selected_order_id=None):
     shipper = clean_value(shipper)
     if not shipper:
         return {'ok': False, 'error': 'Choose a shipper first.', 'updated': 0}
     values, errors = validate_contact_payload(payload)
     if errors:
         return {'ok': False, 'error': ' '.join(errors), 'updated': 0}
-    orders = (
+    active_orders = (
         Orders.query
         .filter(active_order_filter())
         .filter(Orders.Shipper == shipper)
         .all()
     )
+    orders = list(active_orders)
+    selected_order = Orders.query.get(selected_order_id) if selected_order_id is not None else None
+    if selected_order is not None and selected_order.id not in {order.id for order in orders}:
+        orders.append(selected_order)
     if not orders:
-        return {'ok': False, 'error': 'No active jobs were found for that shipper.', 'updated': 0}
+        return {'ok': False, 'error': 'No selected or active jobs were found for that shipper.', 'updated': 0}
     for order in orders:
         for field_name, form_name in EMAIL_FIELDS:
             setattr(order, field_name, values.get(form_name) or None)
     db.session.commit()
-    return {'ok': True, 'error': '', 'updated': len(orders)}
+    return {
+        'ok': True,
+        'error': '',
+        'updated': len(orders),
+        'active_updated': len(active_orders),
+        'selected_updated': selected_order is not None,
+    }

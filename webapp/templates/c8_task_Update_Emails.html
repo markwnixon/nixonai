@@ -1,5 +1,7 @@
 <div class="card">
     <div class="card-body">
+        {% set callfrom = holdvec[81] if holdvec|length > 81 and holdvec[81] else 'truck_job_manager' %}
+        <input type="hidden" name="callfrom" value="{{ callfrom }}">
         <h5 class="card-title">Update Emails</h5>
         <p class="text-muted small mb-3">Update broker and AP contacts on all active jobs for the selected order's shipper.</p>
 
@@ -10,7 +12,7 @@
             {% set contact_values = shipper_context['values'] %}
             <div class="alert alert-info py-2">
                 Selected {{ shipper_context.selected_jo }}{% if shipper_context.selected_container %} / {{ shipper_context.selected_container }}{% endif %}
-                for {{ shipper_context.shipper }}. This will update {{ shipper_context.active_count }} active job(s).
+                for {{ shipper_context.shipper }}. This will update this selected job and {{ shipper_context.active_count }} active job(s).
                 {% if shipper_context.no_order_emails %}
                     No order emails defined, shipper has these emails defined:
                     Status={{ shipper_context.shipper_emails.primary_broker_email or 'blank' }},

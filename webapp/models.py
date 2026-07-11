@@ -645,6 +645,7 @@ class Orders(db.Model):
     Voyage = db.Column('Voyage', db.String(45))
     UserMod = db.Column('UserMod', db.String(45))
     DelStat = db.Column('DelStat', db.Integer)
+    DisStatus = db.Column('DisStatus', db.String(45))
     HoldType = db.Column('HoldType', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
@@ -654,7 +655,7 @@ class Orders(db.Model):
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
                  Date4, Date5, Date6, Date7, Date8, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
                  Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap, SSCO, Ship, Voyage, UserMod, DelStat,
-                 DrvProof, DrvSeal, D1cache, D2cache, HoldType=None, RCneeded=0, RCAmount=None):
+                 DrvProof, DrvSeal, D1cache, D2cache, HoldType=None, RCneeded=0, RCAmount=None, DisStatus=None):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -742,6 +743,7 @@ class Orders(db.Model):
         self.Voyage = Voyage
         self.UserMod = UserMod
         self.DelStat = DelStat
+        self.DisStatus = DisStatus
         self.HoldType = HoldType
         self.DrvProof = DrvProof
         self.DrvSeal = DrvSeal

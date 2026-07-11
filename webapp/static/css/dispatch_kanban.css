@@ -149,3 +149,36 @@
 .dispatch-kanban-summary dd {
     margin: 0;
 }
+
+.dispatch-kanban-review-panel {
+    border: 1px solid #d9dee4;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fff;
+}
+
+.dispatch-kanban-review-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.dispatch-kanban-review-item {
+    border-top: 1px solid #edf0f2;
+    padding: 8px 0;
+}
+
+.dispatch-kanban-review-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.dispatch-kanban-review-meta {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.dispatch-kanban-review-notes {
+    color: #343a40;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+}
