@@ -24,7 +24,7 @@ from webapp.viewfuncs import hasinput
 
 COLLECTION_COLUMNS = [
     ('completed_not_invoiced', 'Completed Not Invoiced'),
-    ('needs_rate_con', 'Needs Rate Con'),
+    ('needs_rate_con', 'Needs Rate Con Invoice Match'),
     ('rate_con_requested', 'Rate Con Requested'),
     ('ready_to_send', 'Ready To Send'),
     ('sent_current', 'Sent Current'),
@@ -112,10 +112,7 @@ def rate_con_required(order):
 
 
 def rate_con_stage(order):
-    stage = int_value(getattr(order, 'RCneeded', 0))
-    if stage > 0 and hasinput(getattr(order, 'RateCon', None)):
-        return 3
-    return stage
+    return int_value(getattr(order, 'RCneeded', 0))
 
 
 def rate_con_needed(order):
@@ -127,22 +124,54 @@ def rate_con_requested(order):
 
 
 def rate_con_received(order):
-    return rate_con_stage(order) == 3 or (rate_con_required(order) and hasinput(getattr(order, 'RateCon', None)))
+    return rate_con_stage(order) == 3
+
+
+def rate_con_amount(order):
+    return money_value(getattr(order, 'RCAmount', None))
+
+
+def invoice_ready_for_rate_con_match(order):
+    return hasinput(getattr(order, 'Invoice', None)) and money_value(getattr(order, 'InvoTotal', None)) > Decimal('0.00')
+
+
+def rate_con_amount_matches_invoice(order):
+    if not hasinput(getattr(order, 'RCAmount', None)):
+        return False
+    invoice_total = money_value(getattr(order, 'InvoTotal', None))
+    return abs(rate_con_amount(order) - invoice_total) <= Decimal('0.01')
+
+
+def invalid_rate_con_received_status(order):
+    if rate_con_stage(order) != 3:
+        return False
+    rc_amount = rate_con_amount(order)
+    invoice_total = money_value(getattr(order, 'InvoTotal', None))
+    if rc_amount <= Decimal('0.00'):
+        return True
+    if invoice_total > Decimal('0.00') and abs(rc_amount - invoice_total) > Decimal('0.01'):
+        return True
+    return False
+
+
+def rate_con_ready_to_send(order):
+    return rate_con_received(order) and invoice_ready_for_rate_con_match(order) and rate_con_amount_matches_invoice(order)
 
 
 def rate_con_label(order):
-    stage = rate_con_stage(order)
-    if stage == 1:
-        return 'Needs rate con'
-    if stage == 2:
-        return 'Request sent'
-    if stage == 3:
+    if rate_con_required(order) and not rate_con_received(order):
+        return 'Needs Rate Con'
+    if rate_con_received(order) and not invoice_ready_for_rate_con_match(order):
+        return 'Needs Invoice'
+    if rate_con_received(order) and not rate_con_amount_matches_invoice(order):
+        return 'Unmatched Rate Con & Invoice'
+    if rate_con_ready_to_send(order):
         return 'Received'
     return 'Not required'
 
 
 def is_rate_con_followup(order):
-    return rate_con_stage(order) in [1, 2]
+    return rate_con_required(order) and not rate_con_ready_to_send(order)
 
 
 def collection_email_defaults(order):
@@ -212,15 +241,17 @@ def collection_status(order, today=None):
         return 'partial_paid'
     if hstat < 2 and istat < 1:
         return 'not_ready'
-    if rate_con_needed(order):
-        return 'needs_rate_con'
     if rate_con_requested(order):
         return 'rate_con_requested'
+    if rate_con_required(order) and not rate_con_ready_to_send(order):
+        return 'needs_rate_con'
     if istat < 1:
-        if rate_con_received(order):
+        if rate_con_ready_to_send(order):
             return 'ready_to_send'
         return 'completed_not_invoiced'
     if istat in [1, 2, 6]:
+        if rate_con_required(order) and not rate_con_ready_to_send(order):
+            return 'needs_rate_con'
         return 'ready_to_send'
     if age is not None and age >= 120:
         return 'bad_debts'
@@ -229,6 +260,18 @@ def collection_status(order, today=None):
     if age is not None and age >= 30:
         return 'over_30'
     return 'sent_current'
+
+
+def normalize_presend_collection_status(order):
+    changed = False
+    if invalid_rate_con_received_status(order):
+        order.RCneeded = 1
+        changed = True
+    status = collection_status(order)
+    if status in ['completed_not_invoiced', 'needs_rate_con', 'rate_con_requested'] and int_value(order.Istat, -1) == 3:
+        order.Istat = 2
+        changed = True
+    return changed
 
 
 def order_matches_range(order, range_filter):
@@ -365,6 +408,10 @@ def collection_card(order):
         'rate_con_requested': rate_con_requested(order),
         'rate_con_received': rate_con_received(order),
         'rate_con_file': clean_text(order.RateCon),
+        'rate_con_amount': money_text(rate_con_amount(order)) if hasinput(getattr(order, 'RCAmount', None)) else '',
+        'rate_con_amount_matches_invoice': rate_con_amount_matches_invoice(order),
+        'rate_con_ready_to_send': rate_con_ready_to_send(order),
+        'rate_con_invoice_required': not invoice_ready_for_rate_con_match(order) if rate_con_received(order) else False,
         'rate_con_view_url': rate_con_view_url(order),
         'delivery_date': format_date(order.Date3),
         'returned_date': format_date(order.Date2),
@@ -427,6 +474,8 @@ def filtered_orders(filters=None):
         seen_ids = {order.id for order in orders}
         rate_con_orders = query.filter(Orders.Hstat >= 2, Orders.RCneeded > 0).order_by(*order_by).all()
         orders.extend(order for order in rate_con_orders if order.id not in seen_ids)
+    if any(normalize_presend_collection_status(order) for order in orders):
+        db.session.commit()
     status_filter = clean_text(filters.get('status'))
     range_filter = clean_text(filters.get('range')) or 'open'
     output = []
@@ -479,6 +528,9 @@ def update_collection_job(order_id, data):
     if rc_stage not in [0, 1, 2, 3]:
         return {'ok': False, 'error': 'Rate con stage must be 0, 1, 2, or 3.'}, 400
     order.RCneeded = rc_stage
+    if 'rate_con_amount' in data:
+        amount = clean_text(data.get('rate_con_amount'))
+        order.RCAmount = money_text(amount) if amount else None
     update_order_broker_emails(order, data)
     db.session.commit()
     return {'ok': True, 'job': collection_card(order)}, 200
@@ -572,7 +624,8 @@ def send_collection_email(order_id, data):
     return {'ok': True, 'emails': email_logs_for_order(order_id)}, 200
 
 
-def upload_collection_rate_con(order_id, uploaded_file):
+def upload_collection_rate_con(order_id, uploaded_file, data=None):
+    data = data or {}
     order = Orders.query.get(order_id)
     if order is None:
         return {'ok': False, 'error': 'Order not found.'}, 404
@@ -605,6 +658,9 @@ def upload_collection_rate_con(order_id, uploaded_file):
     order.RateCon = filename
     order.Rcache = next_cache
     order.RCneeded = 3
+    amount = clean_text(data.get('rate_con_amount'))
+    if amount:
+        order.RCAmount = money_text(amount)
     db.session.commit()
     return {'ok': True, 'job': collection_card(order)}, 200
 

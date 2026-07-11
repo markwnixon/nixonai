@@ -737,7 +737,7 @@ def CollectionKanbanSendEmail(order_id):
 @login_required
 @financial_mfa_required
 def CollectionKanbanUploadRateCon(order_id):
-    result, status_code = upload_collection_rate_con(order_id, request.files.get('rate_con'))
+    result, status_code = upload_collection_rate_con(order_id, request.files.get('rate_con'), request.form)
     return jsonify(result), status_code
 
 

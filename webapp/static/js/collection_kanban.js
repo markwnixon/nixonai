@@ -74,7 +74,7 @@
                 <div class="collection-kanban-card-line">Total $${escapeHtml(job.invoice_total)} | Paid $${escapeHtml(job.paid_amount)}</div>
                 ${job.payment_repair_needed ? `<div class="collection-kanban-card-line collection-kanban-card-repair-text">Repair: expected due $${escapeHtml(job.expected_balance_due)}</div>` : ''}
                 <div class="collection-kanban-card-line">Invoice: ${escapeHtml(job.invoice_date || '-')} ${job.invoice_age !== '' ? `(${escapeHtml(job.invoice_age)} days)` : ''}</div>
-                ${job.rate_con_needed ? `<div class="collection-kanban-card-line collection-kanban-card-warning">${escapeHtml(job.rate_con_status)}</div>` : ''}
+                ${job.status === 'needs_rate_con' ? `<div class="collection-kanban-card-line collection-kanban-card-warning">${escapeHtml(job.rate_con_status)}</div>` : ''}
             `;
             card.addEventListener('click', () => openModal(job.id));
             return card;
@@ -218,12 +218,14 @@
                     <dt>Balance Due</dt><dd>$${escapeHtml(job.balance_due || '0.00')}</dd>
                     <dt>Pay Check</dt><dd>${job.payment_repair_needed ? `<span class="text-danger font-weight-bold">Repair needed. Expected due $${escapeHtml(job.expected_balance_due || '0.00')}</span>` : 'OK'}</dd>
                     <dt>Rate Con</dt><dd>${Number(job.rate_con_stage || 0) > 0 ? escapeHtml(`${job.rate_con_status}${job.rate_con_file ? ` | ${job.rate_con_file}` : ''}`) : 'Not required'}</dd>
+                    <dt>RC Amount</dt><dd>${job.rate_con_amount ? `$${escapeHtml(job.rate_con_amount)}` : '-'}</dd>
                     <dt>Paid Date</dt><dd>${escapeHtml(job.paid_date || '-')}</dd>
                     <dt>Payment Ref</dt><dd>${escapeHtml(job.pay_ref || '-')}</dd>
                     <dt>Payment Method</dt><dd>${escapeHtml(job.pay_method || '-')}</dd>
                 </dl>
             `;
             document.getElementById('collection-modal-rate-con-stage').value = String(job.rate_con_stage || 0);
+            document.getElementById('collection-modal-rate-con-amount').value = job.rate_con_amount || '';
             const rateConUploadRow = document.getElementById('collection-rate-con-upload-row');
             const rateConFile = document.getElementById('collection-rate-con-file');
             const rateConStatus = document.getElementById('collection-rate-con-upload-status');
@@ -303,6 +305,7 @@
             }
             const formData = new FormData();
             formData.append('rate_con', fileInput.files[0]);
+            formData.append('rate_con_amount', document.getElementById('collection-modal-rate-con-amount').value);
             const {response, data} = await postForm(endpoint(rateConUploadUrlTemplate, jobId), formData);
             if (!response.ok || !data.ok) {
                 showMessage(data.error || 'Unable to upload rate con.', 'warning');
@@ -331,6 +334,7 @@
             const jobId = document.getElementById('collection-modal-order-id').value;
             const payload = {
                 rate_con_stage: document.getElementById('collection-modal-rate-con-stage').value,
+                rate_con_amount: document.getElementById('collection-modal-rate-con-amount').value,
                 emailjp: document.getElementById('collection-modal-email-jp').value,
                 emailoa: document.getElementById('collection-modal-email-oa').value,
             };

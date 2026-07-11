@@ -3985,6 +3985,9 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     input = eval(dbnew)
     db.session.add(input)
     db.session.commit()
+    if table == 'Orders' and getattr(input, 'RCneeded', 0) in [2, 3]:
+        input.RCneeded = 1
+        db.session.commit()
 
     completed = True
 
