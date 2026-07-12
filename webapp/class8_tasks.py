@@ -2892,6 +2892,8 @@ def make_new_entry(tablesetup,holdvec):
                 setattr(dat, 'Scache', 0)
                 db.session.commit()
 
+        apply_customer_order_defaults(dat)
+
     return err, id
 
 #def New_task(task_iter, tablesetup, task_focus, checked_data):
@@ -3933,6 +3935,24 @@ def quote_strip(tv):
     return tvnew
 
 
+def customer_no_proof_needed(shipper):
+    if not hasinput(shipper):
+        return False
+    pdat = People.query.filter(People.Company == shipper).first()
+    try:
+        return int(getattr(pdat, 'NoProofNeeded', 0) or 0) == 1
+    except:
+        return False
+
+
+def apply_customer_order_defaults(order):
+    if order is None or order.__class__.__name__ != 'Orders':
+        return
+    if customer_no_proof_needed(getattr(order, 'Shipper', None)):
+        order.Proof = 'No Proof Needed'
+        db.session.commit()
+
+
 
 def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
@@ -4018,6 +4038,7 @@ def NewCopy_task(genre, task_iter, tablesetup, task_focus, checked_data, thistab
     if table == 'Orders' and getattr(input, 'RCneeded', 0) in [2, 3]:
         input.RCneeded = 1
         db.session.commit()
+    apply_customer_order_defaults(input)
 
     completed = True
 

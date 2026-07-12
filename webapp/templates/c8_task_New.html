@@ -62,6 +62,7 @@
                                 {% elif entry[4] == 'delivery_types' %}{% set klist = genre_data['delivery_types'] %}
                                 {% elif entry[4] == 'hold_types' %}{% set klist = genre_data['hold_types'] %}
                                 {% elif entry[4] == 'rc_needed_flags' %}{% set klist = genre_data['rc_needed_flags'] %}
+                                {% elif entry[4] == 'no_proof_options' %}{% set klist = genre_data['no_proof_options'] %}
                                 {% elif entry[4] == 'terminaldata' %}{% set klist = keydata.terminaldata %}
                                 {% elif entry[4] == 'truck_types' %}{% set klist = genre_data['truck_types'] %}
 
@@ -82,6 +83,9 @@
                                     {% if entry[4] == 'rc_needed_flags' %}
                                         {% set rc_labels = {'0': '0 - No rate con', '1': '1 - Needs rate con', '2': '2 - Request sent', '3': '3 - Received / ready'} %}
                                         <option value="{{ kdata }}" {% if kdata|string == htest|string %} selected {% endif %}> {{ rc_labels[kdata|string] }} </option>
+                                    {% elif entry[4] == 'no_proof_options' %}
+                                        {% set np_labels = {'0': 'No', '1': 'Yes'} %}
+                                        <option value="{{ kdata }}" {% if kdata|string == htest|string %} selected {% endif %}> {{ np_labels[kdata|string] }} </option>
                                     {% else %}
                                         <option value="{{kdata}}" {% if kdata == htest %} selected {% endif %}> {{ kdata }} </option>
                                     {% endif %}

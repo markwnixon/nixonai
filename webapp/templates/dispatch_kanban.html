@@ -7,7 +7,8 @@
      data-jobs-url="{{ url_for('main.DispatchKanbanJobs') }}"
      data-move-url-template="{{ url_for('main.DispatchKanbanMove', order_id=0) }}"
      data-update-url-template="{{ url_for('main.DispatchKanbanUpdate', order_id=0) }}"
-     data-review-url-template="{{ url_for('main.DispatchKanbanReviews', order_id=0) }}">
+     data-review-url-template="{{ url_for('main.DispatchKanbanReviews', order_id=0) }}"
+     data-upload-proof-url-template="{{ url_for('main.DispatchKanbanUploadProof', order_id=0) }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <div>
             <h3 class="mb-1">Dispatch Kanban Board</h3>
@@ -168,6 +169,15 @@
                     <div class="form-check mt-2">
                         <input type="checkbox" class="form-check-input" id="kanban-modal-no-proof-needed">
                         <label class="form-check-label" for="kanban-modal-no-proof-needed">No Proof Needed</label>
+                    </div>
+                    <div id="kanban-proof-upload-panel" class="dispatch-kanban-proof-upload mt-3 d-none">
+                        <label for="kanban-proof-file" class="mb-1">Upload Proof PDF</label>
+                        <div class="input-group">
+                            <input type="file" id="kanban-proof-file" class="form-control" accept="application/pdf,.pdf">
+                            <div class="input-group-append">
+                                <button type="button" id="kanban-proof-upload-button" class="btn btn-outline-primary">Upload Proof PDF</button>
+                            </div>
+                        </div>
                     </div>
                     <div id="kanban-review-panel" class="dispatch-kanban-review-panel mt-3 d-none">
                         <div class="dispatch-kanban-review-title">Daily Review Log</div>

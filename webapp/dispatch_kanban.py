@@ -1,8 +1,11 @@
 import datetime
+import os
 
 from sqlalchemy import inspect, or_, text
+from werkzeug.utils import secure_filename
 
 from webapp import db
+from webapp.CCC_system_setup import addpath, tpath
 from webapp.dispatch_calendar import (
     clean_text,
     combine_date_time,
@@ -23,8 +26,7 @@ KANBAN_COLUMNS = [
     ('drop_pick', 'Drop-Pick'),
     ('pin_assigned', 'PIN Assigned'),
     ('in_progress', 'In Progress'),
-    ('delivered', 'Delivered'),
-    ('completed', 'Completed'),
+    ('completed', 'Completed Need Proof'),
 ]
 
 KANBAN_STATUS_LABELS = dict(KANBAN_COLUMNS)
@@ -35,6 +37,7 @@ LEGACY_STATUS_MAP = {
     'pin_ready': 'pin_assigned',
     'ready_to_dispatch': 'pin_assigned',
     'assigned': 'pin_assigned',
+    'delivered': 'in_progress',
 }
 
 
@@ -89,6 +92,13 @@ def ensure_dispatch_kanban_tables():
             ReadyForDelivery VARCHAR(45),
             Location VARCHAR(100),
             LFDDate DATE,
+            ECCESContainerType VARCHAR(100),
+            ECCESChassis VARCHAR(100),
+            ECCESAvailTerminal VARCHAR(100),
+            ECCESGateIn VARCHAR(100),
+            ECCESCBPExamComplete VARCHAR(100),
+            ECCESCustomsRelease VARCHAR(100),
+            ECCESFreightRelease VARCHAR(100),
             Notes TEXT,
             Username VARCHAR(45),
             CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -112,6 +122,13 @@ def ensure_dispatch_kanban_tables():
         'ReadyForDelivery': 'VARCHAR(45)',
         'Location': 'VARCHAR(100)',
         'LFDDate': 'DATE',
+        'ECCESContainerType': 'VARCHAR(100)',
+        'ECCESChassis': 'VARCHAR(100)',
+        'ECCESAvailTerminal': 'VARCHAR(100)',
+        'ECCESGateIn': 'VARCHAR(100)',
+        'ECCESCBPExamComplete': 'VARCHAR(100)',
+        'ECCESCustomsRelease': 'VARCHAR(100)',
+        'ECCESFreightRelease': 'VARCHAR(100)',
     }
     for column_name, column_def in review_column_defs.items():
         if column_name not in review_columns:
@@ -439,6 +456,10 @@ def has_exam_or_hold(order, import_row=None):
     return bool(hold_type and hold_type.strip().lower() not in ['', 'no hold', 'none', 'null'])
 
 
+def is_ecces_hold(order):
+    return clean_text(getattr(order, 'HoldType', '')).strip().lower() == 'ecces'
+
+
 def scheduled_this_week(order, schedule=None):
     target = kanban_scheduled_datetime(order, schedule)
     if target is None:
@@ -458,6 +479,10 @@ def has_delivery_proof(order):
 
 def proof_none_required(order):
     return clean_text(getattr(order, 'Proof', '')).lower() in ['none required', 'no proof needed']
+
+
+def proof_upload_allowed_for_status(workflow_status):
+    return workflow_status in ['in_progress', 'completed']
 
 
 def ready_to_invoice_documents(order):
@@ -495,6 +520,8 @@ def is_active_kanban_order(order, workflow_status):
     status_text = (order.Status or '').lower()
     if any(term in status_text for term in ['cancel', 'closed', 'void']):
         return False
+    if int_value(order.Hstat) >= 2 and ready_to_invoice_documents(order):
+        return False
     return True
 
 
@@ -509,9 +536,10 @@ def derived_workflow_status(order, state=None, pin=None, schedule=None, import_r
     #   routes unpulled planning work to On Call. Import line/customs fields do
     #   not change dispatch workflow status by themselves.
     # - Orders.Hstat drives physical container progress: 0 unpulled, 1 pulled/in progress, 2 returned.
-    # - Delivered means POD/manual delivery confirmation before the box is returned.
-    # - Completed means the container has been returned to port and proof exists,
-    #   or Proof is marked "No Proof Needed" / "None Required".
+    # - Delivered-but-not-returned jobs remain In Progress and show a Delivered alert.
+    # - Completed Need Proof means the container has been returned to port, but
+    #   proof is still missing. Returned jobs with proof/no-proof-needed leave
+    #   the dispatch board.
     # - Orders.Istat is shown as billing status only; it should not complete dispatch workflow.
     # - PIN Assigned is only for a matching Pins row dated today, and physical progress wins.
     saved_status = normalize_workflow_status(state.get('WorkflowStatus')) if state and clean_text(state.get('WorkflowStatus')) else ''
@@ -530,15 +558,11 @@ def derived_workflow_status(order, state=None, pin=None, schedule=None, import_r
     hstat = int_value(order.Hstat)
 
     if returned_or_delivered(order):
-        if ready_to_invoice_documents(order):
-            return 'completed'
         return 'completed'
-    if saved_status == 'delivered':
-        return 'delivered'
     if is_drop_pick_order(order):
         return 'drop_pick'
     if has_delivery_proof(order):
-        return 'delivered'
+        return 'in_progress'
     if hstat == 1:
         return 'in_progress'
     if manual_hold:
@@ -687,6 +711,8 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'driver_proof': clean_text(getattr(order, 'DrvProof', '')),
         'proof_none_required': proof_none_required(order),
         'has_delivery_proof': has_delivery_proof(order),
+        'delivered_alert': has_delivery_proof(order) and not returned_or_delivered(order),
+        'delivered_message': 'Delivered' if has_delivery_proof(order) and not returned_or_delivered(order) else '',
         'order_status': order.Status or '',
         'notes': state.get('Notes') if state else '',
     }
@@ -708,7 +734,16 @@ def kanban_jobs(filters=None):
 
 
 def purge_incomplete_review_logs(order):
-    if is_import_order(order):
+    if is_ecces_hold(order):
+        completeness_condition = """
+                  Shipline IS NULL OR TRIM(Shipline) = ''
+                  OR ECCESContainerType IS NULL OR TRIM(ECCESContainerType) = ''
+                  OR ECCESChassis IS NULL OR TRIM(ECCESChassis) = ''
+                  OR ECCESAvailTerminal IS NULL OR TRIM(ECCESAvailTerminal) = ''
+                  OR ECCESGateIn IS NULL OR TRIM(ECCESGateIn) = ''
+                  OR ECCESCustomsRelease IS NULL OR TRIM(ECCESCustomsRelease) = ''
+        """
+    elif is_import_order(order):
         completeness_condition = """
                   ArrivalDate IS NULL
                   OR EquipmentSize IS NULL OR TRIM(EquipmentSize) = ''
@@ -725,13 +760,18 @@ def purge_incomplete_review_logs(order):
             WHERE OrderId = :order_id
               AND (
                   ReviewDate IS NULL
-                  OR Shipline IS NULL OR TRIM(Shipline) = ''
-                  OR Ship IS NULL OR TRIM(Ship) = ''
-                  OR Voyage IS NULL OR TRIM(Voyage) = ''
                   OR {completeness_condition}
+                  OR (
+                      :is_ecces = 0
+                      AND (
+                          Shipline IS NULL OR TRIM(Shipline) = ''
+                          OR Ship IS NULL OR TRIM(Ship) = ''
+                          OR Voyage IS NULL OR TRIM(Voyage) = ''
+                      )
+                  )
               )
         """),
-        {'order_id': order.id},
+        {'order_id': order.id, 'is_ecces': 1 if is_ecces_hold(order) else 0},
     )
     db.session.commit()
 
@@ -746,6 +786,8 @@ def review_logs_for_order(order_id):
         text("""
             SELECT id, ReviewDate, ReviewType, Shipline, Ship, Voyage, ArrivalDate, ERDDate, CutoffDate,
                    LineStatus, CustomsStatus, OtherHolds, EquipmentSize, ReadyForDelivery, Location, LFDDate,
+                   ECCESContainerType, ECCESChassis, ECCESAvailTerminal, ECCESGateIn, ECCESCBPExamComplete,
+                   ECCESCustomsRelease, ECCESFreightRelease,
                    Notes, Username, CreatedAt
             FROM dispatch_kanban_review_log
             WHERE OrderId = :order_id
@@ -757,6 +799,7 @@ def review_logs_for_order(order_id):
     return {
         'ok': True,
         'is_import': is_import_order(order),
+        'is_ecces_hold': is_ecces_hold(order),
         'reviews': [
             {
                 'id': row.get('id'),
@@ -777,6 +820,13 @@ def review_logs_for_order(order_id):
                 'ready_for_delivery': clean_text(row.get('ReadyForDelivery')),
                 'location': clean_text(row.get('Location')),
                 'lfd_date': format_date(row.get('LFDDate')) or format_date(row.get('CutoffDate')),
+                'ecces_container_type': clean_text(row.get('ECCESContainerType')),
+                'ecces_chassis': clean_text(row.get('ECCESChassis')),
+                'ecces_avail_terminal': clean_text(row.get('ECCESAvailTerminal')),
+                'ecces_gate_in': clean_text(row.get('ECCESGateIn')),
+                'ecces_cbp_exam_complete': clean_text(row.get('ECCESCBPExamComplete')),
+                'ecces_customs_release': clean_text(row.get('ECCESCustomsRelease')),
+                'ecces_freight_release': clean_text(row.get('ECCESFreightRelease')),
                 'notes': clean_text(row.get('Notes')),
                 'username': clean_text(row.get('Username')),
                 'created_at': row.get('CreatedAt').strftime('%Y-%m-%d %H:%M') if row.get('CreatedAt') else '',
@@ -865,9 +915,9 @@ def validate_status_move(order, new_status, state=None, override_pin=False):
             return 'Moving to In Progress requires an assigned truck.'
     if new_status == 'completed':
         if not returned_or_delivered(order):
-            return 'Moving to Completed requires the container to be returned.'
-        if not ready_to_invoice_documents(order):
-            return 'Moving to Completed requires proof, or mark No Proof Needed.'
+            return 'Moving to Completed Need Proof requires the container to be returned.'
+        if ready_to_invoice_documents(order):
+            return 'Returned jobs with proof, or No Proof Needed, are excluded from the Dispatch Kanban.'
     return None
 
 
@@ -987,7 +1037,12 @@ def update_job(order_id, data, username=None):
         updated_state,
         override_pin=bool(data.get('override_pin')),
     )
-    if error:
+    resolved_completed_need_proof = (
+        workflow_status == 'completed'
+        and returned_or_delivered(order)
+        and ready_to_invoice_documents(order)
+    )
+    if error and not resolved_completed_need_proof:
         return {'ok': False, 'error': error}, 400
 
     upsert_state(
@@ -1012,6 +1067,44 @@ def update_job(order_id, data, username=None):
         },
     }))
     db.session.commit()
+    return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), workflow_status)}, 200
+
+
+def upload_proof(order_id, file_storage, username=None):
+    order = Orders.query.get(order_id)
+    if order is None:
+        return {'ok': False, 'error': 'Order not found.'}, 404
+    state = state_row(order.id)
+    workflow_status = derived_workflow_status(order, state)
+    if not proof_upload_allowed_for_status(workflow_status):
+        return {'ok': False, 'error': 'Proof uploads are only available for In Progress or Completed Need Proof jobs.'}, 400
+    if has_delivery_proof(order) or proof_none_required(order):
+        return {'ok': False, 'error': 'This job already has proof or is marked No Proof Needed.'}, 400
+    if file_storage is None or not clean_text(getattr(file_storage, 'filename', '')):
+        return {'ok': False, 'error': 'Select a proof PDF to upload.'}, 400
+
+    original_name = clean_text(file_storage.filename)
+    _, extension = os.path.splitext(original_name)
+    if extension.lower() != '.pdf':
+        return {'ok': False, 'error': 'Proof upload must be a PDF file.'}, 400
+
+    try:
+        old_cache = int(getattr(order, 'Pcache', None) or 0)
+    except (TypeError, ValueError):
+        old_cache = 0
+    new_cache = old_cache + 1
+    job_key = clean_text(getattr(order, 'Jo', '')) or clean_text(getattr(order, 'Container', '')) or f'Order_{order.id}'
+    safe_job_key = secure_filename(job_key) or f'Order_{order.id}'
+    filename = f'Proof_Jo_{safe_job_key}_c{new_cache}.pdf'
+    output_path = addpath(tpath('Orders-Proof', filename))
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    file_storage.save(output_path)
+
+    order.Proof = filename
+    order.Pcache = new_cache
+    order.UserMod = username
+    db.session.commit()
+
     return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), workflow_status)}, 200
 
 

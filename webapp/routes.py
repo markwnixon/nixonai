@@ -62,6 +62,7 @@ from webapp.dispatch_kanban import (
     move_job as kanban_move_job,
     review_logs_for_order as kanban_review_logs,
     update_job as kanban_update_job,
+    upload_proof as kanban_upload_proof,
 )
 from webapp.collection_kanban import (
     collection_email_logs,
@@ -681,6 +682,14 @@ def DispatchKanbanUpdate(order_id):
     payload = request.get_json(silent=True) or {}
     username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
     result, status_code = kanban_update_job(order_id, payload, username=username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/job/<int:order_id>/upload-proof', methods=['POST'])
+@login_required
+def DispatchKanbanUploadProof(order_id):
+    username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
+    result, status_code = kanban_upload_proof(order_id, request.files.get('proof_pdf'), username=username)
     return jsonify(result), status_code
 
 

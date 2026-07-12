@@ -12,6 +12,7 @@
     const moveUrlTemplate = page.dataset.moveUrlTemplate;
     const updateUrlTemplate = page.dataset.updateUrlTemplate;
     const reviewUrlTemplate = page.dataset.reviewUrlTemplate;
+    const uploadProofUrlTemplate = page.dataset.uploadProofUrlTemplate;
     const jobsById = new Map();
     let columns = [];
 
@@ -86,6 +87,7 @@
             <div class="dispatch-kanban-card-line">${escapeHtml(job.delivery_location || 'No delivery location')}</div>
             ${job.hold_status ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.hold_status)}</div>` : ''}
             ${dropPickAlert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(dropPickAlert)}</div>` : ''}
+            ${job.delivered_alert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.delivered_message || 'Delivered')}</div>` : ''}
             ${job.pull_today_alert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.pull_today_message || 'Pull Today')}</div>` : ''}
             ${job.placeholder_delivery_date_alert && job.workflow_status !== 'drop_pick' ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.placeholder_delivery_date_message || 'Update Placeholder Delivery Date')}</div>` : ''}
             <div class="dispatch-kanban-card-line">${dateLine}</div>
@@ -169,38 +171,52 @@
         return {response, data};
     }
 
-    function renderReviews(reviews, isImportReview) {
+    function renderReviews(reviews, isImportReview, isEccesReview) {
         const target = document.getElementById('kanban-review-list');
         if (!reviews || !reviews.length) {
             target.innerHTML = '<div class="text-muted">No review history yet.</div>';
             return;
         }
-        const headers = isImportReview
-            ? ['Review<br>Date', 'Shipline', 'Vessel', 'Voyage', 'Arrival<br>Date', 'Equipment<br>Size', 'Location', 'Line<br>Status', 'Customs<br>Status', 'LFD']
-            : ['Review<br>Date', 'Shipline', 'Vessel', 'Voyage', 'Equipment<br>Size', 'ERD', 'Cutoff'];
+        const headers = isEccesReview
+            ? ['Review<br>Date', 'Shipline', 'Container<br>Type', 'Chassis', 'Avail<br>Terminal', 'CES<br>Gate In', 'CBP Exam<br>Complete', 'Customs<br>Release', 'Freight<br>Release']
+            : (isImportReview
+                ? ['Review<br>Date', 'Shipline', 'Vessel', 'Voyage', 'Arrival<br>Date', 'Equipment<br>Size', 'Location', 'Line<br>Status', 'Customs<br>Status', 'LFD']
+                : ['Review<br>Date', 'Shipline', 'Vessel', 'Voyage', 'Equipment<br>Size', 'ERD', 'Cutoff']);
         const rows = reviews.map((review) => {
-            const values = isImportReview
+            const values = isEccesReview
                 ? [
                     review.review_date || review.created_at || '',
                     review.shipline || '-',
-                    review.ship || '-',
-                    review.voyage || '-',
-                    review.arrival_date || '-',
-                    review.equipment_size || '-',
-                    review.location || '-',
-                    review.line_status || '-',
-                    review.customs_status || '-',
-                    review.lfd_date || '-',
+                    review.ecces_container_type || '-',
+                    review.ecces_chassis || '-',
+                    review.ecces_avail_terminal || '-',
+                    review.ecces_gate_in || '-',
+                    review.ecces_cbp_exam_complete || '-',
+                    review.ecces_customs_release || '-',
+                    review.ecces_freight_release || '-',
                 ]
-                : [
-                    review.review_date || review.created_at || '',
-                    review.shipline || '-',
-                    review.ship || '-',
-                    review.voyage || '-',
-                    review.equipment_size || '-',
-                    review.erd_date || '-',
-                    review.cutoff_date || '-',
-                ];
+                : (isImportReview
+                    ? [
+                        review.review_date || review.created_at || '',
+                        review.shipline || '-',
+                        review.ship || '-',
+                        review.voyage || '-',
+                        review.arrival_date || '-',
+                        review.equipment_size || '-',
+                        review.location || '-',
+                        review.line_status || '-',
+                        review.customs_status || '-',
+                        review.lfd_date || '-',
+                    ]
+                    : [
+                        review.review_date || review.created_at || '',
+                        review.shipline || '-',
+                        review.ship || '-',
+                        review.voyage || '-',
+                        review.equipment_size || '-',
+                        review.erd_date || '-',
+                        review.cutoff_date || '-',
+                    ]);
             return `<tr>${values.map((value) => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`;
         }).join('');
         target.innerHTML = `
@@ -228,7 +244,7 @@
             target.innerHTML = '<div class="text-danger">Unable to load review history.</div>';
             return;
         }
-        renderReviews(data.reviews || [], Boolean(data.is_import));
+        renderReviews(data.reviews || [], Boolean(data.is_import), Boolean(data.is_ecces_hold));
     }
 
     async function handleDrop(event) {
@@ -276,7 +292,6 @@
             'drop_pick',
             'pin_assigned',
             'in_progress',
-            'delivered',
             'completed',
         ].includes(job.workflow_status);
         document.getElementById('kanban-modal-order-id').value = job.id;
@@ -325,6 +340,8 @@
         setModalGroupVisible('.kanban-modal-pin-field', !isPlanningReviewStatus);
         setModalGroupVisible('.kanban-modal-billing-field', !isPlanningReviewStatus);
         const showReviewPanel = isPlanningReviewStatus;
+        document.querySelector('.dispatch-kanban-review-title').textContent =
+            (job.hold_status || '').toLowerCase() === 'ecces' ? 'ECCES Review Log' : 'Daily Review Log';
         document.getElementById('kanban-review-panel').classList.toggle('d-none', !showReviewPanel);
         if (showReviewPanel) {
             loadReviews(job.id);
@@ -342,6 +359,11 @@
         document.getElementById('kanban-modal-notes').value = job.notes || '';
         document.getElementById('kanban-modal-override-pin').checked = false;
         document.getElementById('kanban-modal-no-proof-needed').checked = Boolean(job.proof_none_required);
+        const showProofUpload = ['in_progress', 'completed'].includes(job.workflow_status)
+            && !job.has_delivery_proof
+            && !job.proof_none_required;
+        document.getElementById('kanban-proof-upload-panel').classList.toggle('d-none', !showProofUpload);
+        document.getElementById('kanban-proof-file').value = '';
         modal.modal('show');
     }
 
@@ -372,6 +394,35 @@
         showMessage('Dispatch job saved.', 'success');
         loadBoard();
     });
+
+    document.getElementById('kanban-proof-upload-button').addEventListener('click', async () => {
+        const jobId = document.getElementById('kanban-modal-order-id').value;
+        const fileInput = document.getElementById('kanban-proof-file');
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            showMessage('Select a proof PDF to upload.', 'warning');
+            return;
+        }
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            showMessage('Proof upload must be a PDF file.', 'warning');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('proof_pdf', file);
+        const response = await fetch(endpoint(uploadProofUrlTemplate, jobId), {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to upload proof PDF.', 'warning');
+            return;
+        }
+        modal.modal('hide');
+        showMessage('Proof PDF uploaded.', 'success');
+        loadBoard();
+    });
+
     document.querySelectorAll('.kanban-filter').forEach((field) => {
         field.addEventListener('change', loadBoard);
     });

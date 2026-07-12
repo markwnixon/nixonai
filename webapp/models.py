@@ -1106,8 +1106,9 @@ class People(db.Model):
     Saljp = db.Column('Saljp', db.String(45))
     Saloa = db.Column('Saloa', db.String(45))
     Salap = db.Column('Salap', db.String(45))
+    NoProofNeeded = db.Column('NoProofNeeded', db.Integer, default=0)
 
-    def __init__(self, Ptype, Company, First, Middle, Last, Addr1, Addr2, Addr3, Idtype, Idnumber, Telephone, Email, Associate1, Associate2, Temp1, Temp2, Date1, Date2, Source, Accountid, Saljp, Saloa, Salap):
+    def __init__(self, Ptype, Company, First, Middle, Last, Addr1, Addr2, Addr3, Idtype, Idnumber, Telephone, Email, Associate1, Associate2, Temp1, Temp2, Date1, Date2, Source, Accountid, Saljp, Saloa, Salap, NoProofNeeded=0):
         self.Ptype = Ptype
         self.Company = Company
         self.First = First
@@ -1131,6 +1132,7 @@ class People(db.Model):
         self.Saljp = Saljp
         self.Saloa = Saloa
         self.Salap = Salap
+        self.NoProofNeeded = NoProofNeeded
 
 
 
