@@ -82,6 +82,13 @@ def ensure_dispatch_kanban_tables():
             ArrivalDate DATE,
             ERDDate DATE,
             CutoffDate DATE,
+            LineStatus VARCHAR(100),
+            CustomsStatus VARCHAR(100),
+            OtherHolds VARCHAR(255),
+            EquipmentSize VARCHAR(100),
+            ReadyForDelivery VARCHAR(45),
+            Location VARCHAR(100),
+            LFDDate DATE,
             Notes TEXT,
             Username VARCHAR(45),
             CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -98,6 +105,13 @@ def ensure_dispatch_kanban_tables():
         'ArrivalDate': 'DATE',
         'ERDDate': 'DATE',
         'CutoffDate': 'DATE',
+        'LineStatus': 'VARCHAR(100)',
+        'CustomsStatus': 'VARCHAR(100)',
+        'OtherHolds': 'VARCHAR(255)',
+        'EquipmentSize': 'VARCHAR(100)',
+        'ReadyForDelivery': 'VARCHAR(45)',
+        'Location': 'VARCHAR(100)',
+        'LFDDate': 'DATE',
     }
     for column_name, column_def in review_column_defs.items():
         if column_name not in review_columns:
@@ -332,12 +346,25 @@ def next_business_day(day):
     return current
 
 
+def add_business_days(day, count):
+    current = day
+    for _ in range(count):
+        current = next_business_day(current)
+    return current
+
+
 def pin_planning_cutoff(now=None):
     now = now or datetime.datetime.now()
     close_time = datetime.time(16, 30)
+    if now.date().weekday() >= 5:
+        return next_business_day(now.date())
     if now.time() >= close_time:
         return next_business_day(now.date())
     return now.date()
+
+
+def upcoming_delivery_window_end(now=None):
+    return add_business_days(pin_planning_cutoff(now), 5)
 
 
 def kanban_delivery_location(order):
@@ -397,7 +424,10 @@ def confirmed_delivery(order, schedule=None):
 
 def is_upcoming_delivery(order, schedule=None):
     target = kanban_scheduled_datetime(order, schedule)
-    return bool(target and target.date() > pin_planning_cutoff())
+    if not target:
+        return False
+    cutoff = pin_planning_cutoff()
+    return cutoff < target.date() <= upcoming_delivery_window_end()
 
 
 def is_new_future_import(order):
@@ -405,7 +435,8 @@ def is_new_future_import(order):
 
 
 def has_exam_or_hold(order, import_row=None):
-    return bool(clean_text(getattr(order, 'HoldType', '')))
+    hold_type = clean_text(getattr(order, 'HoldType', ''))
+    return bool(hold_type and hold_type.strip().lower() not in ['', 'no hold', 'none', 'null'])
 
 
 def scheduled_this_week(order, schedule=None):
@@ -438,6 +469,25 @@ def scheduled_for_today(order, schedule=None):
     return bool(target and target.date() == datetime.date.today())
 
 
+def delivery_qualifies_for_port_today(order, schedule=None):
+    target = kanban_scheduled_datetime(order, schedule)
+    return bool(target and target.date() <= pin_planning_cutoff() and not has_past_placeholder_delivery_date(order, schedule))
+
+
+def planned_pull_qualifies_for_port_today(order):
+    pull_date = order_date(getattr(order, 'Date', None))
+    return bool(pull_date and pull_date == pin_planning_cutoff())
+
+
+def port_today_only_for_planned_pull(order, schedule=None):
+    return planned_pull_qualifies_for_port_today(order) and not delivery_qualifies_for_port_today(order, schedule)
+
+
+def has_past_placeholder_delivery_date(order, schedule=None):
+    target = kanban_scheduled_datetime(order, schedule)
+    return bool(target and target.date() < datetime.date.today())
+
+
 def is_active_kanban_order(order, workflow_status):
     # Kanban is an operations board, so invoice/payment status should not hide
     # dispatch work. Completion is controlled by the Kanban workflow state and
@@ -454,7 +504,10 @@ def active_trucks_available():
 
 def derived_workflow_status(order, state=None, pin=None, schedule=None, import_row=None):
     # Kanban mapping from existing Class8 fields:
-    # - Physical movement and hold/exam flags can override an older saved workflow state.
+    # - Physical movement can override an older saved workflow state.
+    # - Orders.HoldType is manually maintained; if set to a real hold value it
+    #   routes unpulled planning work to On Call. Import line/customs fields do
+    #   not change dispatch workflow status by themselves.
     # - Orders.Hstat drives physical container progress: 0 unpulled, 1 pulled/in progress, 2 returned.
     # - Delivered means POD/manual delivery confirmation before the box is returned.
     # - Completed means the container has been returned to port and proof exists,
@@ -462,6 +515,18 @@ def derived_workflow_status(order, state=None, pin=None, schedule=None, import_r
     # - Orders.Istat is shown as billing status only; it should not complete dispatch workflow.
     # - PIN Assigned is only for a matching Pins row dated today, and physical progress wins.
     saved_status = normalize_workflow_status(state.get('WorkflowStatus')) if state and clean_text(state.get('WorkflowStatus')) else ''
+    manual_hold = has_exam_or_hold(order, import_row)
+    if saved_status == 'on_call' and not manual_hold:
+        saved_status = ''
+    if saved_status == 'port_today':
+        if not delivery_qualifies_for_port_today(order, schedule) and not planned_pull_qualifies_for_port_today(order):
+            saved_status = ''
+    if (
+        saved_status == 'upcoming_deliveries'
+        and not is_upcoming_delivery(order, schedule)
+        and not has_past_placeholder_delivery_date(order, schedule)
+    ):
+        saved_status = ''
     hstat = int_value(order.Hstat)
 
     if returned_or_delivered(order):
@@ -476,19 +541,22 @@ def derived_workflow_status(order, state=None, pin=None, schedule=None, import_r
         return 'delivered'
     if hstat == 1:
         return 'in_progress'
-    if has_exam_or_hold(order, import_row):
+    if manual_hold:
         return 'on_call'
+    if has_past_placeholder_delivery_date(order, schedule) and not planned_pull_qualifies_for_port_today(order):
+        return 'upcoming_deliveries'
     if pin_is_for_today(pin):
         return 'pin_assigned'
-    if scheduled_for_today(order, schedule):
+    if delivery_qualifies_for_port_today(order, schedule) or planned_pull_qualifies_for_port_today(order):
         return 'port_today'
     if saved_status and saved_status != 'pin_assigned':
         return saved_status
     if confirmed_delivery(order, schedule):
         planned = kanban_scheduled_datetime(order, schedule)
-        if planned and planned.date() <= pin_planning_cutoff():
+        if planned and delivery_qualifies_for_port_today(order, schedule):
             return 'port_today'
-        return 'upcoming_deliveries'
+        if is_upcoming_delivery(order, schedule):
+            return 'upcoming_deliveries'
     if is_new_future_import(order):
         return 'new_orders'
     if has_container_identity(order):
@@ -576,6 +644,8 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'id': order.id,
         'workflow_status': workflow_status,
         'workflow_label': KANBAN_STATUS_LABELS.get(workflow_status, workflow_status),
+        'is_import': is_import_order(order),
+        'is_export': not is_import_order(order),
         'jo': order.Jo,
         'container': order.Container or '',
         'container_type': order.Type or '',
@@ -589,14 +659,21 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'pickup_terminal': kanban_pickup_terminal(order),
         'delivery_location': kanban_delivery_location(order),
         'delivery_city_state': kanban_delivery_city_state(order),
+        'delivery_type': clean_text(getattr(order, 'Delivery', '')),
         'required_delivery_date': format_date(order.Date3),
         'scheduled_delivery_date': planned.strftime('%Y-%m-%d') if planned else '',
         'scheduled_delivery_time': planned.strftime('%H:%M') if planned and planned.time() != datetime.time.min else '',
         'pull_date': format_date(order.Date),
         'return_date': format_date(order.Date2),
+        'erd_date': format_date(order.Date4),
         'last_free_day': format_date(order.Date5),
+        'cutoff_date': format_date(order.Date5),
         'ship_arrive_date': format_date(order.Date6),
         'due_back_date': format_date(order.Date7),
+        'placeholder_delivery_date_alert': has_past_placeholder_delivery_date(order, schedule),
+        'placeholder_delivery_date_message': 'Update Placeholder Delivery Date' if has_past_placeholder_delivery_date(order, schedule) else '',
+        'pull_today_alert': port_today_only_for_planned_pull(order, schedule),
+        'pull_today_message': 'Pull Today' if port_today_only_for_planned_pull(order, schedule) else '',
         'hold_status': clean_text(getattr(order, 'HoldType', '')),
         'is_drop_pick': is_drop_pick_order(order),
         'drop_pick_pulled': is_drop_pick_order(order) and int_value(order.Hstat) >= 1,
@@ -630,14 +707,45 @@ def kanban_jobs(filters=None):
     }
 
 
+def purge_incomplete_review_logs(order):
+    if is_import_order(order):
+        completeness_condition = """
+                  ArrivalDate IS NULL
+                  OR EquipmentSize IS NULL OR TRIM(EquipmentSize) = ''
+                  OR Location IS NULL OR TRIM(Location) = ''
+                  OR LineStatus IS NULL OR TRIM(LineStatus) = ''
+                  OR CustomsStatus IS NULL OR TRIM(CustomsStatus) = ''
+                  OR LFDDate IS NULL
+        """
+    else:
+        completeness_condition = 'ERDDate IS NULL OR CutoffDate IS NULL'
+    db.session.execute(
+        text(f"""
+            DELETE FROM dispatch_kanban_review_log
+            WHERE OrderId = :order_id
+              AND (
+                  ReviewDate IS NULL
+                  OR Shipline IS NULL OR TRIM(Shipline) = ''
+                  OR Ship IS NULL OR TRIM(Ship) = ''
+                  OR Voyage IS NULL OR TRIM(Voyage) = ''
+                  OR {completeness_condition}
+              )
+        """),
+        {'order_id': order.id},
+    )
+    db.session.commit()
+
+
 def review_logs_for_order(order_id):
     ensure_dispatch_kanban_tables()
     order = Orders.query.get(order_id)
     if order is None:
         return {'ok': False, 'error': 'Order not found.'}, 404
+    purge_incomplete_review_logs(order)
     rows = db.session.execute(
         text("""
             SELECT id, ReviewDate, ReviewType, Shipline, Ship, Voyage, ArrivalDate, ERDDate, CutoffDate,
+                   LineStatus, CustomsStatus, OtherHolds, EquipmentSize, ReadyForDelivery, Location, LFDDate,
                    Notes, Username, CreatedAt
             FROM dispatch_kanban_review_log
             WHERE OrderId = :order_id
@@ -648,6 +756,7 @@ def review_logs_for_order(order_id):
     ).mappings().all()
     return {
         'ok': True,
+        'is_import': is_import_order(order),
         'reviews': [
             {
                 'id': row.get('id'),
@@ -661,6 +770,13 @@ def review_logs_for_order(order_id):
                 'arrival_date': format_date(row.get('ArrivalDate')),
                 'erd_date': format_date(row.get('ERDDate')),
                 'cutoff_date': format_date(row.get('CutoffDate')),
+                'line_status': clean_text(row.get('LineStatus')),
+                'customs_status': clean_text(row.get('CustomsStatus')),
+                'other_holds': clean_text(row.get('OtherHolds')),
+                'equipment_size': clean_text(row.get('EquipmentSize')),
+                'ready_for_delivery': clean_text(row.get('ReadyForDelivery')),
+                'location': clean_text(row.get('Location')),
+                'lfd_date': format_date(row.get('LFDDate')) or format_date(row.get('CutoffDate')),
                 'notes': clean_text(row.get('Notes')),
                 'username': clean_text(row.get('Username')),
                 'created_at': row.get('CreatedAt').strftime('%Y-%m-%d %H:%M') if row.get('CreatedAt') else '',
@@ -680,25 +796,36 @@ def log_review(order_id, data, username=None):
     review_date = parse_date(data.get('review_date')) or datetime.date.today()
     if not notes:
         return {'ok': False, 'error': 'Review notes are required.'}, 400
+    import_row = import_from_lookup(order, import_lookup_for_orders([order])) if is_import_order(order) else None
+    import_lfd = parse_date(clean_text(import_row.LFD)) if import_row else None
     db.session.execute(
         text("""
             INSERT INTO dispatch_kanban_review_log
                 (OrderId, ReviewDate, ReviewType, Shipline, Ship, Voyage, ArrivalDate, ERDDate, CutoffDate,
-                 Notes, Username, CreatedAt)
+                 LineStatus, CustomsStatus, OtherHolds, EquipmentSize, ReadyForDelivery, Location, LFDDate, Notes, Username,
+                 CreatedAt)
             VALUES
                 (:order_id, :review_date, :review_type, :shipline, :ship, :voyage, :arrival_date, :erd_date,
-                 :cutoff_date, :notes, :username, :created_at)
+                 :cutoff_date, :line_status, :customs_status, :other_holds, :equipment_size, :ready_for_delivery,
+                 :location, :lfd_date, :notes, :username, :created_at)
         """),
         {
             'order_id': order_id,
             'review_date': review_date,
             'review_type': review_type,
             'shipline': clean_text(order.SSCO),
-            'ship': clean_text(order.Ship),
-            'voyage': clean_text(order.Voyage),
+            'ship': clean_text(order.Ship) or (clean_text(import_row.Vessel) if import_row else ''),
+            'voyage': clean_text(order.Voyage) or (clean_text(import_row.Voyage) if import_row else ''),
             'arrival_date': order_date(order.Date6),
             'erd_date': order_date(order.Date4) if not is_import_order(order) else None,
             'cutoff_date': order_date(order.Date5) if not is_import_order(order) else None,
+            'line_status': clean_text(import_row.LineStatus) if import_row else '',
+            'customs_status': clean_text(import_row.CustomsStatus) if import_row else '',
+            'other_holds': clean_text(import_row.OtherHolds) if import_row else '',
+            'equipment_size': clean_text(import_row.Size) if import_row else clean_text(order.Type),
+            'ready_for_delivery': clean_text(import_row.Ready) if import_row else '',
+            'location': clean_text(import_row.Location) if import_row else clean_text(order.Location3),
+            'lfd_date': import_lfd or order_date(order.Date5) if is_import_order(order) else None,
             'notes': notes,
             'username': username or 'dispatch',
             'created_at': datetime.datetime.utcnow(),
@@ -811,8 +938,18 @@ def update_job(order_id, data, username=None):
         return {'ok': False, 'error': 'Order not found.'}, 404
     state = state_row(order.id)
     workflow_status = normalize_workflow_status(data.get('workflow_status')) or derived_workflow_status(order, state)
-    old_fields = {'Driver': order.Driver, 'Truck': order.Truck, 'Status': order.Status, 'Proof': order.Proof}
+    old_fields = {
+        'Driver': order.Driver,
+        'Truck': order.Truck,
+        'Status': order.Status,
+        'Proof': order.Proof,
+        'HoldType': clean_text(getattr(order, 'HoldType', '')),
+        'Delivery': clean_text(getattr(order, 'Delivery', '')),
+        'Date': format_date(order.Date),
+    }
 
+    order.HoldType = clean_text(data.get('hold_type'))
+    order.Delivery = clean_text(data.get('delivery_type'))
     order.Driver = clean_text(data.get('driver'))
     order.Truck = clean_text(data.get('truck'))
     order.Status = clean_text(data.get('order_status')) or order.Status
@@ -837,6 +974,12 @@ def update_job(order_id, data, username=None):
             action='kanban_update',
         )
 
+    planned_pull_date = parse_date(data.get('planned_pull_date'))
+    if planned_pull_date:
+        order.Date = datetime.datetime.combine(planned_pull_date, datetime.time.min)
+        order.UserMod = username
+        db.session.commit()
+
     updated_state = state_row(order.id)
     error = validate_status_move(
         order,
@@ -858,7 +1001,15 @@ def update_job(order_id, data, username=None):
     )
     audit_status_change(order.id, 'order_fields', 'order_fields', username, str({
         'old': old_fields,
-        'new': {'Driver': order.Driver, 'Truck': order.Truck, 'Status': order.Status, 'Proof': order.Proof},
+        'new': {
+            'Driver': order.Driver,
+            'Truck': order.Truck,
+            'Status': order.Status,
+            'Proof': order.Proof,
+            'HoldType': clean_text(getattr(order, 'HoldType', '')),
+            'Delivery': clean_text(getattr(order, 'Delivery', '')),
+            'Date': format_date(order.Date),
+        },
     }))
     db.session.commit()
     return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), workflow_status)}, 200
@@ -880,6 +1031,8 @@ def kanban_options():
             customers.add(clean_text(company))
     options['customers'] = sorted(customers)
     options['columns'] = [{'key': key, 'label': label} for key, label in KANBAN_COLUMNS]
+    options['hold_types'] = ['', 'ECCES', 'Line Hold', 'Custom Hold', 'Other Hold', 'Line and Customs Hold']
+    options['delivery_types'] = ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder']
     options['ranges'] = [
         {'key': 'today', 'label': 'Today'},
         {'key': 'tomorrow', 'label': 'Tomorrow'},

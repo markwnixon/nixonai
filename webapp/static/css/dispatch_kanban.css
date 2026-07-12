@@ -150,6 +150,10 @@
     margin: 0;
 }
 
+.dispatch-kanban-modal-dialog {
+    max-width: min(50vw, 1100px);
+}
+
 .dispatch-kanban-review-panel {
     border: 1px solid #d9dee4;
     border-radius: 6px;
@@ -162,23 +166,35 @@
     margin-bottom: 8px;
 }
 
-.dispatch-kanban-review-item {
-    border-top: 1px solid #edf0f2;
-    padding: 8px 0;
+.dispatch-kanban-review-table-wrap {
+    overflow-x: visible;
 }
 
-.dispatch-kanban-review-item:first-child {
-    border-top: 0;
-    padding-top: 0;
-}
-
-.dispatch-kanban-review-meta {
-    color: #6c757d;
-    font-size: 0.8rem;
-}
-
-.dispatch-kanban-review-notes {
+.dispatch-kanban-review-table {
+    background: #fff;
     color: #343a40;
-    font-size: 0.85rem;
-    white-space: pre-wrap;
+    font-size: 0.76rem;
+    table-layout: auto;
+    width: 100%;
+}
+
+.dispatch-kanban-review-table th {
+    background: #f6f7f9;
+    color: #495057;
+    font-weight: 700;
+    line-height: 1.05;
+    padding: 0.3rem 0.35rem;
+    white-space: normal;
+    vertical-align: middle;
+}
+
+.dispatch-kanban-review-table td {
+    padding: 0.3rem 0.35rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 1400px) {
+    .dispatch-kanban-modal-dialog {
+        max-width: 90vw;
+    }
 }

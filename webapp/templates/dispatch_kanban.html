@@ -7,8 +7,7 @@
      data-jobs-url="{{ url_for('main.DispatchKanbanJobs') }}"
      data-move-url-template="{{ url_for('main.DispatchKanbanMove', order_id=0) }}"
      data-update-url-template="{{ url_for('main.DispatchKanbanUpdate', order_id=0) }}"
-     data-review-url-template="{{ url_for('main.DispatchKanbanReviews', order_id=0) }}"
-     data-log-review-url-template="{{ url_for('main.DispatchKanbanLogReview', order_id=0) }}">
+     data-review-url-template="{{ url_for('main.DispatchKanbanReviews', order_id=0) }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <div>
             <h3 class="mb-1">Dispatch Kanban Board</h3>
@@ -71,7 +70,7 @@
 </div>
 
 <div class="modal fade" id="dispatch-kanban-modal" tabindex="-1" role="dialog" aria-labelledby="dispatch-kanban-modal-title" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-lg dispatch-kanban-modal-dialog" role="document">
         <div class="modal-content">
             <form id="dispatch-kanban-form">
                 <div class="modal-header">
@@ -84,7 +83,7 @@
                     <input type="hidden" id="kanban-modal-order-id">
                     <div id="kanban-modal-summary" class="dispatch-kanban-summary mb-3"></div>
                     <div class="form-row">
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-3">
                             <label for="kanban-modal-status">Workflow Status</label>
                             <select id="kanban-modal-status" class="form-control">
                                 {% for column in options.columns %}
@@ -92,7 +91,19 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="form-group col-md-4 kanban-modal-assignment-field">
+                        <div class="form-group col-md-3 kanban-modal-hold-field">
+                            <label for="kanban-modal-hold-type">Hold Type</label>
+                            <select id="kanban-modal-hold-type" class="form-control">
+                                {% for hold_type in options.hold_types %}
+                                    <option value="{{ hold_type }}">{{ hold_type if hold_type else 'No Hold' }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-3 kanban-modal-planned-pull-field">
+                            <label for="kanban-modal-planned-pull-date">Planned Pull Date</label>
+                            <input type="date" id="kanban-modal-planned-pull-date" class="form-control">
+                        </div>
+                        <div class="form-group col-md-3 kanban-modal-assignment-field">
                             <label for="kanban-modal-driver">Driver</label>
                             <select id="kanban-modal-driver" class="form-control">
                                 <option value="">Unassigned</option>
@@ -101,7 +112,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="form-group col-md-4 kanban-modal-assignment-field">
+                        <div class="form-group col-md-3 kanban-modal-assignment-field">
                             <label for="kanban-modal-truck">Truck</label>
                             <select id="kanban-modal-truck" class="form-control">
                                 <option value="">Unassigned</option>
@@ -128,6 +139,15 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        <div class="form-group col-md-3">
+                            <label for="kanban-modal-delivery-type">Delivery Type</label>
+                            <select id="kanban-modal-delivery-type" class="form-control">
+                                <option value="">No type</option>
+                                {% for delivery_type in options.delivery_types %}
+                                    <option value="{{ delivery_type }}">{{ delivery_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <div class="form-group col-md-3 kanban-modal-pin-field">
                             <label for="kanban-modal-pin">PIN Reference</label>
                             <input type="text" id="kanban-modal-pin" class="form-control">
@@ -151,23 +171,6 @@
                     </div>
                     <div id="kanban-review-panel" class="dispatch-kanban-review-panel mt-3 d-none">
                         <div class="dispatch-kanban-review-title">Daily Review Log</div>
-                        <div class="form-row align-items-end">
-                            <div class="form-group col-md-4">
-                                <label for="kanban-review-type">Review Type</label>
-                                <select id="kanban-review-type" class="form-control">
-                                    <option value="Daily Review">Daily Review</option>
-                                    <option value="Ship Arrival">Ship Arrival</option>
-                                    <option value="Exam Availability">Exam Availability</option>
-                                    <option value="Port Availability">Port Availability</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div class="form-group col-md-8">
-                                <label for="kanban-review-notes">Review Notes</label>
-                                <textarea id="kanban-review-notes" class="form-control" rows="2"></textarea>
-                            </div>
-                        </div>
-                        <button id="kanban-review-save" type="button" class="btn btn-sm btn-outline-primary">Log Review</button>
                         <div id="kanban-review-list" class="dispatch-kanban-review-list text-muted mt-3">Select a job to load review history.</div>
                     </div>
                 </div>
