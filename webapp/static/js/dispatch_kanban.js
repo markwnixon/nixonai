@@ -312,6 +312,10 @@
             job.ship || '',
             job.voyage || '',
         ].filter(Boolean).join(' | ');
+        const releaseLabel = job.is_import ? 'BOL' : 'Booking';
+        const releaseSummaryLine = job.release
+            ? `<dt>${releaseLabel}</dt><dd>${escapeHtml(job.release)}</dd>`
+            : '';
         const portDateLines = job.is_import ? `
                 <dt>Ship Arrives</dt><dd>${escapeHtml(job.ship_arrive_date || '-')}</dd>
                 <dt>LFD</dt><dd>${escapeHtml(job.last_free_day || '-')}</dd>
@@ -323,6 +327,7 @@
             <dl>
                 <dt>Customer|Size</dt><dd>${escapeHtml(customerLine || '-')}</dd>
                 <dt>Delivery</dt><dd>${escapeHtml(job.delivery_location || '-')}</dd>
+                ${releaseSummaryLine}
                 <dt>SSCO|Vessel|Voyage</dt><dd>${escapeHtml(vesselLine || '-')}</dd>
                 <dt>Planned Pull Date</dt><dd>${escapeHtml(job.pull_date || '-')}</dd>
                 ${portDateLines}

@@ -680,7 +680,7 @@ def kanban_job_card(order, state=None, workflow_status=None, schedule=None, pin=
         'container': order.Container or '',
         'container_type': order.Type or '',
         'booking': order.Booking or '',
-        'release': display_text(getattr(order, 'Release', '')),
+        'release': display_text(order.Booking),
         'customer': order.Shipper or order.Company or '',
         'shipper': order.Shipper or '',
         'steamship_line': order.SSCO or order.Ship or '',
