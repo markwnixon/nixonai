@@ -54,6 +54,14 @@
         return `${identity}${job.delivery_city_state ? ` | ${job.delivery_city_state}` : ''}`;
     }
 
+    function releaseLine(job) {
+        if (!job.release) {
+            return '';
+        }
+        const label = job.is_import ? 'BOL' : 'Booking';
+        return `<div class="dispatch-kanban-card-line">${label}: ${escapeHtml(job.release)}</div>`;
+    }
+
     function renderCard(job) {
         const card = document.createElement('div');
         card.className = 'dispatch-kanban-card';
@@ -67,6 +75,7 @@
                 <div class="dispatch-kanban-card-title">${escapeHtml(cardTitle(job))}</div>
                 <div class="dispatch-kanban-card-line">${escapeHtml(job.customer || job.shipper || 'No customer')}</div>
                 <div class="dispatch-kanban-card-line">${escapeHtml(job.delivery_location || 'No delivery address')}</div>
+                ${releaseLine(job)}
                 <div class="dispatch-kanban-card-line">Ship Arrives: ${escapeHtml(job.ship_arrive_date || '-')}</div>
                 <div class="dispatch-kanban-card-line">Anticipated Pull: ${escapeHtml(job.pull_date || '-')}</div>
                 <div class="dispatch-kanban-card-line">LFD: ${escapeHtml(job.last_free_day || '-')}</div>
@@ -85,6 +94,7 @@
             <div class="dispatch-kanban-card-line">${escapeHtml(job.customer || job.shipper || 'No customer')}</div>
             <div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml([job.steamship_line, job.container_type].filter(Boolean).join(' | ') || 'No steamship line')}</div>
             <div class="dispatch-kanban-card-line">${escapeHtml(job.delivery_location || 'No delivery location')}</div>
+            ${releaseLine(job)}
             ${job.hold_status ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.hold_status)}</div>` : ''}
             ${dropPickAlert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(dropPickAlert)}</div>` : ''}
             ${job.delivered_alert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.delivered_message || 'Delivered')}</div>` : ''}
