@@ -466,6 +466,68 @@ def display_text(value):
     return str(value).strip()
 
 
+def split_booking(value):
+    value = display_text(value)
+    return value.split('-', 1)[0] if value else ''
+
+
+def short_container_type(value):
+    value = display_text(value).upper()
+    if '45' in value and '9' in value:
+        label = '45HC'
+    elif '40' in value and '9' in value:
+        label = '40HC'
+    elif '40' in value and '8' in value:
+        label = '40STD'
+    elif '45' in value and '8' in value:
+        label = '45STD'
+    elif '20' in value:
+        label = '20'
+    else:
+        label = value
+    if 'R' in value and 'REEFER' not in label:
+        label = f'{label} Reefer'.strip()
+    if 'U' in value and 'OPENTOP' not in label:
+        label = f'{label} OpenTop'.strip()
+    return label
+
+
+def dispatch_city(order):
+    city_state = kanban_delivery_city_state(order)
+    if city_state:
+        return city_state.split(',', 1)[0].strip()
+    shipper = display_text(getattr(order, 'Shipper', ''))
+    return shipper.split()[0] if shipper else ''
+
+
+def pin_order_text(order, direction):
+    ctext = short_container_type(getattr(order, 'Type', ''))
+    city = dispatch_city(order)
+    context = ' '.join([value for value in [ctext, city] if value])
+    context = f' ({context})' if context else ''
+    is_import = is_import_order(order)
+    booking = split_booking(getattr(order, 'Booking', ''))
+    container = display_text(getattr(order, 'Container', ''))
+    if direction == 'in':
+        if is_import:
+            return f'Empty In: *{container}*{context}'
+        return f'Load In: *{booking}  {container}*{context}'
+    if is_import:
+        short_book = booking[-4:] if booking else ''
+        return f'Load Out: *{short_book}  {container}*{context}'
+    return f'Empty Out: *{booking}*{context}'
+
+
+def append_pin_to_text(text_value, pin_value):
+    text_value = display_text(text_value)
+    pin_value = display_text(pin_value)
+    if not text_value or not pin_value or pin_value == '0':
+        return text_value
+    if pin_value.lower() in text_value.lower():
+        return text_value
+    return f'{text_value} PIN: *{pin_value}*'
+
+
 def scheduled_this_week(order, schedule=None):
     target = kanban_scheduled_datetime(order, schedule)
     if target is None:
@@ -730,10 +792,15 @@ def kanban_jobs(filters=None):
     jobs_by_status = {key: [] for key, label in KANBAN_COLUMNS}
     total_jobs = 0
     for order, state, workflow_status, schedule, pin, import_row in filtered_orders(filters):
+        if workflow_status == 'pin_assigned':
+            continue
         jobs_by_status.setdefault(workflow_status, []).append(
             kanban_job_card(order, state, workflow_status, schedule, pin, import_row)
         )
         total_jobs += 1
+    pin_cards = pin_pairing_cards()
+    jobs_by_status['pin_assigned'] = pin_cards
+    total_jobs += len(pin_cards)
     return {
         'total_jobs': total_jobs,
         'columns': [{'key': key, 'label': label, 'jobs': jobs_by_status.get(key, [])} for key, label in KANBAN_COLUMNS],
@@ -1113,6 +1180,216 @@ def upload_proof(order_id, file_storage, username=None):
     db.session.commit()
 
     return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), workflow_status)}, 200
+
+
+def pin_make_allowed(order, workflow_status=None):
+    workflow_status = workflow_status or derived_workflow_status(order, state_row(order.id))
+    return bool(
+        workflow_status == 'drop_pick'
+        and not is_import_order(order)
+        and int_value(getattr(order, 'Hstat', None)) >= 1
+    )
+
+
+def pin_job_summary(order, direction):
+    return {
+        'id': order.id,
+        'jo': display_text(getattr(order, 'Jo', '')),
+        'customer': display_text(getattr(order, 'Shipper', '')) or display_text(getattr(order, 'Company', '')),
+        'container': display_text(getattr(order, 'Container', '')),
+        'booking': display_text(getattr(order, 'Booking', '')),
+        'container_type': display_text(getattr(order, 'Type', '')),
+        'chassis': display_text(getattr(order, 'Chassis', '')),
+        'delivery': kanban_delivery_location(order),
+        'text': pin_order_text(order, direction),
+        'date': format_date(getattr(order, 'Date', None)),
+        'haul_type': display_text(getattr(order, 'HaulType', '')),
+    }
+
+
+def make_pin_candidates(order_id):
+    order = Orders.query.get(order_id)
+    if order is None:
+        return {'ok': False, 'error': 'Order not found.'}, 404
+    workflow_status = derived_workflow_status(order, state_row(order.id))
+    if not pin_make_allowed(order, workflow_status):
+        return {'ok': False, 'error': 'Make Pin is only available for pulled export Drop-Pick jobs.'}, 400
+
+    today = datetime.date.today()
+    start = datetime.datetime.combine(today - datetime.timedelta(days=45), datetime.time.min)
+    end = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time.max)
+    query = (
+        Orders.query
+        .filter(Orders.id != order.id)
+        .filter(or_(Orders.Hstat.is_(None), Orders.Hstat < 1))
+        .filter(or_(Orders.Date.between(start, end), Orders.Date3.between(start, end)))
+        .order_by(Orders.Date.asc(), Orders.Date3.asc())
+        .limit(120)
+    )
+    candidates = []
+    for candidate in query.all():
+        status_text = display_text(getattr(candidate, 'Status', '')).lower()
+        if any(term in status_text for term in ['cancel', 'closed', 'void']):
+            continue
+        if not display_text(getattr(candidate, 'Booking', '')) and not display_text(getattr(candidate, 'Container', '')):
+            continue
+        candidates.append(pin_job_summary(candidate, 'out'))
+
+    return {
+        'ok': True,
+        'pin_date': today.strftime('%Y-%m-%d'),
+        'in_job': pin_job_summary(order, 'in'),
+        'candidates': candidates,
+        'timeslots': ['06:00-07:00', '07:00-08:00', '08:00-09:00', '09:00-10:00', '10:00-11:00',
+                      '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:30'],
+        'drivers': [
+            {
+                'name': display_text(driver.Name),
+                'phone': display_text(driver.Phone),
+                'truck': display_text(driver.Truck),
+            }
+            for driver in Drivers.query.filter(Drivers.Active == 1).order_by(Drivers.Name).all()
+        ],
+        'trucks': [
+            {
+                'unit': display_text(truck.Unit),
+                'type': display_text(truck.Type),
+                'plate': display_text(truck.Plate),
+            }
+            for truck in Vehicles.query.filter((Vehicles.Type == 'Tractor') & (Vehicles.Active == 1)).order_by(Vehicles.Unit).all()
+        ],
+    }, 200
+
+
+def create_kanban_pin(order_id, data, username=None):
+    in_order = Orders.query.get(order_id)
+    if in_order is None:
+        return {'ok': False, 'error': 'Order not found.'}, 404
+    workflow_status = derived_workflow_status(in_order, state_row(in_order.id))
+    if not pin_make_allowed(in_order, workflow_status):
+        return {'ok': False, 'error': 'Make Pin is only available for pulled export Drop-Pick jobs.'}, 400
+
+    out_order_id = data.get('out_order_id')
+    out_order = Orders.query.get(out_order_id) if out_order_id else None
+    if out_order is None:
+        return {'ok': False, 'error': 'Select an available out job.'}, 400
+    if int_value(getattr(out_order, 'Hstat', None)) >= 1:
+        return {'ok': False, 'error': 'Selected out job is already pulled.'}, 400
+
+    pin_date = parse_date(data.get('pin_date')) or datetime.date.today()
+    driver_name = display_text(data.get('driver'))
+    unit = display_text(data.get('truck'))
+    timeslot = display_text(data.get('timeslot'))
+    if not driver_name:
+        return {'ok': False, 'error': 'Select a driver before adding the pin row.'}, 400
+    if not unit:
+        return {'ok': False, 'error': 'Select a truck before adding the pin row.'}, 400
+    if not timeslot:
+        return {'ok': False, 'error': 'Select a time slot before adding the pin row.'}, 400
+
+    existing = Pins.query.filter(
+        Pins.Date == datetime.datetime.combine(pin_date, datetime.time.min),
+        Pins.InCon == display_text(getattr(in_order, 'Container', '')),
+    ).first()
+    if existing is not None:
+        return {'ok': False, 'error': 'A pin row already exists for this load-in container on that date.'}, 409
+
+    driver = Drivers.query.filter(Drivers.Name == driver_name).first()
+    truck = Vehicles.query.filter(Vehicles.Unit == unit).first()
+    inbook = split_booking(getattr(in_order, 'BOL', '')) or split_booking(getattr(in_order, 'Booking', ''))
+    incon = display_text(getattr(in_order, 'Container', ''))
+    inchas = display_text(getattr(in_order, 'Chassis', ''))
+    if is_import_order(out_order):
+        outbook = split_booking(getattr(out_order, 'Booking', ''))[-4:]
+        outcon = display_text(getattr(out_order, 'Container', ''))
+    else:
+        outbook = split_booking(getattr(out_order, 'Booking', ''))
+        outcon = ''
+    outchas = display_text(getattr(out_order, 'Chassis', ''))
+
+    pin = Pins(
+        Date=datetime.datetime.combine(pin_date, datetime.time.min),
+        Driver=driver_name,
+        InBook=inbook,
+        InCon=incon,
+        InChas=inchas,
+        InPin='0',
+        OutBook=outbook,
+        OutCon=outcon,
+        OutChas=outchas,
+        OutPin='0',
+        Unit=unit,
+        Tag=display_text(getattr(truck, 'Plate', '')) if truck else '',
+        Phone=display_text(getattr(driver, 'Phone', '')) if driver else '',
+        Timeslot=timeslot,
+        Intext=pin_order_text(in_order, 'in'),
+        Outtext=pin_order_text(out_order, 'out'),
+        Notes=f'Will get pin for {driver_name} in unit {unit}. Created from Dispatch Kanban by {username or "dispatch"}',
+        Active=0,
+        Maker='KANBAN',
+    )
+    db.session.add(pin)
+    db.session.commit()
+    return {
+        'ok': True,
+        'pin_id': pin.id,
+        'message': 'Pin row added to pin database.',
+    }, 200
+
+
+def pin_pairing_cards(pin_date=None):
+    pin_date = pin_date or pin_planning_cutoff()
+    start = datetime.datetime.combine(pin_date, datetime.time.min)
+    end = datetime.datetime.combine(pin_date, datetime.time.max)
+    pins = Pins.query.filter(Pins.Date >= start, Pins.Date <= end).order_by(Pins.Timeslot.asc(), Pins.Driver.asc()).all()
+    cards = []
+    for pin in pins:
+        in_text = append_pin_to_text(pin.Intext, pin.InPin)
+        out_text = append_pin_to_text(pin.Outtext, pin.OutPin)
+        notes = display_text(pin.Notes)
+        dispatch_text = '\n'.join([value for value in [in_text, out_text, notes] if value])
+        cards.append({
+            'id': f'pin-{pin.id}',
+            'pin_id': pin.id,
+            'item_type': 'pin_pairing',
+            'workflow_status': 'pin_assigned',
+            'workflow_label': 'PIN Assigned',
+            'pin_date': format_date(pin.Date),
+            'timeslot': display_text(pin.Timeslot),
+            'driver': display_text(pin.Driver),
+            'truck': display_text(pin.Unit),
+            'tag': display_text(pin.Tag),
+            'phone': display_text(pin.Phone),
+            'in_text': in_text,
+            'out_text': out_text,
+            'notes': notes,
+            'dispatch_text': dispatch_text,
+            'active': int_value(pin.Active),
+            'status_label': 'Active' if int_value(pin.Active) else 'Pending',
+            'in_pin': display_text(pin.InPin),
+            'out_pin': display_text(pin.OutPin),
+        })
+    return cards
+
+
+def activate_pin_pairing(pin_id):
+    pin = Pins.query.get(pin_id)
+    if pin is None:
+        return {'ok': False, 'error': 'Pin row not found.'}, 404
+    if display_text(pin.Timeslot) == 'Hold Getting':
+        return {'ok': False, 'error': 'Cannot activate until a time slot is selected.'}, 400
+    pin.Active = 1
+    db.session.commit()
+    return {'ok': True, 'message': 'Pin activated.'}, 200
+
+
+def delete_pin_pairing(pin_id):
+    pin = Pins.query.get(pin_id)
+    if pin is None:
+        return {'ok': False, 'error': 'Pin row not found.'}, 404
+    db.session.delete(pin)
+    db.session.commit()
+    return {'ok': True, 'message': 'Pin assignment deleted.'}, 200
 
 
 def kanban_options():

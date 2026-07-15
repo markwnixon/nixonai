@@ -124,6 +124,16 @@
     border-left-color: #6f42c1;
 }
 
+.dispatch-kanban-pin-card {
+    border-left-color: #198754;
+}
+
+.dispatch-kanban-card-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
 .sortable-ghost {
     opacity: 0.4;
 }

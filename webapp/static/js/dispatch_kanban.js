@@ -8,12 +8,18 @@
     const board = document.getElementById('dispatch-kanban-board');
     const message = document.getElementById('dispatch-kanban-message');
     const modal = $('#dispatch-kanban-modal');
+    const pinModal = $('#dispatch-kanban-pin-modal');
     const jobsUrl = page.dataset.jobsUrl;
     const moveUrlTemplate = page.dataset.moveUrlTemplate;
     const updateUrlTemplate = page.dataset.updateUrlTemplate;
     const reviewUrlTemplate = page.dataset.reviewUrlTemplate;
     const uploadProofUrlTemplate = page.dataset.uploadProofUrlTemplate;
+    const makePinOptionsUrlTemplate = page.dataset.makePinOptionsUrlTemplate;
+    const makePinUrlTemplate = page.dataset.makePinUrlTemplate;
+    const activatePinUrlTemplate = page.dataset.activatePinUrlTemplate;
+    const deletePinUrlTemplate = page.dataset.deletePinUrlTemplate;
     const jobsById = new Map();
+    const pinCandidatesById = new Map();
     let columns = [];
 
 
@@ -63,6 +69,9 @@
     }
 
     function renderCard(job) {
+        if (job.item_type === 'pin_pairing') {
+            return renderPinPairingCard(job);
+        }
         const card = document.createElement('div');
         card.className = 'dispatch-kanban-card';
         if (job.drop_pick_pulled) {
@@ -107,6 +116,31 @@
         return card;
     }
 
+    function renderPinPairingCard(pin) {
+        const card = document.createElement('div');
+        card.className = 'dispatch-kanban-card dispatch-kanban-pin-card';
+        card.dataset.id = pin.id;
+        card.dataset.pinId = pin.pin_id;
+        card.dataset.status = 'pin_assigned';
+        card.innerHTML = `
+            <div class="dispatch-kanban-card-title">${escapeHtml(pin.timeslot || 'No time')} | ${escapeHtml(pin.driver || 'No driver')}</div>
+            <div class="dispatch-kanban-card-line">${escapeHtml(pin.truck || 'No truck')}${pin.tag ? ` | ${escapeHtml(pin.tag)}` : ''}</div>
+            <div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml(pin.pin_date || '')} | ${escapeHtml(pin.status_label || 'Pending')}</div>
+            <div class="dispatch-kanban-card-line">${escapeHtml(pin.in_text || 'No in move')}</div>
+            <div class="dispatch-kanban-card-line">${escapeHtml(pin.out_text || 'No out move')}</div>
+            ${pin.notes ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml(pin.notes)}</div>` : ''}
+            <div class="dispatch-kanban-card-actions mt-2">
+                ${pin.active ? '' : '<button type="button" class="btn btn-sm btn-outline-success kanban-pin-activate">Activate</button>'}
+                <button type="button" class="btn btn-sm btn-outline-secondary kanban-pin-copy">Copy Dispatch</button>
+                <button type="button" class="btn btn-sm btn-outline-danger kanban-pin-delete">Delete</button>
+            </div>
+        `;
+        card.querySelector('.kanban-pin-activate')?.addEventListener('click', () => activatePin(pin.pin_id));
+        card.querySelector('.kanban-pin-copy').addEventListener('click', () => copyDispatchText(pin.dispatch_text || ''));
+        card.querySelector('.kanban-pin-delete').addEventListener('click', () => deletePin(pin.pin_id));
+        return card;
+    }
+
     function renderBoard(data) {
         columns = data.columns || [];
         jobsById.clear();
@@ -130,7 +164,7 @@
             });
             board.appendChild(columnEl);
 
-            if (window.Sortable) {
+            if (window.Sortable && column.key !== 'pin_assigned') {
                 new Sortable(list, {
                     group: 'dispatch-kanban',
                     animation: 150,
@@ -179,6 +213,42 @@
         });
         const data = await response.json();
         return {response, data};
+    }
+
+    async function activatePin(pinId) {
+        const {response, data} = await postJson(endpoint(activatePinUrlTemplate, pinId), {});
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to activate pin.', 'warning');
+            return;
+        }
+        showMessage(data.message || 'Pin activated.', 'success');
+        loadBoard();
+    }
+
+    async function deletePin(pinId) {
+        if (!window.confirm('Delete this pin assignment?')) {
+            return;
+        }
+        const {response, data} = await postJson(endpoint(deletePinUrlTemplate, pinId), {});
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to delete pin assignment.', 'warning');
+            return;
+        }
+        showMessage(data.message || 'Pin assignment deleted.', 'success');
+        loadBoard();
+    }
+
+    async function copyDispatchText(text) {
+        if (!text) {
+            showMessage('No dispatch text available for this pin.', 'warning');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(text);
+            showMessage('Dispatch text copied.', 'success');
+        } catch (error) {
+            showMessage(text, 'info');
+        }
     }
 
     function renderReviews(reviews, isImportReview, isEccesReview) {
@@ -289,6 +359,10 @@
         });
     }
 
+    function canMakePin(job) {
+        return job.workflow_status === 'drop_pick' && job.is_export && job.drop_pick_pulled;
+    }
+
     function openModal(jobId) {
         const job = jobsById.get(String(jobId));
         if (!job) {
@@ -379,7 +453,84 @@
             && !job.proof_none_required;
         document.getElementById('kanban-proof-upload-panel').classList.toggle('d-none', !showProofUpload);
         document.getElementById('kanban-proof-file').value = '';
+        document.getElementById('kanban-make-pin-open').classList.toggle('d-none', !canMakePin(job));
         modal.modal('show');
+    }
+
+    function renderPinCandidateOption(candidate) {
+        const parts = [
+            candidate.jo,
+            candidate.customer,
+            candidate.container || candidate.booking,
+            candidate.container_type,
+            candidate.date ? `Pull ${candidate.date}` : '',
+        ].filter(Boolean);
+        return parts.join(' | ');
+    }
+
+    function updatePinPreview() {
+        const selectedId = document.getElementById('kanban-pin-out-order').value;
+        const candidate = pinCandidatesById.get(String(selectedId));
+        document.getElementById('kanban-pin-preview-out').textContent = candidate ? candidate.text : '';
+    }
+
+    function fillPinSelect(id, rows, valueKey, labelFn, emptyLabel) {
+        const select = document.getElementById(id);
+        select.innerHTML = `<option value="">${emptyLabel}</option>`;
+        (rows || []).forEach((row) => {
+            const option = document.createElement('option');
+            option.value = row[valueKey] || '';
+            option.textContent = labelFn(row);
+            select.appendChild(option);
+        });
+    }
+
+    async function openMakePinModal() {
+        const jobId = document.getElementById('kanban-modal-order-id').value;
+        const response = await fetch(endpoint(makePinOptionsUrlTemplate, jobId));
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to load Make Pin options.', 'warning');
+            return;
+        }
+        pinCandidatesById.clear();
+        document.getElementById('kanban-pin-in-order-id').value = jobId;
+        document.getElementById('kanban-pin-date').value = data.pin_date || '';
+        document.getElementById('kanban-pin-in-summary').textContent = data.in_job ? data.in_job.text : '';
+        document.getElementById('kanban-pin-preview-in').textContent = data.in_job ? data.in_job.text : '';
+        fillPinSelect(
+            'kanban-pin-timeslot',
+            (data.timeslots || []).map((slot) => ({value: slot})),
+            'value',
+            (row) => row.value,
+            'Select time'
+        );
+        fillPinSelect(
+            'kanban-pin-driver',
+            data.drivers || [],
+            'name',
+            (row) => row.truck ? `${row.name} | ${row.truck}` : row.name,
+            'Select driver'
+        );
+        fillPinSelect(
+            'kanban-pin-truck',
+            data.trucks || [],
+            'unit',
+            (row) => [row.unit, row.type, row.plate].filter(Boolean).join(' | '),
+            'Select truck'
+        );
+        const select = document.getElementById('kanban-pin-out-order');
+        select.innerHTML = '<option value="">Select available out job</option>';
+        (data.candidates || []).forEach((candidate) => {
+            pinCandidatesById.set(String(candidate.id), candidate);
+            const option = document.createElement('option');
+            option.value = candidate.id;
+            option.textContent = renderPinCandidateOption(candidate);
+            select.appendChild(option);
+        });
+        updatePinPreview();
+        modal.modal('hide');
+        pinModal.modal('show');
     }
 
     document.getElementById('dispatch-kanban-form').addEventListener('submit', async (event) => {
@@ -435,6 +586,30 @@
         }
         modal.modal('hide');
         showMessage('Proof PDF uploaded.', 'success');
+        loadBoard();
+    });
+
+    document.getElementById('kanban-make-pin-open').addEventListener('click', openMakePinModal);
+
+    document.getElementById('kanban-pin-out-order').addEventListener('change', updatePinPreview);
+
+    document.getElementById('dispatch-kanban-pin-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const jobId = document.getElementById('kanban-pin-in-order-id').value;
+        const payload = {
+            pin_date: document.getElementById('kanban-pin-date').value,
+            out_order_id: document.getElementById('kanban-pin-out-order').value,
+            timeslot: document.getElementById('kanban-pin-timeslot').value,
+            driver: document.getElementById('kanban-pin-driver').value,
+            truck: document.getElementById('kanban-pin-truck').value,
+        };
+        const {response, data} = await postJson(endpoint(makePinUrlTemplate, jobId), payload);
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to create pin row.', 'warning');
+            return;
+        }
+        pinModal.modal('hide');
+        showMessage(data.message || 'Pin row created.', 'success');
         loadBoard();
     });
 

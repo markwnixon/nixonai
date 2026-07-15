@@ -1,11 +1,12 @@
-from flask import abort, render_template, redirect, url_for, jsonify, request, send_file, flash, session
+from flask import abort, render_template, redirect, url_for, jsonify, request, send_file, flash, session, Response
 from flask import Blueprint
 
 from webapp.extensions import db
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Interchange
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
+from webapp.business_reports import ensure_interchange_port_trip_column, rebaseline_interchange_port_trips_for_year
 from flask_login import login_required, current_user
 from sqlalchemy import func, inspect, or_, text
 from webapp.financial_mfa import FINANCIAL_GENRES, financial_mfa_redirect, financial_mfa_required
@@ -55,10 +56,14 @@ from webapp.dispatch_calendar import (
     update_event,
 )
 from webapp.dispatch_kanban import (
+    activate_pin_pairing,
+    delete_pin_pairing,
     ensure_dispatch_kanban_tables,
+    create_kanban_pin,
     kanban_jobs,
     kanban_options,
     log_review as kanban_log_review,
+    make_pin_candidates,
     move_job as kanban_move_job,
     review_logs_for_order as kanban_review_logs,
     update_job as kanban_update_job,
@@ -693,6 +698,36 @@ def DispatchKanbanUploadProof(order_id):
     return jsonify(result), status_code
 
 
+@main.route('/api/dispatch/kanban/job/<int:order_id>/make-pin-options', methods=['GET'])
+@login_required
+def DispatchKanbanMakePinOptions(order_id):
+    result, status_code = make_pin_candidates(order_id)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/job/<int:order_id>/make-pin', methods=['POST'])
+@login_required
+def DispatchKanbanMakePin(order_id):
+    payload = request.get_json(silent=True) or {}
+    username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
+    result, status_code = create_kanban_pin(order_id, payload, username=username)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/pin/<int:pin_id>/activate', methods=['POST'])
+@login_required
+def DispatchKanbanActivatePin(pin_id):
+    result, status_code = activate_pin_pairing(pin_id)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/pin/<int:pin_id>/delete', methods=['POST'])
+@login_required
+def DispatchKanbanDeletePin(pin_id):
+    result, status_code = delete_pin_pairing(pin_id)
+    return jsonify(result), status_code
+
+
 @main.route('/api/dispatch/kanban/job/<int:order_id>/reviews', methods=['GET'])
 @login_required
 def DispatchKanbanReviews(order_id):
@@ -1183,6 +1218,291 @@ def Revenue():
     #print('Made it to the Revenue Data Center')
     title1,col1,data1,title2,col2,data2,title3,col3,data3,tabon = get_revenues()
     return render_template('revenues.html', cmpdata=cmpdata, scac=scac, title1=title1, col1=col1, data1=data1, title2=title2, col2=col2, data2=data2, title3=title3, col3=col3, data3=data3, tabon=tabon)
+
+
+def ensure_business_report_tables():
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS business_report_allocations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            AccountName VARCHAR(100) NOT NULL,
+            AllocationMethod VARCHAR(100) NOT NULL,
+            BasisType VARCHAR(45) NOT NULL DEFAULT 'port_entry',
+            BasisLabel VARCHAR(100) NOT NULL,
+            PeriodStart DATE,
+            PeriodEnd DATE,
+            BasisQty DECIMAL(12, 2) DEFAULT 0,
+            Notes TEXT,
+            Active TINYINT DEFAULT 1,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_business_report_alloc_account (AccountName),
+            INDEX idx_business_report_alloc_active (Active)
+        )
+    """))
+    db.session.commit()
+    inspector = inspect(db.engine)
+    columns = [column['name'] for column in inspector.get_columns('business_report_allocations')]
+    if 'BasisType' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE business_report_allocations
+            ADD COLUMN BasisType VARCHAR(45) NOT NULL DEFAULT 'port_entry'
+        """))
+        db.session.commit()
+
+
+def business_report_parse_date(value, fallback):
+    if not value:
+        return fallback
+    try:
+        return datetime.datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError:
+        return fallback
+
+
+def business_report_money(cents):
+    return "${:,.2f}".format((cents or 0) / 100)
+
+
+def business_report_number(value, places=2):
+    return f"{value or 0:,.{places}f}"
+
+
+BUSINESS_REPORT_BASIS_TYPES = {
+    'port_entry': 'Port Entries',
+    'day': 'Days',
+    'mile': 'Miles',
+}
+
+
+def business_report_decimal(value):
+    if value in [None, '']:
+        return 0.0
+    try:
+        cleaned = str(value).replace(',', '').strip()
+        return float(cleaned or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def business_report_period_bounds(start_date, end_date):
+    return (
+        datetime.datetime.combine(start_date, datetime.time.min),
+        datetime.datetime.combine(end_date, datetime.time.max),
+    )
+
+
+def business_report_basis_qty(basis_type, start_date, end_date):
+    if not start_date or not end_date:
+        return 0.0
+    if end_date < start_date:
+        return 0.0
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    if basis_type == 'day':
+        return float((end_date - start_date).days + 1)
+    if basis_type == 'mile':
+        assignments = DriverAssign.query.filter(
+            DriverAssign.Date >= start_dt,
+            DriverAssign.Date <= end_dt,
+        ).all()
+        return sum(business_report_decimal(row.Miles) for row in assignments)
+    # Port entries are distinct Interchange.PortTrip sequence numbers in the period.
+    return float(db.session.query(func.count(func.distinct(Interchange.PortTrip))).filter(
+        Interchange.Date >= start_dt,
+        Interchange.Date <= end_dt,
+        Interchange.PortTrip.isnot(None),
+        Interchange.PortTrip > 0,
+    ).scalar() or 0)
+
+
+def business_report_expenses(start_date, end_date):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    rows = db.session.query(
+        Gledger.Account,
+        Accounts.Category,
+        Accounts.Subcategory,
+        func.sum(func.coalesce(Gledger.Debit, 0) - func.coalesce(Gledger.Credit, 0)).label('amount_cents'),
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Type == 'Expense',
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).group_by(
+        Gledger.Account,
+        Accounts.Category,
+        Accounts.Subcategory,
+    ).order_by(
+        Accounts.Category.asc(),
+        Gledger.Account.asc(),
+    ).all()
+    output = []
+    for account, category, subcategory, amount_cents in rows:
+        amount_cents = int(amount_cents or 0)
+        output.append({
+            'account': account or '',
+            'category': category or '',
+            'subcategory': subcategory or '',
+            'amount_cents': amount_cents,
+            'amount': business_report_money(amount_cents),
+        })
+    return output
+
+
+def business_report_allocations():
+    rows = db.session.execute(text("""
+        SELECT id, AccountName, AllocationMethod, BasisType, BasisLabel, PeriodStart, PeriodEnd, BasisQty, Notes, Active
+        FROM business_report_allocations
+        WHERE Active = 1
+        ORDER BY AccountName, AllocationMethod, id
+    """)).mappings().all()
+    output = []
+    for row in rows:
+        output.append({
+            'id': row.get('id'),
+            'account': row.get('AccountName') or '',
+            'method': row.get('AllocationMethod') or '',
+            'basis_type': row.get('BasisType') or 'port_entry',
+            'basis': row.get('BasisLabel') or BUSINESS_REPORT_BASIS_TYPES.get(row.get('BasisType'), 'Port Entries'),
+            'period_start': row.get('PeriodStart').strftime('%Y-%m-%d') if row.get('PeriodStart') else '',
+            'period_end': row.get('PeriodEnd').strftime('%Y-%m-%d') if row.get('PeriodEnd') else '',
+            'basis_qty': float(row.get('BasisQty') or 0),
+            'notes': row.get('Notes') or '',
+        })
+    return output
+
+
+def business_report_allocation_calcs(allocations, report_start, report_end):
+    output = []
+    for item in allocations:
+        period_start = business_report_parse_date(item['period_start'], None)
+        period_end = business_report_parse_date(item['period_end'], None)
+        expense_cents = 0
+        if period_start and period_end:
+            expenses = business_report_expenses(period_start, period_end)
+            expense_cents = next((row['amount_cents'] for row in expenses if row['account'] == item['account']), 0)
+        auto_basis_qty = business_report_basis_qty(item['basis_type'], period_start, period_end)
+        basis_qty = item['basis_qty'] or auto_basis_qty
+        report_basis_qty = business_report_basis_qty(item['basis_type'], report_start, report_end)
+        cost_per_basis = (expense_cents / 100) / basis_qty if basis_qty else 0
+        allocated_amount = cost_per_basis * report_basis_qty
+        calc = dict(item)
+        calc.update({
+            'basis_name': BUSINESS_REPORT_BASIS_TYPES.get(item['basis_type'], item['basis_type']),
+            'auto_basis_qty': auto_basis_qty,
+            'source_basis_used': basis_qty,
+            'report_basis_qty': report_basis_qty,
+            'expense_amount': business_report_money(expense_cents),
+            'cost_per_basis': "${:,.4f}".format(cost_per_basis),
+            'allocated_amount': "${:,.2f}".format(allocated_amount),
+        })
+        output.append(calc)
+    return output
+
+
+@main.route('/BusinessReports', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def BusinessReports():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_business_report_tables()
+    ensure_interchange_port_trip_column()
+    today_local = datetime.date.today()
+    default_start = today_local.replace(day=1)
+    selected_start = business_report_parse_date(request.values.get('date_from'), default_start)
+    selected_end = business_report_parse_date(request.values.get('date_to'), today_local)
+    err = []
+    msg = []
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'add_allocation':
+            account_name = (request.form.get('account_name') or '').strip()
+            basis_type = (request.form.get('basis_type') or 'port_entry').strip()
+            if basis_type not in BUSINESS_REPORT_BASIS_TYPES:
+                basis_type = 'port_entry'
+            method = BUSINESS_REPORT_BASIS_TYPES[basis_type]
+            basis = (request.form.get('basis_label') or method).strip()
+            period_start = business_report_parse_date(request.form.get('period_start'), None)
+            period_end = business_report_parse_date(request.form.get('period_end'), None)
+            try:
+                basis_qty = float(request.form.get('basis_qty') or 0)
+            except ValueError:
+                basis_qty = 0
+            if not account_name or not basis:
+                err.append('Account and basis label are required.')
+            else:
+                db.session.execute(text("""
+                    INSERT INTO business_report_allocations
+                        (AccountName, AllocationMethod, BasisType, BasisLabel, PeriodStart, PeriodEnd, BasisQty, Notes, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:account_name, :method, :basis_type, :basis, :period_start, :period_end, :basis_qty, :notes, 1, :created_at, :updated_at)
+                """), {
+                    'account_name': account_name,
+                    'method': method,
+                    'basis_type': basis_type,
+                    'basis': basis,
+                    'period_start': period_start,
+                    'period_end': period_end,
+                    'basis_qty': basis_qty,
+                    'notes': (request.form.get('notes') or '').strip(),
+                    'created_at': datetime.datetime.utcnow(),
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.commit()
+                msg.append('Allocation setup row added.')
+        elif action == 'delete_allocation':
+            allocation_id = request.form.get('allocation_id')
+            db.session.execute(text("""
+                UPDATE business_report_allocations
+                SET Active = 0, UpdatedAt = :updated_at
+                WHERE id = :allocation_id
+            """), {'allocation_id': allocation_id, 'updated_at': datetime.datetime.utcnow()})
+            db.session.commit()
+            msg.append('Allocation setup row removed.')
+        elif action == 'recalculate_port_trips':
+            result = rebaseline_interchange_port_trips_for_year(selected_start.year)
+            msg.append(f"{selected_start.year} port trips rebaselined: {result['port_trips']} trips from {result['rows_reviewed']} interchange rows.")
+        elif action == 'export_expenses_csv':
+            expenses = business_report_expenses(selected_start, selected_end)
+            lines = ['Account,Category,Subcategory,Amount']
+            for row in expenses:
+                lines.append(f"\"{row['account']}\",\"{row['category']}\",\"{row['subcategory']}\",{row['amount_cents'] / 100:.2f}")
+            csv_data = '\n'.join(lines)
+            filename = f'business_expenses_{selected_start}_{selected_end}.csv'
+            return Response(
+                csv_data,
+                mimetype='text/csv',
+                headers={'Content-Disposition': f'attachment; filename={filename}'},
+            )
+
+    expense_rows = business_report_expenses(selected_start, selected_end)
+    allocation_rows = business_report_allocation_calcs(business_report_allocations(), selected_start, selected_end)
+    expense_accounts = Accounts.query.filter(Accounts.Type == 'Expense').order_by(Accounts.Name).all()
+    total_expenses = sum(row['amount_cents'] for row in expense_rows)
+    report_basis = {
+        'port_entries': business_report_number(business_report_basis_qty('port_entry', selected_start, selected_end), 0),
+        'days': business_report_number(business_report_basis_qty('day', selected_start, selected_end), 0),
+        'miles': business_report_number(business_report_basis_qty('mile', selected_start, selected_end), 2),
+    }
+    return render_template(
+        'business_reports.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        filters={
+            'date_from': selected_start.strftime('%Y-%m-%d'),
+            'date_to': selected_end.strftime('%Y-%m-%d'),
+        },
+        expense_rows=expense_rows,
+        expense_accounts=expense_accounts,
+        allocation_rows=allocation_rows,
+        total_expenses=business_report_money(total_expenses),
+        basis_types=BUSINESS_REPORT_BASIS_TYPES,
+        report_basis=report_basis,
+        err=err,
+        msg=msg,
+    )
 
 
 @main.route('/IntercompanyEntries', methods=['GET', 'POST'])

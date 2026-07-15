@@ -97,7 +97,7 @@
 
                 <a class="dropdown-item" href="{{ url_for('main.AdminCalendar') }}">Admin Calendar</a>
                 <a class="dropdown-item" href="{{ url_for('main.Class8Main',genre='Compliance') }}">Compliance Review</a>
-                <a class="dropdown-item" href="{{ url_for('main.Class8Main',genre='Reports') }}">Business Reports</a>
+                <a class="dropdown-item" href="{{ url_for('main.BusinessReports') }}">Business Reports</a>
                 <a class="dropdown-item" href="{{ url_for('main.Class8Main',genre='General') }}">General Information</a>
                 {% if session['authority'] == 'superuser' %}
                     <a class="dropdown-item" href="{{ url_for('authenticate.register') }}">Create New User</a>

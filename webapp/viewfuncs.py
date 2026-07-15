@@ -2462,8 +2462,8 @@ def ticket_copy(tick):
     input = Interchange(Container=myi.Container, TruckNumber=myi.TruckNumber, Driver=myi.Driver, Chassis=myi.Chassis,
                         Date=myi.Date, Release=myi.Release, GrossWt=myi.GrossWt,
                         Seals=myi.Seals, ConType=myi.ConType, CargoWt=myi.CargoWt,
-                        Time=myi.Time, Status='AAAAAA', Original=' ', Path=' ', Type=newtype, Jo=myi.Jo,
-                        Company=myi.Company, Other=str(tick))
+                        Time=myi.Time, Status='AAAAAA', Source=' ', Path=' ', Type=newtype, Jo=myi.Jo,
+                        Company=myi.Company, Other=str(tick), TimeExit='', PortHours=None, PortTrip=None)
     db.session.add(input)
     db.session.commit()
     myo = Interchange.query.filter(Interchange.Other==str(tick)).first()
@@ -2499,8 +2499,8 @@ def street_this():
                                     Chassis=myi.Chassis,
                                     Date=dt, Release=bk, GrossWt=myi.GrossWt,
                                     Seals=myi.Seals, ConType=myi.ConType, CargoWt=myi.CargoWt,
-                                    Time=myi.Time, Status='AAAAAA', Original=' ', Path=' ', Type='Empty Out', Jo=None,
-                                    Company=None, Other=None)
+                                    Time=myi.Time, Status='AAAAAA', Source=' ', Path=' ', Type='Empty Out', Jo=None,
+                                    Company=None, Other=None, TimeExit=None, PortHours=None, PortTrip=None)
                 db.session.add(input)
 
             odat = Orders.query.filter( (Orders.Container == con) & (Orders.Date > lookback) ).first()
@@ -2714,6 +2714,5 @@ def run_adjustments():
 
     from gledger_write import gledger_write
     gledger_write('adjusting',jo,adat.Expense,adat.Asset)
-
 
 

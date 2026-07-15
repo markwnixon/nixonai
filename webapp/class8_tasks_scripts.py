@@ -47,7 +47,7 @@ def ticket_copy(tick):
                         Date=myi.Date, Release=myi.Release, GrossWt=myi.GrossWt,
                         Seals=myi.Seals, ConType=myi.ConType, CargoWt=myi.CargoWt,
                         Time=myi.Time, Status='AAAAAA', Source=' ', Path=' ', Type=newtype, Jo=myi.Jo,
-                        Company=myi.Company, Other=str(tick), TimeExit='', PortHours=None)
+                        Company=myi.Company, Other=str(tick), TimeExit='', PortHours=None, PortTrip=None)
     db.session.add(input)
     db.session.commit()
     myo = Interchange.query.filter(Interchange.Other==str(tick)).first()
@@ -209,7 +209,7 @@ def Street_Turn_task(err, holdvec, iter):
                                             Date=dt, Release=bk, GrossWt=myi.GrossWt,
                                             Seals=myi.Seals, ConType=myi.ConType, CargoWt=myi.CargoWt,
                                             Time=myi.Time, Status='AAAAAA', Source=' ', Path=' ', Type='Empty Out', Jo=None,
-                                            Company=None, Other=None, TimeExit=None, PortHours=None)
+                                            Company=None, Other=None, TimeExit=None, PortHours=None, PortTrip=None)
                         db.session.add(input)
 
                     odat = Orders.query.filter((Orders.Container == con) & (Orders.Date > lookback)).first()
