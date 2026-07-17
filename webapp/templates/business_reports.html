@@ -1,0 +1,243 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Business Reports</h2>
+            <p class="text-muted">Profit and loss setup with adjustable periods and allocation rules.</p>
+        </div>
+    </div>
+
+    {% if err %}
+        <div class="alert alert-warning">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if msg %}
+        <div class="alert alert-info">
+            {% for item in msg %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form action="{{ url_for('main.BusinessReports') }}" method="get" class="mb-4">
+        <div class="form-row align-items-end">
+            <div class="form-group col-md-2">
+                <label for="date_from">Period From</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ filters.date_from }}">
+            </div>
+            <div class="form-group col-md-2">
+                <label for="date_to">Period To</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ filters.date_to }}">
+            </div>
+            <div class="form-group col-md-4">
+                <button type="submit" class="btn btn-primary">Apply Period</button>
+                <a href="{{ url_for('main.BusinessReports') }}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </div>
+    </form>
+    <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-4">
+        <input type="hidden" name="action" value="recalculate_port_trips">
+        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+        <button type="submit" class="btn btn-outline-primary">Rebaseline Port Trips For Selected Year</button>
+        <span class="text-muted ml-2">Updates Interchange.PortTrip sequence numbers for the year of the selected start date.</span>
+    </form>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Report Port Entries</div>
+                    <div class="h4 mb-0">{{ report_basis.port_entries }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Report Days</div>
+                    <div class="h4 mb-0">{{ report_basis.days }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body py-3">
+                    <div class="text-muted small">Report Miles</div>
+                    <div class="h4 mb-0">{{ report_basis.miles }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Company Expenses</span>
+                    <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-0">
+                        <input type="hidden" name="action" value="export_expenses_csv">
+                        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Export Spreadsheet</button>
+                    </form>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Expense Account</th>
+                                    <th>Category</th>
+                                    <th>Subcategory</th>
+                                    <th class="text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in expense_rows %}
+                                    <tr>
+                                        <td>{{ row.account }}</td>
+                                        <td>{{ row.category }}</td>
+                                        <td>{{ row.subcategory }}</td>
+                                        <td class="text-right">{{ row.amount }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-muted">No expenses found for this period.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="3" class="text-right">Total Expenses</th>
+                                    <th class="text-right">{{ total_expenses }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-header">Allocation Setup</div>
+                <div class="card-body">
+                    <form action="{{ url_for('main.BusinessReports') }}" method="post">
+                        <input type="hidden" name="action" value="add_allocation">
+                        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                        <div class="form-group">
+                            <label for="account_name">Expense Account</label>
+                            <select id="account_name" name="account_name" class="form-control">
+                                <option value="">Choose account</option>
+                                {% for account in expense_accounts %}
+                                    <option value="{{ account.Name }}">{{ account.Name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="basis_type">Allocation Basis</label>
+                                <select id="basis_type" name="basis_type" class="form-control">
+                                    {% for value, label in basis_types.items() %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="basis_label">Basis Label</label>
+                                <input type="text" id="basis_label" name="basis_label" class="form-control" placeholder="Port Entries">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="period_start">Source From</label>
+                                <input type="date" id="period_start" name="period_start" class="form-control">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="period_end">Source To</label>
+                                <input type="date" id="period_end" name="period_end" class="form-control">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="basis_qty">Override Qty</label>
+                                <input type="number" step="0.01" min="0" id="basis_qty" name="basis_qty" class="form-control" placeholder="optional">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="notes">Notes</label>
+                            <input type="text" id="notes" name="notes" class="form-control" placeholder="Example: toll statement divided by port entries">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add Allocation Rule</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Allocation Rules</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Method</th>
+                            <th>Basis</th>
+                            <th>Source Period</th>
+                            <th class="text-right">Auto Qty</th>
+                            <th class="text-right">Qty Used</th>
+                            <th class="text-right">Expense</th>
+                            <th class="text-right">Cost / Basis</th>
+                            <th class="text-right">Report Qty</th>
+                            <th class="text-right">Report Allocation</th>
+                            <th>Notes</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in allocation_rows %}
+                            <tr>
+                                <td>{{ row.account }}</td>
+                                <td>{{ row.method }}</td>
+                                <td>{{ row.basis }}</td>
+                                <td>{{ row.period_start }} to {{ row.period_end }}</td>
+                                <td class="text-right">{{ '%.2f'|format(row.auto_basis_qty) }}</td>
+                                <td class="text-right">{{ '%.2f'|format(row.source_basis_used) }}</td>
+                                <td class="text-right">{{ row.expense_amount }}</td>
+                                <td class="text-right">{{ row.cost_per_basis }}</td>
+                                <td class="text-right">{{ '%.2f'|format(row.report_basis_qty) }}</td>
+                                <td class="text-right">{{ row.allocated_amount }}</td>
+                                <td>{{ row.notes }}</td>
+                                <td class="text-right">
+                                    <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-0">
+                                        <input type="hidden" name="action" value="delete_allocation">
+                                        <input type="hidden" name="allocation_id" value="{{ row.id }}">
+                                        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                                        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="12" class="text-muted">No allocation rules have been added yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-secondary">
+        Port entries are counted as distinct Interchange.PortTrip sequence numbers. Days are calendar days. Miles are summed from driver assignment mileage in the period.
+    </div>
+</div>
+{% endblock %}
