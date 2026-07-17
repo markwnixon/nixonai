@@ -809,14 +809,7 @@ def kanban_jobs(filters=None):
 
 def purge_incomplete_review_logs(order):
     if is_ecces_hold(order):
-        completeness_condition = """
-                  Shipline IS NULL OR TRIM(Shipline) = ''
-                  OR ECCESContainerType IS NULL OR TRIM(ECCESContainerType) = ''
-                  OR ECCESChassis IS NULL OR TRIM(ECCESChassis) = ''
-                  OR ECCESAvailTerminal IS NULL OR TRIM(ECCESAvailTerminal) = ''
-                  OR ECCESGateIn IS NULL OR TRIM(ECCESGateIn) = ''
-                  OR ECCESCustomsRelease IS NULL OR TRIM(ECCESCustomsRelease) = ''
-        """
+        completeness_condition = "0 = 1"
     elif is_import_order(order):
         completeness_condition = """
                   ArrivalDate IS NULL
@@ -832,6 +825,7 @@ def purge_incomplete_review_logs(order):
         text(f"""
             DELETE FROM dispatch_kanban_review_log
             WHERE OrderId = :order_id
+              AND COALESCE(ReviewType, '') != 'ECCES Review'
               AND (
                   ReviewDate IS NULL
                   OR {completeness_condition}

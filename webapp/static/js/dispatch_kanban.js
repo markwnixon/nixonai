@@ -257,13 +257,23 @@
             target.innerHTML = '<div class="text-muted">No review history yet.</div>';
             return;
         }
-        const headers = isEccesReview
+        const hasEccesReview = isEccesReview || reviews.some((review) => (
+            (review.review_type || '').toLowerCase().includes('ecces')
+            || review.ecces_container_type
+            || review.ecces_chassis
+            || review.ecces_avail_terminal
+            || review.ecces_gate_in
+            || review.ecces_cbp_exam_complete
+            || review.ecces_customs_release
+            || review.ecces_freight_release
+        ));
+        const headers = hasEccesReview
             ? ['Review<br>Date', 'Shipline', 'Container<br>Type', 'Chassis', 'Avail<br>Terminal', 'CES<br>Gate In', 'CBP Exam<br>Complete', 'Customs<br>Release', 'Freight<br>Release']
             : (isImportReview
                 ? ['Review<br>Date', 'Shipline', 'Vessel', 'Voyage', 'Arrival<br>Date', 'Equipment<br>Size', 'Location', 'Line<br>Status', 'Customs<br>Status', 'LFD']
                 : ['Review<br>Date', 'Shipline', 'Vessel', 'Voyage', 'Equipment<br>Size', 'ERD', 'Cutoff']);
         const rows = reviews.map((review) => {
-            const values = isEccesReview
+            const values = hasEccesReview
                 ? [
                     review.review_date || review.created_at || '',
                     review.shipline || '-',
