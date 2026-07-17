@@ -2728,7 +2728,8 @@ def get_dbdata(table_setup, tfilters):
         hold_row_color = (
             table == 'Orders' and
             hasattr(odat, 'HoldType') and
-            hasinput(odat.HoldType)
+            hasinput(odat.HoldType) and
+            str(odat.HoldType).strip().lower() != 'no hold'
         )
         if color_selector is not None:
             for kx, selector in enumerate(color_selector):
@@ -2737,6 +2738,8 @@ def get_dbdata(table_setup, tfilters):
                 #print(f'table is {table}')
                 if kx == 0: rowcolors1.append(colorcode(table, color_selector_value))
                 if kx == 1: rowcolors2.append(colorcode(table, color_selector_value))
+            if rowcolors1 and len(rowcolors2) < len(rowcolors1):
+                rowcolors2.append(rowcolors1[-1])
         else:
             color_selector_value = 0
             rowcolors1.append(colorcode(table, color_selector_value))
