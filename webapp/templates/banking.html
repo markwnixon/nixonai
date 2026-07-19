@@ -11,11 +11,15 @@
 
     <form action="{{ url_for('main.Banking') }}" method="post" enctype="multipart/form-data">
         <input type="hidden" name="cache" value="{{ cache }}">
+        <input type="hidden" name="previous_acname" value="{{ acctinfo[6] }}">
 
         <div class="row">
             <div class="col-lg-3 mb-3">
                 <div class="border rounded p-3 h-100">
                     <h5>Account</h5>
+                    {% if is_credit_reconciliation %}
+                        <div class="alert alert-secondary py-2 mb-2">Credit card reconciliation mode</div>
+                    {% endif %}
                     <div class="form-group">
                         <label for="acname">Reconciliation Account</label>
                         <select class="form-control" id="acname" name="acname" onchange="this.form.submit()">
@@ -52,7 +56,7 @@
                     </div>
 
                     <button type="submit" name="recothese" value="1" class="btn btn-primary btn-block mb-2">Mark Trial</button>
-                    <button type="submit" name="finalize" value="1" class="btn btn-success btn-block mb-2">Finalize</button>
+                    <button type="submit" name="finalize" value="1" id="finalizeReconciliationButton" class="btn btn-success btn-block mb-2" disabled>Finalize</button>
                     <button type="submit" name="undothese" value="1" class="btn btn-outline-secondary btn-block">Undo Checked</button>
 
                     <hr>
@@ -274,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
         "stateSave": true,
         "paging": false
     });
+    var isCreditReconciliation = {{ 'true' if is_credit_reconciliation else 'false' }};
 
     function moneyFromCents(cents) {
         var sign = cents < 0 ? '-' : '';
@@ -282,6 +287,22 @@ document.addEventListener('DOMContentLoaded', function () {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
+    }
+
+    function centsFromMoney(value) {
+        var cleaned = String(value || '').replace(/[$,]/g, '').trim();
+        var parsed = parseFloat(cleaned);
+        if (isNaN(parsed)) {
+            return 0;
+        }
+        return Math.round(parsed * 100);
+    }
+
+    function setBalancedState(isBalanced) {
+        ['selectedDeposits', 'selectedWithdrawals', 'selectedNet'].forEach(function (id) {
+            $('#' + id).closest('.border').toggleClass('banking-balanced', isBalanced);
+        });
+        $('#finalizeReconciliationButton').prop('disabled', !isBalanced);
     }
 
     function updateSelectedTotals() {
@@ -306,6 +327,17 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#selectedWithdrawals').text(moneyFromCents(withdrawals));
         $('#selectedNet').text(moneyFromCents(deposits - withdrawals));
         $('#selectedLines').text(selected + ' / ' + ledgerRows);
+
+        var beginningBalance = centsFromMoney($('#begbal').val());
+        var endingBalance = centsFromMoney($('#endbal').val());
+        var bankCharges = centsFromMoney($('#bkcharges').val());
+        var difference;
+        if (isCreditReconciliation) {
+            difference = beginningBalance - deposits + withdrawals + bankCharges - endingBalance;
+        } else {
+            difference = beginningBalance + deposits - withdrawals - bankCharges - endingBalance;
+        }
+        setBalancedState(Math.abs(difference) <= 1);
     }
 
     table.columns().every(function () {
@@ -318,6 +350,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('#dtBanking tbody').on('change', 'input[type="checkbox"]', updateSelectedTotals);
+    $('#begbal, #endbal, #bkcharges').on('input change', updateSelectedTotals);
     table.on('draw', updateSelectedTotals);
     updateSelectedTotals();
 
@@ -386,6 +419,10 @@ document.addEventListener('DOMContentLoaded', function () {
 .banking-tcode-list {
     white-space: normal;
     word-break: break-word;
+}
+.banking-balanced {
+    background-color: #d4edda !important;
+    border-color: #8fd19e !important;
 }
 </style>
 {% endblock %}

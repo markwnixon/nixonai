@@ -1779,6 +1779,22 @@ def IntercompanyEntries():
     def has_final_reconciliation(lines):
         return any(line.Reconciled not in [None, 0, 25] for line in lines)
 
+    def line_has_final_reconciliation(line):
+        return line is not None and line.Reconciled not in [None, 0, 25]
+
+    def transfer_lock_state(lines):
+        debit_line = next((line for line in lines if line.Type == 'XD'), None)
+        credit_line = next((line for line in lines if line.Type == 'XC'), None)
+        return {
+            'transfer_from_locked': line_has_final_reconciliation(credit_line),
+            'transfer_to_locked': line_has_final_reconciliation(debit_line),
+            'transfer_core_locked': has_final_reconciliation(lines),
+            'transfer_partial_lock_message': (
+                'One side of this transfer has been reconciled. Only unreconciled account-side repairs are allowed.'
+                if has_final_reconciliation(lines) else ''
+            ),
+        }
+
     def transfer_selection_from_lines(lines):
         debit_line = next((line for line in lines if line.Type == 'XD'), None)
         credit_line = next((line for line in lines if line.Type == 'XC'), None)
@@ -1803,7 +1819,70 @@ def IntercompanyEntries():
             'transfer_ref': debit_line.Ref or credit_line.Ref or '',
             'transfer_memo': debit_line.JournalMemo or credit_line.JournalMemo or '',
             'owner_transfer_treatment': owner_transfer_treatment,
+            **transfer_lock_state(lines),
         }
+
+    def transfer_date_matches(line, transfer_date):
+        if line is None:
+            return False
+        line_date = line.Date
+        if isinstance(line_date, datetime.date) and not isinstance(line_date, datetime.datetime):
+            line_date = datetime.datetime.combine(line_date, datetime.time.min)
+        return line_date == transfer_date
+
+    def update_open_transfer_side(existing_lines, from_account, to_account, transfer_date, amount, ref, memo):
+        debit_line = next((line for line in existing_lines if line.Type == 'XD'), None)
+        credit_line = next((line for line in existing_lines if line.Type == 'XC'), None)
+        if debit_line is None or credit_line is None or len(existing_lines) != 2:
+            return ['Partially reconciled transfer repair is only supported for standard two-line account transfers.']
+
+        from_locked = line_has_final_reconciliation(credit_line)
+        to_locked = line_has_final_reconciliation(debit_line)
+        if from_locked and to_locked:
+            return ['Both sides of this transfer have been reconciled. Reopen the reconciliation statement before editing it.']
+        if not from_locked and not to_locked:
+            return []
+
+        if credit_line.Aid != from_account.id:
+            return ['Pay From has been reconciled and cannot be changed.']
+        if (credit_line.Credit or 0) != amount or (debit_line.Debit or 0) != amount:
+            return ['Amount cannot be changed because one side of this transfer has been reconciled.']
+        if not transfer_date_matches(credit_line, transfer_date) or not transfer_date_matches(debit_line, transfer_date):
+            return ['Date cannot be changed because one side of this transfer has been reconciled.']
+
+        if from_locked:
+            if to_locked:
+                return ['Pay To has been reconciled and cannot be changed.']
+            if from_account.Co != to_account.Co:
+                return ['Cannot convert a partially reconciled standard transfer into a cross-company transfer.']
+            debit_line.Account = to_account.Name
+            debit_line.Aid = to_account.id
+            debit_line.Source = from_account.Name
+            debit_line.Sid = from_account.id
+            debit_line.Com = to_account.Co
+            debit_line.Ref = ref
+            debit_line.JournalMemo = memo or debit_line.JournalMemo
+            debit_line.PostedBy = 'account_transfer_repair'
+            debit_line.PostedAt = datetime.datetime.now()
+            db.session.commit()
+            return []
+
+        if to_locked:
+            if from_account.Co != to_account.Co:
+                return ['Cannot convert a partially reconciled standard transfer into a cross-company transfer.']
+            credit_line.Account = from_account.Name
+            credit_line.Aid = from_account.id
+            credit_line.Source = to_account.Name
+            credit_line.Sid = to_account.id
+            credit_line.Com = from_account.Co
+            credit_line.Ref = ref
+            credit_line.JournalMemo = memo or credit_line.JournalMemo
+            credit_line.PostedBy = 'account_transfer_repair'
+            credit_line.PostedAt = datetime.datetime.now()
+            db.session.commit()
+            return []
+
+        return ['This transfer could not be repaired.']
 
     selected = {
         'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
@@ -1819,6 +1898,10 @@ def IntercompanyEntries():
         'transfer_memo': request.values.get('transfer_memo', ''),
         'owner_transfer_treatment': request.values.get('owner_transfer_treatment', ''),
         'edit_transfer_journal_id': request.values.get('edit_transfer_journal_id', ''),
+        'transfer_from_locked': False,
+        'transfer_to_locked': False,
+        'transfer_core_locked': False,
+        'transfer_partial_lock_message': '',
         'amount': request.values.get('amount', ''),
         'source': request.values.get('source', ''),
         'ref': request.values.get('ref', ''),
@@ -1990,8 +2073,8 @@ def IntercompanyEntries():
                 err.append('Choose whether this owner transfer is repayable or owner equity.')
         if edit_journal_id and not existing_transfer_lines:
             err.append('The transfer being edited could not be found.')
-        if existing_transfer_lines and has_final_reconciliation(existing_transfer_lines):
-            err.append('This transfer has been reconciled. Reopen the reconciliation statement before editing it.')
+        if existing_transfer_lines:
+            selected.update(transfer_lock_state(existing_transfer_lines))
 
         if not err:
             if existing_transfer_lines:
@@ -2004,6 +2087,13 @@ def IntercompanyEntries():
             lines, transfer_err = transfer_journal_lines(amount, from_account, to_account, tcode, transfer_date, ref, owner_transfer_treatment)
             if transfer_err:
                 err.extend(transfer_err)
+            elif existing_transfer_lines and has_final_reconciliation(existing_transfer_lines):
+                repair_err = update_open_transfer_side(existing_transfer_lines, from_account, to_account, transfer_date, amount, ref, journal_memo)
+                if repair_err:
+                    err.extend(repair_err)
+                else:
+                    msg = f'Updated unreconciled side of account transfer {tcode}.'
+                    selected.update(transfer_selection_from_lines(transfer_lines_for_journal(journal_id)) or {})
             else:
                 for existing_line in existing_transfer_lines:
                     db.session.delete(existing_line)
@@ -3851,7 +3941,7 @@ def DepreciationSchedules():
 @login_required
 @financial_mfa_required
 def Banking():
-    from webapp.iso_Bank import isoBank
+    from webapp.iso_Bank import isoBank, is_credit_reconciliation_account
     odata, oder, err, modata, modlink, leftscreen, leftsize, today, now, docref, cache, acdata, thismuch, acctinfo, hv = isoBank()
     def date_only(value):
         if isinstance(value, datetime.datetime):
@@ -3939,6 +4029,7 @@ def Banking():
         acctinfo=acctinfo,
         hv=hv,
         bank_rows=bank_rows,
+        is_credit_reconciliation=is_credit_reconciliation_account(acctinfo[6]),
     )
 
 

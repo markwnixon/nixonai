@@ -73,6 +73,20 @@ def default_beginning_balance(bankacct):
         return rdat.Ebal
     return '0.00'
 
+def is_credit_reconciliation_account(bankacct):
+    adat = Accounts.query.filter(Accounts.Name == bankacct).first()
+    if adat is None:
+        return False
+    values = [
+        adat.Name,
+        adat.Type,
+        adat.Description,
+        adat.Category,
+        adat.Subcategory,
+    ]
+    text = ' '.join(str(value or '').lower() for value in values)
+    return any(token in text for token in ['credit card', 'liability', 'loan'])
+
 def statement_defaults(bankacct, today_str):
     defaults = {
         'rdate': today_str,
@@ -311,14 +325,15 @@ def recon_totals(bankacct):
     totalc = totalc - bkc
     return d2s(float(totald)/100), d2s(float(totalc)/100), d2s(float(bkc)/100), dlist, wlist
 
-def banktotals(bankacct):
+def banktotals(bankacct, statement_values=None):
     totald=0
     totalc=0
     totald_U = 0
     totalc_U = 0
     defaults = statement_defaults(bankacct, datetime.date.today().strftime('%Y-%m-%d'))
-    endbal = request.values.get('endbal')
-    begbal = request.values.get('begbal')
+    statement_values = statement_values or request.values
+    endbal = statement_values.get('endbal')
+    begbal = statement_values.get('begbal')
     if endbal in [None, '']:
         endbal = defaults['endbal']
     if begbal in [None, '']:
@@ -349,7 +364,12 @@ def banktotals(bankacct):
 
     totald = float(totald)/100
     totalc = float(totalc)/100
-    diff = begbal + float(trial_dr) - float(trial_cr) - float(bk_charge) - endbal
+    if is_credit_reconciliation_account(bankacct):
+        # Credit card statement balances are entered as positive amounts owed.
+        # Ledger net activity is debit-minus-credit, so charges reduce the net.
+        diff = begbal - float(trial_dr) + float(trial_cr) + float(bk_charge) - endbal
+    else:
+        diff = begbal + float(trial_dr) - float(trial_cr) - float(bk_charge) - endbal
     totalds = d2s(totald)
     totalcs = d2s(totalc)
     balance = d2s( (float(totald) - float(totalc))/100 )
@@ -420,18 +440,21 @@ def isoBank():
         reopenhit = request.values.get('reopen_reconciliation')
         baseline_date = request.values.get('baseline_date')
         baseline_balance = request.values.get('baseline_balance')
+        previous_acname = request.values.get('previous_acname')
+        account_changed = previous_acname not in [None, ''] and previous_acname != acname
         defaults = statement_defaults(acname, today_str)
         rdate = request.values.get('rdate')
-        if rdate is None:
+        if rdate is None or account_changed:
             rdate = defaults['rdate']
         hv[0] = rdate
         hv[1] = [0]
         endbal = request.values.get('endbal')
         begbal = request.values.get('begbal')
-        if endbal in [None, '']:
+        if endbal in [None, ''] or account_changed:
             endbal = defaults['endbal']
-        if begbal in [None, '']:
+        if begbal in [None, ''] or account_changed:
             begbal = defaults['begbal']
+        statement_values = {'begbal': begbal, 'endbal': endbal}
         recready = 1
         try:
             endbal=parse_money(endbal)
@@ -492,7 +515,7 @@ def isoBank():
         print('acname=',acname)
         odata = dataget_Bank(thismuch,acname)
         hv[1] = trial_ids(odata)
-        acctinfo = banktotals(acname)
+        acctinfo = banktotals(acname, statement_values)
 # ____________________________________________________________________________________________________________________B.Search.General
 
         if baselinehit is not None:
@@ -570,7 +593,10 @@ def isoBank():
                 save_trial_reconciliation(acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5])
                 odata = dataget_Bank(thismuch, acname)
 
-                if finalize is not None:
+                if finalize is not None and abs(parse_money(acctinfo[5])) > .01:
+                    err.append(f'Cannot finalize because the statement is out of balance by ${acctinfo[5]}.')
+
+                if finalize is not None and abs(parse_money(acctinfo[5])) <= .01:
                     reset_trial(recmo, acname)
                     reconciled_jobs = mark_reconciled_payment_jobs(odervec)
                     hv[1] = [0]

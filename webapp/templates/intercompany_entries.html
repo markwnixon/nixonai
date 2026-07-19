@@ -19,14 +19,24 @@
                         <div class="alert alert-info py-2" role="alert">
                             Editing selected transfer
                         </div>
+                        {% if selected.transfer_partial_lock_message %}
+                            <div class="alert alert-warning py-2" role="alert">
+                                {{ selected.transfer_partial_lock_message }}
+                            </div>
+                        {% endif %}
                     {% endif %}
                     <div class="form-group">
                         <label for="transfer_date">Date</label>
-                        <input type="date" class="form-control" id="transfer_date" name="transfer_date" value="{{ selected.transfer_date }}">
+                        <input type="date" class="form-control" id="transfer_date" name="transfer_date" value="{{ selected.transfer_date }}"
+                               {% if selected.transfer_core_locked %}readonly{% endif %}>
                     </div>
                     <div class="form-group">
                         <label for="transfer_from_account_id">Pay From</label>
-                        <select class="form-control" id="transfer_from_account_id" name="transfer_from_account_id">
+                        {% if selected.transfer_from_locked %}
+                            <input type="hidden" name="transfer_from_account_id" value="{{ selected.transfer_from_account_id }}">
+                        {% endif %}
+                        <select class="form-control" id="transfer_from_account_id" name="transfer_from_account_id"
+                                {% if selected.transfer_from_locked %}disabled{% endif %}>
                             <option value="">Select account</option>
                             {% for account in transfer_accounts %}
                                 <option value="{{ account.id }}"
@@ -43,7 +53,11 @@
                     </div>
                     <div class="form-group">
                         <label for="transfer_to_account_id">Pay To</label>
-                        <select class="form-control" id="transfer_to_account_id" name="transfer_to_account_id">
+                        {% if selected.transfer_to_locked %}
+                            <input type="hidden" name="transfer_to_account_id" value="{{ selected.transfer_to_account_id }}">
+                        {% endif %}
+                        <select class="form-control" id="transfer_to_account_id" name="transfer_to_account_id"
+                                {% if selected.transfer_to_locked %}disabled{% endif %}>
                             <option value="">Select account</option>
                             {% for account in transfer_accounts %}
                                 <option value="{{ account.id }}"
@@ -68,7 +82,8 @@
                     </div>
                     <div class="form-group">
                         <label for="transfer_amount">Amount</label>
-                        <input type="text" class="form-control" id="transfer_amount" name="transfer_amount" value="{{ selected.transfer_amount }}" placeholder="0.00">
+                        <input type="text" class="form-control" id="transfer_amount" name="transfer_amount" value="{{ selected.transfer_amount }}" placeholder="0.00"
+                               {% if selected.transfer_core_locked %}readonly{% endif %}>
                     </div>
                     <div class="form-group">
                         <label for="transfer_ref">Reference</label>
