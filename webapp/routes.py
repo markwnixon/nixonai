@@ -2,7 +2,7 @@ from flask import abort, render_template, redirect, url_for, jsonify, request, s
 from flask import Blueprint
 
 from webapp.extensions import db
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Interchange
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Interchange, Reconciliations
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
 from webapp.revenues import get_revenues
@@ -34,6 +34,7 @@ from webapp.plaid_integration import (
 from decimal import Decimal
 
 from datetime import date, timedelta
+import datetime
 
 from twilio.twiml.messaging_response import MessagingResponse
 from webapp.messager import msg_analysis
@@ -3943,6 +3944,47 @@ def DepreciationSchedules():
 def Banking():
     from webapp.iso_Bank import isoBank, is_credit_reconciliation_account
     odata, oder, err, modata, modlink, leftscreen, leftsize, today, now, docref, cache, acdata, thismuch, acctinfo, hv = isoBank()
+
+    def reconciliation_history_start(range_key):
+        today_date = date.today()
+        if range_key == 'last_12':
+            return today_date - timedelta(days=365)
+        if range_key == 'last_24':
+            return today_date - timedelta(days=730)
+        if range_key == 'all':
+            return None
+        return date(today_date.year, 1, 1)
+
+    def reconciliation_status_label(status):
+        if status == 1:
+            return 'Finalized'
+        if status == 25:
+            return 'Trial'
+        if status == 0:
+            return 'Reopened'
+        return f'Status {status}' if status is not None else ''
+
+    def reconciliation_history(account_name, range_key):
+        start_date = reconciliation_history_start(range_key)
+        query = Reconciliations.query.filter(Reconciliations.Account == account_name)
+        if start_date is not None:
+            query = query.filter(Reconciliations.Rdate >= start_date)
+        rows = query.order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).all()
+        history = []
+        for row in rows:
+            history.append({
+                'date': row.Rdate,
+                'beginning': row.Bbal or '',
+                'ending': row.Ebal or '',
+                'deposits': row.Deposits or '',
+                'withdrawals': row.Withdraws or '',
+                'servicefees': row.Servicefees or '',
+                'difference': row.Diff or '',
+                'status': row.Status,
+                'status_label': reconciliation_status_label(row.Status),
+            })
+        return history
+
     def date_only(value):
         if isinstance(value, datetime.datetime):
             return value.date()
@@ -4009,6 +4051,8 @@ def Banking():
         key=lambda row: (sort_datetime(row['date']), row['source'], row['ref']),
         reverse=True,
     )
+    reconciliation_history_range = request.values.get('reconciliation_history_range', 'current_year')
+    reconciliation_history_rows = reconciliation_history(acctinfo[6], reconciliation_history_range)
     return render_template(
         'banking.html',
         cmpdata=cmpdata,
@@ -4030,6 +4074,8 @@ def Banking():
         hv=hv,
         bank_rows=bank_rows,
         is_credit_reconciliation=is_credit_reconciliation_account(acctinfo[6]),
+        reconciliation_history_rows=reconciliation_history_rows,
+        reconciliation_history_range=reconciliation_history_range,
     )
 
 

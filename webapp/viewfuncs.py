@@ -2388,7 +2388,12 @@ def enter_bk_charges(acct,bkch,date,username):
         gledger_write('dircharge',nextjo,bacct,acct)
         return nextjo
     else:
-        print(f'Have this bill {bdat.id} {bdat.Company}')
+        bdat.bAmount = bkch
+        bdat.pAmount = bkch
+        bdat.Status = 'Paid'
+        db.session.commit()
+        gledger_write('dircharge', bdat.Jo, bacct, acct)
+        print(f'Updated this bill {bdat.id} {bdat.Company}')
         return bdat.Jo
 
 def monvals(iback):
@@ -2714,5 +2719,4 @@ def run_adjustments():
 
     from gledger_write import gledger_write
     gledger_write('adjusting',jo,adat.Expense,adat.Asset)
-
 

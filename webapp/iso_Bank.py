@@ -61,6 +61,12 @@ def latest_reconciliation(bankacct):
         (Reconciliations.Status == 1)
     ).order_by(Reconciliations.Rdate.desc()).first()
 
+def finalized_reconciliations(bankacct, limit=2):
+    return Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Status == 1)
+    ).order_by(Reconciliations.Rdate.desc()).limit(limit).all()
+
 def trial_reconciliation(bankacct):
     return Reconciliations.query.filter(
         (Reconciliations.Account == bankacct) &
@@ -72,6 +78,31 @@ def default_beginning_balance(bankacct):
     if rdat is not None and rdat.Ebal not in [None, '']:
         return rdat.Ebal
     return '0.00'
+
+def add_months(value, months):
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+def default_statement_date(bankacct, today_str):
+    finalized = finalized_reconciliations(bankacct, 2)
+    if not finalized or finalized[0].Rdate is None:
+        return today_str
+
+    latest_date = finalized[0].Rdate.date() if isinstance(finalized[0].Rdate, datetime.datetime) else finalized[0].Rdate
+    if len(finalized) == 1 or finalized[1].Rdate is None:
+        return add_months(latest_date, 1).strftime('%Y-%m-%d')
+
+    previous_date = finalized[1].Rdate.date() if isinstance(finalized[1].Rdate, datetime.datetime) else finalized[1].Rdate
+    if latest_date.day == previous_date.day:
+        return add_months(latest_date, 1).strftime('%Y-%m-%d')
+
+    interval = latest_date - previous_date
+    if interval.days > 0:
+        return (latest_date + interval).strftime('%Y-%m-%d')
+    return add_months(latest_date, 1).strftime('%Y-%m-%d')
 
 def is_credit_reconciliation_account(bankacct):
     adat = Accounts.query.filter(Accounts.Name == bankacct).first()
@@ -89,7 +120,7 @@ def is_credit_reconciliation_account(bankacct):
 
 def statement_defaults(bankacct, today_str):
     defaults = {
-        'rdate': today_str,
+        'rdate': default_statement_date(bankacct, today_str),
         'begbal': default_beginning_balance(bankacct),
         'endbal': '0.00',
     }
@@ -564,19 +595,7 @@ def isoBank():
                 recdate = datetime.datetime.strptime(rdate, "%Y-%m-%d")
                 recmo = recdate.month
                 #if recothese is not None: recmo = 25 #Do not record month until reconciliation final
-                bkcharges = request.values.get('bkcharges')
-                bkcharges = d2s(bkcharges)
                 bkchargeid = 0
-                try:
-                    bkf = float(bkcharges)
-                    print('bkf=',bkf)
-                    if bkf > 0.0:
-                        bank_jo = enter_bk_charges(acname, bkcharges, rdate, username)
-                        gdat = Gledger.query.filter((Gledger.Tcode == bank_jo) & (Gledger.Type=='PC')).first()
-                        if gdat is not None:
-                            bkchargeid = gdat.id
-                except:
-                    bkf = 0.00
 
                 odervec = selected_bank_ids(odata)
                 print('bkid=',bkchargeid)

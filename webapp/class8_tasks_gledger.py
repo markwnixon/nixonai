@@ -437,6 +437,7 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
                     gdat.Recorded=dt
                     gdat.Date=bdate
                     gdat.Account=acctdb
+                    gdat.Aid = adb.id
                     gdat.Sid = pid
                 else:
                     input1 = Gledger(Debit=expense_debit,Credit=expense_credit,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type='ED',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=bdate,Ref=bdat.Ref)

@@ -1,7 +1,8 @@
 from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
-                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap
+                          SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap, \
+                          Chassis, DepreciationAsset
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail, dispatch_sender_key, require_invoice_cc, require_rate_con_cc
@@ -22,7 +23,7 @@ import os
 import ntpath
 from requests import get
 API_KEY_GEO = apikeys['gkey']
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 import datetime
 from datetime import timedelta
 import subprocess
@@ -2900,6 +2901,78 @@ def make_new_entry(tablesetup,holdvec):
     return err, id
 
 #def New_task(task_iter, tablesetup, task_focus, checked_data):
+def cascade_account_name_change(account_id, old_name, new_name):
+    if old_name in [None, ''] or new_name in [None, ''] or old_name == new_name:
+        return []
+
+    account = Accounts.query.get(account_id)
+    if account is None:
+        return []
+
+    updates = []
+
+    for row in Gledger.query.filter(Gledger.Aid == account_id).all():
+        if row.Account != new_name:
+            row.Account = new_name
+            updates.append('gledger.Account')
+
+    for row in Gledger.query.filter((Gledger.Account == old_name) & (Gledger.Com == account.Co)).all():
+        row.Account = new_name
+        row.Aid = account_id
+        updates.append('gledger.Account')
+
+    for row in Gledger.query.filter((Gledger.Sid == account_id) & (Gledger.Source == old_name)).all():
+        row.Source = new_name
+        updates.append('gledger.Source')
+
+    for row in Bills.query.filter((Bills.pAccount == old_name) & (Bills.Co == account.Co)).all():
+        row.pAccount = new_name
+        updates.append('bills.pAccount')
+
+    for row in Bills.query.filter((Bills.bAccount == old_name) & (Bills.Co == account.Co)).all():
+        row.bAccount = new_name
+        updates.append('bills.bAccount')
+
+    for row in Chassis.query.filter(Chassis.Asset == old_name).all():
+        row.Asset = new_name
+        updates.append('chassis.Asset')
+
+    for row in Chassis.query.filter(Chassis.Expense == old_name).all():
+        row.Expense = new_name
+        updates.append('chassis.Expense')
+
+    for row in DepreciationAsset.query.filter(DepreciationAsset.AssetAccount == old_name).all():
+        row.AssetAccount = new_name
+        updates.append('depreciation_assets.AssetAccount')
+
+    for row in DepreciationAsset.query.filter(DepreciationAsset.AccumDepAccount == old_name).all():
+        row.AccumDepAccount = new_name
+        updates.append('depreciation_assets.AccumDepAccount')
+
+    for row in DepreciationAsset.query.filter(DepreciationAsset.DepExpenseAccount == old_name).all():
+        row.DepExpenseAccount = new_name
+        updates.append('depreciation_assets.DepExpenseAccount')
+
+    if inspect(db.engine).has_table('business_report_allocations'):
+        db.session.execute(
+            text("""
+                UPDATE business_report_allocations
+                   SET AccountName = :new_name,
+                       UpdatedAt = CURRENT_TIMESTAMP
+                 WHERE AccountName = :old_name
+            """),
+            {'new_name': new_name, 'old_name': old_name},
+        )
+        allocation_count = db.session.execute(text("SELECT ROW_COUNT()")).scalar() or 0
+        updates.extend(['business_report_allocations.AccountName'] * int(allocation_count))
+
+    db.session.commit()
+    counts = {}
+    for item in updates:
+        counts[item] = counts.get(item, 0) + 1
+    return [f'{name}: {count}' for name, count in sorted(counts.items())]
+
+
 def mask_apply(entrydata, masks, ht):
     mask_to_apply = request.values.get('HaulType')
     if mask_to_apply is None:
@@ -3127,6 +3200,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
+    old_account_name = olddat.Name if table == 'Accounts' else None
     try:
         htold = olddat.HaulType
     except:
@@ -3242,6 +3316,11 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                             #print(f'Setting entry {entry[0]} to {holdvec[jx]}')
                             setattr(olddat, f'{entry[0]}', holdvec[jx])
                 db.session.commit()
+                if table == 'Accounts':
+                    new_account_name = getattr(olddat, 'Name', None)
+                    cascade_report = cascade_account_name_change(sid, old_account_name, new_account_name)
+                    if cascade_report:
+                        err.append(f'Account rename cascaded from "{old_account_name}" to "{new_account_name}": ' + '; '.join(cascade_report))
                 for jx, entry in enumerate(hiddendata):
                     thisvalue = getattr(olddat,entry[2])
                     try:

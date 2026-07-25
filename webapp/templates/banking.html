@@ -50,11 +50,6 @@
                         <label for="endbal">Ending Balance</label>
                         <input type="text" class="form-control" id="endbal" name="endbal" value="{{ acctinfo[4] }}">
                     </div>
-                    <div class="form-group">
-                        <label for="bkcharges">Bank Charges</label>
-                        <input type="text" class="form-control" id="bkcharges" name="bkcharges" value="0.00">
-                    </div>
-
                     <button type="submit" name="recothese" value="1" class="btn btn-primary btn-block mb-2">Mark Trial</button>
                     <button type="submit" name="finalize" value="1" id="finalizeReconciliationButton" class="btn btn-success btn-block mb-2" disabled>Finalize</button>
                     <button type="submit" name="undothese" value="1" class="btn btn-outline-secondary btn-block">Undo Checked</button>
@@ -87,60 +82,118 @@
             <div class="col-lg-9">
                 <div class="row mb-3">
                     <div class="col-md-3">
-                        <div class="border rounded p-3">
+                        <div class="border rounded banking-summary-card">
                             <div class="text-muted">Current Balance</div>
                             <h5>${{ acctinfo[0] }}</h5>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3">
+                        <div class="border rounded banking-summary-card">
                             <div class="text-muted">Unreconciled Deposits</div>
                             <h5>${{ acctinfo[1] }}</h5>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3">
+                        <div class="border rounded banking-summary-card">
                             <div class="text-muted">Unreconciled Withdrawals</div>
                             <h5>${{ acctinfo[2] }}</h5>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3">
+                        <div class="border rounded banking-summary-card">
                             <div class="text-muted">Difference</div>
-                            <h5>${{ acctinfo[5] }}</h5>
+                            <h5 id="statementDifference">${{ acctinfo[5] }}</h5>
                         </div>
                     </div>
                 </div>
 
                 <div class="row mb-3">
                     <div class="col-md-3">
-                        <div class="border rounded p-3 bg-light">
+                        <div class="border rounded banking-summary-card bg-light">
                             <div class="text-muted">Selected Deposits</div>
                             <h5 id="selectedDeposits">$0.00</h5>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3 bg-light">
+                        <div class="border rounded banking-summary-card bg-light">
                             <div class="text-muted">Selected Withdrawals</div>
                             <h5 id="selectedWithdrawals">$0.00</h5>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3 bg-light">
+                        <div class="border rounded banking-summary-card bg-light">
                             <div class="text-muted">Selected Net</div>
                             <h5 id="selectedNet">$0.00</h5>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3 bg-light">
+                        <div class="border rounded banking-summary-card bg-light">
                             <div class="text-muted">Selected Lines</div>
                             <h5 id="selectedLines">0</h5>
                         </div>
                     </div>
                 </div>
 
-                <div class="alert alert-info" role="alert">
+                <div class="alert alert-info banking-feedback" role="alert">
                     <pre class="mb-0">{{ err }}</pre>
+                </div>
+
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                        <h5 class="mb-2 mb-md-0">Reconciliation History</h5>
+                        <div class="form-inline">
+                            <label for="reconciliation_history_range" class="mr-2 text-muted">Range</label>
+                            <select class="form-control form-control-sm" id="reconciliation_history_range"
+                                    name="reconciliation_history_range" onchange="this.form.submit()">
+                                <option value="current_year" {% if reconciliation_history_range == 'current_year' %}selected{% endif %}>Current Year</option>
+                                <option value="last_12" {% if reconciliation_history_range == 'last_12' %}selected{% endif %}>Last 12 Months</option>
+                                <option value="last_24" {% if reconciliation_history_range == 'last_24' %}selected{% endif %}>Last 24 Months</option>
+                                <option value="all" {% if reconciliation_history_range == 'all' %}selected{% endif %}>All</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered table-hover mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Statement Date</th>
+                                    <th>Status</th>
+                                    <th class="text-right">Beginning</th>
+                                    <th class="text-right">Ending</th>
+                                    <th class="text-right">Deposits</th>
+                                    <th class="text-right">Withdrawals</th>
+                                    <th class="text-right">Difference</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in reconciliation_history_rows %}
+                                    <tr>
+                                        <td>{% if item.date %}{{ item.date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                        <td>
+                                            {% if item.status == 1 %}
+                                                <span class="badge badge-success">{{ item.status_label }}</span>
+                                            {% elif item.status == 25 %}
+                                                <span class="badge badge-warning">{{ item.status_label }}</span>
+                                            {% elif item.status == 0 %}
+                                                <span class="badge badge-secondary">{{ item.status_label }}</span>
+                                            {% else %}
+                                                {{ item.status_label }}
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-right">{{ item.beginning }}</td>
+                                        <td class="text-right">{{ item.ending }}</td>
+                                        <td class="text-right">{{ item.deposits }}</td>
+                                        <td class="text-right">{{ item.withdrawals }}</td>
+                                        <td class="text-right">{{ item.difference }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-muted text-center">No reconciliation history for this account and range.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="table-responsive">
@@ -256,6 +309,34 @@
     </div>
 </div>
 
+<style>
+    .banking-summary-card {
+        padding: .45rem .65rem;
+        min-height: 58px;
+    }
+
+    .banking-summary-card .text-muted {
+        font-size: .78rem;
+        line-height: 1.1;
+    }
+
+    .banking-summary-card h5 {
+        font-size: 1rem;
+        line-height: 1.15;
+        margin: .18rem 0 0;
+    }
+
+    .banking-feedback {
+        padding: .35rem .55rem;
+        margin-bottom: .6rem;
+    }
+
+    .banking-feedback pre {
+        line-height: 1.15;
+        white-space: pre-wrap;
+    }
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.jQuery || !$.fn.DataTable || !document.getElementById('dtBanking')) {
@@ -330,13 +411,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var beginningBalance = centsFromMoney($('#begbal').val());
         var endingBalance = centsFromMoney($('#endbal').val());
-        var bankCharges = centsFromMoney($('#bkcharges').val());
         var difference;
         if (isCreditReconciliation) {
-            difference = beginningBalance - deposits + withdrawals + bankCharges - endingBalance;
+            difference = beginningBalance - deposits + withdrawals - endingBalance;
         } else {
-            difference = beginningBalance + deposits - withdrawals - bankCharges - endingBalance;
+            difference = beginningBalance + deposits - withdrawals - endingBalance;
         }
+        $('#statementDifference').text(moneyFromCents(difference));
         setBalancedState(Math.abs(difference) <= 1);
     }
 
@@ -350,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     $('#dtBanking tbody').on('change', 'input[type="checkbox"]', updateSelectedTotals);
-    $('#begbal, #endbal, #bkcharges').on('input change', updateSelectedTotals);
+    $('#begbal, #endbal').on('input change', updateSelectedTotals);
     table.on('draw', updateSelectedTotals);
     updateSelectedTotals();
 
