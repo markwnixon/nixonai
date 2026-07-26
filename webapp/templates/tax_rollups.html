@@ -1,0 +1,229 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<style>
+    .tax-rollup-category-table td,
+    .tax-rollup-category-table th {
+        vertical-align: middle;
+    }
+    .tax-rollup-category-label {
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+    .tax-rollup-category-table .form-control-sm {
+        height: calc(1.5em + .35rem + 2px);
+        padding: .1rem .35rem;
+    }
+    .tax-rollup-category-table .btn-sm {
+        padding: .12rem .42rem;
+        line-height: 1.25;
+    }
+    .tax-rollup-category-table .tax-rollup-parent-select {
+        min-width: 180px;
+    }
+</style>
+<div class="container-fluid mt-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+        <div>
+            <h2>Tax Rollups</h2>
+            <p class="text-muted mb-0">Maintain company-specific tax categories and assign expense accounts to those rollups.</p>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('main.Class8Main', genre='Accounts') }}">Chart of Accounts</a>
+    </div>
+
+    {% if msg %}
+        <div class="alert alert-success py-2">
+            {% for item in msg %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if err %}
+        <div class="alert alert-warning py-2">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="get" action="{{ url_for('main.TaxRollups') }}" class="form-inline mb-3">
+        <label for="company" class="mr-2">Company</label>
+        <select class="form-control form-control-sm mr-2" id="company" name="company" onchange="this.form.submit()">
+            {% for company in companies %}
+                <option value="{{ company }}" {% if company == selected_company %}selected{% endif %}>{{ company }}</option>
+            {% endfor %}
+        </select>
+        <noscript><button class="btn btn-primary btn-sm" type="submit">Load</button></noscript>
+    </form>
+
+    <div class="row">
+        <div class="col-lg-5 mb-3">
+            <div class="border rounded p-3 mb-3">
+                <h5>Add Tax Category</h5>
+                <form method="post" action="{{ url_for('main.TaxRollups') }}">
+                    <input type="hidden" name="action" value="add_category">
+                    <input type="hidden" name="company" value="{{ selected_company }}">
+                    <div class="form-group">
+                        <label for="category_name">Category Name</label>
+                        <input type="text" class="form-control" id="category_name" name="category_name" placeholder="Fuel, Payroll, Repairs">
+                    </div>
+                    <div class="form-group">
+                        <label for="parent_id">Parent Category</label>
+                        <select class="form-control" id="parent_id" name="parent_id">
+                            <option value="">Top Level</option>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}">{{ '--' * category.level }} {{ category.path }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <p class="text-muted small">New categories are placed at the end of the selected parent category.</p>
+                    <button type="submit" class="btn btn-primary btn-block">Add Category</button>
+                </form>
+            </div>
+
+            <div class="border rounded p-3">
+                <h5>Edit Tax Categories</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-hover mb-0 tax-rollup-category-table">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Category</th>
+                                <th>Name</th>
+                                <th>Parent</th>
+                                <th style="width: 58px;">Save</th>
+                                <th style="width: 68px;">Delete</th>
+                                <th style="width: 90px;">Order</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in categories %}
+                                <tr>
+                                    <td>
+                                        <div class="tax-rollup-category-label" style="padding-left: {{ category.level * 20 }}px;" title="{{ category.path }}">
+                                            {% if category.level == 0 %}
+                                                <strong>{{ category.name }}</strong>
+                                            {% else %}
+                                                {{ category.name }}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('main.TaxRollups') }}" id="tax-rollup-edit-{{ category.id }}" class="mb-0">
+                                            <input type="hidden" name="action" value="update_category">
+                                            <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="category_id" value="{{ category.id }}">
+                                        </form>
+                                        <input type="text" class="form-control form-control-sm" form="tax-rollup-edit-{{ category.id }}"
+                                               name="edit_category_name" value="{{ category.name }}">
+                                    </td>
+                                    <td>
+                                        <select class="form-control form-control-sm tax-rollup-parent-select" form="tax-rollup-edit-{{ category.id }}"
+                                                name="edit_parent_id">
+                                            <option value="">Top Level</option>
+                                            {% for parent in categories %}
+                                                {% if parent.id != category.id %}
+                                                    <option value="{{ parent.id }}" {% if parent.id == category.parent_id %}selected{% endif %}>
+                                                        {{ '--' * parent.level }} {{ parent.path }}
+                                                    </option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="submit" form="tax-rollup-edit-{{ category.id }}"
+                                                class="btn btn-sm btn-outline-primary">Save</button>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" action="{{ url_for('main.TaxRollups') }}" id="tax-rollup-delete-{{ category.id }}" class="mb-0">
+                                            <input type="hidden" name="action" value="delete_category">
+                                            <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="category_id" value="{{ category.id }}">
+                                        </form>
+                                        <button type="submit" form="tax-rollup-delete-{{ category.id }}"
+                                                class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('Delete this tax category?');">Delete</button>
+                                    </td>
+                                    <td class="text-center text-nowrap">
+                                        <form method="post" action="{{ url_for('main.TaxRollups') }}" class="d-inline">
+                                            <input type="hidden" name="action" value="move_category">
+                                            <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="category_id" value="{{ category.id }}">
+                                            <input type="hidden" name="direction" value="up">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary px-2"
+                                                    title="Move up" {% if not category.can_move_up %}disabled{% endif %}>&uarr;</button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('main.TaxRollups') }}" class="d-inline">
+                                            <input type="hidden" name="action" value="move_category">
+                                            <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="category_id" value="{{ category.id }}">
+                                            <input type="hidden" name="direction" value="down">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary px-2"
+                                                    title="Move down" {% if not category.can_move_down %}disabled{% endif %}>&darr;</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-muted text-center">No tax categories defined for {{ selected_company }}.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7 mb-3">
+            <div class="border rounded p-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                    <h5 class="mb-0">Expense Account Assignments</h5>
+                    <span class="text-muted small">{{ expense_accounts|length }} expense accounts</span>
+                </div>
+                <form method="post" action="{{ url_for('main.TaxRollups') }}">
+                    <input type="hidden" name="action" value="save_assignments">
+                    <input type="hidden" name="company" value="{{ selected_company }}">
+                    <div class="table-responsive" style="max-height: 720px;">
+                        <table class="table table-sm table-striped table-bordered table-hover">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Category</th>
+                                    <th>Subcategory</th>
+                                    <th>Tax Rollup</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for account in expense_accounts %}
+                                    <tr>
+                                        <td>{{ account.Name }}</td>
+                                        <td>{{ account.Category or '' }}</td>
+                                        <td>{{ account.Subcategory or '' }}</td>
+                                        <td>
+                                            <select class="form-control form-control-sm" name="taxrollup_{{ account.id }}">
+                                                <option value="">Unassigned</option>
+                                                {% for category in categories %}
+                                                    <option value="{{ category.path }}" {% if account.Taxrollup == category.path %}selected{% endif %}>
+                                                        {{ '--' * category.level }} {{ category.path }}
+                                                    </option>
+                                                {% endfor %}
+                                                {% if account.Taxrollup and account.Taxrollup not in category_paths %}
+                                                    <option value="{{ account.Taxrollup }}" selected>{{ account.Taxrollup }} (not in setup)</option>
+                                                {% endif %}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center">No expense accounts found for {{ selected_company }}.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-block mt-2">Save Account Assignments</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
