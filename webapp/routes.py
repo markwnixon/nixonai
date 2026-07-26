@@ -1806,6 +1806,15 @@ def business_report_rollup_rows(rows, configured_categories):
             totals[prefix] = totals.get(prefix, 0) + row['amount_cents']
         detail_accounts.setdefault(path, []).append(row)
 
+    def contained_accounts(path):
+        if path == 'Unassigned':
+            return detail_accounts.get(path, [])
+        contained = []
+        for account_path, accounts in detail_accounts.items():
+            if account_path == path or account_path.startswith(f'{path}:'):
+                contained.extend(accounts)
+        return sorted(contained, key=lambda item: (item['taxrollup'], item['account']))
+
     output = []
     seen = set()
     for category in configured_categories:
@@ -1817,7 +1826,7 @@ def business_report_rollup_rows(rows, configured_categories):
                 'level': category['level'],
                 'amount_cents': totals[path],
                 'amount': business_report_money(totals[path]),
-                'accounts': detail_accounts.get(path, []),
+                'accounts': contained_accounts(path),
             })
             seen.add(path)
 
@@ -1829,10 +1838,82 @@ def business_report_rollup_rows(rows, configured_categories):
             'level': level,
             'amount_cents': totals[path],
             'amount': business_report_money(totals[path]),
-            'accounts': detail_accounts.get(path, []),
+            'accounts': contained_accounts(path),
         })
 
     return output
+
+
+def business_report_bill_for_ledger_line(line):
+    if line.SourceTable == 'Bills' and line.SourceId:
+        bill = Bills.query.get(line.SourceId)
+        if bill is not None:
+            return bill
+    if line.Tcode:
+        bill_jo = line.Tcode
+        if (line.JournalId or '').startswith('PAYBILL-') and '-' in bill_jo:
+            bill_jo = bill_jo.rsplit('-', 1)[0]
+        bill = Bills.query.filter(Bills.Jo == bill_jo).first()
+        if bill is not None:
+            return bill
+    return None
+
+
+def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, account_type):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    ledger_rows = db.session.query(Gledger, Accounts).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == account_type,
+        Accounts.Taxrollup.isnot(None),
+        Accounts.Taxrollup != '',
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).order_by(
+        Gledger.Date.asc(),
+        Gledger.Account.asc(),
+        Gledger.id.asc(),
+    ).all()
+
+    by_path = {}
+    for line, account in ledger_rows:
+        if account_type == 'Income':
+            amount_cents = int(line.Credit or 0) - int(line.Debit or 0)
+        else:
+            amount_cents = int(line.Debit or 0) - int(line.Credit or 0)
+        bill = business_report_bill_for_ledger_line(line)
+        detail = {
+            'date': line.Date.strftime('%Y-%m-%d') if line.Date else '',
+            'account': account.Name or line.Account or '',
+            'taxrollup': account.Taxrollup or '',
+            'category': account.Category or '',
+            'subcategory': account.Subcategory or '',
+            'amount_cents': amount_cents,
+            'amount': business_report_money(amount_cents),
+            'ledger_type': line.Type or '',
+            'journal_id': line.JournalId or '',
+            'source_table': line.SourceTable or '',
+            'source_id': line.SourceId or '',
+            'tcode': line.Tcode or '',
+            'ref': line.Ref or '',
+            'source': line.Source or '',
+            'bill_jo': bill.Jo if bill else '',
+            'bill_vendor': bill.Company if bill else '',
+            'bill_description': bill.Description if bill else '',
+            'bill_amount': bill.bAmount if bill else '',
+            'bill_date': bill.Date.strftime('%Y-%m-%d') if bill and bill.Date else '',
+            'paid_date': bill.pDate.strftime('%Y-%m-%d') if bill and bill.pDate else '',
+            'paid_amount': bill.pAmount if bill else '',
+            'paid_account': bill.pAccount if bill else '',
+            'bill_status': bill.Status if bill else '',
+        }
+        parts = [part.strip() for part in (account.Taxrollup or '').split(':') if part.strip()]
+        for index in range(1, len(parts) + 1):
+            prefix = ':'.join(parts[:index])
+            by_path.setdefault(prefix, []).append(detail)
+    return by_path
 
 
 def business_report_rollup_section_report_rows(rollup_rows):
@@ -1850,6 +1931,8 @@ def business_report_rollup_section_report_rows(rollup_rows):
             'total_cents': active_top['amount_cents'],
             'amount': '',
             'total': business_report_money(active_top['amount_cents']),
+            'accounts': active_top.get('accounts', []),
+            'details': active_top.get('details', []),
             'kind': 'top_total',
         })
 
@@ -1863,6 +1946,8 @@ def business_report_rollup_section_report_rows(rollup_rows):
                 'total_cents': None,
                 'amount': '',
                 'total': '',
+                'accounts': row.get('accounts', []),
+                'details': row.get('details', []),
                 'kind': 'top',
             })
             output.append(display_row)
@@ -1871,6 +1956,8 @@ def business_report_rollup_section_report_rows(rollup_rows):
             display_row.update({
                 'total_cents': None,
                 'total': '',
+                'accounts': row.get('accounts', []),
+                'details': row.get('details', []),
                 'kind': 'rollup',
             })
             output.append(display_row)
@@ -1930,6 +2017,12 @@ def business_report_tax_rollup_pl(company_code, start_date, end_date):
     expense_categories = tax_rollup_categories(company_code, 'Expense')
     income_rows = business_report_rollup_rows(income_accounts, income_categories)
     expense_rows = business_report_rollup_rows(expense_accounts, expense_categories)
+    income_detail_by_path = business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 'Income')
+    expense_detail_by_path = business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 'Expense')
+    for row in income_rows:
+        row['details'] = income_detail_by_path.get(row['path'], [])
+    for row in expense_rows:
+        row['details'] = expense_detail_by_path.get(row['path'], [])
     total_income = sum(row['amount_cents'] for row in income_accounts)
     total_expenses = sum(row['amount_cents'] for row in expense_accounts)
     unassigned_expenses = sum(row['amount_cents'] for row in unassigned_expense_accounts)
