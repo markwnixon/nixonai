@@ -2974,17 +2974,18 @@ def cascade_account_name_change(account_id, old_name, new_name):
             Chassis.Expense == old_name
         ).update({Chassis.Expense: new_name}, synchronize_session=False))
 
-    record('depreciation_assets.AssetAccount', DepreciationAsset.query.filter(
-        DepreciationAsset.AssetAccount == old_name
-    ).update({DepreciationAsset.AssetAccount: new_name}, synchronize_session=False))
+    if inspect(db.engine).has_table('depreciation_assets'):
+        record('depreciation_assets.AssetAccount', DepreciationAsset.query.filter(
+            DepreciationAsset.AssetAccount == old_name
+        ).update({DepreciationAsset.AssetAccount: new_name}, synchronize_session=False))
 
-    record('depreciation_assets.AccumDepAccount', DepreciationAsset.query.filter(
-        DepreciationAsset.AccumDepAccount == old_name
-    ).update({DepreciationAsset.AccumDepAccount: new_name}, synchronize_session=False))
+        record('depreciation_assets.AccumDepAccount', DepreciationAsset.query.filter(
+            DepreciationAsset.AccumDepAccount == old_name
+        ).update({DepreciationAsset.AccumDepAccount: new_name}, synchronize_session=False))
 
-    record('depreciation_assets.DepExpenseAccount', DepreciationAsset.query.filter(
-        DepreciationAsset.DepExpenseAccount == old_name
-    ).update({DepreciationAsset.DepExpenseAccount: new_name}, synchronize_session=False))
+        record('depreciation_assets.DepExpenseAccount', DepreciationAsset.query.filter(
+            DepreciationAsset.DepExpenseAccount == old_name
+        ).update({DepreciationAsset.DepExpenseAccount: new_name}, synchronize_session=False))
 
     if inspect(db.engine).has_table('business_report_allocations'):
         db.session.execute(
