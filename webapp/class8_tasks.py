@@ -2909,72 +2909,82 @@ def cascade_account_name_change(account_id, old_name, new_name):
     if account is None:
         return []
 
-    updates = []
+    counts = {}
 
-    for row in Gledger.query.filter(Gledger.Aid == account_id).all():
-        if row.Account != new_name:
-            row.Account = new_name
-            updates.append('gledger.Account')
+    def record(name, count):
+        if count:
+            counts[name] = counts.get(name, 0) + int(count)
 
-    for row in Gledger.query.filter((Gledger.Account == old_name) & (Gledger.Com == account.Co)).all():
-        row.Account = new_name
-        row.Aid = account_id
-        updates.append('gledger.Account')
+    # Use set-based updates here. Production hosts can time out when thousands of
+    # ledger/payment rows are loaded and saved one ORM object at a time.
+    record('gledger.Account', Gledger.query.filter(
+        Gledger.Aid == account_id,
+        Gledger.Account != new_name,
+    ).update({Gledger.Account: new_name}, synchronize_session=False))
 
-    for row in Gledger.query.filter((Gledger.Sid == account_id) & (Gledger.Source == old_name)).all():
-        row.Source = new_name
-        updates.append('gledger.Source')
+    record('gledger.Account', Gledger.query.filter(
+        (Gledger.Account == old_name) & (Gledger.Com == account.Co)
+    ).update({
+        Gledger.Account: new_name,
+        Gledger.Aid: account_id,
+    }, synchronize_session=False))
 
-    for row in Bills.query.filter((Bills.pAccount == old_name) & (Bills.Co == account.Co)).all():
-        row.pAccount = new_name
-        updates.append('bills.pAccount')
+    record('gledger.Source', Gledger.query.filter(
+        (Gledger.Sid == account_id) & (Gledger.Source == old_name)
+    ).update({Gledger.Source: new_name}, synchronize_session=False))
 
-    for row in Bills.query.filter((Bills.bAccount == old_name) & (Bills.Co == account.Co)).all():
-        row.bAccount = new_name
-        row.bType = account.Type
-        row.bCat = account.Category
-        row.bSubcat = account.Subcategory
-        updates.append('bills.bAccount')
+    record('bills.pAccount', Bills.query.filter(
+        (Bills.pAccount == old_name) & (Bills.Co == account.Co)
+    ).update({Bills.pAccount: new_name}, synchronize_session=False))
 
-    for row in PaymentsRec.query.filter((PaymentsRec.Account == old_name) & (PaymentsRec.Com == account.Co)).all():
-        row.Account = new_name
-        updates.append('paymentsrec.Account')
+    record('bills.bAccount', Bills.query.filter(
+        (Bills.bAccount == old_name) & (Bills.Co == account.Co)
+    ).update({
+        Bills.bAccount: new_name,
+        Bills.bType: account.Type,
+        Bills.bCat: account.Category,
+        Bills.bSubcat: account.Subcategory,
+    }, synchronize_session=False))
 
-    for row in Deposits.query.filter(Deposits.Account == old_name).all():
-        row.Account = new_name
-        updates.append('deposits.Account')
+    record('paymentsrec.Account', PaymentsRec.query.filter(
+        (PaymentsRec.Account == old_name) & (PaymentsRec.Com == account.Co)
+    ).update({PaymentsRec.Account: new_name}, synchronize_session=False))
 
-    for row in Deposits.query.filter(Deposits.Bank == old_name).all():
-        row.Bank = new_name
-        updates.append('deposits.Bank')
+    record('deposits.Account', Deposits.query.filter(
+        Deposits.Account == old_name
+    ).update({Deposits.Account: new_name}, synchronize_session=False))
 
-    for row in Reconciliations.query.filter(Reconciliations.Account == old_name).all():
-        row.Account = new_name
-        updates.append('reconciliations.Account')
+    record('deposits.Bank', Deposits.query.filter(
+        Deposits.Bank == old_name
+    ).update({Deposits.Bank: new_name}, synchronize_session=False))
+
+    record('reconciliations.Account', Reconciliations.query.filter(
+        Reconciliations.Account == old_name
+    ).update({Reconciliations.Account: new_name}, synchronize_session=False))
 
     # These fields existed in older chassis schemas. Guard them so account edits
     # still cascade on current databases where chassis is job/invoice detail only.
     if hasattr(Chassis, 'Asset'):
-        for row in Chassis.query.filter(Chassis.Asset == old_name).all():
-            row.Asset = new_name
-            updates.append('chassis.Asset')
+        record('chassis.Asset', Chassis.query.filter(
+            Chassis.Asset == old_name
+        ).update({Chassis.Asset: new_name}, synchronize_session=False))
 
     if hasattr(Chassis, 'Expense'):
-        for row in Chassis.query.filter(Chassis.Expense == old_name).all():
-            row.Expense = new_name
-            updates.append('chassis.Expense')
+        record('chassis.Expense', Chassis.query.filter(
+            Chassis.Expense == old_name
+        ).update({Chassis.Expense: new_name}, synchronize_session=False))
 
-    for row in DepreciationAsset.query.filter(DepreciationAsset.AssetAccount == old_name).all():
-        row.AssetAccount = new_name
-        updates.append('depreciation_assets.AssetAccount')
+    record('depreciation_assets.AssetAccount', DepreciationAsset.query.filter(
+        DepreciationAsset.AssetAccount == old_name
+    ).update({DepreciationAsset.AssetAccount: new_name}, synchronize_session=False))
 
-    for row in DepreciationAsset.query.filter(DepreciationAsset.AccumDepAccount == old_name).all():
-        row.AccumDepAccount = new_name
-        updates.append('depreciation_assets.AccumDepAccount')
+    record('depreciation_assets.AccumDepAccount', DepreciationAsset.query.filter(
+        DepreciationAsset.AccumDepAccount == old_name
+    ).update({DepreciationAsset.AccumDepAccount: new_name}, synchronize_session=False))
 
-    for row in DepreciationAsset.query.filter(DepreciationAsset.DepExpenseAccount == old_name).all():
-        row.DepExpenseAccount = new_name
-        updates.append('depreciation_assets.DepExpenseAccount')
+    record('depreciation_assets.DepExpenseAccount', DepreciationAsset.query.filter(
+        DepreciationAsset.DepExpenseAccount == old_name
+    ).update({DepreciationAsset.DepExpenseAccount: new_name}, synchronize_session=False))
 
     if inspect(db.engine).has_table('business_report_allocations'):
         db.session.execute(
@@ -2987,12 +2997,9 @@ def cascade_account_name_change(account_id, old_name, new_name):
             {'new_name': new_name, 'old_name': old_name},
         )
         allocation_count = db.session.execute(text("SELECT ROW_COUNT()")).scalar() or 0
-        updates.extend(['business_report_allocations.AccountName'] * int(allocation_count))
+        record('business_report_allocations.AccountName', allocation_count)
 
     db.session.commit()
-    counts = {}
-    for item in updates:
-        counts[item] = counts.get(item, 0) + 1
     return [f'{name}: {count}' for name, count in sorted(counts.items())]
 
 
@@ -3008,34 +3015,34 @@ def cascade_account_metadata_change(account_id, old_type, old_category, old_subc
     ):
         return []
 
-    updates = []
+    counts = {}
 
-    bill_rows = Bills.query.filter(Bills.bAccount == account.Name).all()
-    for row in bill_rows:
-        if row.Co not in [account.Co, None, '']:
-            continue
-        changed = False
-        if row.bType != account.Type:
-            row.bType = account.Type
-            changed = True
-        if row.bCat != account.Category:
-            row.bCat = account.Category
-            changed = True
-        if row.bSubcat != account.Subcategory:
-            row.bSubcat = account.Subcategory
-            changed = True
-        if changed:
-            updates.append('bills.expense_metadata')
+    def record(name, count):
+        if count:
+            counts[name] = counts.get(name, 0) + int(count)
 
-    for row in Gledger.query.filter((Gledger.Account == account.Name) & (Gledger.Com == account.Co)).all():
-        if row.Aid != account.id:
-            row.Aid = account.id
-            updates.append('gledger.Aid')
+    record('bills.expense_metadata', Bills.query.filter(
+        Bills.bAccount == account.Name,
+        or_(Bills.Co == account.Co, Bills.Co.is_(None), Bills.Co == ''),
+        or_(
+            Bills.bType != account.Type,
+            Bills.bCat != account.Category,
+            Bills.bSubcat != account.Subcategory,
+            Bills.bType.is_(None),
+            Bills.bCat.is_(None),
+            Bills.bSubcat.is_(None),
+        )
+    ).update({
+        Bills.bType: account.Type,
+        Bills.bCat: account.Category,
+        Bills.bSubcat: account.Subcategory,
+    }, synchronize_session=False))
+
+    record('gledger.Aid', Gledger.query.filter(
+        (Gledger.Account == account.Name) & (Gledger.Com == account.Co) & (Gledger.Aid != account.id)
+    ).update({Gledger.Aid: account.id}, synchronize_session=False))
 
     db.session.commit()
-    counts = {}
-    for item in updates:
-        counts[item] = counts.get(item, 0) + 1
     return [f'{name}: {count}' for name, count in sorted(counts.items())]
 
 
