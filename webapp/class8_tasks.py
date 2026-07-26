@@ -2,7 +2,7 @@ from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
                           SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap, \
-                          Chassis, DepreciationAsset
+                          Chassis, DepreciationAsset, Deposits, Reconciliations
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail, dispatch_sender_key, require_invoice_cc, require_rate_con_cc
@@ -2931,7 +2931,26 @@ def cascade_account_name_change(account_id, old_name, new_name):
 
     for row in Bills.query.filter((Bills.bAccount == old_name) & (Bills.Co == account.Co)).all():
         row.bAccount = new_name
+        row.bType = account.Type
+        row.bCat = account.Category
+        row.bSubcat = account.Subcategory
         updates.append('bills.bAccount')
+
+    for row in PaymentsRec.query.filter((PaymentsRec.Account == old_name) & (PaymentsRec.Com == account.Co)).all():
+        row.Account = new_name
+        updates.append('paymentsrec.Account')
+
+    for row in Deposits.query.filter(Deposits.Account == old_name).all():
+        row.Account = new_name
+        updates.append('deposits.Account')
+
+    for row in Deposits.query.filter(Deposits.Bank == old_name).all():
+        row.Bank = new_name
+        updates.append('deposits.Bank')
+
+    for row in Reconciliations.query.filter(Reconciliations.Account == old_name).all():
+        row.Account = new_name
+        updates.append('reconciliations.Account')
 
     for row in Chassis.query.filter(Chassis.Asset == old_name).all():
         row.Asset = new_name
@@ -2965,6 +2984,49 @@ def cascade_account_name_change(account_id, old_name, new_name):
         )
         allocation_count = db.session.execute(text("SELECT ROW_COUNT()")).scalar() or 0
         updates.extend(['business_report_allocations.AccountName'] * int(allocation_count))
+
+    db.session.commit()
+    counts = {}
+    for item in updates:
+        counts[item] = counts.get(item, 0) + 1
+    return [f'{name}: {count}' for name, count in sorted(counts.items())]
+
+
+def cascade_account_metadata_change(account_id, old_type, old_category, old_subcategory, force=False):
+    account = Accounts.query.get(account_id)
+    if account is None:
+        return []
+
+    if not force and (
+        old_type == account.Type and
+        old_category == account.Category and
+        old_subcategory == account.Subcategory
+    ):
+        return []
+
+    updates = []
+
+    bill_rows = Bills.query.filter(Bills.bAccount == account.Name).all()
+    for row in bill_rows:
+        if row.Co not in [account.Co, None, '']:
+            continue
+        changed = False
+        if row.bType != account.Type:
+            row.bType = account.Type
+            changed = True
+        if row.bCat != account.Category:
+            row.bCat = account.Category
+            changed = True
+        if row.bSubcat != account.Subcategory:
+            row.bSubcat = account.Subcategory
+            changed = True
+        if changed:
+            updates.append('bills.expense_metadata')
+
+    for row in Gledger.query.filter((Gledger.Account == account.Name) & (Gledger.Com == account.Co)).all():
+        if row.Aid != account.id:
+            row.Aid = account.id
+            updates.append('gledger.Aid')
 
     db.session.commit()
     counts = {}
@@ -3201,6 +3263,9 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
     old_account_name = olddat.Name if table == 'Accounts' else None
+    old_account_type = olddat.Type if table == 'Accounts' else None
+    old_account_category = olddat.Category if table == 'Accounts' else None
+    old_account_subcategory = olddat.Subcategory if table == 'Accounts' else None
     try:
         htold = olddat.HaulType
     except:
@@ -3321,6 +3386,15 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     cascade_report = cascade_account_name_change(sid, old_account_name, new_account_name)
                     if cascade_report:
                         err.append(f'Account rename cascaded from "{old_account_name}" to "{new_account_name}": ' + '; '.join(cascade_report))
+                    metadata_report = cascade_account_metadata_change(
+                        sid,
+                        old_account_type,
+                        old_account_category,
+                        old_account_subcategory,
+                        force=True,
+                    )
+                    if metadata_report:
+                        err.append('Account metadata cascaded to historical transaction rows: ' + '; '.join(metadata_report))
                 for jx, entry in enumerate(hiddendata):
                     thisvalue = getattr(olddat,entry[2])
                     try:

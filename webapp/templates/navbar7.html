@@ -85,6 +85,9 @@
                 <a class="dropdown-item" href="{{ url_for('main.Revenue') }}">Revenue Reports</a>
                 <div class="dropdown-divider"></div>
                 <h6 class="dropdown-header">Setup</h6>
+                {% if session['authority'] in ['admin', 'superuser'] %}
+                    <a class="dropdown-item" href="{{ url_for('main.TaxRollups') }}">Tax Rollups</a>
+                {% endif %}
                 <a class="dropdown-item" href="{{ url_for('main.OpeningBalances') }}">Opening Balances</a>
 
             </div>

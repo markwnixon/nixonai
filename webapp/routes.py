@@ -1274,6 +1274,387 @@ BUSINESS_REPORT_BASIS_TYPES = {
     'mile': 'Miles',
 }
 
+def ensure_tax_rollup_tables():
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS tax_rollup_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(2) NOT NULL,
+            Name VARCHAR(100) NOT NULL,
+            ParentId INT NULL,
+            SortOrder INT NOT NULL DEFAULT 0,
+            Active TINYINT NOT NULL DEFAULT 1,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_tax_rollup_categories_co (Co),
+            INDEX idx_tax_rollup_categories_parent (ParentId),
+            INDEX idx_tax_rollup_categories_active (Active)
+        )
+    """))
+    db.session.commit()
+
+
+def tax_rollup_categories(company_code):
+    rows = db.session.execute(text("""
+        SELECT id, Co, Name, ParentId, SortOrder, Active
+        FROM tax_rollup_categories
+        WHERE Co = :company_code AND Active = 1
+        ORDER BY COALESCE(ParentId, 0), SortOrder, Name
+    """), {'company_code': company_code}).mappings().all()
+    items = []
+    by_id = {}
+    for row in rows:
+        item = {
+            'id': row['id'],
+            'co': row['Co'],
+            'name': row['Name'] or '',
+            'parent_id': row['ParentId'],
+            'sort_order': row['SortOrder'] or 0,
+            'level': 0,
+            'path': row['Name'] or '',
+        }
+        items.append(item)
+        by_id[item['id']] = item
+
+    def build_path(item, seen=None):
+        seen = seen or set()
+        if item['id'] in seen:
+            return item['name']
+        seen.add(item['id'])
+        parent = by_id.get(item['parent_id'])
+        if parent is None:
+            item['level'] = 0
+            return item['name']
+        parent_path = build_path(parent, seen)
+        item['level'] = parent.get('level', 0) + 1
+        return f"{parent_path}:{item['name']}" if parent_path else item['name']
+
+    for item in items:
+        item['path'] = build_path(item)
+
+    children = {}
+    roots = []
+    for item in items:
+        children.setdefault(item['parent_id'], []).append(item)
+        if item['parent_id'] not in by_id:
+            roots.append(item)
+
+    for child_items in children.values():
+        child_items.sort(key=lambda item: (item['sort_order'], item['name'].lower(), item['id']))
+        for index, item in enumerate(child_items):
+            item['can_move_up'] = index > 0
+            item['can_move_down'] = index < len(child_items) - 1
+    roots.sort(key=lambda item: (item['sort_order'], item['name'].lower(), item['id']))
+
+    ordered = []
+
+    def add_children(parent_item):
+        ordered.append(parent_item)
+        for child in children.get(parent_item['id'], []):
+            add_children(child)
+
+    for root in roots:
+        add_children(root)
+
+    return ordered
+
+
+def next_tax_rollup_sort(company_code, parent_id):
+    max_sort = db.session.execute(text("""
+        SELECT COALESCE(MAX(SortOrder), 0)
+        FROM tax_rollup_categories
+        WHERE Co = :company_code
+          AND Active = 1
+          AND (
+                (:parent_id IS NULL AND ParentId IS NULL)
+                OR ParentId = :parent_id
+          )
+    """), {'company_code': company_code, 'parent_id': parent_id}).scalar() or 0
+    return int(max_sort) + 10
+
+
+def normalize_tax_rollup_sibling_sort(company_code, parent_id):
+    rows = db.session.execute(text("""
+        SELECT id
+        FROM tax_rollup_categories
+        WHERE Co = :company_code
+          AND Active = 1
+          AND (
+                (:parent_id IS NULL AND ParentId IS NULL)
+                OR ParentId = :parent_id
+          )
+        ORDER BY SortOrder, Name, id
+    """), {'company_code': company_code, 'parent_id': parent_id}).mappings().all()
+    for index, row in enumerate(rows, start=1):
+        db.session.execute(text("""
+            UPDATE tax_rollup_categories
+               SET SortOrder = :sort_order
+             WHERE id = :category_id
+        """), {'sort_order': index * 10, 'category_id': row['id']})
+    db.session.commit()
+
+
+def move_tax_rollup_category(company_code, category_id, direction):
+    category = db.session.execute(text("""
+        SELECT id, ParentId
+        FROM tax_rollup_categories
+        WHERE id = :category_id
+          AND Co = :company_code
+          AND Active = 1
+    """), {'category_id': category_id, 'company_code': company_code}).mappings().first()
+    if category is None:
+        return 'Tax category not found.'
+
+    parent_id = category['ParentId']
+    normalize_tax_rollup_sibling_sort(company_code, parent_id)
+    siblings = db.session.execute(text("""
+        SELECT id, SortOrder
+        FROM tax_rollup_categories
+        WHERE Co = :company_code
+          AND Active = 1
+          AND (
+                (:parent_id IS NULL AND ParentId IS NULL)
+                OR ParentId = :parent_id
+          )
+        ORDER BY SortOrder, Name, id
+    """), {'company_code': company_code, 'parent_id': parent_id}).mappings().all()
+    index = next((idx for idx, row in enumerate(siblings) if str(row['id']) == str(category_id)), None)
+    if index is None:
+        return 'Tax category sibling group could not be loaded.'
+    target_index = index - 1 if direction == 'up' else index + 1
+    if target_index < 0 or target_index >= len(siblings):
+        return 'Tax category is already at the requested edge.'
+
+    current = siblings[index]
+    target = siblings[target_index]
+    db.session.execute(text("""
+        UPDATE tax_rollup_categories
+           SET SortOrder = :sort_order,
+               UpdatedAt = :updated_at
+         WHERE id = :category_id
+    """), {
+        'sort_order': target['SortOrder'],
+        'updated_at': datetime.datetime.utcnow(),
+        'category_id': current['id'],
+    })
+    db.session.execute(text("""
+        UPDATE tax_rollup_categories
+           SET SortOrder = :sort_order,
+               UpdatedAt = :updated_at
+         WHERE id = :category_id
+    """), {
+        'sort_order': current['SortOrder'],
+        'updated_at': datetime.datetime.utcnow(),
+        'category_id': target['id'],
+    })
+    db.session.commit()
+    return ''
+
+
+def tax_rollup_company_options():
+    companies = [
+        row[0] for row in db.session.query(Accounts.Co)
+        .filter(Accounts.Co.isnot(None))
+        .distinct()
+        .order_by(Accounts.Co)
+        .all()
+        if row[0]
+    ]
+    return companies or [cmpdata[10]]
+
+
+def sync_tax_rollup_account_paths(company_code, old_path_by_id):
+    if not old_path_by_id:
+        return 0
+    new_categories = tax_rollup_categories(company_code)
+    new_path_by_id = {item['id']: item['path'] for item in new_categories}
+    updated = 0
+    for category_id, old_path in old_path_by_id.items():
+        new_path = new_path_by_id.get(category_id)
+        if not old_path or not new_path or old_path == new_path:
+            continue
+        rows = Accounts.query.filter(
+            (Accounts.Co == company_code) &
+            (Accounts.Taxrollup == old_path)
+        ).all()
+        for account in rows:
+            account.Taxrollup = new_path
+            updated += 1
+    if updated:
+        db.session.commit()
+    return updated
+
+
+@main.route('/TaxRollups', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def TaxRollups():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_tax_rollup_tables()
+    companies = tax_rollup_company_options()
+    selected_company = request.values.get('company') or cmpdata[10]
+    if selected_company not in companies:
+        selected_company = companies[0]
+    err = []
+    msg = []
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        selected_company = request.form.get('company') or selected_company
+        if selected_company not in companies:
+            selected_company = companies[0]
+
+        if action == 'add_category':
+            name = (request.form.get('category_name') or '').strip()
+            parent_id = request.form.get('parent_id') or None
+            sort_order = next_tax_rollup_sort(selected_company, parent_id)
+            if not name:
+                err.append('Tax category name is required.')
+            else:
+                db.session.execute(text("""
+                    INSERT INTO tax_rollup_categories
+                        (Co, Name, ParentId, SortOrder, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:co, :name, :parent_id, :sort_order, 1, :created_at, :updated_at)
+                """), {
+                    'co': selected_company,
+                    'name': name,
+                    'parent_id': parent_id,
+                    'sort_order': sort_order,
+                    'created_at': datetime.datetime.utcnow(),
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.commit()
+                msg.append(f'Tax category {name} added.')
+
+        elif action == 'update_category':
+            old_path_by_id = {
+                item['id']: item['path']
+                for item in tax_rollup_categories(selected_company)
+            }
+            category_id = request.form.get('category_id')
+            name = (request.form.get('edit_category_name') or '').strip()
+            parent_id = request.form.get('edit_parent_id') or None
+            category_row = db.session.execute(text("""
+                SELECT ParentId, SortOrder
+                FROM tax_rollup_categories
+                WHERE id = :category_id
+                  AND Co = :co
+                  AND Active = 1
+            """), {'category_id': category_id, 'co': selected_company}).mappings().first()
+            old_parent_id = str(category_row['ParentId']) if category_row and category_row['ParentId'] is not None else None
+            new_parent_id = str(parent_id) if parent_id is not None else None
+            if category_row is not None and old_parent_id == new_parent_id:
+                sort_order = category_row['SortOrder'] or 0
+            else:
+                sort_order = next_tax_rollup_sort(selected_company, parent_id)
+            if not category_id or not name:
+                err.append('Choose a category and enter a name.')
+            elif str(category_id) == str(parent_id):
+                err.append('A category cannot be its own parent.')
+            elif category_row is None:
+                err.append('The selected category could not be found.')
+            else:
+                db.session.execute(text("""
+                    UPDATE tax_rollup_categories
+                       SET Name = :name,
+                           ParentId = :parent_id,
+                           SortOrder = :sort_order,
+                           UpdatedAt = :updated_at
+                     WHERE id = :category_id
+                       AND Co = :co
+                       AND Active = 1
+                """), {
+                    'name': name,
+                    'parent_id': parent_id,
+                    'sort_order': sort_order,
+                    'updated_at': datetime.datetime.utcnow(),
+                    'category_id': category_id,
+                    'co': selected_company,
+                })
+                db.session.commit()
+                account_updates = sync_tax_rollup_account_paths(selected_company, old_path_by_id)
+                msg.append(f'Tax category updated. {account_updates} account assignment(s) moved to the new rollup path.')
+
+        elif action == 'delete_category':
+            category_id = request.form.get('category_id')
+            categories = tax_rollup_categories(selected_company)
+            category = next((item for item in categories if str(item['id']) == str(category_id)), None)
+            child_count = sum(1 for item in categories if str(item['parent_id']) == str(category_id))
+            account_count = 0
+            if category is not None:
+                account_count = Accounts.query.filter(
+                    (Accounts.Co == selected_company) &
+                    (Accounts.Taxrollup == category['path'])
+                ).count()
+            if category is None:
+                err.append('Choose a category to delete.')
+            elif child_count:
+                err.append('Move or delete child categories first.')
+            elif account_count:
+                err.append('Move expense accounts off this tax category before deleting it.')
+            else:
+                db.session.execute(text("""
+                    UPDATE tax_rollup_categories
+                       SET Active = 0,
+                           UpdatedAt = :updated_at
+                     WHERE id = :category_id
+                       AND Co = :co
+                """), {
+                    'updated_at': datetime.datetime.utcnow(),
+                    'category_id': category_id,
+                    'co': selected_company,
+                })
+                db.session.commit()
+                msg.append('Tax category deleted.')
+
+        elif action == 'move_category':
+            category_id = request.form.get('category_id')
+            direction = request.form.get('direction')
+            if direction not in ['up', 'down']:
+                err.append('Choose a valid move direction.')
+            else:
+                move_error = move_tax_rollup_category(selected_company, category_id, direction)
+                if move_error:
+                    err.append(move_error)
+                else:
+                    msg.append('Tax category order updated.')
+
+        elif action == 'save_assignments':
+            accounts = Accounts.query.filter(
+                (Accounts.Co == selected_company) &
+                (Accounts.Type == 'Expense')
+            ).all()
+            updated = 0
+            category_paths = {item['path'] for item in tax_rollup_categories(selected_company)}
+            for account in accounts:
+                value = (request.form.get(f'taxrollup_{account.id}') or '').strip()
+                if value and value not in category_paths:
+                    continue
+                if (account.Taxrollup or '') != value:
+                    account.Taxrollup = value or None
+                    updated += 1
+            db.session.commit()
+            msg.append(f'Tax rollup assignments updated for {updated} expense account(s).')
+
+    categories = tax_rollup_categories(selected_company)
+    expense_accounts = Accounts.query.filter(
+        (Accounts.Co == selected_company) &
+        (Accounts.Type == 'Expense')
+    ).order_by(Accounts.Category, Accounts.Subcategory, Accounts.Name).all()
+    return render_template(
+        'tax_rollups.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        companies=companies,
+        selected_company=selected_company,
+        categories=categories,
+        category_paths={category['path'] for category in categories},
+        expense_accounts=expense_accounts,
+        err=err,
+        msg=msg,
+    )
+
 
 def business_report_decimal(value):
     if value in [None, '']:
