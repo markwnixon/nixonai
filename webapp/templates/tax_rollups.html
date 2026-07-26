@@ -64,6 +64,13 @@
                     <input type="hidden" name="action" value="add_category">
                     <input type="hidden" name="company" value="{{ selected_company }}">
                     <div class="form-group">
+                        <label for="rollup_section">Section</label>
+                        <select class="form-control" id="rollup_section" name="rollup_section">
+                            <option value="Income">Income</option>
+                            <option value="Expense" selected>Expense</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="category_name">Category Name</label>
                         <input type="text" class="form-control" id="category_name" name="category_name" placeholder="Fuel, Payroll, Repairs">
                     </div>
@@ -71,9 +78,16 @@
                         <label for="parent_id">Parent Category</label>
                         <select class="form-control" id="parent_id" name="parent_id">
                             <option value="">Top Level</option>
-                            {% for category in categories %}
-                                <option value="{{ category.id }}">{{ '--' * category.level }} {{ category.path }}</option>
-                            {% endfor %}
+                            <optgroup label="Income">
+                                {% for category in income_categories %}
+                                    <option value="{{ category.id }}">{{ '--' * category.level }} {{ category.path }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Expense">
+                                {% for category in expense_categories %}
+                                    <option value="{{ category.id }}">{{ '--' * category.level }} {{ category.path }}</option>
+                                {% endfor %}
+                            </optgroup>
                         </select>
                     </div>
                     <p class="text-muted small">New categories are placed at the end of the selected parent category.</p>
@@ -87,6 +101,7 @@
                     <table class="table table-sm table-bordered table-hover mb-0 tax-rollup-category-table">
                         <thead class="thead-light">
                             <tr>
+                                <th style="width: 74px;">Section</th>
                                 <th>Category</th>
                                 <th>Name</th>
                                 <th>Parent</th>
@@ -98,6 +113,11 @@
                         <tbody>
                             {% for category in categories %}
                                 <tr>
+                                    <td class="text-nowrap">
+                                        <span class="badge {% if category.section == 'Income' %}badge-success{% else %}badge-info{% endif %}">
+                                            {{ category.section }}
+                                        </span>
+                                    </td>
                                     <td>
                                         <div class="tax-rollup-category-label" style="padding-left: {{ category.level * 20 }}px;" title="{{ category.path }}">
                                             {% if category.level == 0 %}
@@ -111,6 +131,7 @@
                                         <form method="post" action="{{ url_for('main.TaxRollups') }}" id="tax-rollup-edit-{{ category.id }}" class="mb-0">
                                             <input type="hidden" name="action" value="update_category">
                                             <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="rollup_section" value="{{ category.section }}">
                                             <input type="hidden" name="category_id" value="{{ category.id }}">
                                         </form>
                                         <input type="text" class="form-control form-control-sm" form="tax-rollup-edit-{{ category.id }}"
@@ -121,7 +142,7 @@
                                                 name="edit_parent_id">
                                             <option value="">Top Level</option>
                                             {% for parent in categories %}
-                                                {% if parent.id != category.id %}
+                                                {% if parent.section == category.section and parent.id != category.id %}
                                                     <option value="{{ parent.id }}" {% if parent.id == category.parent_id %}selected{% endif %}>
                                                         {{ '--' * parent.level }} {{ parent.path }}
                                                     </option>
@@ -137,6 +158,7 @@
                                         <form method="post" action="{{ url_for('main.TaxRollups') }}" id="tax-rollup-delete-{{ category.id }}" class="mb-0">
                                             <input type="hidden" name="action" value="delete_category">
                                             <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="rollup_section" value="{{ category.section }}">
                                             <input type="hidden" name="category_id" value="{{ category.id }}">
                                         </form>
                                         <button type="submit" form="tax-rollup-delete-{{ category.id }}"
@@ -147,6 +169,7 @@
                                         <form method="post" action="{{ url_for('main.TaxRollups') }}" class="d-inline">
                                             <input type="hidden" name="action" value="move_category">
                                             <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="rollup_section" value="{{ category.section }}">
                                             <input type="hidden" name="category_id" value="{{ category.id }}">
                                             <input type="hidden" name="direction" value="up">
                                             <button type="submit" class="btn btn-sm btn-outline-secondary px-2"
@@ -155,6 +178,7 @@
                                         <form method="post" action="{{ url_for('main.TaxRollups') }}" class="d-inline">
                                             <input type="hidden" name="action" value="move_category">
                                             <input type="hidden" name="company" value="{{ selected_company }}">
+                                            <input type="hidden" name="rollup_section" value="{{ category.section }}">
                                             <input type="hidden" name="category_id" value="{{ category.id }}">
                                             <input type="hidden" name="direction" value="down">
                                             <button type="submit" class="btn btn-sm btn-outline-secondary px-2"
@@ -164,7 +188,7 @@
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="6" class="text-muted text-center">No tax categories defined for {{ selected_company }}.</td>
+                                    <td colspan="7" class="text-muted text-center">No tax categories defined for {{ selected_company }}.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -176,13 +200,56 @@
         <div class="col-lg-7 mb-3">
             <div class="border rounded p-3">
                 <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
-                    <h5 class="mb-0">Expense Account Assignments</h5>
-                    <span class="text-muted small">{{ expense_accounts|length }} expense accounts</span>
+                    <h5 class="mb-0">Income Account Assignments</h5>
+                    <span class="text-muted small">{{ income_accounts|length }} income accounts</span>
                 </div>
                 <form method="post" action="{{ url_for('main.TaxRollups') }}">
                     <input type="hidden" name="action" value="save_assignments">
                     <input type="hidden" name="company" value="{{ selected_company }}">
-                    <div class="table-responsive" style="max-height: 720px;">
+                    <div class="table-responsive mb-3" style="max-height: 320px;">
+                        <table class="table table-sm table-striped table-bordered table-hover">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Category</th>
+                                    <th>Subcategory</th>
+                                    <th>Tax Rollup</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for account in income_accounts %}
+                                    <tr>
+                                        <td>{{ account.Name }}</td>
+                                        <td>{{ account.Category or '' }}</td>
+                                        <td>{{ account.Subcategory or '' }}</td>
+                                        <td>
+                                            <select class="form-control form-control-sm" name="taxrollup_{{ account.id }}">
+                                                <option value="">Unassigned</option>
+                                                {% for category in income_categories %}
+                                                    <option value="{{ category.path }}" {% if account.Taxrollup == category.path %}selected{% endif %}>
+                                                        {{ '--' * category.level }} {{ category.path }}
+                                                    </option>
+                                                {% endfor %}
+                                                {% if account.Taxrollup and account.Taxrollup not in income_category_paths %}
+                                                    <option value="{{ account.Taxrollup }}" selected>{{ account.Taxrollup }} (not in setup)</option>
+                                                {% endif %}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-muted text-center">No income accounts found for {{ selected_company }}.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                        <h5 class="mb-0">Expense Account Assignments</h5>
+                        <span class="text-muted small">{{ expense_accounts|length }} expense accounts</span>
+                    </div>
+                    <div class="table-responsive" style="max-height: 520px;">
                         <table class="table table-sm table-striped table-bordered table-hover">
                             <thead class="thead-light">
                                 <tr>
@@ -201,12 +268,12 @@
                                         <td>
                                             <select class="form-control form-control-sm" name="taxrollup_{{ account.id }}">
                                                 <option value="">Unassigned</option>
-                                                {% for category in categories %}
+                                                {% for category in expense_categories %}
                                                     <option value="{{ category.path }}" {% if account.Taxrollup == category.path %}selected{% endif %}>
                                                         {{ '--' * category.level }} {{ category.path }}
                                                     </option>
                                                 {% endfor %}
-                                                {% if account.Taxrollup and account.Taxrollup not in category_paths %}
+                                                {% if account.Taxrollup and account.Taxrollup not in expense_category_paths %}
                                                     <option value="{{ account.Taxrollup }}" selected>{{ account.Taxrollup }} (not in setup)</option>
                                                 {% endif %}
                                             </select>
@@ -220,7 +287,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <button type="submit" class="btn btn-success btn-block mt-2">Save Account Assignments</button>
+                    <button type="submit" class="btn btn-success btn-block mt-2">Save Income and Expense Assignments</button>
                 </form>
             </div>
         </div>

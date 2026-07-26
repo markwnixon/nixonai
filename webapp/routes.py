@@ -1279,6 +1279,7 @@ def ensure_tax_rollup_tables():
         CREATE TABLE IF NOT EXISTS tax_rollup_categories (
             id INT AUTO_INCREMENT PRIMARY KEY,
             Co VARCHAR(2) NOT NULL,
+            Section VARCHAR(20) NOT NULL DEFAULT 'Expense',
             Name VARCHAR(100) NOT NULL,
             ParentId INT NULL,
             SortOrder INT NOT NULL DEFAULT 0,
@@ -1286,26 +1287,37 @@ def ensure_tax_rollup_tables():
             CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_tax_rollup_categories_co (Co),
+            INDEX idx_tax_rollup_categories_section (Section),
             INDEX idx_tax_rollup_categories_parent (ParentId),
             INDEX idx_tax_rollup_categories_active (Active)
         )
     """))
     db.session.commit()
+    inspector = inspect(db.engine)
+    columns = [column['name'] for column in inspector.get_columns('tax_rollup_categories')]
+    if 'Section' not in columns:
+        after_clause = ' AFTER Co' if db.engine.dialect.name == 'mysql' else ''
+        db.session.execute(text("""
+            ALTER TABLE tax_rollup_categories
+            ADD COLUMN Section VARCHAR(20) NOT NULL DEFAULT 'Expense'""" + after_clause))
+        db.session.execute(text("UPDATE tax_rollup_categories SET Section = 'Expense' WHERE Section IS NULL OR Section = ''"))
+        db.session.commit()
 
 
-def tax_rollup_categories(company_code):
+def tax_rollup_categories(company_code, section='Expense'):
     rows = db.session.execute(text("""
-        SELECT id, Co, Name, ParentId, SortOrder, Active
+        SELECT id, Co, Section, Name, ParentId, SortOrder, Active
         FROM tax_rollup_categories
-        WHERE Co = :company_code AND Active = 1
+        WHERE Co = :company_code AND Section = :section AND Active = 1
         ORDER BY COALESCE(ParentId, 0), SortOrder, Name
-    """), {'company_code': company_code}).mappings().all()
+    """), {'company_code': company_code, 'section': section}).mappings().all()
     items = []
     by_id = {}
     for row in rows:
         item = {
             'id': row['id'],
             'co': row['Co'],
+            'section': row['Section'] or section,
             'name': row['Name'] or '',
             'parent_id': row['ParentId'],
             'sort_order': row['SortOrder'] or 0,
@@ -1358,32 +1370,34 @@ def tax_rollup_categories(company_code):
     return ordered
 
 
-def next_tax_rollup_sort(company_code, parent_id):
+def next_tax_rollup_sort(company_code, parent_id, section='Expense'):
     max_sort = db.session.execute(text("""
         SELECT COALESCE(MAX(SortOrder), 0)
         FROM tax_rollup_categories
         WHERE Co = :company_code
+          AND Section = :section
           AND Active = 1
           AND (
                 (:parent_id IS NULL AND ParentId IS NULL)
                 OR ParentId = :parent_id
           )
-    """), {'company_code': company_code, 'parent_id': parent_id}).scalar() or 0
+    """), {'company_code': company_code, 'parent_id': parent_id, 'section': section}).scalar() or 0
     return int(max_sort) + 10
 
 
-def normalize_tax_rollup_sibling_sort(company_code, parent_id):
+def normalize_tax_rollup_sibling_sort(company_code, parent_id, section='Expense'):
     rows = db.session.execute(text("""
         SELECT id
         FROM tax_rollup_categories
         WHERE Co = :company_code
+          AND Section = :section
           AND Active = 1
           AND (
                 (:parent_id IS NULL AND ParentId IS NULL)
                 OR ParentId = :parent_id
           )
         ORDER BY SortOrder, Name, id
-    """), {'company_code': company_code, 'parent_id': parent_id}).mappings().all()
+    """), {'company_code': company_code, 'parent_id': parent_id, 'section': section}).mappings().all()
     for index, row in enumerate(rows, start=1):
         db.session.execute(text("""
             UPDATE tax_rollup_categories
@@ -1393,30 +1407,32 @@ def normalize_tax_rollup_sibling_sort(company_code, parent_id):
     db.session.commit()
 
 
-def move_tax_rollup_category(company_code, category_id, direction):
+def move_tax_rollup_category(company_code, category_id, direction, section='Expense'):
     category = db.session.execute(text("""
         SELECT id, ParentId
         FROM tax_rollup_categories
         WHERE id = :category_id
           AND Co = :company_code
+          AND Section = :section
           AND Active = 1
-    """), {'category_id': category_id, 'company_code': company_code}).mappings().first()
+    """), {'category_id': category_id, 'company_code': company_code, 'section': section}).mappings().first()
     if category is None:
         return 'Tax category not found.'
 
     parent_id = category['ParentId']
-    normalize_tax_rollup_sibling_sort(company_code, parent_id)
+    normalize_tax_rollup_sibling_sort(company_code, parent_id, section)
     siblings = db.session.execute(text("""
         SELECT id, SortOrder
         FROM tax_rollup_categories
         WHERE Co = :company_code
+          AND Section = :section
           AND Active = 1
           AND (
                 (:parent_id IS NULL AND ParentId IS NULL)
                 OR ParentId = :parent_id
           )
         ORDER BY SortOrder, Name, id
-    """), {'company_code': company_code, 'parent_id': parent_id}).mappings().all()
+    """), {'company_code': company_code, 'parent_id': parent_id, 'section': section}).mappings().all()
     index = next((idx for idx, row in enumerate(siblings) if str(row['id']) == str(category_id)), None)
     if index is None:
         return 'Tax category sibling group could not be loaded.'
@@ -1503,21 +1519,35 @@ def TaxRollups():
         selected_company = request.form.get('company') or selected_company
         if selected_company not in companies:
             selected_company = companies[0]
+        rollup_section = request.form.get('rollup_section') or 'Expense'
+        if rollup_section not in ['Income', 'Expense']:
+            rollup_section = 'Expense'
 
         if action == 'add_category':
             name = (request.form.get('category_name') or '').strip()
             parent_id = request.form.get('parent_id') or None
-            sort_order = next_tax_rollup_sort(selected_company, parent_id)
+            if parent_id:
+                parent_section = db.session.execute(text("""
+                    SELECT Section
+                    FROM tax_rollup_categories
+                    WHERE id = :parent_id
+                      AND Co = :co
+                      AND Active = 1
+                """), {'parent_id': parent_id, 'co': selected_company}).scalar()
+                if parent_section != rollup_section:
+                    parent_id = None
+            sort_order = next_tax_rollup_sort(selected_company, parent_id, rollup_section)
             if not name:
                 err.append('Tax category name is required.')
             else:
                 db.session.execute(text("""
                     INSERT INTO tax_rollup_categories
-                        (Co, Name, ParentId, SortOrder, Active, CreatedAt, UpdatedAt)
+                        (Co, Section, Name, ParentId, SortOrder, Active, CreatedAt, UpdatedAt)
                     VALUES
-                        (:co, :name, :parent_id, :sort_order, 1, :created_at, :updated_at)
+                        (:co, :section, :name, :parent_id, :sort_order, 1, :created_at, :updated_at)
                 """), {
                     'co': selected_company,
+                    'section': rollup_section,
                     'name': name,
                     'parent_id': parent_id,
                     'sort_order': sort_order,
@@ -1525,12 +1555,12 @@ def TaxRollups():
                     'updated_at': datetime.datetime.utcnow(),
                 })
                 db.session.commit()
-                msg.append(f'Tax category {name} added.')
+                msg.append(f'{rollup_section} tax category {name} added.')
 
         elif action == 'update_category':
             old_path_by_id = {
                 item['id']: item['path']
-                for item in tax_rollup_categories(selected_company)
+                for item in tax_rollup_categories(selected_company, rollup_section)
             }
             category_id = request.form.get('category_id')
             name = (request.form.get('edit_category_name') or '').strip()
@@ -1540,14 +1570,15 @@ def TaxRollups():
                 FROM tax_rollup_categories
                 WHERE id = :category_id
                   AND Co = :co
+                  AND Section = :section
                   AND Active = 1
-            """), {'category_id': category_id, 'co': selected_company}).mappings().first()
+            """), {'category_id': category_id, 'co': selected_company, 'section': rollup_section}).mappings().first()
             old_parent_id = str(category_row['ParentId']) if category_row and category_row['ParentId'] is not None else None
             new_parent_id = str(parent_id) if parent_id is not None else None
             if category_row is not None and old_parent_id == new_parent_id:
                 sort_order = category_row['SortOrder'] or 0
             else:
-                sort_order = next_tax_rollup_sort(selected_company, parent_id)
+                sort_order = next_tax_rollup_sort(selected_company, parent_id, rollup_section)
             if not category_id or not name:
                 err.append('Choose a category and enter a name.')
             elif str(category_id) == str(parent_id):
@@ -1555,6 +1586,17 @@ def TaxRollups():
             elif category_row is None:
                 err.append('The selected category could not be found.')
             else:
+                if parent_id:
+                    parent_section = db.session.execute(text("""
+                        SELECT Section
+                        FROM tax_rollup_categories
+                        WHERE id = :parent_id
+                          AND Co = :co
+                          AND Active = 1
+                    """), {'parent_id': parent_id, 'co': selected_company}).scalar()
+                    if parent_section != rollup_section:
+                        parent_id = None
+                        sort_order = next_tax_rollup_sort(selected_company, parent_id, rollup_section)
                 db.session.execute(text("""
                     UPDATE tax_rollup_categories
                        SET Name = :name,
@@ -1563,6 +1605,7 @@ def TaxRollups():
                            UpdatedAt = :updated_at
                      WHERE id = :category_id
                        AND Co = :co
+                       AND Section = :section
                        AND Active = 1
                 """), {
                     'name': name,
@@ -1571,6 +1614,7 @@ def TaxRollups():
                     'updated_at': datetime.datetime.utcnow(),
                     'category_id': category_id,
                     'co': selected_company,
+                    'section': rollup_section,
                 })
                 db.session.commit()
                 account_updates = sync_tax_rollup_account_paths(selected_company, old_path_by_id)
@@ -1578,7 +1622,7 @@ def TaxRollups():
 
         elif action == 'delete_category':
             category_id = request.form.get('category_id')
-            categories = tax_rollup_categories(selected_company)
+            categories = tax_rollup_categories(selected_company, rollup_section)
             category = next((item for item in categories if str(item['id']) == str(category_id)), None)
             child_count = sum(1 for item in categories if str(item['parent_id']) == str(category_id))
             account_count = 0
@@ -1600,10 +1644,12 @@ def TaxRollups():
                            UpdatedAt = :updated_at
                      WHERE id = :category_id
                        AND Co = :co
+                       AND Section = :section
                 """), {
                     'updated_at': datetime.datetime.utcnow(),
                     'category_id': category_id,
                     'co': selected_company,
+                    'section': rollup_section,
                 })
                 db.session.commit()
                 msg.append('Tax category deleted.')
@@ -1614,7 +1660,7 @@ def TaxRollups():
             if direction not in ['up', 'down']:
                 err.append('Choose a valid move direction.')
             else:
-                move_error = move_tax_rollup_category(selected_company, category_id, direction)
+                move_error = move_tax_rollup_category(selected_company, category_id, direction, rollup_section)
                 if move_error:
                     err.append(move_error)
                 else:
@@ -1623,21 +1669,29 @@ def TaxRollups():
         elif action == 'save_assignments':
             accounts = Accounts.query.filter(
                 (Accounts.Co == selected_company) &
-                (Accounts.Type == 'Expense')
+                (Accounts.Type.in_(['Income', 'Expense']))
             ).all()
             updated = 0
-            category_paths = {item['path'] for item in tax_rollup_categories(selected_company)}
+            income_paths = {item['path'] for item in tax_rollup_categories(selected_company, 'Income')}
+            expense_paths = {item['path'] for item in tax_rollup_categories(selected_company, 'Expense')}
             for account in accounts:
                 value = (request.form.get(f'taxrollup_{account.id}') or '').strip()
+                category_paths = income_paths if account.Type == 'Income' else expense_paths
                 if value and value not in category_paths:
                     continue
                 if (account.Taxrollup or '') != value:
                     account.Taxrollup = value or None
                     updated += 1
             db.session.commit()
-            msg.append(f'Tax rollup assignments updated for {updated} expense account(s).')
+            msg.append(f'Tax rollup assignments updated for {updated} income/expense account(s).')
 
-    categories = tax_rollup_categories(selected_company)
+    income_categories = tax_rollup_categories(selected_company, 'Income')
+    expense_categories = tax_rollup_categories(selected_company, 'Expense')
+    categories = income_categories + expense_categories
+    income_accounts = Accounts.query.filter(
+        (Accounts.Co == selected_company) &
+        (Accounts.Type == 'Income')
+    ).order_by(Accounts.Category, Accounts.Subcategory, Accounts.Name).all()
     expense_accounts = Accounts.query.filter(
         (Accounts.Co == selected_company) &
         (Accounts.Type == 'Expense')
@@ -1649,7 +1703,12 @@ def TaxRollups():
         companies=companies,
         selected_company=selected_company,
         categories=categories,
+        income_categories=income_categories,
+        expense_categories=expense_categories,
+        income_category_paths={category['path'] for category in income_categories},
+        expense_category_paths={category['path'] for category in expense_categories},
         category_paths={category['path'] for category in categories},
+        income_accounts=income_accounts,
         expense_accounts=expense_accounts,
         err=err,
         msg=msg,
@@ -1696,9 +1755,9 @@ def business_report_basis_qty(basis_type, start_date, end_date):
     ).scalar() or 0)
 
 
-def business_report_expenses(start_date, end_date):
+def business_report_expenses(start_date, end_date, company_code=None):
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
-    rows = db.session.query(
+    query = db.session.query(
         Gledger.Account,
         Accounts.Category,
         Accounts.Subcategory,
@@ -1710,7 +1769,10 @@ def business_report_expenses(start_date, end_date):
         Accounts.Type == 'Expense',
         Gledger.Date >= start_dt,
         Gledger.Date <= end_dt,
-    ).group_by(
+    )
+    if company_code:
+        query = query.filter(Accounts.Co == company_code)
+    rows = query.group_by(
         Gledger.Account,
         Accounts.Category,
         Accounts.Subcategory,
@@ -1725,6 +1787,359 @@ def business_report_expenses(start_date, end_date):
             'account': account or '',
             'category': category or '',
             'subcategory': subcategory or '',
+            'amount_cents': amount_cents,
+            'amount': business_report_money(amount_cents),
+        })
+    return output
+
+
+def business_report_rollup_rows(rows, configured_categories):
+    totals = {}
+    detail_accounts = {}
+    for row in rows:
+        path = row['taxrollup'] or 'Unassigned'
+        parts = [part.strip() for part in path.split(':') if part.strip()]
+        if not parts:
+            parts = ['Unassigned']
+        for index in range(1, len(parts) + 1):
+            prefix = ':'.join(parts[:index])
+            totals[prefix] = totals.get(prefix, 0) + row['amount_cents']
+        detail_accounts.setdefault(path, []).append(row)
+
+    output = []
+    seen = set()
+    for category in configured_categories:
+        path = category['path']
+        if path in totals:
+            output.append({
+                'path': path,
+                'label': category['name'],
+                'level': category['level'],
+                'amount_cents': totals[path],
+                'amount': business_report_money(totals[path]),
+                'accounts': detail_accounts.get(path, []),
+            })
+            seen.add(path)
+
+    for path in sorted(set(totals) - seen):
+        level = 0 if path == 'Unassigned' else path.count(':')
+        output.append({
+            'path': path,
+            'label': path.split(':')[-1],
+            'level': level,
+            'amount_cents': totals[path],
+            'amount': business_report_money(totals[path]),
+            'accounts': detail_accounts.get(path, []),
+        })
+
+    return output
+
+
+def business_report_rollup_section_report_rows(rollup_rows):
+    output = []
+    active_top = None
+
+    def append_top_total():
+        if active_top is None:
+            return
+        output.append({
+            'path': active_top['path'],
+            'label': f"Total {active_top['label']}",
+            'level': 1,
+            'amount_cents': None,
+            'total_cents': active_top['amount_cents'],
+            'amount': '',
+            'total': business_report_money(active_top['amount_cents']),
+            'kind': 'top_total',
+        })
+
+    for row in rollup_rows:
+        if row['level'] == 0:
+            append_top_total()
+            active_top = row
+            display_row = dict(row)
+            display_row.update({
+                'amount_cents': None,
+                'total_cents': None,
+                'amount': '',
+                'total': '',
+                'kind': 'top',
+            })
+            output.append(display_row)
+        else:
+            display_row = dict(row)
+            display_row.update({
+                'total_cents': None,
+                'total': '',
+                'kind': 'rollup',
+            })
+            output.append(display_row)
+
+    append_top_total()
+    return output
+
+
+def business_report_tax_rollup_pl(company_code, start_date, end_date):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    rows = db.session.query(
+        Accounts.Type,
+        Accounts.Taxrollup,
+        Accounts.Name,
+        Accounts.Category,
+        Accounts.Subcategory,
+        func.sum(func.coalesce(Gledger.Debit, 0)).label('debit_cents'),
+        func.sum(func.coalesce(Gledger.Credit, 0)).label('credit_cents'),
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type.in_(['Income', 'Expense']),
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).group_by(
+        Accounts.Type,
+        Accounts.Taxrollup,
+        Accounts.Name,
+        Accounts.Category,
+        Accounts.Subcategory,
+    ).all()
+
+    income_accounts = []
+    expense_accounts = []
+    unassigned_expense_accounts = []
+    for row in rows:
+        debit_cents = int(row.debit_cents or 0)
+        credit_cents = int(row.credit_cents or 0)
+        if row.Type == 'Income':
+            amount_cents = credit_cents - debit_cents
+            target = income_accounts
+        else:
+            amount_cents = debit_cents - credit_cents
+            target = expense_accounts if (row.Taxrollup or '').strip() else unassigned_expense_accounts
+        target.append({
+            'account': row.Name or '',
+            'category': row.Category or '',
+            'subcategory': row.Subcategory or '',
+            'taxrollup': row.Taxrollup or '',
+            'amount_cents': amount_cents,
+            'amount': business_report_money(amount_cents),
+        })
+
+    income_categories = tax_rollup_categories(company_code, 'Income')
+    expense_categories = tax_rollup_categories(company_code, 'Expense')
+    income_rows = business_report_rollup_rows(income_accounts, income_categories)
+    expense_rows = business_report_rollup_rows(expense_accounts, expense_categories)
+    total_income = sum(row['amount_cents'] for row in income_accounts)
+    total_expenses = sum(row['amount_cents'] for row in expense_accounts)
+    unassigned_expenses = sum(row['amount_cents'] for row in unassigned_expense_accounts)
+    net_income = total_income - total_expenses
+
+    return {
+        'income_rows': income_rows,
+        'expense_rows': expense_rows,
+        'income_report_rows': business_report_rollup_section_report_rows(income_rows),
+        'expense_report_rows': business_report_rollup_section_report_rows(expense_rows),
+        'total_income_cents': total_income,
+        'total_expenses_cents': total_expenses,
+        'unassigned_expenses_cents': unassigned_expenses,
+        'net_income_cents': net_income,
+        'total_income': business_report_money(total_income),
+        'total_expenses': business_report_money(total_expenses),
+        'unassigned_expenses': business_report_money(unassigned_expenses),
+        'net_income': business_report_money(net_income),
+    }
+
+
+def business_report_tax_rollup_export_rows(tax_rollup_pl):
+    rows = [{'label': 'Income', 'level': 0, 'amount_cents': None, 'kind': 'section'}]
+    for row in tax_rollup_pl['income_report_rows']:
+        rows.append({
+            'label': row['label'],
+            'path': row['path'],
+            'level': row['level'] + 1,
+            'amount_cents': row['amount_cents'],
+            'total_cents': row.get('total_cents'),
+            'kind': row.get('kind', 'rollup'),
+        })
+    rows.append({
+        'label': 'Total Income',
+        'level': 1,
+        'amount_cents': None,
+        'total_cents': tax_rollup_pl['total_income_cents'],
+        'kind': 'total',
+    })
+    rows.append({'label': '', 'level': 0, 'amount_cents': None, 'kind': 'blank'})
+    rows.append({'label': 'Expenses', 'level': 0, 'amount_cents': None, 'kind': 'section'})
+    for row in tax_rollup_pl['expense_report_rows']:
+        rows.append({
+            'label': row['label'],
+            'path': row['path'],
+            'level': row['level'] + 1,
+            'amount_cents': row['amount_cents'],
+            'total_cents': row.get('total_cents'),
+            'kind': row.get('kind', 'rollup'),
+        })
+    rows.append({
+        'label': 'Total Expenses',
+        'level': 1,
+        'amount_cents': None,
+        'total_cents': tax_rollup_pl['total_expenses_cents'],
+        'kind': 'total',
+    })
+    rows.append({'label': '', 'level': 0, 'amount_cents': None, 'kind': 'blank'})
+    rows.append({
+        'label': 'Net Income',
+        'level': 0,
+        'amount_cents': None,
+        'total_cents': tax_rollup_pl['net_income_cents'],
+        'kind': 'net',
+    })
+    return rows
+
+
+def business_report_tax_rollup_xlsx(company_code, start_date, end_date, tax_rollup_pl):
+    from io import BytesIO
+    import openpyxl
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    output = BytesIO()
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Tax Rollup PL'
+
+    ws['A1'] = 'Profit & Loss - Tax Rollup'
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A2'] = f'Company: {company_code}'
+    ws['A3'] = f'Period: {start_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}'
+    ws.append([])
+    ws.append(['Rollup', 'Amount', 'Total'])
+    header_row = ws.max_row
+    for cell in ws[header_row]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill('solid', fgColor='D9EAF7')
+
+    for row in business_report_tax_rollup_export_rows(tax_rollup_pl):
+        amount = row['amount_cents'] / 100 if row['amount_cents'] is not None else None
+        total = row.get('total_cents') / 100 if row.get('total_cents') is not None else None
+        ws.append([row['label'], amount, total])
+        excel_row = ws.max_row
+        ws.cell(excel_row, 1).alignment = Alignment(indent=row['level'])
+        ws.row_dimensions[excel_row].outlineLevel = min(row['level'], 7)
+        if row['amount_cents'] is not None:
+            ws.cell(excel_row, 2).number_format = '$#,##0.00;[Red]($#,##0.00)'
+            ws.cell(excel_row, 2).alignment = Alignment(horizontal='right')
+        if row.get('total_cents') is not None:
+            ws.cell(excel_row, 3).number_format = '$#,##0.00;[Red]($#,##0.00)'
+            ws.cell(excel_row, 3).alignment = Alignment(horizontal='right')
+        if row['kind'] in ['section', 'top_total', 'total', 'net']:
+            ws.cell(excel_row, 1).font = Font(bold=True)
+            ws.cell(excel_row, 2).font = Font(bold=True)
+            ws.cell(excel_row, 3).font = Font(bold=True)
+        if row['kind'] == 'section':
+            ws.cell(excel_row, 1).fill = PatternFill('solid', fgColor='E2F0D9')
+            ws.cell(excel_row, 2).fill = PatternFill('solid', fgColor='E2F0D9')
+            ws.cell(excel_row, 3).fill = PatternFill('solid', fgColor='E2F0D9')
+        if row['kind'] == 'net':
+            ws.cell(excel_row, 1).fill = PatternFill('solid', fgColor='FFF2CC')
+            ws.cell(excel_row, 2).fill = PatternFill('solid', fgColor='FFF2CC')
+            ws.cell(excel_row, 3).fill = PatternFill('solid', fgColor='FFF2CC')
+
+    ws.column_dimensions['A'].width = 58
+    ws.column_dimensions['B'].width = 18
+    ws.column_dimensions['C'].width = 18
+    wb.save(output)
+    output.seek(0)
+    filename = f'tax_rollup_profit_loss_{company_code}_{start_date}_{end_date}.xlsx'.replace('/', '-')
+    return send_file(output, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+def business_report_tax_rollup_pdf(company_code, start_date, end_date, tax_rollup_pl):
+    from io import BytesIO
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    output = BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph('Profit & Loss - Tax Rollup', styles['Title']),
+        Paragraph(f'Company: {company_code} &nbsp;&nbsp; Period: {start_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}', styles['Normal']),
+        Spacer(1, 12),
+    ]
+
+    table_data = [['Rollup', 'Amount', 'Total']]
+    row_styles = []
+    for row in business_report_tax_rollup_export_rows(tax_rollup_pl):
+        table_data.append([
+            row['label'],
+            business_report_money(row['amount_cents']) if row['amount_cents'] is not None else '',
+            business_report_money(row.get('total_cents')) if row.get('total_cents') is not None else '',
+        ])
+        idx = len(table_data) - 1
+        row_styles.append(('LEFTPADDING', (0, idx), (0, idx), 6 + (row['level'] * 14)))
+        if row['kind'] in ['section', 'top_total', 'total', 'net']:
+            row_styles.append(('FONTNAME', (0, idx), (-1, idx), 'Helvetica-Bold'))
+        if row['kind'] == 'section':
+            row_styles.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor('#E2F0D9')))
+        if row['kind'] == 'net':
+            row_styles.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor('#FFF2CC')))
+
+    table = Table(table_data, colWidths=[330, 85, 85], repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#D9EAF7')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), .25, colors.lightgrey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ] + row_styles))
+    story.append(table)
+    doc.build(story)
+    output.seek(0)
+    filename = f'tax_rollup_profit_loss_{company_code}_{start_date}_{end_date}.pdf'.replace('/', '-')
+    return send_file(output, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+
+def business_report_unassigned_expense_lines(company_code, start_date, end_date):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    rows = db.session.query(
+        Gledger.Date,
+        Gledger.Account,
+        Gledger.Tcode,
+        Gledger.Ref,
+        Gledger.Source,
+        Gledger.Debit,
+        Gledger.Credit,
+        Accounts.Category,
+        Accounts.Subcategory,
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == 'Expense',
+        or_(Accounts.Taxrollup.is_(None), Accounts.Taxrollup == ''),
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).order_by(
+        Gledger.Date.asc(),
+        Gledger.Account.asc(),
+        Gledger.id.asc(),
+    ).all()
+
+    output = []
+    for row in rows:
+        amount_cents = int(row.Debit or 0) - int(row.Credit or 0)
+        output.append({
+            'date': row.Date.strftime('%Y-%m-%d') if row.Date else '',
+            'account': row.Account or '',
+            'category': row.Category or '',
+            'subcategory': row.Subcategory or '',
+            'tcode': row.Tcode or '',
+            'ref': row.Ref or '',
+            'source': row.Source or '',
             'amount_cents': amount_cents,
             'amount': business_report_money(amount_cents),
         })
@@ -1789,16 +2204,25 @@ def BusinessReports():
     if session.get('authority') not in ['admin', 'superuser']:
         abort(403)
     ensure_business_report_tables()
+    ensure_tax_rollup_tables()
     ensure_interchange_port_trip_column()
+    companies = tax_rollup_company_options()
+    selected_company = request.values.get('company') or cmpdata[10]
+    if selected_company not in companies:
+        selected_company = companies[0]
     today_local = datetime.date.today()
-    default_start = today_local.replace(day=1)
+    default_start = datetime.date(today_local.year, 1, 1)
+    default_end = datetime.date(today_local.year, 12, 31)
     selected_start = business_report_parse_date(request.values.get('date_from'), default_start)
-    selected_end = business_report_parse_date(request.values.get('date_to'), today_local)
+    selected_end = business_report_parse_date(request.values.get('date_to'), default_end)
     err = []
     msg = []
 
     if request.method == 'POST':
         action = request.form.get('action')
+        selected_company = request.form.get('company') or selected_company
+        if selected_company not in companies:
+            selected_company = companies[0]
         if action == 'add_allocation':
             account_name = (request.form.get('account_name') or '').strip()
             basis_type = (request.form.get('basis_type') or 'port_entry').strip()
@@ -1847,7 +2271,7 @@ def BusinessReports():
             result = rebaseline_interchange_port_trips_for_year(selected_start.year)
             msg.append(f"{selected_start.year} port trips rebaselined: {result['port_trips']} trips from {result['rows_reviewed']} interchange rows.")
         elif action == 'export_expenses_csv':
-            expenses = business_report_expenses(selected_start, selected_end)
+            expenses = business_report_expenses(selected_start, selected_end, selected_company)
             lines = ['Account,Category,Subcategory,Amount']
             for row in expenses:
                 lines.append(f"\"{row['account']}\",\"{row['category']}\",\"{row['subcategory']}\",{row['amount_cents'] / 100:.2f}")
@@ -1858,10 +2282,21 @@ def BusinessReports():
                 mimetype='text/csv',
                 headers={'Content-Disposition': f'attachment; filename={filename}'},
             )
+        elif action == 'export_tax_rollup_xlsx':
+            tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
+            return business_report_tax_rollup_xlsx(selected_company, selected_start, selected_end, tax_rollup_pl)
+        elif action == 'export_tax_rollup_pdf':
+            tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
+            return business_report_tax_rollup_pdf(selected_company, selected_start, selected_end, tax_rollup_pl)
 
-    expense_rows = business_report_expenses(selected_start, selected_end)
+    expense_rows = business_report_expenses(selected_start, selected_end, selected_company)
+    tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
+    unassigned_expense_lines = business_report_unassigned_expense_lines(selected_company, selected_start, selected_end)
     allocation_rows = business_report_allocation_calcs(business_report_allocations(), selected_start, selected_end)
-    expense_accounts = Accounts.query.filter(Accounts.Type == 'Expense').order_by(Accounts.Name).all()
+    expense_accounts = Accounts.query.filter(
+        (Accounts.Co == selected_company) &
+        (Accounts.Type == 'Expense')
+    ).order_by(Accounts.Name).all()
     total_expenses = sum(row['amount_cents'] for row in expense_rows)
     report_basis = {
         'port_entries': business_report_number(business_report_basis_qty('port_entry', selected_start, selected_end), 0),
@@ -1873,9 +2308,14 @@ def BusinessReports():
         cmpdata=cmpdata,
         scac=scac,
         filters={
+            'company': selected_company,
             'date_from': selected_start.strftime('%Y-%m-%d'),
             'date_to': selected_end.strftime('%Y-%m-%d'),
         },
+        companies=companies,
+        selected_company=selected_company,
+        tax_rollup_pl=tax_rollup_pl,
+        unassigned_expense_lines=unassigned_expense_lines,
         expense_rows=expense_rows,
         expense_accounts=expense_accounts,
         allocation_rows=allocation_rows,

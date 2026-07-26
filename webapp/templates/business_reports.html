@@ -27,6 +27,14 @@
     <form action="{{ url_for('main.BusinessReports') }}" method="get" class="mb-4">
         <div class="form-row align-items-end">
             <div class="form-group col-md-2">
+                <label for="company">Company</label>
+                <select class="form-control" id="company" name="company">
+                    {% for company in companies %}
+                        <option value="{{ company }}" {% if company == selected_company %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-2">
                 <label for="date_from">Period From</label>
                 <input type="date" class="form-control" id="date_from" name="date_from" value="{{ filters.date_from }}">
             </div>
@@ -42,6 +50,7 @@
     </form>
     <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-4">
         <input type="hidden" name="action" value="recalculate_port_trips">
+        <input type="hidden" name="company" value="{{ filters.company }}">
         <input type="hidden" name="date_from" value="{{ filters.date_from }}">
         <input type="hidden" name="date_to" value="{{ filters.date_to }}">
         <button type="submit" class="btn btn-outline-primary">Rebaseline Port Trips For Selected Year</button>
@@ -75,6 +84,151 @@
         </div>
     </div>
 
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Profit &amp; Loss - Tax Rollup</span>
+            <div class="d-flex align-items-center">
+                <span class="text-muted small mr-3">{{ selected_company }} | {{ filters.date_from }} to {{ filters.date_to }}</span>
+                <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-0 mr-1">
+                    <input type="hidden" name="action" value="export_tax_rollup_pdf">
+                    <input type="hidden" name="company" value="{{ filters.company }}">
+                    <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                    <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">PDF</button>
+                </form>
+                <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-0">
+                    <input type="hidden" name="action" value="export_tax_rollup_xlsx">
+                    <input type="hidden" name="company" value="{{ filters.company }}">
+                    <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                    <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                    <button type="submit" class="btn btn-sm btn-outline-success">Excel</button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Rollup</th>
+                            <th class="text-right">Amount</th>
+                            <th class="text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-success">
+                            <th colspan="3">Income</th>
+                        </tr>
+                        {% for row in tax_rollup_pl.income_report_rows %}
+                            <tr class="{% if row.kind == 'top_total' %}font-weight-bold{% endif %}">
+                                <td style="padding-left: {{ 12 + (row.level * 22) }}px;" title="{{ row.path }}">
+                                    {% if row.kind in ['top', 'top_total'] %}
+                                        <strong>{{ row.label }}</strong>
+                                    {% else %}
+                                        {{ row.label }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-right">{{ row.amount }}</td>
+                                <td class="text-right">{{ row.total }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-muted">No income found for this period.</td>
+                            </tr>
+                        {% endfor %}
+                        <tr>
+                            <th class="text-right">Total Income</th>
+                            <th></th>
+                            <th class="text-right">{{ tax_rollup_pl.total_income }}</th>
+                        </tr>
+
+                        <tr class="table-info">
+                            <th colspan="3">Expenses</th>
+                        </tr>
+                        {% for row in tax_rollup_pl.expense_report_rows %}
+                            <tr class="{% if row.kind == 'top_total' %}font-weight-bold{% endif %}">
+                                <td style="padding-left: {{ 12 + (row.level * 22) }}px;" title="{{ row.path }}">
+                                    {% if row.kind in ['top', 'top_total'] %}
+                                        <strong>{{ row.label }}</strong>
+                                    {% else %}
+                                        {{ row.label }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-right">{{ row.amount }}</td>
+                                <td class="text-right">{{ row.total }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-muted">No expenses found for this period.</td>
+                            </tr>
+                        {% endfor %}
+                        <tr>
+                            <th class="text-right">Total Expenses</th>
+                            <th></th>
+                            <th class="text-right">{{ tax_rollup_pl.total_expenses }}</th>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="{% if tax_rollup_pl.net_income_cents >= 0 %}table-success{% else %}table-danger{% endif %}">
+                            <th class="text-right">Net Income</th>
+                            <th></th>
+                            <th class="text-right">{{ tax_rollup_pl.net_income }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
+            <span>Unassigned Expense Review</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-toggle="collapse" data-target="#unassignedExpenseReview" aria-expanded="false" aria-controls="unassignedExpenseReview">
+                Review {{ unassigned_expense_lines|length }} Line{% if unassigned_expense_lines|length != 1 %}s{% endif %}
+            </button>
+        </div>
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap justify-content-between">
+                <span class="text-muted">These expense lines are excluded from the Tax Rollup P&amp;L because their accounts have no Tax Rollup assignment.</span>
+                <strong>{{ tax_rollup_pl.unassigned_expenses }}</strong>
+            </div>
+        </div>
+        <div class="collapse" id="unassignedExpenseReview">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Account</th>
+                            <th>Category</th>
+                            <th>Subcategory</th>
+                            <th>Reference</th>
+                            <th>Source</th>
+                            <th class="text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in unassigned_expense_lines %}
+                            <tr>
+                                <td>{{ row.date }}</td>
+                                <td>{{ row.account }}</td>
+                                <td>{{ row.category }}</td>
+                                <td>{{ row.subcategory }}</td>
+                                <td>{{ row.tcode }} {{ row.ref }}</td>
+                                <td>{{ row.source }}</td>
+                                <td class="text-right">{{ row.amount }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-muted">No unassigned expense ledger lines found for this period.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-lg-7">
             <div class="card mb-4">
@@ -82,6 +236,7 @@
                     <span>Company Expenses</span>
                     <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-0">
                         <input type="hidden" name="action" value="export_expenses_csv">
+                        <input type="hidden" name="company" value="{{ filters.company }}">
                         <input type="hidden" name="date_from" value="{{ filters.date_from }}">
                         <input type="hidden" name="date_to" value="{{ filters.date_to }}">
                         <button type="submit" class="btn btn-sm btn-outline-primary">Export Spreadsheet</button>
@@ -130,6 +285,7 @@
                 <div class="card-body">
                     <form action="{{ url_for('main.BusinessReports') }}" method="post">
                         <input type="hidden" name="action" value="add_allocation">
+                        <input type="hidden" name="company" value="{{ filters.company }}">
                         <input type="hidden" name="date_from" value="{{ filters.date_from }}">
                         <input type="hidden" name="date_to" value="{{ filters.date_to }}">
                         <div class="form-group">
@@ -219,6 +375,7 @@
                                     <form action="{{ url_for('main.BusinessReports') }}" method="post" class="mb-0">
                                         <input type="hidden" name="action" value="delete_allocation">
                                         <input type="hidden" name="allocation_id" value="{{ row.id }}">
+                                        <input type="hidden" name="company" value="{{ filters.company }}">
                                         <input type="hidden" name="date_from" value="{{ filters.date_from }}">
                                         <input type="hidden" name="date_to" value="{{ filters.date_to }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
