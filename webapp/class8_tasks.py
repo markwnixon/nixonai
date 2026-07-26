@@ -2952,13 +2952,17 @@ def cascade_account_name_change(account_id, old_name, new_name):
         row.Account = new_name
         updates.append('reconciliations.Account')
 
-    for row in Chassis.query.filter(Chassis.Asset == old_name).all():
-        row.Asset = new_name
-        updates.append('chassis.Asset')
+    # These fields existed in older chassis schemas. Guard them so account edits
+    # still cascade on current databases where chassis is job/invoice detail only.
+    if hasattr(Chassis, 'Asset'):
+        for row in Chassis.query.filter(Chassis.Asset == old_name).all():
+            row.Asset = new_name
+            updates.append('chassis.Asset')
 
-    for row in Chassis.query.filter(Chassis.Expense == old_name).all():
-        row.Expense = new_name
-        updates.append('chassis.Expense')
+    if hasattr(Chassis, 'Expense'):
+        for row in Chassis.query.filter(Chassis.Expense == old_name).all():
+            row.Expense = new_name
+            updates.append('chassis.Expense')
 
     for row in DepreciationAsset.query.filter(DepreciationAsset.AssetAccount == old_name).all():
         row.AssetAccount = new_name
