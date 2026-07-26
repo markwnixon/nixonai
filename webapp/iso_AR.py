@@ -840,7 +840,7 @@ def _selected_order_email_defaults(odata, boxes, pdat):
     for ix, odat in enumerate(odata):
         if boxes is not None and ix < len(boxes) and boxes[ix] != 'on':
             continue
-        emailjp, emailoa, emailap = order_email_defaults(odat, pdat)
+        emailjp, emailoa, emailap, _emailoa_legacy = order_email_defaults(odat, pdat)
         _append_unique(email_jps, emailjp)
         _append_unique(email_oas, emailoa)
         _append_unique(email_aps, emailap)

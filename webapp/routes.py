@@ -1184,6 +1184,8 @@ def Class8Main(genre):
         return redirect(url_for('main.DispatchPlanningCalendar'))
     if genre == 'Calendar':
         return redirect(url_for('main.AdminCalendar'))
+    if genre == 'Reports':
+        return redirect(url_for('main.ProfitLossYearToDate'))
     if genre in FINANCIAL_GENRES:
         redirect_response = financial_mfa_redirect()
         if redirect_response is not None:
@@ -1249,6 +1251,60 @@ def ensure_business_report_tables():
             ADD COLUMN BasisType VARCHAR(45) NOT NULL DEFAULT 'port_entry'
         """))
         db.session.commit()
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS operations_indirect_allocations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(2) NOT NULL,
+            AccountName VARCHAR(100) NOT NULL,
+            PeriodStart DATE NOT NULL,
+            PeriodEnd DATE NOT NULL,
+            AmountCents INT NOT NULL DEFAULT 0,
+            AutoUpdate TINYINT NOT NULL DEFAULT 0,
+            Notes TEXT,
+            Active TINYINT DEFAULT 1,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ops_indirect_alloc_co (Co),
+            INDEX idx_ops_indirect_alloc_account (AccountName),
+            INDEX idx_ops_indirect_alloc_period (PeriodStart, PeriodEnd),
+            INDEX idx_ops_indirect_alloc_active (Active)
+        )
+    """))
+    db.session.commit()
+    columns = [column['name'] for column in inspector.get_columns('operations_indirect_allocations')]
+    if 'AutoUpdate' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_indirect_allocations
+            ADD COLUMN AutoUpdate TINYINT NOT NULL DEFAULT 0
+        """))
+        db.session.commit()
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS operations_ga_allocations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(2) NOT NULL,
+            AccountName VARCHAR(100) NOT NULL,
+            PeriodStart DATE NOT NULL,
+            PeriodEnd DATE NOT NULL,
+            AmountCents INT NOT NULL DEFAULT 0,
+            AutoUpdate TINYINT NOT NULL DEFAULT 0,
+            Notes TEXT,
+            Active TINYINT DEFAULT 1,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ops_ga_alloc_co (Co),
+            INDEX idx_ops_ga_alloc_account (AccountName),
+            INDEX idx_ops_ga_alloc_period (PeriodStart, PeriodEnd),
+            INDEX idx_ops_ga_alloc_active (Active)
+        )
+    """))
+    db.session.commit()
+    columns = [column['name'] for column in inspector.get_columns('operations_ga_allocations')]
+    if 'AutoUpdate' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_ga_allocations
+            ADD COLUMN AutoUpdate TINYINT NOT NULL DEFAULT 0
+        """))
+        db.session.commit()
 
 
 def business_report_parse_date(value, fallback):
@@ -1273,6 +1329,58 @@ BUSINESS_REPORT_BASIS_TYPES = {
     'day': 'Days',
     'mile': 'Miles',
 }
+
+
+def business_report_cents(value):
+    try:
+        clean = str(value).replace('$', '').replace(',', '').strip()
+        if clean in ['', '-']:
+            return 0
+        return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
+    except:
+        return 0
+
+
+def business_report_each_day(start_date, end_date):
+    current = start_date
+    while current <= end_date:
+        yield current
+        current += datetime.timedelta(days=1)
+
+
+def business_report_allocate_cents_by_day(daily_totals, start_date, end_date, amount_cents):
+    if start_date is None or end_date is None or end_date < start_date or not amount_cents:
+        return
+    days = (end_date - start_date).days + 1
+    sign = 1 if amount_cents >= 0 else -1
+    base_abs, remainder_abs = divmod(abs(int(amount_cents)), days)
+    for index, day in enumerate(business_report_each_day(start_date, end_date)):
+        cents_for_day = sign * (base_abs + (1 if index < remainder_abs else 0))
+        daily_totals[day] = daily_totals.get(day, 0) + cents_for_day
+
+
+def business_report_allocate_cents_by_period(daily_totals, period_start, period_end, amount_cents, include_start, include_end):
+    if period_start is None or period_end is None or period_end < period_start or not amount_cents:
+        return
+    if include_start is None:
+        include_start = period_start
+    if include_end is None:
+        include_end = period_end
+    include_start = max(include_start, period_start)
+    include_end = min(include_end, period_end)
+    if include_end < include_start:
+        return
+    days = (period_end - period_start).days + 1
+    sign = 1 if amount_cents >= 0 else -1
+    base_abs, remainder_abs = divmod(abs(int(amount_cents)), days)
+    for index, day in enumerate(business_report_each_day(period_start, period_end)):
+        if include_start <= day <= include_end:
+            cents_for_day = sign * (base_abs + (1 if index < remainder_abs else 0))
+            daily_totals[day] = daily_totals.get(day, 0) + cents_for_day
+
+
+def business_report_week_start(day):
+    return day - datetime.timedelta(days=day.weekday())
 
 def ensure_tax_rollup_tables():
     db.session.execute(text("""
@@ -1859,6 +1967,52 @@ def business_report_bill_for_ledger_line(line):
     return None
 
 
+def business_report_final_reconciled_value(value):
+    # 0/None are unreconciled; 25 is a trial-selected line. Finalized statements
+    # replace 25 with the statement month number, so only values outside this
+    # open set are treated as reconciled.
+    return value not in [None, 0, 25]
+
+
+def business_report_payment_reconciled_for_bill(bill, fallback_line=None):
+    if bill is None:
+        return business_report_final_reconciled_value(fallback_line.Reconciled) if fallback_line else False
+
+    payment_filters = [
+        (Gledger.SourceTable == 'Bills') & (Gledger.SourceId == bill.id),
+    ]
+    if bill.Jo:
+        payment_filters.extend([
+            Gledger.JournalId == f'PAYBILL-{bill.Jo}',
+            Gledger.JournalId.like(f'PAYBILL-{bill.Jo}-%'),
+            Gledger.Tcode == bill.Jo,
+            Gledger.Tcode.like(f'{bill.Jo}-%'),
+        ])
+    payment_lines = Gledger.query.filter(or_(*payment_filters)).all()
+
+    bank_payment_lines = [
+        line for line in payment_lines
+        if line.Type in ['PC', 'DD', 'QC', 'XC'] or (line.Account or '') == (bill.pAccount or '')
+    ]
+    if bank_payment_lines:
+        return any(business_report_final_reconciled_value(line.Reconciled) for line in bank_payment_lines)
+    return any(business_report_final_reconciled_value(line.Reconciled) for line in payment_lines)
+
+
+def business_report_payroll_reconciled_for_line(line):
+    if line is None or line.SourceTable != 'PayrollBatch':
+        return None
+    payroll_lines = Gledger.query.filter(
+        (Gledger.SourceTable == 'PayrollBatch') &
+        (Gledger.JournalId == line.JournalId) &
+        (Gledger.Com == line.Com)
+    ).all()
+    bank_lines = [row for row in payroll_lines if row.Type in ['PC', 'XC']]
+    if not bank_lines:
+        return any(business_report_final_reconciled_value(row.Reconciled) for row in payroll_lines)
+    return any(business_report_final_reconciled_value(row.Reconciled) for row in bank_lines)
+
+
 def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, account_type):
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
     ledger_rows = db.session.query(Gledger, Accounts).join(
@@ -1884,6 +2038,13 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
         else:
             amount_cents = int(line.Debit or 0) - int(line.Credit or 0)
         bill = business_report_bill_for_ledger_line(line)
+        payroll_reconciled = business_report_payroll_reconciled_for_line(line)
+        if payroll_reconciled is not None:
+            reconciled = payroll_reconciled
+        elif account_type == 'Expense':
+            reconciled = business_report_payment_reconciled_for_bill(bill, line)
+        else:
+            reconciled = business_report_final_reconciled_value(line.Reconciled)
         detail = {
             'date': line.Date.strftime('%Y-%m-%d') if line.Date else '',
             'account': account.Name or line.Account or '',
@@ -1893,6 +2054,7 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
             'amount_cents': amount_cents,
             'amount': business_report_money(amount_cents),
             'ledger_type': line.Type or '',
+            'reconciled': reconciled,
             'journal_id': line.JournalId or '',
             'source_table': line.SourceTable or '',
             'source_id': line.SourceId or '',
@@ -2290,15 +2452,318 @@ def business_report_allocation_calcs(allocations, report_start, report_end):
     return output
 
 
+def operations_indirect_allocations(company_code):
+    rows = db.session.execute(text("""
+        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes
+        FROM operations_indirect_allocations
+        WHERE Co = :company_code AND Active = 1
+        ORDER BY PeriodStart DESC, AccountName, id
+    """), {'company_code': company_code}).mappings().all()
+    output = []
+    for row in rows:
+        output.append({
+            'id': row['id'],
+            'account': row['AccountName'] or '',
+            'period_start': row['PeriodStart'].strftime('%Y-%m-%d') if row['PeriodStart'] else '',
+            'period_end': row['PeriodEnd'].strftime('%Y-%m-%d') if row['PeriodEnd'] else '',
+            'amount_cents': int(row['AmountCents'] or 0),
+            'amount': business_report_money(int(row['AmountCents'] or 0)),
+            'auto_update': bool(row['AutoUpdate']),
+            'notes': row['Notes'] or '',
+        })
+    return output
+
+
+def operations_ga_allocations(company_code):
+    rows = db.session.execute(text("""
+        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes
+        FROM operations_ga_allocations
+        WHERE Co = :company_code AND Active = 1
+        ORDER BY PeriodStart DESC, AccountName, id
+    """), {'company_code': company_code}).mappings().all()
+    output = []
+    for row in rows:
+        output.append({
+            'id': row['id'],
+            'account': row['AccountName'] or '',
+            'period_start': row['PeriodStart'].strftime('%Y-%m-%d') if row['PeriodStart'] else '',
+            'period_end': row['PeriodEnd'].strftime('%Y-%m-%d') if row['PeriodEnd'] else '',
+            'amount_cents': int(row['AmountCents'] or 0),
+            'amount': business_report_money(int(row['AmountCents'] or 0)),
+            'auto_update': bool(row['AutoUpdate']),
+            'notes': row['Notes'] or '',
+        })
+    return output
+
+
+def operations_account_ytd_cents(company_code, account_name, as_of_date, account_category):
+    year_start = datetime.date(as_of_date.year, 1, 1)
+    start_dt, end_dt = business_report_period_bounds(year_start, as_of_date)
+    amount = db.session.query(
+        func.sum(func.coalesce(Gledger.Debit, 0) - func.coalesce(Gledger.Credit, 0))
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == 'Expense',
+        func.lower(Accounts.Category) == account_category,
+        Accounts.Name == account_name,
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).scalar()
+    return int(amount or 0)
+
+
+def operations_sync_auto_allocations(company_code, as_of_date, table_name, account_category):
+    year_start = datetime.date(as_of_date.year, 1, 1)
+    if table_name not in ['operations_indirect_allocations', 'operations_ga_allocations']:
+        return
+    rows = db.session.execute(text("""
+        SELECT id, AccountName
+        FROM """ + table_name + """
+        WHERE Co = :company_code AND Active = 1 AND AutoUpdate = 1
+    """), {'company_code': company_code}).mappings().all()
+    for row in rows:
+        amount_cents = operations_account_ytd_cents(company_code, row['AccountName'], as_of_date, account_category)
+        db.session.execute(text("""
+            UPDATE """ + table_name + """
+            SET PeriodStart = :period_start,
+                PeriodEnd = :period_end,
+                AmountCents = :amount_cents,
+                UpdatedAt = :updated_at
+            WHERE id = :allocation_id AND Co = :company_code
+        """), {
+            'period_start': year_start,
+            'period_end': as_of_date,
+            'amount_cents': amount_cents,
+            'updated_at': datetime.datetime.utcnow(),
+            'allocation_id': row['id'],
+            'company_code': company_code,
+        })
+    if rows:
+        db.session.commit()
+
+
+def operations_account_options(company_code, as_of_date, account_category):
+    year_start = datetime.date(as_of_date.year, 1, 1)
+    start_dt, end_dt = business_report_period_bounds(year_start, as_of_date)
+    rows = db.session.query(
+        Accounts.Name,
+        Accounts.Category,
+        Accounts.Subcategory,
+        func.sum(func.coalesce(Gledger.Debit, 0) - func.coalesce(Gledger.Credit, 0)).label('amount_cents'),
+    ).outerjoin(
+        Gledger,
+        (Gledger.Aid == Accounts.id) &
+        (Gledger.Com == Accounts.Co) &
+        (Gledger.Date >= start_dt) &
+        (Gledger.Date <= end_dt),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == 'Expense',
+        func.lower(Accounts.Category) == account_category,
+    ).group_by(
+        Accounts.id,
+        Accounts.Name,
+        Accounts.Category,
+        Accounts.Subcategory,
+    ).order_by(Accounts.Name).all()
+
+    output = []
+    for row in rows:
+        amount_cents = int(row.amount_cents or 0)
+        output.append({
+            'name': row.Name or '',
+            'category': row.Category or '',
+            'subcategory': row.Subcategory or '',
+            'default_start': year_start.strftime('%Y-%m-%d'),
+            'default_end': as_of_date.strftime('%Y-%m-%d'),
+            'default_amount': f'{amount_cents / 100:.2f}',
+            'default_amount_display': business_report_money(amount_cents),
+        })
+    return output
+
+
+def operations_weekly_profit_loss(company_code, start_date, end_date):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    daily_income = {}
+    income_rows = db.session.query(
+        Gledger.Date,
+        func.sum(func.coalesce(Gledger.Credit, 0) - func.coalesce(Gledger.Debit, 0)).label('amount_cents'),
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == 'Income',
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).group_by(Gledger.Date).all()
+    for row in income_rows:
+        if row.Date:
+            daily_income[row.Date.date()] = daily_income.get(row.Date.date(), 0) + int(row.amount_cents or 0)
+
+    direct_daily = {}
+    direct_rows = db.session.query(
+        Gledger.Account,
+        Gledger.Date,
+        func.sum(func.coalesce(Gledger.Debit, 0) - func.coalesce(Gledger.Credit, 0)).label('amount_cents'),
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == 'Expense',
+        func.lower(Accounts.Category) == 'direct',
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).group_by(Gledger.Account, Gledger.Date).order_by(Gledger.Account, Gledger.Date).all()
+
+    previous_date_by_account = {}
+    for row in direct_rows:
+        if row.Date is None:
+            continue
+        expense_date = row.Date.date()
+        previous_date = previous_date_by_account.get(row.Account)
+        allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
+        allocation_start = max(allocation_start, start_date)
+        allocation_end = min(expense_date, end_date)
+        business_report_allocate_cents_by_day(direct_daily, allocation_start, allocation_end, int(row.amount_cents or 0))
+        previous_date_by_account[row.Account] = expense_date
+
+    indirect_daily = {}
+    for row in db.session.execute(text("""
+        SELECT PeriodStart, PeriodEnd, AmountCents
+        FROM operations_indirect_allocations
+        WHERE Co = :company_code
+          AND Active = 1
+          AND PeriodEnd >= :start_date
+          AND PeriodStart <= :end_date
+    """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all():
+        period_start = row['PeriodStart']
+        period_end = row['PeriodEnd']
+        if isinstance(period_start, datetime.datetime):
+            period_start = period_start.date()
+        if isinstance(period_end, datetime.datetime):
+            period_end = period_end.date()
+        # Indirect rows represent a payment coverage period, for example an
+        # insurance policy from June-to-June. Allocate across the full coverage
+        # period, then include only the days that land in the report window.
+        business_report_allocate_cents_by_period(
+            indirect_daily,
+            period_start,
+            period_end,
+            int(row['AmountCents'] or 0),
+            start_date,
+            end_date,
+        )
+
+    ga_daily = {}
+    for row in db.session.execute(text("""
+        SELECT PeriodStart, PeriodEnd, AmountCents
+        FROM operations_ga_allocations
+        WHERE Co = :company_code
+          AND Active = 1
+          AND PeriodEnd >= :start_date
+          AND PeriodStart <= :end_date
+    """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all():
+        period_start = row['PeriodStart']
+        period_end = row['PeriodEnd']
+        if isinstance(period_start, datetime.datetime):
+            period_start = period_start.date()
+        if isinstance(period_end, datetime.datetime):
+            period_end = period_end.date()
+        business_report_allocate_cents_by_period(
+            ga_daily,
+            period_start,
+            period_end,
+            int(row['AmountCents'] or 0),
+            start_date,
+            end_date,
+        )
+
+    weeks = {}
+    for day in business_report_each_day(start_date, end_date):
+        week_start = business_report_week_start(day)
+        week_end = week_start + datetime.timedelta(days=6)
+        week = weeks.setdefault(week_start, {
+            'week_start': week_start,
+            'week_end': week_end,
+            'income_cents': 0,
+            'direct_cents': 0,
+            'indirect_cents': 0,
+            'ga_cents': 0,
+        })
+        week['income_cents'] += daily_income.get(day, 0)
+        week['direct_cents'] += direct_daily.get(day, 0)
+        week['indirect_cents'] += indirect_daily.get(day, 0)
+        week['ga_cents'] += ga_daily.get(day, 0)
+
+    output = []
+    for week_start in sorted(weeks):
+        row = weeks[week_start]
+        row['week_start_text'] = max(row['week_start'], start_date).strftime('%Y-%m-%d')
+        row['week_end_text'] = min(row['week_end'], end_date).strftime('%Y-%m-%d')
+        row['gross_profit_cents'] = row['income_cents'] - row['direct_cents']
+        row['net_ops_cents'] = row['gross_profit_cents'] - row['indirect_cents']
+        row['net_profit_cents'] = row['net_ops_cents'] - row['ga_cents']
+        row['income'] = business_report_money(row['income_cents'])
+        row['direct'] = business_report_money(row['direct_cents'])
+        row['gross_profit'] = business_report_money(row['gross_profit_cents'])
+        row['indirect'] = business_report_money(row['indirect_cents'])
+        row['net_ops'] = business_report_money(row['net_ops_cents'])
+        row['ga'] = business_report_money(row['ga_cents'])
+        row['net_profit'] = business_report_money(row['net_profit_cents'])
+        output.append(row)
+
+    totals = {
+        'income_cents': sum(row['income_cents'] for row in output),
+        'direct_cents': sum(row['direct_cents'] for row in output),
+        'gross_profit_cents': sum(row['gross_profit_cents'] for row in output),
+        'indirect_cents': sum(row['indirect_cents'] for row in output),
+        'net_ops_cents': sum(row['net_ops_cents'] for row in output),
+        'ga_cents': sum(row['ga_cents'] for row in output),
+        'net_profit_cents': sum(row['net_profit_cents'] for row in output),
+    }
+    totals.update({
+        'income': business_report_money(totals['income_cents']),
+        'direct': business_report_money(totals['direct_cents']),
+        'gross_profit': business_report_money(totals['gross_profit_cents']),
+        'indirect': business_report_money(totals['indirect_cents']),
+        'net_ops': business_report_money(totals['net_ops_cents']),
+        'ga': business_report_money(totals['ga_cents']),
+        'net_profit': business_report_money(totals['net_profit_cents']),
+    })
+    return output, totals
+
+
 @main.route('/BusinessReports', methods=['GET', 'POST'])
 @login_required
 @financial_mfa_required
 def BusinessReports():
+    return redirect(url_for('main.ProfitLossYearToDate'))
+
+
+@main.route('/BusinessReports/Weekly', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def ProfitLossWeekly():
+    return business_reports_page('weekly')
+
+
+@main.route('/BusinessReports/YearToDate', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def ProfitLossYearToDate():
+    return business_reports_page('ytd')
+
+
+def business_reports_page(report_mode):
     if session.get('authority') not in ['admin', 'superuser']:
         abort(403)
     ensure_business_report_tables()
     ensure_tax_rollup_tables()
-    ensure_interchange_port_trip_column()
     companies = tax_rollup_company_options()
     selected_company = request.values.get('company') or cmpdata[10]
     if selected_company not in companies:
@@ -2360,9 +2825,106 @@ def BusinessReports():
             """), {'allocation_id': allocation_id, 'updated_at': datetime.datetime.utcnow()})
             db.session.commit()
             msg.append('Allocation setup row removed.')
-        elif action == 'recalculate_port_trips':
-            result = rebaseline_interchange_port_trips_for_year(selected_start.year)
-            msg.append(f"{selected_start.year} port trips rebaselined: {result['port_trips']} trips from {result['rows_reviewed']} interchange rows.")
+        elif action == 'add_ops_indirect_allocation':
+            account_name = (request.form.get('ops_indirect_account_name') or '').strip()
+            period_start = business_report_parse_date(request.form.get('ops_period_start'), None)
+            period_end = business_report_parse_date(request.form.get('ops_period_end'), None)
+            amount_cents = business_report_cents(request.form.get('ops_amount'))
+            auto_update = 1 if request.form.get('ops_auto_update') else 0
+            if auto_update:
+                period_start = datetime.date(today_local.year, 1, 1)
+                period_end = today_local
+                amount_cents = operations_account_ytd_cents(selected_company, account_name, today_local, 'indirect') if account_name else 0
+            if not account_name:
+                err.append('Indirect expense account is required.')
+            elif period_start is None or period_end is None:
+                err.append('Indirect allocation period start and end are required.')
+            elif period_end < period_start:
+                err.append('Indirect allocation period end must be on or after the start date.')
+            elif amount_cents == 0:
+                err.append('Indirect allocation amount is required.')
+            else:
+                db.session.execute(text("""
+                    INSERT INTO operations_indirect_allocations
+                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :auto_update, :notes, 1, :created_at, :updated_at)
+                """), {
+                    'company_code': selected_company,
+                    'account_name': account_name,
+                    'period_start': period_start,
+                    'period_end': period_end,
+                    'amount_cents': amount_cents,
+                    'auto_update': auto_update,
+                    'notes': (request.form.get('ops_notes') or '').strip(),
+                    'created_at': datetime.datetime.utcnow(),
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.commit()
+                msg.append('Operations indirect allocation added.')
+        elif action == 'delete_ops_indirect_allocation':
+            allocation_id = request.form.get('ops_allocation_id')
+            db.session.execute(text("""
+                UPDATE operations_indirect_allocations
+                SET Active = 0, UpdatedAt = :updated_at
+                WHERE id = :allocation_id AND Co = :company_code
+            """), {
+                'allocation_id': allocation_id,
+                'company_code': selected_company,
+                'updated_at': datetime.datetime.utcnow(),
+            })
+            db.session.commit()
+            msg.append('Operations indirect allocation removed.')
+        elif action == 'add_ops_ga_allocation':
+            account_name = (request.form.get('ops_ga_account_name') or '').strip()
+            period_start = business_report_parse_date(request.form.get('ops_ga_period_start'), None)
+            period_end = business_report_parse_date(request.form.get('ops_ga_period_end'), None)
+            amount_cents = business_report_cents(request.form.get('ops_ga_amount'))
+            auto_update = 1 if request.form.get('ops_ga_auto_update') else 0
+            if auto_update:
+                period_start = datetime.date(today_local.year, 1, 1)
+                period_end = today_local
+                amount_cents = operations_account_ytd_cents(selected_company, account_name, today_local, 'g-a') if account_name else 0
+            if not account_name:
+                err.append('G&A expense account is required.')
+            elif period_start is None or period_end is None:
+                err.append('G&A allocation period start and end are required.')
+            elif period_end < period_start:
+                err.append('G&A allocation period end must be on or after the start date.')
+            elif amount_cents == 0:
+                err.append('G&A allocation amount is required.')
+            else:
+                db.session.execute(text("""
+                    INSERT INTO operations_ga_allocations
+                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :auto_update, :notes, 1, :created_at, :updated_at)
+                """), {
+                    'company_code': selected_company,
+                    'account_name': account_name,
+                    'period_start': period_start,
+                    'period_end': period_end,
+                    'amount_cents': amount_cents,
+                    'auto_update': auto_update,
+                    'notes': (request.form.get('ops_ga_notes') or '').strip(),
+                    'created_at': datetime.datetime.utcnow(),
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.commit()
+                msg.append('G&A allocation added.')
+        elif action == 'delete_ops_ga_allocation':
+            allocation_id = request.form.get('ops_ga_allocation_id')
+            db.session.execute(text("""
+                UPDATE operations_ga_allocations
+                SET Active = 0, UpdatedAt = :updated_at
+                WHERE id = :allocation_id AND Co = :company_code
+            """), {
+                'allocation_id': allocation_id,
+                'company_code': selected_company,
+                'updated_at': datetime.datetime.utcnow(),
+            })
+            db.session.commit()
+            msg.append('G&A allocation removed.')
         elif action == 'export_expenses_csv':
             expenses = business_report_expenses(selected_start, selected_end, selected_company)
             lines = ['Account,Category,Subcategory,Amount']
@@ -2382,14 +2944,23 @@ def BusinessReports():
             tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
             return business_report_tax_rollup_pdf(selected_company, selected_start, selected_end, tax_rollup_pl)
 
+    operations_end = selected_end
+    if report_mode == 'weekly':
+        operations_end = min(selected_end, today_local)
+        operations_end = operations_end - datetime.timedelta(days=(operations_end.weekday() + 1) % 7)
+
+    if report_mode == 'weekly':
+        operations_sync_auto_allocations(selected_company, today_local, 'operations_indirect_allocations', 'indirect')
+        operations_sync_auto_allocations(selected_company, today_local, 'operations_ga_allocations', 'g-a')
+
     expense_rows = business_report_expenses(selected_start, selected_end, selected_company)
     tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
+    operations_rows, operations_totals = operations_weekly_profit_loss(selected_company, selected_start, operations_end)
+    ops_indirect_rows = operations_indirect_allocations(selected_company)
+    ops_ga_rows = operations_ga_allocations(selected_company)
     unassigned_expense_lines = business_report_unassigned_expense_lines(selected_company, selected_start, selected_end)
-    allocation_rows = business_report_allocation_calcs(business_report_allocations(), selected_start, selected_end)
-    expense_accounts = Accounts.query.filter(
-        (Accounts.Co == selected_company) &
-        (Accounts.Type == 'Expense')
-    ).order_by(Accounts.Name).all()
+    ops_indirect_accounts = operations_account_options(selected_company, today_local, 'indirect')
+    ops_ga_accounts = operations_account_options(selected_company, today_local, 'g-a')
     total_expenses = sum(row['amount_cents'] for row in expense_rows)
     report_basis = {
         'port_entries': business_report_number(business_report_basis_qty('port_entry', selected_start, selected_end), 0),
@@ -2405,16 +2976,25 @@ def BusinessReports():
             'date_from': selected_start.strftime('%Y-%m-%d'),
             'date_to': selected_end.strftime('%Y-%m-%d'),
         },
+        report_mode=report_mode,
+        report_endpoint='main.ProfitLossWeekly' if report_mode == 'weekly' else 'main.ProfitLossYearToDate',
         companies=companies,
         selected_company=selected_company,
         tax_rollup_pl=tax_rollup_pl,
+        operations_rows=operations_rows,
+        operations_totals=operations_totals,
+        operations_effective_date_to=operations_end.strftime('%Y-%m-%d') if operations_end >= selected_start else '',
+        ops_indirect_rows=ops_indirect_rows,
+        ops_indirect_accounts=ops_indirect_accounts,
+        ops_ga_rows=ops_ga_rows,
+        ops_ga_accounts=ops_ga_accounts,
         unassigned_expense_lines=unassigned_expense_lines,
         expense_rows=expense_rows,
-        expense_accounts=expense_accounts,
-        allocation_rows=allocation_rows,
         total_expenses=business_report_money(total_expenses),
         basis_types=BUSINESS_REPORT_BASIS_TYPES,
         report_basis=report_basis,
+        ops_default_start=datetime.date(today_local.year, 1, 1).strftime('%Y-%m-%d'),
+        ops_default_end=today_local.strftime('%Y-%m-%d'),
         err=err,
         msg=msg,
     )
