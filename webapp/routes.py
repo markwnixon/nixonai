@@ -2590,19 +2590,33 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
     daily_income = {}
     income_rows = db.session.query(
         Gledger.Date,
-        func.sum(func.coalesce(Gledger.Credit, 0) - func.coalesce(Gledger.Debit, 0)).label('amount_cents'),
+        Gledger.Debit,
+        Gledger.Credit,
+        Orders.Date2.label('gate_in_date'),
     ).join(
         Accounts,
         or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).outerjoin(
+        Orders,
+        Gledger.Tcode == Orders.Jo,
     ).filter(
         Accounts.Co == company_code,
         Accounts.Type == 'Income',
-        Gledger.Date >= start_dt,
-        Gledger.Date <= end_dt,
-    ).group_by(Gledger.Date).all()
+        or_(
+            (Gledger.Date >= start_dt) & (Gledger.Date <= end_dt),
+            (Orders.Date2 >= start_dt - datetime.timedelta(days=7)) & (Orders.Date2 <= end_dt - datetime.timedelta(days=7)),
+        ),
+    ).all()
     for row in income_rows:
-        if row.Date:
-            daily_income[row.Date.date()] = daily_income.get(row.Date.date(), 0) + int(row.amount_cents or 0)
+        source_date = row.gate_in_date or row.Date
+        if source_date is None:
+            continue
+        recognition_date = source_date.date()
+        if row.gate_in_date:
+            recognition_date = recognition_date + datetime.timedelta(days=7)
+        if start_date <= recognition_date <= end_date:
+            amount_cents = int(row.Credit or 0) - int(row.Debit or 0)
+            daily_income[recognition_date] = daily_income.get(recognition_date, 0) + amount_cents
 
     direct_daily = {}
     direct_rows = db.session.query(

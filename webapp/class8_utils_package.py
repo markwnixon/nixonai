@@ -30,6 +30,45 @@ NO_PROOF_MARKERS = ['none required', 'no proof needed']
 def proof_is_marker(value):
     return str(value or '').strip().lower() in NO_PROOF_MARKERS
 
+
+def existing_order_pdf(folder, filename):
+    if filename is None:
+        return ''
+    filename = str(filename).strip()
+    if not filename or proof_is_marker(filename):
+        return ''
+
+    candidates = []
+    if os.path.isabs(filename):
+        candidates.append(filename)
+    if filename.startswith('/static/') or filename.startswith('static/'):
+        candidates.append(addpath(filename.lstrip('/')))
+    candidates.append(addpath(f'static/{scac}/data/{folder}/{filename}'))
+    candidates.append(addpath(f'static/{scac}/data/{folder}/{os.path.basename(filename)}'))
+
+    for filepath in candidates:
+        if os.path.isfile(filepath):
+            return filepath
+    return ''
+
+
+def order_has_gate_tickets(odat):
+    """Gate tickets are normally found through Interchange rows, not Orders.Gate."""
+    if existing_order_pdf('vGate', getattr(odat, 'Gate', None)):
+        return True
+
+    idata = Interchange.query.filter(Interchange.Container == odat.Container).all()
+    if not idata:
+        return False
+
+    if len(idata) > 1:
+        blended = existing_order_pdf('vGate', f'{idata[0].Container}_Blended.pdf')
+        if blended:
+            return True
+        return bool(existing_order_pdf('vGate', idata[0].Source) and existing_order_pdf('vGate', idata[1].Source))
+
+    return bool(existing_order_pdf('vGate', idata[0].Source))
+
 def call_stamp(odat, task_iter):
     stampdata = []
     if task_iter > 1:
@@ -192,8 +231,8 @@ def get_doclist(odat, dockind):
         if thisdoc != '0':
             if thisdoc == 'Source':
                 try:
-                    fa = addpath(f'static/{scac}/data/vSource/{odat.Source}')
-                    if os.path.isfile(fa):
+                    fa = existing_order_pdf('vSource', odat.Source)
+                    if fa:
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
@@ -201,8 +240,8 @@ def get_doclist(odat, dockind):
                     #print('No source file exists')
             if thisdoc == 'RateCon':
                 try:
-                    fa = addpath(f'static/{scac}/data/vRateCon/{odat.RateCon}')
-                    if os.path.isfile(fa):
+                    fa = existing_order_pdf('vRateCon', odat.RateCon)
+                    if fa:
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
@@ -210,39 +249,51 @@ def get_doclist(odat, dockind):
                     #print('No ratecon file exists')
             if thisdoc == 'Invoice':
                 try:
-                    fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
-                    if os.path.isfile(fa):
+                    fa = existing_order_pdf('vInvoice', odat.Invoice)
+                    if fa:
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
                     pass
                     #print('No invoice exists')
             if thisdoc == 'Proofs':
+                proof_found = False
                 try:
-                    if not proof_is_marker(odat.Proof):
-                        fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}')
-                        #print('Looking for proof file:', fa)
-                        if os.path.isfile(fa):
-                            packitems.append(fa)
-                            fexist[jx] = 1
+                    fa = existing_order_pdf('vProof', odat.Proof)
+                    #print('Looking for proof file:', fa)
+                    if fa:
+                        packitems.append(fa)
+                        fexist[jx] = 1
+                        proof_found = True
                 except:
                     #print('Proof file 1 does not exist')
                     fexist[jx] = 0
                 try:
-                    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof2}')
+                    fa = existing_order_pdf('vProof', odat.Proof2)
                     #print('Looking for 2nd proof file:', fa)
-                    if os.path.isfile(fa):
+                    if fa:
                         packitems.append(fa)
                         fexist[jx] = 1
+                        proof_found = True
                 except:
                     pass
                     #print('Proof file 2 does not exist')
+                if not proof_found:
+                    try:
+                        fa = existing_order_pdf('vProof', odat.DrvProof)
+                        # Use driver-uploaded proof only when no standard proof
+                        # document exists for the order.
+                        if fa:
+                            packitems.append(fa)
+                            fexist[jx] = 1
+                    except:
+                        pass
 
             if thisdoc == 'PaidInvoice':
                 try:
-                    fa = addpath(f'static/{scac}/data/vPaidInvoice/{odat.PaidInvoice}')
+                    fa = existing_order_pdf('vPaidInvoice', odat.PaidInvoice)
                     print('Looking for paid invoice file:', fa)
-                    if os.path.isfile(fa):
+                    if fa:
                         packitems.append(fa)
                         fexist[jx] = 1
                 except:
@@ -261,16 +312,17 @@ def get_doclist(odat, dockind):
                             fexist[jx] = 1
                         else:
                             try:
-                                g1 = f'static/{scac}/data/vGate/{idata[0].Source}'
-                                g2 = f'static/{scac}/data/vGate/{idata[1].Source}'
-                                blendticks(addpath(g1), addpath(g2), addpath(newdoc))
+                                g1 = existing_order_pdf('vGate', idata[0].Source)
+                                g2 = existing_order_pdf('vGate', idata[1].Source)
+                                blendticks(g1, g2, addpath(newdoc))
                                 packitems.append(addpath(newdoc))
                                 fexist[jx] = 1
                             except:
                                 fexist[jx] = 0
                     else:
-                        if os.path.isfile(addpath(f'static/{scac}/data/vGate/{idata[0].Source}')):
-                            packitems.append(addpath(f'static/{scac}/data/vGate/{idata[0].Source}'))
+                        fa = existing_order_pdf('vGate', idata[0].Source)
+                        if fa:
+                            packitems.append(fa)
                             fexist[jx] = 1
                         else:
                             pass
@@ -280,26 +332,26 @@ def get_doclist(odat, dockind):
 def getdocs(odat):
     dockind = []
     #Check for Invoice
-    fa = addpath(f'static/{scac}/data/vInvoice/{odat.Invoice}')
-    if os.path.isfile(fa):
+    fa = existing_order_pdf('vInvoice', odat.Invoice)
+    if fa:
         dockind.append('Invoice')
     #Check for Proof
-    fa = addpath(f'static/{scac}/data/vProof/{odat.Proof}') if not proof_is_marker(odat.Proof) else ''
-    fa2 = addpath(f'static/{scac}/data/vProof/{odat.Proof2}')
-    if os.path.isfile(fa) or os.path.isfile(fa2):
+    fa = existing_order_pdf('vProof', odat.Proof)
+    fa2 = existing_order_pdf('vProof', odat.Proof2)
+    fa3 = existing_order_pdf('vProof', odat.DrvProof)
+    if fa or fa2 or (not fa and not fa2 and fa3):
         dockind.append('Proofs')
     #Check for Gate
-    fa = addpath(f'static/{scac}/data/vGate/{odat.Gate}')
-    if os.path.isfile(fa):
+    if order_has_gate_tickets(odat):
         dockind.append('Gate Tickets')
     #Check for RateCon
-    fa = addpath(f'static/{scac}/data/vRateCon/{odat.RateCon}')
-    if os.path.isfile(fa):
+    fa = existing_order_pdf('vRateCon', odat.RateCon)
+    if fa:
         dockind.append('RateCon')
     else:
         #If no rate con then try to add DO
-        fa = addpath(f'static/{scac}/data/vSource/{odat.Source}')
-        if os.path.isfile(fa):
+        fa = existing_order_pdf('vSource', odat.Source)
+        if fa:
             dockind.append('Source')
     ix = len(dockind)
     for jx in range(ix,4): dockind.append('0')
