@@ -1590,6 +1590,27 @@ def business_report_number(value, places=2):
     return f"{value or 0:,.{places}f}"
 
 
+def business_report_as_date(value):
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return value
+
+
+def business_report_date_text(value):
+    value = business_report_as_date(value)
+    return value.strftime('%Y-%m-%d') if value else ''
+
+
+def business_report_as_datetime(value, end_of_day=False):
+    if isinstance(value, datetime.datetime):
+        return value
+    if isinstance(value, datetime.date):
+        return datetime.datetime.combine(value, datetime.time.max if end_of_day else datetime.time.min)
+    return value
+
+
 BUSINESS_REPORT_BASIS_TYPES = {
     'port_entry': 'Port Entries',
     'day': 'Days',
@@ -2101,8 +2122,8 @@ def business_report_decimal(value):
 
 def business_report_period_bounds(start_date, end_date):
     return (
-        datetime.datetime.combine(start_date, datetime.time.min),
-        datetime.datetime.combine(end_date, datetime.time.max),
+        business_report_as_datetime(start_date),
+        business_report_as_datetime(end_date, end_of_day=True),
     )
 
 
@@ -2312,7 +2333,7 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
         else:
             reconciled = business_report_final_reconciled_value(line.Reconciled)
         detail = {
-            'date': line.Date.strftime('%Y-%m-%d') if line.Date else '',
+            'date': business_report_date_text(line.Date),
             'account': account.Name or line.Account or '',
             'taxrollup': account.Taxrollup or '',
             'category': account.Category or '',
@@ -2331,8 +2352,8 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
             'bill_vendor': bill.Company if bill else '',
             'bill_description': bill.Description if bill else '',
             'bill_amount': bill.bAmount if bill else '',
-            'bill_date': bill.Date.strftime('%Y-%m-%d') if bill and bill.Date else '',
-            'paid_date': bill.pDate.strftime('%Y-%m-%d') if bill and bill.pDate else '',
+            'bill_date': business_report_date_text(bill.Date) if bill else '',
+            'paid_date': business_report_date_text(bill.pDate) if bill else '',
             'paid_amount': bill.pAmount if bill else '',
             'paid_account': bill.pAccount if bill else '',
             'bill_status': bill.Status if bill else '',
@@ -2654,7 +2675,7 @@ def business_report_unassigned_expense_lines(company_code, start_date, end_date)
     for row in rows:
         amount_cents = int(row.Debit or 0) - int(row.Credit or 0)
         output.append({
-            'date': row.Date.strftime('%Y-%m-%d') if row.Date else '',
+            'date': business_report_date_text(row.Date),
             'account': row.Account or '',
             'category': row.Category or '',
             'subcategory': row.Subcategory or '',
@@ -2682,8 +2703,8 @@ def business_report_allocations():
             'method': row.get('AllocationMethod') or '',
             'basis_type': row.get('BasisType') or 'port_entry',
             'basis': row.get('BasisLabel') or BUSINESS_REPORT_BASIS_TYPES.get(row.get('BasisType'), 'Port Entries'),
-            'period_start': row.get('PeriodStart').strftime('%Y-%m-%d') if row.get('PeriodStart') else '',
-            'period_end': row.get('PeriodEnd').strftime('%Y-%m-%d') if row.get('PeriodEnd') else '',
+            'period_start': business_report_date_text(row.get('PeriodStart')),
+            'period_end': business_report_date_text(row.get('PeriodEnd')),
             'basis_qty': float(row.get('BasisQty') or 0),
             'notes': row.get('Notes') or '',
         })
@@ -2730,8 +2751,8 @@ def operations_indirect_allocations(company_code):
         output.append({
             'id': row['id'],
             'account': row['AccountName'] or '',
-            'period_start': row['PeriodStart'].strftime('%Y-%m-%d') if row['PeriodStart'] else '',
-            'period_end': row['PeriodEnd'].strftime('%Y-%m-%d') if row['PeriodEnd'] else '',
+            'period_start': business_report_date_text(row['PeriodStart']),
+            'period_end': business_report_date_text(row['PeriodEnd']),
             'amount_cents': int(row['AmountCents'] or 0),
             'amount': business_report_money(int(row['AmountCents'] or 0)),
             'auto_update': bool(row['AutoUpdate']),
@@ -2752,8 +2773,8 @@ def operations_ga_allocations(company_code):
         output.append({
             'id': row['id'],
             'account': row['AccountName'] or '',
-            'period_start': row['PeriodStart'].strftime('%Y-%m-%d') if row['PeriodStart'] else '',
-            'period_end': row['PeriodEnd'].strftime('%Y-%m-%d') if row['PeriodEnd'] else '',
+            'period_start': business_report_date_text(row['PeriodStart']),
+            'period_end': business_report_date_text(row['PeriodEnd']),
             'amount_cents': int(row['AmountCents'] or 0),
             'amount': business_report_money(int(row['AmountCents'] or 0)),
             'auto_update': bool(row['AutoUpdate']),
@@ -2877,7 +2898,7 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
         source_date = row.gate_in_date or row.Date
         if source_date is None:
             continue
-        recognition_date = source_date.date()
+        recognition_date = business_report_as_date(source_date)
         if row.gate_in_date:
             recognition_date = recognition_date + datetime.timedelta(days=7)
         if start_date <= recognition_date <= end_date:
@@ -2904,7 +2925,7 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
     for row in direct_rows:
         if row.Date is None:
             continue
-        expense_date = row.Date.date()
+        expense_date = business_report_as_date(row.Date)
         previous_date = previous_date_by_account.get(row.Account)
         allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
         allocation_start = max(allocation_start, start_date)
@@ -2923,10 +2944,8 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
     """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all():
         period_start = row['PeriodStart']
         period_end = row['PeriodEnd']
-        if isinstance(period_start, datetime.datetime):
-            period_start = period_start.date()
-        if isinstance(period_end, datetime.datetime):
-            period_end = period_end.date()
+        period_start = business_report_as_date(period_start)
+        period_end = business_report_as_date(period_end)
         # Indirect rows represent a payment coverage period, for example an
         # insurance policy from June-to-June. Allocate across the full coverage
         # period, then include only the days that land in the report window.
@@ -2950,10 +2969,8 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
     """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all():
         period_start = row['PeriodStart']
         period_end = row['PeriodEnd']
-        if isinstance(period_start, datetime.datetime):
-            period_start = period_start.date()
-        if isinstance(period_end, datetime.datetime):
-            period_end = period_end.date()
+        period_start = business_report_as_date(period_start)
+        period_end = business_report_as_date(period_end)
         business_report_allocate_cents_by_period(
             ga_daily,
             period_start,
