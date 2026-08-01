@@ -1,0 +1,601 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/compliance_check.css') }}">
+
+<div class="compliance-page mt-3">
+    <div class="d-flex flex-wrap align-items-start justify-content-between mb-3">
+        <div>
+            <h3 class="mb-1">General Information</h3>
+            <div class="text-muted">Company-scoped reference records for IDs, portals, contacts, banking references, assets, and operational notes.</div>
+        </div>
+    </div>
+
+    {% if err %}
+        <div class="alert alert-warning py-2">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if msg %}
+        <div class="alert alert-success py-2">
+            {% for item in msg %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <section class="compliance-panel mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+            <h5 class="mb-1">Company Profile</h5>
+            <div class="text-muted small">Company-specific values used for quick reference.</div>
+        </div>
+        <form method="post">
+            <input type="hidden" name="action" value="save_profile">
+            <div class="general-profile-grid mb-2">
+                <div class="general-profile-item">
+                    <label>SCAC</label>
+                    <input class="form-control form-control-sm" name="scac_code" value="{{ profile.SCACCode or scac }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>MCA</label>
+                    <input class="form-control form-control-sm" name="mc_number" value="{{ profile.MCNumber or '' }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>DOT</label>
+                    <input class="form-control form-control-sm" name="dot_number" value="{{ profile.DOTNumber or '' }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>FEIN</label>
+                    <input class="form-control form-control-sm" name="fein" value="{{ profile.FEIN or '' }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>Authority Grant Date</label>
+                    <input type="date" class="form-control form-control-sm" name="authority_grant_date" value="{{ profile.AuthorityGrantDateValue or '' }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>NAICS Code</label>
+                    <input class="form-control form-control-sm" name="naics_code" value="{{ profile.NAICSCode or '' }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>Formation Date</label>
+                    <input type="date" class="form-control form-control-sm" name="formation_date" value="{{ profile.FormationDateValue or '' }}">
+                </div>
+                <div class="general-profile-item">
+                    <label>Main DOT Telephone</label>
+                    <input class="form-control form-control-sm" name="main_dot_tel" value="{{ profile.MainDOTTEL or '' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label>Physical Address</label>
+                    <textarea class="form-control form-control-sm" name="physical_address" rows="3">{{ profile.PhysicalAddress or '' }}</textarea>
+                </div>
+                <div class="form-group col-md-4">
+                    <label>Mailing Address</label>
+                    <textarea class="form-control form-control-sm" name="mailing_address" rows="3">{{ profile.MailingAddress or '' }}</textarea>
+                </div>
+                <div class="form-group col-md-4">
+                    <label>DOT Address</label>
+                    <textarea class="form-control form-control-sm" name="dot_address" rows="3">{{ profile.DOTAddress or '' }}</textarea>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Save Profile</button>
+        </form>
+    </section>
+
+    <section class="compliance-panel mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+            <h5 class="mb-1">Add or Edit General Information</h5>
+            <button class="btn btn-sm btn-outline-primary"
+                    type="button"
+                    data-toggle="collapse"
+                    data-target="#generalInformationEditor"
+                    aria-expanded="false"
+                    aria-controls="generalInformationEditor">
+                Add Item
+            </button>
+        </div>
+        <div id="generalInformationEditor" class="collapse">
+        <div class="compliance-type-editor mb-3">
+            <div class="form-inline">
+                <form method="post" class="form-inline mr-3 mb-1">
+                    <input type="hidden" name="action" value="add_category">
+                    <label class="mr-2">Add Category</label>
+                    <input class="form-control form-control-sm mr-2" name="category_name" placeholder="Example: Fuel Cards">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Add</button>
+                </form>
+                <form method="post" id="delete-general-category-form" class="form-inline mb-1">
+                    <input type="hidden" name="action" value="delete_category">
+                    <label class="mr-2">Remove Category</label>
+                    <select class="form-control form-control-sm mr-2" name="category_name" id="delete-general-category-select">
+                        <option value="">Choose category</option>
+                        {% for category in categories %}
+                            <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" id="activate-general-category-delete" class="btn btn-sm btn-outline-secondary mr-2">Activate Delete</button>
+                    <button type="submit" id="delete-general-category-button" class="btn btn-sm btn-danger" disabled>Delete</button>
+                </form>
+            </div>
+        </div>
+
+        <form id="general-information-form" method="post">
+            <input type="hidden" name="action" value="save_item">
+            <input type="hidden" id="general-item-id" name="item_id">
+            <input type="hidden" id="payment-method-id" name="payment_method_id">
+            <div class="form-row">
+                <div class="form-group col-md-3">
+                    <label>Category</label>
+                    <select id="general-category" class="form-control form-control-sm" name="category">
+                        {% for category in categories %}
+                            <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-5">
+                    <label>Title</label>
+                    <input id="general-title" class="form-control form-control-sm" name="title" required>
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Email</label>
+                    <input id="general-email" class="form-control form-control-sm" name="email">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Phone</label>
+                    <input id="general-phone" class="form-control form-control-sm" name="phone">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label>Website / URL</label>
+                    <input id="general-website" class="form-control form-control-sm" name="website_url">
+                </div>
+                <div class="form-group col-md-3">
+                    <label>Username</label>
+                    <input id="general-username" class="form-control form-control-sm" name="username">
+                </div>
+                <div class="form-group col-md-3">
+                    <label>Password / Access</label>
+                    <input id="general-password" class="form-control form-control-sm" name="password_value" autocomplete="new-password">
+                </div>
+                <div class="form-group col-md-2 compliance-check-cell">
+                    <label>Sensitive</label>
+                    <input id="general-sensitive" type="checkbox" name="sensitive" checked>
+                </div>
+            </div>
+            <div id="payment-method-secure-fields" class="general-payment-fields d-none">
+                <div class="alert alert-light border py-2 mb-2">
+                    Payment Methods are stored with encrypted password, PIN, and security notes. Leave protected fields blank when editing to keep the current encrypted value.
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-4">
+                        <label>Account Hint</label>
+                        <input id="payment-account-hint" class="form-control form-control-sm" name="account_hint" placeholder="last 4, card label, vendor id">
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label>PIN</label>
+                        <input id="secure-pin" type="password" class="form-control form-control-sm" name="secure_pin" autocomplete="new-password">
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label>Security Notes</label>
+                        <input id="secure-security-notes" class="form-control form-control-sm" name="secure_security_notes" autocomplete="new-password">
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label>Details</label>
+                    <textarea id="general-detail" class="form-control form-control-sm" name="detail_text" rows="3"></textarea>
+                </div>
+                <div class="form-group col-md-6">
+                    <label>Notes</label>
+                    <textarea id="general-notes" class="form-control form-control-sm" name="notes" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="d-flex">
+                <button type="submit" class="btn btn-sm btn-primary mr-2">Save Item</button>
+                <button type="button" id="clear-general-form" class="btn btn-sm btn-outline-secondary">Clear</button>
+            </div>
+        </form>
+        </div>
+    </section>
+
+    <section class="compliance-panel">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+            <h5 class="mb-1">General Information Items</h5>
+            <div class="form-inline mb-1">
+                <label class="mr-2">Category</label>
+                <select id="general-category-filter" class="form-control form-control-sm mr-2">
+                    <option value="">All</option>
+                    {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <label class="mr-2">Search</label>
+                <input id="general-search-filter" class="form-control form-control-sm" placeholder="title, user, note">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped compliance-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Title</th>
+                        <th>Website</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>User</th>
+                        <th>Details</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr class="general-info-row"
+                            data-category="{{ item.Category or '' }}"
+                            data-search="{{ ((item.Category or '') ~ ' ' ~ (item.Title or '') ~ ' ' ~ (item.DetailText or '') ~ ' ' ~ (item.WebsiteUrl or '') ~ ' ' ~ (item.Username or '') ~ ' ' ~ (item.Email or '') ~ ' ' ~ (item.Phone or '') ~ ' ' ~ (item.Notes or ''))|lower }}">
+                            <td>{{ item.Category or '' }}</td>
+                            <td>
+                                {{ item.Title or '' }}
+                                {% if item.Sensitive %}<span class="badge badge-warning ml-1">Sensitive</span>{% endif %}
+                            </td>
+                            <td>{% if item.WebsiteUrl %}<a href="{{ item.WebsiteUrl }}" target="_blank">Open</a>{% endif %}</td>
+                            <td>{{ item.Email or '' }}</td>
+                            <td>{{ item.Phone or '' }}</td>
+                            <td>{{ item.Username or '' }}</td>
+                            <td>
+                                {% if item.IsSecurePayment %}
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-warning"
+                                            data-toggle="modal"
+                                            data-target="#revealPaymentMethodModal{{ item.SourceId }}">
+                                        Reveal
+                                    </button>
+                                {% else %}
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-info"
+                                            data-toggle="modal"
+                                            data-target="#generalInfoModal{{ item.id }}">
+                                        View
+                                    </button>
+                                {% endif %}
+                            </td>
+                            <td class="text-right">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary general-edit"
+                                        data-item="{{ {
+                                            "id": item.id,
+                                            "SourceId": item.SourceId,
+                                            "ItemKind": item.ItemKind,
+                                            "Category": item.Category,
+                                            "Title": item.Title,
+                                            "Email": item.Email,
+                                            "Phone": item.Phone,
+                                            "WebsiteUrl": item.WebsiteUrl,
+                                            "Username": item.Username,
+                                            "PasswordValue": "" if item.IsSecurePayment else item.PasswordValue,
+                                            "Sensitive": item.Sensitive,
+                                            "DetailText": item.DetailText,
+                                            "Notes": item.Notes,
+                                            "AccountHint": item.AccountHint
+                                        }|tojson|forceescape }}">Edit</button>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="delete_item">
+                                    <input type="hidden" name="item_kind" value="{{ item.ItemKind or 'general' }}">
+                                    <input type="hidden" name="item_id" value="{{ item.id if not item.IsSecurePayment else '' }}">
+                                    <input type="hidden" name="payment_method_id" value="{{ item.SourceId if item.IsSecurePayment else '' }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="8" class="text-muted">No general information items have been entered.</td></tr>
+                    {% endfor %}
+                    <tr id="general-filter-empty-row" class="d-none">
+                        <td colspan="8" class="text-muted">No general information items match this filter.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    {% for item in items %}
+        {% if not item.IsSecurePayment %}
+            <div class="modal fade" id="generalInfoModal{{ item.id }}" tabindex="-1" role="dialog" aria-labelledby="generalInfoModalLabel{{ item.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg compliance-document-modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <div>
+                            <h5 class="modal-title mb-0" id="generalInfoModalLabel{{ item.id }}">{{ item.Title or 'General Information' }}</h5>
+                            <div class="text-muted small">{{ item.Category or '' }}</div>
+                        </div>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3">Website</dt>
+                            <dd class="col-sm-9">{% if item.WebsiteUrl %}<a href="{{ item.WebsiteUrl }}" target="_blank">{{ item.WebsiteUrl }}</a>{% endif %}</dd>
+                            <dt class="col-sm-3">Username</dt>
+                            <dd class="col-sm-9">{{ item.Username or '' }}</dd>
+                            <dt class="col-sm-3">Password / Access</dt>
+                            <dd class="col-sm-9">{{ item.PasswordValue or '' }}</dd>
+                            <dt class="col-sm-3">Email</dt>
+                            <dd class="col-sm-9">{{ item.Email or '' }}</dd>
+                            <dt class="col-sm-3">Phone</dt>
+                            <dd class="col-sm-9">{{ item.Phone or '' }}</dd>
+                            <dt class="col-sm-3">Details</dt>
+                            <dd class="col-sm-9"><pre class="general-info-pre">{{ item.DetailText or '' }}</pre></dd>
+                            <dt class="col-sm-3">Notes</dt>
+                            <dd class="col-sm-9"><pre class="general-info-pre">{{ item.Notes or '' }}</pre></dd>
+                        </dl>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+
+    {% for item in items %}
+        {% if item.IsSecurePayment %}
+        <div class="modal fade" id="revealPaymentMethodModal{{ item.SourceId }}" tabindex="-1" role="dialog" aria-labelledby="revealPaymentMethodModalLabel{{ item.SourceId }}" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <form method="post">
+                        <input type="hidden" name="action" value="reveal_payment_method">
+                        <input type="hidden" name="payment_method_id" value="{{ item.SourceId }}">
+                        <div class="modal-header py-2">
+                            <div>
+                                <h5 class="modal-title mb-0" id="revealPaymentMethodModalLabel{{ item.SourceId }}">Reveal Secure Access</h5>
+                                <div class="text-muted small">{{ item.Title or '' }}{% if item.DetailText %} - {{ item.DetailText }}{% endif %}</div>
+                            </div>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-muted mb-2">Re-enter your app password to decrypt this payment method. This reveal will be logged.</p>
+                            <label>Password Confirmation</label>
+                            <input type="password" class="form-control form-control-sm" name="confirm_password" autocomplete="current-password" required>
+                        </div>
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-sm btn-warning">Reveal</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+
+    {% if revealed_payment_method %}
+        <div class="modal fade" id="revealedPaymentMethodModal" tabindex="-1" role="dialog" aria-labelledby="revealedPaymentMethodModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg compliance-document-modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <div>
+                            <h5 class="modal-title mb-0" id="revealedPaymentMethodModalLabel">Secure Access Revealed</h5>
+                            <div class="text-muted small">{{ revealed_payment_method.MethodName or '' }}{% if revealed_payment_method.ProviderName %} - {{ revealed_payment_method.ProviderName }}{% endif %}</div>
+                        </div>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3">Website</dt>
+                            <dd class="col-sm-9">{% if revealed_payment_method.WebsiteUrl %}<a href="{{ revealed_payment_method.WebsiteUrl }}" target="_blank">{{ revealed_payment_method.WebsiteUrl }}</a>{% endif %}</dd>
+                            <dt class="col-sm-3">Username</dt>
+                            <dd class="col-sm-9">{{ revealed_payment_method.Username or '' }}</dd>
+                            <dt class="col-sm-3">Password</dt>
+                            <dd class="col-sm-9">
+                                <code class="secure-reveal-value" data-secure-value="{{ (revealed_payment_method.PasswordValue or '')|forceescape }}">{{ revealed_payment_method.PasswordValue or '' }}</code>
+                                {% if revealed_payment_method.PasswordValue %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ml-2 secure-copy">Copy</button>
+                                {% endif %}
+                            </dd>
+                            <dt class="col-sm-3">PIN</dt>
+                            <dd class="col-sm-9">
+                                <code class="secure-reveal-value" data-secure-value="{{ (revealed_payment_method.PinValue or '')|forceescape }}">{{ revealed_payment_method.PinValue or '' }}</code>
+                                {% if revealed_payment_method.PinValue %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ml-2 secure-copy">Copy</button>
+                                {% endif %}
+                            </dd>
+                            <dt class="col-sm-3">Security Notes</dt>
+                            <dd class="col-sm-9">
+                                <pre class="general-info-pre secure-reveal-value" data-secure-value="{{ (revealed_payment_method.SecurityNotesValue or '')|forceescape }}">{{ revealed_payment_method.SecurityNotesValue or '' }}</pre>
+                                {% if revealed_payment_method.SecurityNotesValue %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1 secure-copy">Copy</button>
+                                {% endif %}
+                            </dd>
+                            <dt class="col-sm-3">Notes</dt>
+                            <dd class="col-sm-9"><pre class="general-info-pre">{{ revealed_payment_method.Notes or '' }}</pre></dd>
+                        </dl>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('general-information-form');
+    const fields = {
+        id: document.getElementById('general-item-id'),
+        payment_method_id: document.getElementById('payment-method-id'),
+        category: document.getElementById('general-category'),
+        title: document.getElementById('general-title'),
+        email: document.getElementById('general-email'),
+        phone: document.getElementById('general-phone'),
+        website_url: document.getElementById('general-website'),
+        username: document.getElementById('general-username'),
+        password_value: document.getElementById('general-password'),
+        sensitive: document.getElementById('general-sensitive'),
+        detail_text: document.getElementById('general-detail'),
+        notes: document.getElementById('general-notes'),
+        account_hint: document.getElementById('payment-account-hint'),
+        secure_pin: document.getElementById('secure-pin'),
+        secure_security_notes: document.getElementById('secure-security-notes')
+    };
+    const paymentSecureFields = document.getElementById('payment-method-secure-fields');
+    const editorPanel = document.getElementById('generalInformationEditor');
+
+    function showGeneralEditor() {
+        if (editorPanel && !editorPanel.classList.contains('show')) {
+            $('#generalInformationEditor').collapse('show');
+        }
+    }
+
+    function updatePaymentFieldVisibility() {
+        const isPaymentMethod = fields.category.value === 'Payment Methods';
+        paymentSecureFields.classList.toggle('d-none', !isPaymentMethod);
+        if (isPaymentMethod) {
+            fields.sensitive.checked = true;
+        }
+    }
+
+    document.querySelectorAll('.general-edit').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const item = JSON.parse(button.dataset.item);
+            fields.id.value = item.ItemKind === 'payment_method' ? '' : (item.id || '');
+            fields.payment_method_id.value = item.ItemKind === 'payment_method' ? (item.SourceId || '') : '';
+            fields.category.value = item.Category || 'General Notes';
+            fields.title.value = item.Title || '';
+            fields.email.value = item.Email || '';
+            fields.phone.value = item.Phone || '';
+            fields.website_url.value = item.WebsiteUrl || '';
+            fields.username.value = item.Username || '';
+            fields.password_value.value = item.PasswordValue || '';
+            fields.sensitive.checked = Number(item.Sensitive || 0) === 1;
+            fields.detail_text.value = item.DetailText || '';
+            fields.notes.value = item.Notes || '';
+            fields.account_hint.value = item.AccountHint || '';
+            fields.secure_pin.value = '';
+            fields.secure_security_notes.value = '';
+            updatePaymentFieldVisibility();
+            showGeneralEditor();
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    document.getElementById('clear-general-form').addEventListener('click', function () {
+        showGeneralEditor();
+        form.reset();
+        fields.id.value = '';
+        fields.payment_method_id.value = '';
+        fields.sensitive.checked = true;
+        updatePaymentFieldVisibility();
+    });
+    fields.category.addEventListener('change', function () {
+        if (fields.category.value !== 'Payment Methods') {
+            fields.payment_method_id.value = '';
+            fields.account_hint.value = '';
+            fields.secure_pin.value = '';
+            fields.secure_security_notes.value = '';
+        }
+        updatePaymentFieldVisibility();
+    });
+    updatePaymentFieldVisibility();
+
+    document.querySelectorAll('.secure-copy').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const target = button.parentElement.querySelector('.secure-reveal-value');
+            const value = target ? (target.dataset.secureValue || target.textContent || '') : '';
+            if (!value) {
+                return;
+            }
+            navigator.clipboard.writeText(value).then(function () {
+                const original = button.textContent;
+                button.textContent = 'Copied';
+                setTimeout(function () {
+                    button.textContent = original;
+                }, 1200);
+            });
+        });
+    });
+
+    {% if revealed_payment_method %}
+        $('#revealedPaymentMethodModal').modal('show');
+    {% endif %}
+
+    const deleteCategorySelect = document.getElementById('delete-general-category-select');
+    const activateCategoryDelete = document.getElementById('activate-general-category-delete');
+    const deleteCategoryButton = document.getElementById('delete-general-category-button');
+    const deleteCategoryForm = document.getElementById('delete-general-category-form');
+
+    function lockCategoryDelete() {
+        deleteCategoryButton.disabled = true;
+        activateCategoryDelete.classList.remove('btn-warning');
+        activateCategoryDelete.classList.add('btn-outline-secondary');
+    }
+
+    if (deleteCategorySelect && activateCategoryDelete && deleteCategoryButton && deleteCategoryForm) {
+        deleteCategorySelect.addEventListener('change', lockCategoryDelete);
+        activateCategoryDelete.addEventListener('click', function () {
+            if (!deleteCategorySelect.value) {
+                lockCategoryDelete();
+                return;
+            }
+            deleteCategoryButton.disabled = false;
+            activateCategoryDelete.classList.remove('btn-outline-secondary');
+            activateCategoryDelete.classList.add('btn-warning');
+        });
+        deleteCategoryForm.addEventListener('submit', function (event) {
+            if (deleteCategoryButton.disabled || !deleteCategorySelect.value) {
+                event.preventDefault();
+            }
+        });
+    }
+
+    const categoryFilter = document.getElementById('general-category-filter');
+    const searchFilter = document.getElementById('general-search-filter');
+    const rows = document.querySelectorAll('.general-info-row');
+    const emptyRow = document.getElementById('general-filter-empty-row');
+    const filterStorageKey = 'generalInformationCategoryFilter';
+
+    function applyFilters() {
+        const category = categoryFilter ? categoryFilter.value : '';
+        const search = searchFilter ? searchFilter.value.trim().toLowerCase() : '';
+        let visibleCount = 0;
+        rows.forEach(function (row) {
+            const categoryMatch = !category || row.dataset.category === category;
+            const searchMatch = !search || (row.dataset.search || '').indexOf(search) !== -1;
+            const shouldShow = categoryMatch && searchMatch;
+            row.classList.toggle('d-none', !shouldShow);
+            if (shouldShow) {
+                visibleCount += 1;
+            }
+        });
+        if (emptyRow) {
+            emptyRow.classList.toggle('d-none', visibleCount > 0);
+        }
+    }
+
+    if (categoryFilter) {
+        const storedFilter = localStorage.getItem(filterStorageKey) || '';
+        if (storedFilter && categoryFilter.querySelector('option[value="' + storedFilter + '"]')) {
+            categoryFilter.value = storedFilter;
+        }
+        categoryFilter.addEventListener('change', function () {
+            localStorage.setItem(filterStorageKey, categoryFilter.value);
+            applyFilters();
+        });
+    }
+    if (searchFilter) {
+        searchFilter.addEventListener('input', applyFilters);
+    }
+    applyFilters();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,546 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/compliance_check.css') }}">
+
+<div class="compliance-page mt-3">
+    <div class="d-flex flex-wrap align-items-start justify-content-between mb-3">
+        <div>
+            <h3 class="mb-1">Compliance Check</h3>
+            <div class="text-muted">Company identifiers, filing dates, driver credentials, vehicle renewals, repair history, credentials, and due-alert emails.</div>
+        </div>
+        <form method="post">
+            <input type="hidden" name="action" value="send_alerts">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Send Due Alerts Now</button>
+        </form>
+    </div>
+
+    {% if err %}
+        <div class="alert alert-warning py-2">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if msg %}
+        <div class="alert alert-success py-2">
+            {% for item in msg %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="compliance-grid mb-3">
+        <section class="compliance-panel">
+            <h5>Company Compliance Profile</h5>
+            <form method="post">
+                <input type="hidden" name="action" value="update_profile">
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label>Company</label>
+                        <input class="form-control form-control-sm" name="company_name" value="{{ profile.CompanyName or cmpdata[2] }}">
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label>DOT</label>
+                        <input class="form-control form-control-sm" name="dot_number" value="{{ profile.DOTNumber or '' }}">
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label>MC</label>
+                        <input class="form-control form-control-sm" name="mc_number" value="{{ profile.MCNumber or '' }}">
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label>FEIN</label>
+                        <input class="form-control form-control-sm" name="fein" value="{{ profile.FEIN or '' }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-8">
+                        <label>Alert Email</label>
+                        <input class="form-control form-control-sm" name="alert_email" value="{{ profile.AlertEmail or '' }}">
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label>Alert Lead Days</label>
+                        <input class="form-control form-control-sm" type="number" min="0" name="alert_lead_days" value="{{ profile.AlertLeadDays or 30 }}">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea class="form-control form-control-sm" name="profile_notes" rows="2">{{ profile.Notes or '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary">Save Profile</button>
+            </form>
+        </section>
+
+        <section class="compliance-panel compliance-alert-panel">
+            <h5>Due Alert Queue</h5>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Due</th>
+                            <th>Days</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in due_items %}
+                            <tr class="compliance-row-{{ item.ComputedStatus }}">
+                                <td>
+                                    <strong>{{ item.TypeLabel }}</strong><br>
+                                    <span>{{ item.Subject or item.Identifier or '' }}</span>
+                                </td>
+                                <td>{{ item.DueDate or item.ExpireDate or '' }}</td>
+                                <td>{{ item.DaysUntil }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="3" class="text-muted">No due alerts inside the lead window.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <section class="compliance-panel mb-3">
+        <h5>Add or Edit Compliance Item</h5>
+        <div class="compliance-type-editor mb-3">
+            <div class="form-inline">
+                <form method="post" class="form-inline mr-3 mb-1">
+                    <input type="hidden" name="action" value="add_item_type">
+                    <label class="mr-2">Add Selection</label>
+                    <input class="form-control form-control-sm mr-2" name="type_label" placeholder="Example: Hazmat Permit">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Add</button>
+                </form>
+                <form method="post" id="delete-compliance-type-form" class="form-inline mb-1">
+                    <input type="hidden" name="action" value="delete_item_type">
+                    <label class="mr-2">Remove Selection</label>
+                    <select class="form-control form-control-sm mr-2" name="type_value" id="delete-compliance-type-select">
+                        <option value="">Choose item type</option>
+                        {% for value, label in item_types %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" id="activate-compliance-type-delete" class="btn btn-sm btn-outline-secondary mr-2">Activate Delete</button>
+                    <button type="submit" id="delete-compliance-type-button" class="btn btn-sm btn-danger" disabled>Delete</button>
+                </form>
+            </div>
+        </div>
+        <form id="compliance-item-form" method="post">
+            <input type="hidden" name="action" value="save_item">
+            <input type="hidden" id="item-id" name="item_id" value="">
+            <div class="form-row">
+                <div class="form-group col-md-3">
+                    <label>Type</label>
+                    <select id="item-type" class="form-control form-control-sm" name="item_type">
+                        {% for value, label in item_types %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label>Subject</label>
+                    <input id="item-subject" class="form-control form-control-sm" name="subject" placeholder="Driver, truck, report, website">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Identifier</label>
+                    <input id="item-identifier" class="form-control form-control-sm" name="identifier" placeholder="Unit, account, qtr">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Period Type</label>
+                    <select id="item-period-cadence" class="form-control form-control-sm" name="period_cadence">
+                        <option value="annual">Annual</option>
+                        <option value="biannual">Bi-Annual</option>
+                        <option value="quarterly">QTR</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Status</label>
+                    <select id="item-status" class="form-control form-control-sm" name="status">
+                        <option>Open</option>
+                        <option>Filed</option>
+                        <option>Complete</option>
+                        <option>Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-2">
+                    <label>Period From</label>
+                    <input id="item-period-from" type="date" class="form-control form-control-sm" name="period_from">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Period To</label>
+                    <input id="item-period-to" type="date" class="form-control form-control-sm" name="period_to">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Due Date / Expires</label>
+                    <input id="item-due-expire-date" type="date" class="form-control form-control-sm" name="due_date_expire">
+                </div>
+                <div class="form-group col-md-2">
+                    <label>Filed Date</label>
+                    <input id="item-filed-date" type="date" class="form-control form-control-sm" name="filed_date">
+                </div>
+                <div class="form-group col-md-4">
+                    <label>Website</label>
+                    <input id="item-website" class="form-control form-control-sm" name="website_url">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-3">
+                    <label>Username</label>
+                    <input id="item-username" class="form-control form-control-sm" name="username">
+                </div>
+                <div class="form-group col-md-3">
+                    <label>Password</label>
+                    <input id="item-password" class="form-control form-control-sm" name="password_value">
+                </div>
+                <div class="form-group col-md-5">
+                    <label>Notes</label>
+                    <input id="item-notes" class="form-control form-control-sm" name="notes">
+                </div>
+                <div class="form-group col-md-1 compliance-check-cell">
+                    <label>Alert</label>
+                    <input id="item-alert-enabled" type="checkbox" name="alert_enabled" checked>
+                </div>
+            </div>
+            <div class="d-flex">
+                <button type="submit" class="btn btn-sm btn-primary mr-2">Save Item</button>
+                <button type="button" id="clear-compliance-form" class="btn btn-sm btn-outline-secondary">Clear</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="compliance-panel mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+            <h5 class="mb-1">Compliance Items</h5>
+            <div class="form-inline mb-1">
+                <label class="mr-2">Filter Type</label>
+                <select id="compliance-item-type-filter" class="form-control form-control-sm">
+                    <option value="">All</option>
+                    {% for value, label in item_types %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped compliance-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Subject</th>
+                        <th>Identifier</th>
+                        <th>Period</th>
+                        <th>Due Date / Expires</th>
+                        <th>Filed</th>
+                        <th>Status</th>
+                        <th>Add Docs</th>
+                        <th>View Links</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr class="compliance-row-{{ item.ComputedStatus }} compliance-item-row" data-item-type="{{ item.ItemType or '' }}">
+                            <td>{{ item.TypeLabel }}</td>
+                            <td>{{ item.Subject or '' }}</td>
+                            <td>{{ item.Identifier or '' }}</td>
+                            <td>{{ item.PeriodDisplay or '' }}</td>
+                            <td>{{ item.DueExpireDisplay or '' }}</td>
+                            <td>{{ item.FiledDate or '' }}</td>
+                            <td>{{ item.Status or '' }}</td>
+                            <td class="compliance-documents-cell">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-info"
+                                        data-toggle="modal"
+                                        data-target="#complianceDocumentModal{{ item.id }}">
+                                    Add Docs
+                                </button>
+                            </td>
+                            <td class="compliance-documents-cell">
+                                {% for file in item.Files %}
+                                    <a class="compliance-document-symbol"
+                                       href="{{ file_link(file.StoredFile) }}"
+                                       target="_blank"
+                                       title="{{ file.DisplayName or file.FileLabel or file.OriginalFile or 'Open Document' }}">[0]</a>
+                                {% endfor %}
+                            </td>
+                            <td class="text-right">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary compliance-edit"
+                                        data-item='{{ item|tojson }}'>Edit</button>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="create_next_item">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">New Next Item</button>
+                                </form>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="delete_item">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="10" class="text-muted">No compliance items have been entered.</td></tr>
+                    {% endfor %}
+                    <tr id="compliance-filter-empty-row" class="d-none">
+                        <td colspan="10" class="text-muted">No compliance items match this filter.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    {% for item in items %}
+        <div class="modal fade" id="complianceDocumentModal{{ item.id }}" tabindex="-1" role="dialog" aria-labelledby="complianceDocumentModalLabel{{ item.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg compliance-document-modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <div>
+                            <h5 class="modal-title mb-0" id="complianceDocumentModalLabel{{ item.id }}">Compliance Documents</h5>
+                            <div class="text-muted small">
+                                {{ item.TypeLabel }}{% if item.Subject %} - {{ item.Subject }}{% endif %}{% if item.Identifier %} - {{ item.Identifier }}{% endif %}
+                            </div>
+                        </div>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <h6 class="mb-2">Uploaded Documents</h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>File</th>
+                                        <th>Uploaded From</th>
+                                        <th>Uploaded</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for file in item.Files %}
+                                        <tr>
+                                            <td>
+                                                <a href="{{ file_link(file.StoredFile) }}" target="_blank">
+                                                    {{ file.DisplayName or file.FileLabel or file.OriginalFile or 'Open Document' }}
+                                                </a>
+                                            </td>
+                                            <td>{{ file.OriginalFile or '' }}</td>
+                                            <td>{{ file.UploadedAt or '' }}</td>
+                                            <td class="text-right">
+                                                <form method="post" class="d-inline">
+                                                    <input type="hidden" name="action" value="delete_item_file">
+                                                    <input type="hidden" name="file_id" value="{{ file.id }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        <tr><td colspan="4" class="text-muted">No documents have been uploaded for this item.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% if item.Files|length < 3 %}
+                            <h6 class="mb-2">Add Document</h6>
+                            <form method="post" enctype="multipart/form-data" class="compliance-upload-form">
+                                <input type="hidden" name="action" value="upload_item_file">
+                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                <div class="form-row align-items-end">
+                                    <div class="form-group col-md-5">
+                                        <label>Document Label</label>
+                                        <input class="form-control form-control-sm" name="file_label" placeholder="CAB card, IFTA Q1, registration">
+                                        <small class="text-muted">The uploaded file will be named from this label.</small>
+                                    </div>
+                                    <div class="form-group col-md-5">
+                                        <label>File</label>
+                                        <input class="form-control form-control-sm" type="file" name="item_file" required>
+                                    </div>
+                                    <div class="form-group col-md-2">
+                                        <button type="submit" class="btn btn-sm btn-primary btn-block">Upload</button>
+                                    </div>
+                                </div>
+                            </form>
+                        {% else %}
+                            <div class="alert alert-info py-2 mb-0">
+                                This item already has 3 documents. Delete one before uploading another.
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+
+    <div class="compliance-assets-grid">
+        <section class="compliance-panel">
+            <h5>Drivers</h5>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Name</th><th>CDL Exp</th><th>Med Exp</th><th>TWIC Exp</th><th>Alert</th></tr></thead>
+                    <tbody>
+                        {% for driver in drivers %}
+                            <tr class="{% if driver.ComplianceAlerts %}compliance-row-due-soon{% endif %}">
+                                <td>{{ driver.Name }}</td>
+                                <td>{{ display_date(driver.CDLexpire) }}</td>
+                                <td>{{ display_date(driver.MedExpire) }}</td>
+                                <td>{{ display_date(driver.TwicExpire) }}</td>
+                                <td>{{ driver.ComplianceAlerts|join(', ') }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-muted">No active drivers found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <section class="compliance-panel compliance-vehicle-panel">
+            <h5>Vehicles: Trucks and Chassis</h5>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Unit</th><th>Type</th><th>Plate/Tag</th><th>Registration Exp</th><th>DOT</th><th>Docs</th></tr></thead>
+                    <tbody>
+                        {% for vehicle in vehicles %}
+                            <tr class="compliance-row-{{ vehicle.ComplianceStatus }}">
+                                <td>{{ vehicle.Unit }}</td>
+                                <td>{{ vehicle.Type or '' }}</td>
+                                <td>{{ vehicle.Plate }}</td>
+                                <td>{{ vehicle.ExpDate or '' }}</td>
+                                <td>{{ vehicle.DOTNum or '' }}</td>
+                                <td>
+                                    {% if vehicle.Regpdf %}<a href="{{ file_link('/static/' ~ scac ~ '/data/vCompliance/' ~ vehicle.Regpdf) }}" target="_blank">Reg</a>{% endif %}
+                                    {% if vehicle.Titpdf %}<a href="{{ file_link('/static/' ~ scac ~ '/data/vCompliance/' ~ vehicle.Titpdf) }}" target="_blank">Title</a>{% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="6" class="text-muted">No active vehicles found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('compliance-item-form');
+    const fields = {
+        id: document.getElementById('item-id'),
+        item_type: document.getElementById('item-type'),
+        subject: document.getElementById('item-subject'),
+        identifier: document.getElementById('item-identifier'),
+        period_cadence: document.getElementById('item-period-cadence'),
+        period_from: document.getElementById('item-period-from'),
+        period_to: document.getElementById('item-period-to'),
+        due_expire_date: document.getElementById('item-due-expire-date'),
+        filed_date: document.getElementById('item-filed-date'),
+        status: document.getElementById('item-status'),
+        website_url: document.getElementById('item-website'),
+        username: document.getElementById('item-username'),
+        password_value: document.getElementById('item-password'),
+        notes: document.getElementById('item-notes'),
+        alert_enabled: document.getElementById('item-alert-enabled')
+    };
+
+    function isoDate(value) {
+        return value ? String(value).slice(0, 10) : '';
+    }
+
+    document.querySelectorAll('.compliance-edit').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const item = JSON.parse(button.dataset.item);
+            fields.id.value = item.id || '';
+            fields.item_type.value = item.ItemType || 'other';
+            fields.subject.value = item.Subject || '';
+            fields.identifier.value = item.Identifier || '';
+            fields.period_cadence.value = item.PeriodCadence || 'annual';
+            fields.period_from.value = item.PeriodFromForm || isoDate(item.PeriodFrom);
+            fields.period_to.value = item.PeriodToForm || isoDate(item.PeriodTo);
+            fields.due_expire_date.value = item.DueExpireForm || isoDate(item.DueDate || item.ExpireDate);
+            fields.filed_date.value = item.FiledDateForm || isoDate(item.FiledDate);
+            fields.status.value = item.Status || 'Open';
+            fields.website_url.value = item.WebsiteUrl || '';
+            fields.username.value = item.Username || '';
+            fields.password_value.value = item.PasswordValue || '';
+            fields.notes.value = item.Notes || '';
+            fields.alert_enabled.checked = Number(item.AlertEnabled || 0) === 1;
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    document.getElementById('clear-compliance-form').addEventListener('click', function () {
+        form.reset();
+        fields.id.value = '';
+        fields.status.value = 'Open';
+        fields.alert_enabled.checked = true;
+    });
+
+    const deleteTypeSelect = document.getElementById('delete-compliance-type-select');
+    const activateTypeDelete = document.getElementById('activate-compliance-type-delete');
+    const deleteTypeButton = document.getElementById('delete-compliance-type-button');
+    const deleteTypeForm = document.getElementById('delete-compliance-type-form');
+
+    function lockTypeDelete() {
+        deleteTypeButton.disabled = true;
+        activateTypeDelete.classList.remove('btn-warning');
+        activateTypeDelete.classList.add('btn-outline-secondary');
+    }
+
+    if (deleteTypeSelect && activateTypeDelete && deleteTypeButton && deleteTypeForm) {
+        deleteTypeSelect.addEventListener('change', lockTypeDelete);
+        activateTypeDelete.addEventListener('click', function () {
+            if (!deleteTypeSelect.value) {
+                lockTypeDelete();
+                return;
+            }
+            deleteTypeButton.disabled = false;
+            activateTypeDelete.classList.remove('btn-outline-secondary');
+            activateTypeDelete.classList.add('btn-warning');
+        });
+        deleteTypeForm.addEventListener('submit', function (event) {
+            if (deleteTypeButton.disabled || !deleteTypeSelect.value) {
+                event.preventDefault();
+            }
+        });
+    }
+
+    const itemTypeFilter = document.getElementById('compliance-item-type-filter');
+    const complianceRows = document.querySelectorAll('.compliance-item-row');
+    const filterEmptyRow = document.getElementById('compliance-filter-empty-row');
+    const filterStorageKey = 'complianceItemTypeFilter';
+    if (itemTypeFilter && complianceRows.length && filterEmptyRow) {
+        function applyItemTypeFilter() {
+            const selectedType = itemTypeFilter.value;
+            let visibleCount = 0;
+            complianceRows.forEach(function (row) {
+                const shouldShow = !selectedType || row.dataset.itemType === selectedType;
+                row.classList.toggle('d-none', !shouldShow);
+                if (shouldShow) {
+                    visibleCount += 1;
+                }
+            });
+            filterEmptyRow.classList.toggle('d-none', visibleCount > 0);
+        }
+
+        const storedFilter = localStorage.getItem(filterStorageKey) || '';
+        if (storedFilter && itemTypeFilter.querySelector('option[value="' + storedFilter + '"]')) {
+            itemTypeFilter.value = storedFilter;
+        }
+        applyItemTypeFilter();
+
+        itemTypeFilter.addEventListener('change', function () {
+            localStorage.setItem(filterStorageKey, itemTypeFilter.value);
+            applyItemTypeFilter();
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -34,6 +34,7 @@ webapp/static/font/
 webapp/static/js/*
 !webapp/static/css/admin_calendar.css
 !webapp/static/css/collection_kanban.css
+!webapp/static/css/compliance_check.css
 !webapp/static/css/dispatch_planning_calendar.css
 !webapp/static/css/dispatch_kanban.css
 !webapp/static/js/admin_calendar.js

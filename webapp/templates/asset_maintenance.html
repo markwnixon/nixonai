@@ -1,0 +1,125 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/compliance_check.css') }}">
+
+<div class="compliance-page mt-3">
+    <div class="d-flex flex-wrap align-items-start justify-content-between mb-3">
+        <div>
+            <h3 class="mb-1">Asset Maintenance</h3>
+            <div class="text-muted">Manual repair notes, uploaded repair files, and recent maintenance log records for active trucks and chassis.</div>
+        </div>
+    </div>
+
+    {% if err %}
+        <div class="alert alert-warning py-2">
+            {% for item in err %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% if msg %}
+        <div class="alert alert-success py-2">
+            {% for item in msg %}
+                <div>{{ item }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <section class="compliance-panel mb-3">
+        <h5>Add Repair / Maintenance Record</h5>
+        <form method="post" enctype="multipart/form-data" class="compliance-repair-form">
+            <input type="hidden" name="action" value="add_vehicle_repair">
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label>Vehicle</label>
+                    <select name="vehicle_id" class="form-control form-control-sm" required>
+                        <option value="">Choose vehicle</option>
+                        {% for vehicle in vehicles %}
+                            <option value="{{ vehicle.id }}">{{ vehicle.Unit }}{% if vehicle.Type %} - {{ vehicle.Type }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label>Repair Date</label>
+                    <input type="date" name="repair_date" class="form-control form-control-sm">
+                </div>
+                <div class="form-group col-md-5">
+                    <label>Picture / File</label>
+                    <input type="file" name="repair_file" class="form-control form-control-sm">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Repair Note</label>
+                <textarea name="repair_notes" class="form-control form-control-sm" rows="2" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Add Repair Note</button>
+        </form>
+    </section>
+
+    <section class="compliance-panel">
+        <h5>Repair / Maintenance History</h5>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Unit</th>
+                        <th>Tag/Plate</th>
+                        <th>VIN</th>
+                        <th>Year</th>
+                        <th>Make</th>
+                        <th>Model</th>
+                        <th>Type</th>
+                        <th>Manual Notes</th>
+                        <th>Recent Log Records</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                        <tr>
+                            <td>{{ vehicle.Unit }}</td>
+                            <td>{{ vehicle.Plate or '' }}</td>
+                            <td>{{ vehicle.VIN or '' }}</td>
+                            <td>{{ vehicle.Year or '' }}</td>
+                            <td>{{ vehicle.Make or '' }}</td>
+                            <td>{{ vehicle.Model or '' }}</td>
+                            <td>{{ vehicle.Type or '' }}</td>
+                            <td>
+                                {% for repair in vehicle.ManualRepairs %}
+                                    <div class="compliance-repair-note">
+                                        <strong>{{ repair.RepairDate or '' }}</strong>:
+                                        {{ repair.Notes or '' }}
+                                        {% if repair.File1 %}
+                                            <a href="{{ file_link(repair.File1) }}" target="_blank">File</a>
+                                        {% endif %}
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="delete_vehicle_repair">
+                                            <input type="hidden" name="repair_id" value="{{ repair.id }}">
+                                            <button type="submit" class="btn btn-link btn-sm text-danger p-0">Delete</button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">No manual repair notes</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for repair in vehicle.RecentRepairs %}
+                                    <div>
+                                        {{ repair.Date or '' }}:
+                                        {{ repair.Maintrecord or repair.Status or '' }}
+                                        {% if repair.Rloc %} at {{ repair.Rloc }}{% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">No recent repair records</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="9" class="text-muted">No active vehicles found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

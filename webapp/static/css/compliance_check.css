@@ -1,0 +1,121 @@
+.compliance-page {
+    color: #1f2933;
+}
+
+.compliance-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+    gap: 12px;
+}
+
+.compliance-assets-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.compliance-panel {
+    background: #fff;
+    border: 1px solid #d9e2ec;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.compliance-panel h5 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+}
+
+.compliance-table td,
+.compliance-table th {
+    vertical-align: middle;
+}
+
+.compliance-documents-cell {
+    white-space: nowrap;
+}
+
+.compliance-document-symbol {
+    display: inline-block;
+    font-weight: 700;
+    margin-right: 2px;
+    text-decoration: none;
+}
+
+.compliance-document-symbol:hover {
+    text-decoration: underline;
+}
+
+.compliance-document-modal-dialog {
+    max-width: min(900px, 75vw);
+}
+
+.compliance-row-overdue {
+    background: #fdecea !important;
+}
+
+.compliance-row-due-soon {
+    background: #fff8db !important;
+}
+
+.compliance-row-complete {
+    background: #edf7ed !important;
+}
+
+.compliance-check-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.compliance-alert-panel .table td {
+    vertical-align: top;
+}
+
+.compliance-repair-form {
+    border-bottom: 1px solid #e6edf3;
+    padding-bottom: 10px;
+}
+
+.compliance-repair-note {
+    border-bottom: 1px solid #eef2f6;
+    padding: 3px 0;
+}
+
+.compliance-repair-note:last-child {
+    border-bottom: 0;
+}
+
+.general-info-pre {
+    white-space: pre-wrap;
+    margin-bottom: 0;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.general-profile-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 12px;
+}
+
+.general-profile-item label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.secure-reveal-value {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+@media (max-width: 1100px) {
+    .compliance-grid,
+    .compliance-assets-grid,
+    .general-profile-grid {
+        grid-template-columns: 1fr;
+    }
+}

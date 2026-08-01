@@ -1,7 +1,7 @@
 from flask import abort, render_template, redirect, url_for, jsonify, request, send_file, flash, session, Response
 from flask import Blueprint
 
-from webapp.extensions import db
+from webapp.extensions import db, bcrypt
 from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Interchange, Reconciliations
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker
@@ -78,6 +78,42 @@ from webapp.collection_kanban import (
     send_collection_email,
     update_collection_job,
     upload_collection_rate_con,
+)
+from webapp.compliance_check import (
+    add_compliance_item_type,
+    compliance_asset_summary,
+    compliance_due_alert_payload,
+    compliance_items,
+    compliance_item_type_options,
+    compliance_profile,
+    create_next_compliance_item,
+    delete_compliance_item,
+    delete_compliance_item_file,
+    delete_compliance_item_type,
+    delete_vehicle_repair,
+    display_date as compliance_display_date,
+    due_compliance_items,
+    ensure_compliance_check_tables,
+    file_link as compliance_file_link,
+    save_vehicle_repair,
+    save_compliance_item_file,
+    send_compliance_alert_digest,
+    update_compliance_profile,
+    upsert_compliance_item,
+)
+from webapp.general_information import (
+    add_general_information_category,
+    combined_general_information_items,
+    delete_general_information_category,
+    delete_general_information_item,
+    delete_secure_payment_method,
+    ensure_general_information_tables,
+    general_company_profile,
+    general_information_categories,
+    reveal_secure_payment_method,
+    update_general_company_profile,
+    upsert_general_information_item,
+    upsert_secure_payment_method_from_general_form,
 )
 
 from webapp.class8_utils import *
@@ -560,6 +596,200 @@ def AdminCalendar():
         format_cents=format_cents,
         initial_date=month_start.strftime('%Y-%m-%d'),
         initial_run_date=recommended_run_date(month_start, False).strftime('%Y-%m-%d'),
+    )
+
+
+@main.route('/ComplianceCheck', methods=['GET', 'POST'])
+@login_required
+def ComplianceCheck():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_compliance_check_tables()
+    company_code = cmpdata[10]
+    err = []
+    msg = []
+    profile = compliance_profile(company_code, cmpdata[2], cmpdata[8])
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'update_profile':
+            update_compliance_profile(company_code, request.form)
+            msg.append('Company compliance profile updated.')
+        elif action == 'save_item':
+            upsert_compliance_item(company_code, request.form)
+            msg.append('Compliance item saved.')
+        elif action == 'delete_item':
+            delete_compliance_item(company_code, request.form.get('item_id'))
+            msg.append('Compliance item deleted.')
+        elif action == 'create_next_item':
+            next_err = create_next_compliance_item(company_code, request.form.get('item_id'))
+            if next_err:
+                err.append(next_err)
+            else:
+                msg.append('Next compliance item created.')
+        elif action == 'add_item_type':
+            type_err = add_compliance_item_type(company_code, request.form.get('type_label'))
+            if type_err:
+                err.append(type_err)
+            else:
+                msg.append('Compliance item type added.')
+        elif action == 'delete_item_type':
+            delete_compliance_item_type(company_code, request.form.get('type_value'))
+            msg.append('Compliance item type removed from selection list.')
+        elif action == 'upload_item_file':
+            upload_err = save_compliance_item_file(
+                company_code,
+                request.form.get('item_id'),
+                request.files.get('item_file'),
+                request.form.get('file_label'),
+            )
+            if upload_err:
+                err.append(upload_err)
+            else:
+                msg.append('Compliance document uploaded.')
+        elif action == 'delete_item_file':
+            delete_compliance_item_file(company_code, request.form.get('file_id'))
+            msg.append('Compliance document deleted.')
+        elif action == 'send_alerts':
+            due_rows = due_compliance_items(company_code, profile.get('AlertLeadDays') or 30)
+            err.extend(send_compliance_alert_digest(company_code, profile, due_rows))
+
+    profile = compliance_profile(company_code, cmpdata[2], cmpdata[8])
+    items = compliance_items(company_code)
+    due_items = due_compliance_items(company_code, profile.get('AlertLeadDays') or 30)
+    drivers, vehicles = compliance_asset_summary(company_code)
+    return render_template(
+        'compliance_check.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        profile=profile,
+        item_types=compliance_item_type_options(company_code),
+        items=items,
+        due_items=due_items,
+        drivers=drivers,
+        vehicles=vehicles,
+        file_link=compliance_file_link,
+        display_date=compliance_display_date,
+        err=err,
+        msg=msg,
+    )
+
+
+@main.route('/AssetMaintenance', methods=['GET', 'POST'])
+@login_required
+def AssetMaintenance():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_compliance_check_tables()
+    company_code = cmpdata[10]
+    err = []
+    msg = []
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'add_vehicle_repair':
+            repair_err = save_vehicle_repair(company_code, request.form, request.files.get('repair_file'))
+            if repair_err:
+                err.append(repair_err)
+            else:
+                msg.append('Vehicle repair note added.')
+        elif action == 'delete_vehicle_repair':
+            delete_vehicle_repair(company_code, request.form.get('repair_id'))
+            msg.append('Vehicle repair note deleted.')
+
+    _, vehicles = compliance_asset_summary(company_code)
+    return render_template(
+        'asset_maintenance.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        vehicles=vehicles,
+        file_link=compliance_file_link,
+        err=err,
+        msg=msg,
+    )
+
+
+@main.route('/api/compliance/due-alerts', methods=['GET'])
+@login_required
+def ComplianceDueAlertsApi():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_compliance_check_tables()
+    company_code = cmpdata[10]
+    profile = compliance_profile(company_code, cmpdata[2], cmpdata[8])
+    try:
+        lead_days = int(request.args.get('lead_days') or profile.get('AlertLeadDays') or 30)
+    except (TypeError, ValueError):
+        lead_days = int(profile.get('AlertLeadDays') or 30)
+    return jsonify(compliance_due_alert_payload(company_code, lead_days))
+
+
+@main.route('/GeneralInformation', methods=['GET', 'POST'])
+@login_required
+def GeneralInformation():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_general_information_tables()
+    company_code = cmpdata[10]
+    err = []
+    msg = []
+    revealed_payment_method = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'save_profile':
+            update_general_company_profile(company_code, request.form)
+            msg.append('Company profile updated.')
+        elif action == 'save_item':
+            if (request.form.get('category') or '').strip() == 'Payment Methods':
+                item_err = upsert_secure_payment_method_from_general_form(company_code, request.form)
+            else:
+                item_err = upsert_general_information_item(company_code, request.form)
+            if item_err:
+                err.append(item_err)
+            else:
+                msg.append('General information item saved.')
+        elif action == 'delete_item':
+            if request.form.get('item_kind') == 'payment_method':
+                delete_secure_payment_method(company_code, request.form.get('payment_method_id'))
+            else:
+                delete_general_information_item(company_code, request.form.get('item_id'))
+            msg.append('General information item removed.')
+        elif action == 'add_category':
+            category_err = add_general_information_category(company_code, request.form.get('category_name'))
+            if category_err:
+                err.append(category_err)
+            else:
+                msg.append('General information category added.')
+        elif action == 'delete_category':
+            delete_general_information_category(company_code, request.form.get('category_name'))
+            msg.append('General information category removed from selection list.')
+        elif action == 'reveal_payment_method':
+            confirm_password = request.form.get('confirm_password') or ''
+            if not bcrypt.check_password_hash(current_user.password, confirm_password):
+                err.append('Password confirmation failed. Secure payment method was not revealed.')
+            else:
+                revealed_payment_method = reveal_secure_payment_method(
+                    company_code,
+                    request.form.get('payment_method_id'),
+                    current_user.username,
+                )
+                if not revealed_payment_method:
+                    err.append('Secure payment method could not be found.')
+
+    categories = general_information_categories(company_code)
+    items = combined_general_information_items(company_code)
+    profile = general_company_profile(company_code, scac, cmpdata[7] if len(cmpdata) > 7 else '')
+    return render_template(
+        'general_information.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        profile=profile,
+        categories=categories,
+        items=items,
+        revealed_payment_method=revealed_payment_method,
+        err=err,
+        msg=msg,
     )
 
 
@@ -1318,6 +1548,42 @@ def business_report_parse_date(value, fallback):
 
 def business_report_money(cents):
     return "${:,.2f}".format((cents or 0) / 100)
+
+
+def business_report_empty_tax_rollup_pl():
+    return {
+        'income_rows': [],
+        'expense_rows': [],
+        'income_report_rows': [],
+        'expense_report_rows': [],
+        'total_income_cents': 0,
+        'total_expenses_cents': 0,
+        'unassigned_expenses_cents': 0,
+        'net_income_cents': 0,
+        'total_income': business_report_money(0),
+        'total_expenses': business_report_money(0),
+        'unassigned_expenses': business_report_money(0),
+        'net_income': business_report_money(0),
+    }
+
+
+def business_report_empty_operations_totals():
+    return {
+        'income_cents': 0,
+        'direct_cents': 0,
+        'gross_profit_cents': 0,
+        'indirect_cents': 0,
+        'net_ops_cents': 0,
+        'ga_cents': 0,
+        'net_profit_cents': 0,
+        'income': business_report_money(0),
+        'direct': business_report_money(0),
+        'gross_profit': business_report_money(0),
+        'indirect': business_report_money(0),
+        'net_ops': business_report_money(0),
+        'ga': business_report_money(0),
+        'net_profit': business_report_money(0),
+    }
 
 
 def business_report_number(value, places=2):
@@ -2964,17 +3230,68 @@ def business_reports_page(report_mode):
         operations_end = operations_end - datetime.timedelta(days=(operations_end.weekday() + 1) % 7)
 
     if report_mode == 'weekly':
-        operations_sync_auto_allocations(selected_company, today_local, 'operations_indirect_allocations', 'indirect')
-        operations_sync_auto_allocations(selected_company, today_local, 'operations_ga_allocations', 'g-a')
+        try:
+            operations_sync_auto_allocations(selected_company, today_local, 'operations_indirect_allocations', 'indirect')
+            operations_sync_auto_allocations(selected_company, today_local, 'operations_ga_allocations', 'g-a')
+        except Exception as exc:
+            db.session.rollback()
+            err.append(f'Auto allocation update skipped: {exc}')
 
-    expense_rows = business_report_expenses(selected_start, selected_end, selected_company)
-    tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
-    operations_rows, operations_totals = operations_weekly_profit_loss(selected_company, selected_start, operations_end)
-    ops_indirect_rows = operations_indirect_allocations(selected_company)
-    ops_ga_rows = operations_ga_allocations(selected_company)
-    unassigned_expense_lines = business_report_unassigned_expense_lines(selected_company, selected_start, selected_end)
-    ops_indirect_accounts = operations_account_options(selected_company, today_local, 'indirect')
-    ops_ga_accounts = operations_account_options(selected_company, today_local, 'g-a')
+    try:
+        expense_rows = business_report_expenses(selected_start, selected_end, selected_company)
+    except Exception as exc:
+        db.session.rollback()
+        expense_rows = []
+        err.append(f'Expense summary could not be loaded: {exc}')
+
+    try:
+        tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
+    except Exception as exc:
+        db.session.rollback()
+        tax_rollup_pl = business_report_empty_tax_rollup_pl()
+        err.append(f'Tax rollup report could not be loaded: {exc}')
+
+    try:
+        operations_rows, operations_totals = operations_weekly_profit_loss(selected_company, selected_start, operations_end)
+    except Exception as exc:
+        db.session.rollback()
+        operations_rows, operations_totals = [], business_report_empty_operations_totals()
+        err.append(f'Weekly operations report could not be loaded: {exc}')
+
+    try:
+        ops_indirect_rows = operations_indirect_allocations(selected_company)
+    except Exception as exc:
+        db.session.rollback()
+        ops_indirect_rows = []
+        err.append(f'Indirect allocations could not be loaded: {exc}')
+
+    try:
+        ops_ga_rows = operations_ga_allocations(selected_company)
+    except Exception as exc:
+        db.session.rollback()
+        ops_ga_rows = []
+        err.append(f'G&A allocations could not be loaded: {exc}')
+
+    try:
+        unassigned_expense_lines = business_report_unassigned_expense_lines(selected_company, selected_start, selected_end)
+    except Exception as exc:
+        db.session.rollback()
+        unassigned_expense_lines = []
+        err.append(f'Unassigned expense review could not be loaded: {exc}')
+
+    try:
+        ops_indirect_accounts = operations_account_options(selected_company, today_local, 'indirect')
+    except Exception as exc:
+        db.session.rollback()
+        ops_indirect_accounts = []
+        err.append(f'Indirect account options could not be loaded: {exc}')
+
+    try:
+        ops_ga_accounts = operations_account_options(selected_company, today_local, 'g-a')
+    except Exception as exc:
+        db.session.rollback()
+        ops_ga_accounts = []
+        err.append(f'G&A account options could not be loaded: {exc}')
     total_expenses = sum(row['amount_cents'] for row in expense_rows)
     report_basis = {
         'port_entries': business_report_number(business_report_basis_qty('port_entry', selected_start, selected_end), 0),
