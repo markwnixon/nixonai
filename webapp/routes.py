@@ -2127,6 +2127,25 @@ def business_report_period_bounds(start_date, end_date):
     )
 
 
+def business_report_account_lookup(company_code):
+    accounts = Accounts.query.filter(Accounts.Co == company_code).all()
+    by_id = {account.id: account for account in accounts}
+    by_name = {}
+    for account in accounts:
+        if account.Name and account.Name not in by_name:
+            by_name[account.Name] = account
+    return by_id, by_name
+
+
+def business_report_account_for_line(line, account_by_id, account_by_name):
+    # Prefer Aid because account names may have been changed after the ledger
+    # line was posted. A join on id-or-name can multiply one ledger line when
+    # an old name and a new name both match account records.
+    if line.Aid and line.Aid in account_by_id:
+        return account_by_id[line.Aid]
+    return account_by_name.get(line.Account or '')
+
+
 def business_report_basis_qty(basis_type, start_date, end_date):
     if not start_date or not end_date:
         return 0.0
@@ -2152,31 +2171,38 @@ def business_report_basis_qty(basis_type, start_date, end_date):
 
 def business_report_expenses(start_date, end_date, company_code=None):
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
-    query = db.session.query(
-        Gledger.Account,
-        Accounts.Category,
-        Accounts.Subcategory,
-        func.sum(func.coalesce(Gledger.Debit, 0) - func.coalesce(Gledger.Credit, 0)).label('amount_cents'),
-    ).join(
-        Accounts,
-        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
-    ).filter(
-        Accounts.Type == 'Expense',
+    query = Gledger.query.filter(
         Gledger.Date >= start_dt,
         Gledger.Date <= end_dt,
     )
     if company_code:
-        query = query.filter(Accounts.Co == company_code)
-    rows = query.group_by(
-        Gledger.Account,
-        Accounts.Category,
-        Accounts.Subcategory,
-    ).order_by(
-        Accounts.Category.asc(),
-        Gledger.Account.asc(),
-    ).all()
+        query = query.filter(Gledger.Com == company_code)
+        account_by_id, account_by_name = business_report_account_lookup(company_code)
+    else:
+        accounts = Accounts.query.all()
+        account_by_id = {account.id: account for account in accounts}
+        account_by_name = {}
+        for account in accounts:
+            if account.Co and account.Name and (account.Co, account.Name) not in account_by_name:
+                account_by_name[(account.Co, account.Name)] = account
+
+    totals = {}
+    for line in query.all():
+        if company_code:
+            account_obj = business_report_account_for_line(line, account_by_id, account_by_name)
+        else:
+            account_obj = account_by_id.get(line.Aid) if line.Aid else account_by_name.get((line.Com, line.Account or ''))
+        if account_obj is None or account_obj.Type != 'Expense':
+            continue
+        key = (
+            account_obj.Name or line.Account or '',
+            account_obj.Category or '',
+            account_obj.Subcategory or '',
+        )
+        totals[key] = totals.get(key, 0) + int(line.Debit or 0) - int(line.Credit or 0)
+
     output = []
-    for account, category, subcategory, amount_cents in rows:
+    for (account, category, subcategory), amount_cents in sorted(totals.items(), key=lambda item: (item[0][1], item[0][0])):
         amount_cents = int(amount_cents or 0)
         output.append({
             'account': account or '',
@@ -2302,14 +2328,9 @@ def business_report_payroll_reconciled_for_line(line):
 
 def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, account_type):
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
-    ledger_rows = db.session.query(Gledger, Accounts).join(
-        Accounts,
-        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
-    ).filter(
-        Accounts.Co == company_code,
-        Accounts.Type == account_type,
-        Accounts.Taxrollup.isnot(None),
-        Accounts.Taxrollup != '',
+    account_by_id, account_by_name = business_report_account_lookup(company_code)
+    ledger_rows = Gledger.query.filter(
+        Gledger.Com == company_code,
         Gledger.Date >= start_dt,
         Gledger.Date <= end_dt,
     ).order_by(
@@ -2319,7 +2340,15 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
     ).all()
 
     by_path = {}
-    for line, account in ledger_rows:
+    seen_line_paths = set()
+    for line in ledger_rows:
+        account = business_report_account_for_line(line, account_by_id, account_by_name)
+        if (
+            account is None
+            or account.Type != account_type
+            or not (account.Taxrollup or '').strip()
+        ):
+            continue
         if account_type == 'Income':
             amount_cents = int(line.Credit or 0) - int(line.Debit or 0)
         else:
@@ -2361,6 +2390,10 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
         parts = [part.strip() for part in (account.Taxrollup or '').split(':') if part.strip()]
         for index in range(1, len(parts) + 1):
             prefix = ':'.join(parts[:index])
+            line_path_key = (line.id, prefix)
+            if line_path_key in seen_line_paths:
+                continue
+            seen_line_paths.add(line_path_key)
             by_path.setdefault(prefix, []).append(detail)
     return by_path
 
@@ -2417,47 +2450,47 @@ def business_report_rollup_section_report_rows(rollup_rows):
 
 def business_report_tax_rollup_pl(company_code, start_date, end_date):
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
-    rows = db.session.query(
-        Accounts.Type,
-        Accounts.Taxrollup,
-        Accounts.Name,
-        Accounts.Category,
-        Accounts.Subcategory,
-        func.sum(func.coalesce(Gledger.Debit, 0)).label('debit_cents'),
-        func.sum(func.coalesce(Gledger.Credit, 0)).label('credit_cents'),
-    ).join(
-        Accounts,
-        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
-    ).filter(
-        Accounts.Co == company_code,
-        Accounts.Type.in_(['Income', 'Expense']),
+    account_by_id, account_by_name = business_report_account_lookup(company_code)
+    ledger_rows = Gledger.query.filter(
+        Gledger.Com == company_code,
         Gledger.Date >= start_dt,
         Gledger.Date <= end_dt,
-    ).group_by(
-        Accounts.Type,
-        Accounts.Taxrollup,
-        Accounts.Name,
-        Accounts.Category,
-        Accounts.Subcategory,
     ).all()
+
+    totals = {}
+    for line in ledger_rows:
+        account = business_report_account_for_line(line, account_by_id, account_by_name)
+        if account is None or account.Type not in ['Income', 'Expense']:
+            continue
+        key = (
+            account.Type,
+            account.Taxrollup or '',
+            account.Name or line.Account or '',
+            account.Category or '',
+            account.Subcategory or '',
+        )
+        debit_cents, credit_cents = totals.get(key, (0, 0))
+        totals[key] = (
+            debit_cents + int(line.Debit or 0),
+            credit_cents + int(line.Credit or 0),
+        )
 
     income_accounts = []
     expense_accounts = []
     unassigned_expense_accounts = []
-    for row in rows:
-        debit_cents = int(row.debit_cents or 0)
-        credit_cents = int(row.credit_cents or 0)
-        if row.Type == 'Income':
+    for (account_type, taxrollup, name, category, subcategory), values in sorted(totals.items(), key=lambda item: (item[0][0], item[0][1], item[0][2])):
+        debit_cents, credit_cents = values
+        if account_type == 'Income':
             amount_cents = credit_cents - debit_cents
             target = income_accounts
         else:
             amount_cents = debit_cents - credit_cents
-            target = expense_accounts if (row.Taxrollup or '').strip() else unassigned_expense_accounts
+            target = expense_accounts if (taxrollup or '').strip() else unassigned_expense_accounts
         target.append({
-            'account': row.Name or '',
-            'category': row.Category or '',
-            'subcategory': row.Subcategory or '',
-            'taxrollup': row.Taxrollup or '',
+            'account': name or '',
+            'category': category or '',
+            'subcategory': subcategory or '',
+            'taxrollup': taxrollup or '',
             'amount_cents': amount_cents,
             'amount': business_report_money(amount_cents),
         })

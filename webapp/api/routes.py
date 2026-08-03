@@ -7,6 +7,11 @@ from webapp.viewfuncs import hasinput
 from webapp.CCC_system_setup import addpath, scac, tpath
 from webapp.services.api_data_service import api_call
 from webapp.class8_tasks import get_address_details
+from webapp.financial_import_api import (
+    financial_import_account_options,
+    import_paid_bill_payload,
+    lookup_financial_import_rule,
+)
 
 
 import os
@@ -21,6 +26,31 @@ api_bp = Blueprint('api_bp', __name__)
 @api_bp.route('/api/test')
 def api_test():
     return {"message": "API blueprint working"}
+
+
+@api_bp.route("/api/financial/bill-payment/import", methods=["POST"])
+@api_bp.route("/api/financial/import/bill-payment", methods=["POST"])
+@jwt_required()
+def import_bill_payment():
+    current_user = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    response, status_code = import_paid_bill_payload(data, username=current_user)
+    return jsonify(response), status_code
+
+
+@api_bp.route("/api/financial/import/accounts", methods=["GET"])
+@jwt_required()
+def financial_import_accounts():
+    company_code = request.args.get('co') or request.args.get('company_code')
+    return jsonify(financial_import_account_options(company_code)), 200
+
+
+@api_bp.route("/api/financial/import/rules/lookup", methods=["POST"])
+@jwt_required()
+def financial_import_rule_lookup():
+    data = request.get_json(silent=True) or {}
+    response, status_code = lookup_financial_import_rule(data)
+    return jsonify(response), status_code
 
 
 @api_bp.route("/upload_pdf", methods=["POST"])

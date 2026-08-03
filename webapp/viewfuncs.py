@@ -2593,9 +2593,15 @@ def check_multi_line(jo):
                 err.append(f'Bill {bd.id} was never recorded')
             total = total + float(bd.pAmount)
             # Remove any previous payments to individual accounts as this check about to be paid for all
-            Gledger.query.filter( (Gledger.Tcode == bjo) & (Gledger.Type == 'PD') ).delete()
-            Gledger.query.filter( (Gledger.Tcode == bjo) & (Gledger.Type == 'PC') ).delete()
-            Gledger.query.filter( (Gledger.Tcode == bjo) & (Gledger.Type == 'DD') ).delete()
+            from sqlalchemy import or_
+            payment_types = ['PD', 'PC', 'DD', 'QD', 'QC']
+            Gledger.query.filter(or_(
+                (Gledger.Tcode == bjo) & (Gledger.Type.in_(payment_types)),
+                (Gledger.Tcode.like(f'{bjo}-%')) & (Gledger.Type.in_(payment_types)),
+                Gledger.JournalId == f'PAYBILL-{bjo}',
+                Gledger.JournalId.like(f'PAYBILL-{bjo}-%'),
+                (Gledger.SourceTable == 'Bills') & (Gledger.SourceId == bd.id) & (Gledger.Type.in_(payment_types)),
+            )).delete(synchronize_session=False)
     else:
         total = float(bdat.pAmount)
     db.session.commit()
@@ -2719,4 +2725,3 @@ def run_adjustments():
 
     from gledger_write import gledger_write
     gledger_write('adjusting',jo,adat.Expense,adat.Asset)
-

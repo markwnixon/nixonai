@@ -39,6 +39,32 @@ import uuid
 from sqlalchemy import or_
 
 
+BILL_PAYMENT_LEDGER_TYPES = ['PD', 'PC', 'DD', 'QD', 'QC']
+
+
+def bill_payment_ledger_entries(bill):
+    if bill is None or not bill.Jo:
+        return []
+
+    jo = bill.Jo
+    ledger_filter = or_(
+        (Gledger.Tcode == jo) & (Gledger.Type.in_(BILL_PAYMENT_LEDGER_TYPES)),
+        (Gledger.Tcode.like(f'{jo}-%')) & (Gledger.Type.in_(BILL_PAYMENT_LEDGER_TYPES)),
+        Gledger.JournalId == f'PAYBILL-{jo}',
+        Gledger.JournalId.like(f'PAYBILL-{jo}-%'),
+        (Gledger.SourceTable == 'Bills') & (Gledger.SourceId == bill.id) & (Gledger.Type.in_(BILL_PAYMENT_LEDGER_TYPES)),
+    )
+    return Gledger.query.filter(ledger_filter).all()
+
+
+def delete_bill_payment_ledger_entries(bill):
+    rows = bill_payment_ledger_entries(bill)
+    if not rows:
+        return 0
+    row_ids = [row.id for row in rows]
+    return Gledger.query.filter(Gledger.id.in_(row_ids)).delete(synchronize_session=False)
+
+
 def delete_bill_ledger_entries(bill):
     if bill is None or not bill.Jo:
         return 0
@@ -3039,8 +3065,16 @@ def cascade_account_metadata_change(account_id, old_type, old_category, old_subc
         Bills.bSubcat: account.Subcategory,
     }, synchronize_session=False))
 
+    record('gledger.Account', Gledger.query.filter(
+        (Gledger.Aid == account.id) &
+        (Gledger.Com == account.Co) &
+        (Gledger.Account != account.Name)
+    ).update({Gledger.Account: account.Name}, synchronize_session=False))
+
     record('gledger.Aid', Gledger.query.filter(
-        (Gledger.Account == account.Name) & (Gledger.Com == account.Co) & (Gledger.Aid != account.id)
+        (Gledger.Account == account.Name) &
+        (Gledger.Com == account.Co) &
+        or_(Gledger.Aid != account.id, Gledger.Aid.is_(None))
     ).update({Gledger.Aid: account.id}, synchronize_session=False))
 
     db.session.commit()
@@ -3217,6 +3251,8 @@ def New_task(tablesetup, task_iter):
                             thisval = getattr(adat, col)
                             for ix, entry in enumerate(entrydata):
                                 if entry[0] == colist2[jx]:
+                                    if itable == 'Bills' and colist2[jx] == 'Co' and not hasinput(thisval):
+                                        continue
                                     holdvec[ix] = thisval
 
             err.append(f'There are {failed} input errors and {warned} input warnings')
@@ -3373,6 +3409,8 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         thisval = getattr(adat, col)
                         for ix, entry in enumerate(entrydata):
                             if entry[0] == colist2[jx]:
+                                if table == 'Bills' and colist2[jx] == 'Co' and not hasinput(thisval):
+                                    continue
                                 holdvec[ix] = thisval
                                 #print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
 
@@ -3421,6 +3459,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 if table == 'Bills':
                     bdat = eval(nextquery)
                     err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount, 0)
+                    if not err and bdat.Status == 'Paid':
+                        payment_err = gledger_write(['paybill'], bdat.Jo, bdat.bAccount, bdat.pAccount, 0)
+                        if payment_err:
+                            err.extend(payment_err)
                 if table == 'Orders':
                     #print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
@@ -3443,6 +3485,8 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         if adat is not None:
                             for jx, col in enumerate(colist1):
                                 thisval = getattr(adat, col)
+                                if table == 'Bills' and colist2[jx] == 'Co' and not hasinput(thisval):
+                                    continue
                                 setattr(olddat, colist2[jx], thisval)
                                 #print(f'Moving value {thisval} from {tab2} {col} to {table} {colist2[jx]}')
                             db.session.commit()
@@ -3724,16 +3768,12 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                                     kdat.Status = None
                                     kdat.PmtList = None
                                     kdat.PacctList = None
-                                    kdat.Pmulti = None
-                                    kdat.PAmount2 = None
-                                    jo = kdat.Jo
-                                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
-                                    Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
+                                    kdat.pMulti = None
+                                    kdat.pAmount2 = None
+                                    delete_bill_payment_ledger_entries(kdat)
                             else:
                                 odat.Status = None
-                                jo = odat.Jo
-                                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PD')).delete()
-                                Gledger.query.filter((Gledger.Tcode == jo) & (Gledger.Type == 'PC')).delete()
+                                delete_bill_payment_ledger_entries(odat)
 
 
                     db.session.commit()
@@ -5360,6 +5400,8 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                                     if adat is not None:
                                         for jx, col in enumerate(colist1):
                                             thisval = getattr(adat, col)
+                                            if table == 'Bills' and colist2[jx] == 'Co' and not hasinput(thisval):
+                                                continue
                                             for sid in sids:
                                                 nextquery = f"{table}.query.get({sid})"
                                                 bdat = eval(nextquery)
