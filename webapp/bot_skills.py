@@ -14,7 +14,7 @@ SKILL_DEFINITIONS = {
 
 
 def utc_now():
-    return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 
 def ensure_bot_skill_settings_table():
