@@ -7,6 +7,14 @@ co = companydata()
 genre = 'Trucking'
 jobcode = co[10] + genre[0]
 
+PublicSite_setup = {
+    'OSLM': {
+        # Keep as "classic" until the new front package is approved.
+        # Change to "professional" to render companysite/OSLM/index_professional.html.
+        'front_page_variant': 'professional',
+    }
+}
+
 Trucking_genre = {'table': 'Orders',
                   'genre_tables': ['Orders', 'Interchange', 'Customers', 'Services', 'Summaries', 'Drivers', 'Trucks', 'Pins', 'Terminals'],
                   'genre_tables_on': ['on', 'off', 'off', 'off', 'off', 'off', 'off'],

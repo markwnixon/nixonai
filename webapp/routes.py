@@ -128,6 +128,7 @@ now = datetime.datetime.now()
 today_str = today.strftime('%Y-%m-%d')
 
 from webapp.CCC_system_setup import companydata, statpath, addpath, scac, tpath
+from webapp.class8_dicts import PublicSite_setup
 cmpdata = companydata()
 
 main = Blueprint('main',__name__)
@@ -1144,7 +1145,11 @@ def index():
                 info[6] = f'Already received request, please allow time to respond'
 
     srcpath = statpath('')
-    return render_template(f'companysite/{scac}/index.html',srcpath=srcpath, cmpdata=cmpdata, scac=scac,info=info)
+    front_template = 'index.html'
+    front_page_variant = PublicSite_setup.get(scac, {}).get('front_page_variant', 'classic')
+    if scac == 'OSLM' and front_page_variant == 'professional':
+        front_template = 'index_professional.html'
+    return render_template(f'companysite/{scac}/{front_template}',srcpath=srcpath, cmpdata=cmpdata, scac=scac,info=info)
 
 @main.route('/About')
 def About():

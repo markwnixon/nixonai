@@ -37,13 +37,24 @@ webapp/static/js/*
 !webapp/static/css/compliance_check.css
 !webapp/static/css/dispatch_planning_calendar.css
 !webapp/static/css/dispatch_kanban.css
+!webapp/static/css/oslm_professional_front.css
 !webapp/static/js/admin_calendar.js
 !webapp/static/js/collection_kanban.js
 !webapp/static/js/dispatch_planning_calendar.js
 !webapp/static/js/dispatch_kanban.js
 webapp/static/NEVO/
 webapp/static/OSLM/
+!webapp/static/OSLM/
+webapp/static/OSLM/*
+!webapp/static/OSLM/pics/
+webapp/static/OSLM/pics/*
+!webapp/static/OSLM/pics/oslm_drayage_card.jpg
+!webapp/static/OSLM/pics/oslm_operations_card.jpg
+!webapp/static/OSLM/pics/oslm_export_loading_card.jpg
+!webapp/static/OSLM/pics/port_baltimore_usda_aerial_hero.jpg
 webapp/templates/companysite/OSLM/
+!webapp/templates/companysite/OSLM/
+!webapp/templates/companysite/OSLM/index_professional.html
 
 # pytest
 .pytest_cache/
