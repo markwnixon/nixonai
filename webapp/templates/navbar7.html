@@ -104,6 +104,9 @@
                 <a class="dropdown-item" href="{{ url_for('main.ProfitLossWeekly') }}">P&amp;L Weekly</a>
                 <a class="dropdown-item" href="{{ url_for('main.ProfitLossYearToDate') }}">P&amp;L Year to Date</a>
                 <a class="dropdown-item" href="{{ url_for('main.GeneralInformation') }}">General Information</a>
+                {% if session.get('authority') in ['admin', 'superuser'] %}
+                    <a class="dropdown-item" href="{{ url_for('main.BotSkillSettings') }}">Bot Automation</a>
+                {% endif %}
                 {% if session['authority'] == 'superuser' %}
                     <a class="dropdown-item" href="{{ url_for('authenticate.register') }}">Create New User</a>
                     <a class="dropdown-item" href="{{ url_for('authenticate.register_bot') }}">Create New Bot Client</a>

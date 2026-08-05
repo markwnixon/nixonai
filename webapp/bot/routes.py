@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from webapp.extensions import db
 from webapp.models import Orders, People, Drops, Terminals
+from webapp.bot_skills import get_bot_skill_setting
 
 # adjust these imports to match your app
 from webapp.viewfuncs import newjo
@@ -22,6 +23,20 @@ from webapp.iso_Q import tbox_from_flags, calculate_and_build_quote_api
 bot_bp = Blueprint('bot_bp', __name__)
 
 now = datetime.now()
+
+
+@bot_bp.route('/bot/skills/<skill_key>', methods=['GET'])
+@bot_token_required(required_scopes={'read:orders'})
+def bot_skill_status(skill_key):
+    setting = get_bot_skill_setting(skill_key)
+    if setting is None:
+        return jsonify({'ok': False, 'error': 'Unknown bot skill'}), 404
+    return jsonify({
+        'ok': True,
+        'skill': setting.skill_key,
+        'enabled': bool(setting.enabled),
+        'updated_at': setting.updated_at.isoformat() if setting.updated_at else None,
+    }), 200
 
 
 

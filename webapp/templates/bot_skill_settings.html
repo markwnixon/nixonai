@@ -1,0 +1,93 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body_class %}bot-skills-page{% endblock %}
+
+{% block body %}
+<style>
+  .bot-skills-page { background: #f4f6f8; color: #17212b; }
+  .bot-skills-shell { max-width: 980px; margin: 0 auto; padding: 112px 24px 64px; }
+  .bot-skills-header { margin-bottom: 28px; }
+  .bot-skills-header h1 { color: #17324d; font-size: 2rem; margin: 0 0 8px; }
+  .bot-skills-header p { color: #5b6773; margin: 0; }
+  .skill-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: center;
+    padding: 22px 24px;
+    background: #fff;
+    border: 1px solid #d7dde3;
+    border-radius: 8px;
+  }
+  .skill-row h2 { color: #17324d; font-size: 1.15rem; margin: 0 0 6px; }
+  .skill-description { color: #5b6773; margin: 0 0 8px; }
+  .skill-meta { color: #78838d; font-size: 0.82rem; margin: 0; }
+  .skill-toggle-form { margin: 0; }
+  .skill-toggle {
+    position: relative;
+    display: inline-block;
+    width: 54px;
+    height: 30px;
+    margin: 0;
+  }
+  .skill-toggle input { opacity: 0; width: 0; height: 0; }
+  .skill-toggle-track {
+    position: absolute;
+    inset: 0;
+    background: #aab2ba;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: background 0.18s ease;
+  }
+  .skill-toggle-track::before {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    left: 4px;
+    top: 4px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 0.18s ease;
+  }
+  .skill-toggle input:checked + .skill-toggle-track { background: #218739; }
+  .skill-toggle input:checked + .skill-toggle-track::before { transform: translateX(24px); }
+  .skill-toggle input:focus + .skill-toggle-track { box-shadow: 0 0 0 3px rgba(23, 50, 77, 0.2); }
+  @media (max-width: 600px) {
+    .skill-row { grid-template-columns: minmax(0, 1fr) auto; padding: 18px; }
+  }
+</style>
+
+<main class="bot-skills-shell">
+  <header class="bot-skills-header">
+    <h1>Bot automation</h1>
+    <p>Controls apply when the bot reaches its next scheduled run.</p>
+  </header>
+
+  {% for skill in skills %}
+  <section class="skill-row">
+    <div>
+      <h2>{{ skill.name }}</h2>
+      <p class="skill-description">{{ skill.description }}</p>
+      {% if skill.updated_at %}
+      <p class="skill-meta">Last changed {{ skill.updated_at.strftime('%Y-%m-%d %H:%M') }}{% if skill.updated_by %} by {{ skill.updated_by }}{% endif %}</p>
+      {% endif %}
+    </div>
+    <form class="skill-toggle-form" method="post" action="{{ url_for('main.BotSkillSettings') }}">
+      <input type="hidden" name="skill_key" value="{{ skill.key }}">
+      <input type="hidden" name="enabled" value="{{ '0' if skill.enabled else '1' }}">
+      <label class="skill-toggle" title="Turn {{ skill.name }} {{ 'off' if skill.enabled else 'on' }}">
+        <input
+          type="checkbox"
+          aria-label="{{ skill.name }}"
+          {% if skill.enabled %}checked{% endif %}
+          onchange="this.form.submit()"
+        >
+        <span class="skill-toggle-track"></span>
+      </label>
+    </form>
+  </section>
+  {% endfor %}
+</main>
+{% endblock %}

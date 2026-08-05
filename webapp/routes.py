@@ -30,6 +30,7 @@ from webapp.plaid_integration import (
     upsert_item_from_exchange,
     update_item_status,
 )
+from webapp.bot_skills import bot_skill_rows, set_bot_skill_enabled, SKILL_DEFINITIONS
 
 from decimal import Decimal
 
@@ -1317,6 +1318,32 @@ def app_overview():
 def agents_overview():
     srcpath = statpath('')
     return render_template('agents_overview.html', srcpath=srcpath, cmpdata=cmpdata, scac=scac, today=today.date(), phone=cmpdata[7],email=cmpdata[8])
+
+
+@main.route('/admin/bot-skills', methods=['GET', 'POST'])
+@login_required
+def BotSkillSettings():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+
+    if request.method == 'POST':
+        skill_key = (request.form.get('skill_key') or '').strip()
+        if skill_key not in SKILL_DEFINITIONS:
+            abort(400)
+        enabled = request.form.get('enabled') == '1'
+        set_bot_skill_enabled(skill_key, enabled, current_user.username)
+        flash(
+            f"{SKILL_DEFINITIONS[skill_key]['name']} turned {'on' if enabled else 'off'}.",
+            'success',
+        )
+        return redirect(url_for('main.BotSkillSettings'))
+
+    return render_template(
+        'bot_skill_settings.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        skills=bot_skill_rows(),
+    )
 
 @main.route('/Calculator', methods=['GET', 'POST'])
 def Calculator():

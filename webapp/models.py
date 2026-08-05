@@ -72,6 +72,18 @@ class BotClient(db.Model):
         return f"BotClient('{self.name}', '{self.client_id}', '{self.platform}')"
 
 
+class BotSkillSetting(db.Model):
+    __tablename__ = 'bot_skill_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    skill_key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    updated_by = db.Column(db.String(30))
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"BotSkillSetting('{self.skill_key}', enabled={self.enabled})"
+
+
 class KeyInfo(db.Model):
     __tablename__ = 'keyinformation'
     id = db.Column('id', db.Integer, primary_key=True)
