@@ -84,6 +84,25 @@ class BotSkillSetting(db.Model):
         return f"BotSkillSetting('{self.skill_key}', enabled={self.enabled})"
 
 
+class BotUsageEvent(db.Model):
+    __tablename__ = 'bot_usage_events'
+    id = db.Column(db.Integer, primary_key=True)
+    event_key = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    bot_id = db.Column(db.String(100), nullable=False, index=True)
+    skill_key = db.Column(db.String(100), nullable=False, index=True)
+    session_id = db.Column(db.String(255), nullable=False, index=True)
+    response_id = db.Column(db.String(255))
+    model = db.Column(db.String(100), nullable=False)
+    input_tokens = db.Column(db.BigInteger, nullable=False, default=0)
+    output_tokens = db.Column(db.BigInteger, nullable=False, default=0)
+    cache_read_tokens = db.Column(db.BigInteger, nullable=False, default=0)
+    cache_write_tokens = db.Column(db.BigInteger, nullable=False, default=0)
+    total_tokens = db.Column(db.BigInteger, nullable=False, default=0)
+    cost_usd = db.Column(db.Numeric(14, 8), nullable=False, default=0)
+    occurred_at = db.Column(db.DateTime, nullable=False, index=True)
+    received_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class KeyInfo(db.Model):
     __tablename__ = 'keyinformation'
     id = db.Column('id', db.Integer, primary_key=True)

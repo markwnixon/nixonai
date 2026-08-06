@@ -31,6 +31,7 @@ from webapp.plaid_integration import (
     update_item_status,
 )
 from webapp.bot_skills import bot_skill_rows, set_bot_skill_enabled, SKILL_DEFINITIONS
+from webapp.bot_usage import usage_dashboard
 
 from decimal import Decimal
 
@@ -1343,6 +1344,8 @@ def BotSkillSettings():
         cmpdata=cmpdata,
         scac=scac,
         skills=bot_skill_rows(),
+        usage=usage_dashboard(),
+        skill_definitions=SKILL_DEFINITIONS,
     )
 
 @main.route('/Calculator', methods=['GET', 'POST'])

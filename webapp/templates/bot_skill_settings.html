@@ -20,6 +20,7 @@
     border-radius: 8px;
   }
   .skill-row h2 { color: #17324d; font-size: 1.15rem; margin: 0 0 6px; }
+  .skill-row + .skill-row { margin-top: 12px; }
   .skill-description { color: #5b6773; margin: 0 0 8px; }
   .skill-meta { color: #78838d; font-size: 0.82rem; margin: 0; }
   .skill-toggle-form { margin: 0; }
@@ -54,8 +55,22 @@
   .skill-toggle input:checked + .skill-toggle-track { background: #218739; }
   .skill-toggle input:checked + .skill-toggle-track::before { transform: translateX(24px); }
   .skill-toggle input:focus + .skill-toggle-track { box-shadow: 0 0 0 3px rgba(23, 50, 77, 0.2); }
+  .usage-section { margin-top: 36px; }
+  .usage-section h2 { color: #17324d; font-size: 1.35rem; margin: 0 0 14px; }
+  .usage-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .usage-total { background: #fff; border: 1px solid #d7dde3; border-radius: 8px; padding: 18px 20px; }
+  .usage-label { color: #5b6773; font-size: 0.82rem; margin: 0 0 5px; }
+  .usage-value { color: #17324d; font-size: 1.3rem; font-weight: 600; margin: 0; }
+  .usage-table-wrap { overflow-x: auto; background: #fff; border: 1px solid #d7dde3; border-radius: 8px; }
+  .usage-table { border-collapse: collapse; width: 100%; min-width: 720px; }
+  .usage-table th, .usage-table td { border-bottom: 1px solid #e3e7eb; padding: 12px 14px; text-align: right; }
+  .usage-table th { color: #5b6773; font-size: 0.78rem; font-weight: 600; }
+  .usage-table th:first-child, .usage-table th:nth-child(2), .usage-table td:first-child, .usage-table td:nth-child(2) { text-align: left; }
+  .usage-table tr:last-child td { border-bottom: 0; }
+  .usage-empty { color: #78838d; margin: 0; padding: 20px; }
   @media (max-width: 600px) {
     .skill-row { grid-template-columns: minmax(0, 1fr) auto; padding: 18px; }
+    .usage-totals { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -89,5 +104,41 @@
     </form>
   </section>
   {% endfor %}
+
+  <section class="usage-section">
+    <h2>AI usage</h2>
+    <div class="usage-totals">
+      <div class="usage-total">
+        <p class="usage-label">Current hour</p>
+        <p class="usage-value">${{ '%.4f'|format(usage.hour.cost) }} · {{ '{:,}'.format(usage.hour.tokens) }} tokens</p>
+      </div>
+      <div class="usage-total">
+        <p class="usage-label">Today</p>
+        <p class="usage-value">${{ '%.4f'|format(usage.day.cost) }} · {{ '{:,}'.format(usage.day.tokens) }} tokens</p>
+      </div>
+    </div>
+    <div class="usage-table-wrap">
+      {% if usage.rows %}
+      <table class="usage-table">
+        <thead><tr><th>Skill</th><th>Model</th><th>Input</th><th>Cached</th><th>Output</th><th>Total</th><th>Cost</th></tr></thead>
+        <tbody>
+        {% for row in usage.rows %}
+          <tr>
+            <td>{{ skill_definitions.get(row.skill_key, {}).get('name', row.skill_key) }}</td>
+            <td>{{ row.model }}</td>
+            <td>{{ '{:,}'.format(row.input_tokens) }}</td>
+            <td>{{ '{:,}'.format(row.cache_read_tokens) }}</td>
+            <td>{{ '{:,}'.format(row.output_tokens) }}</td>
+            <td>{{ '{:,}'.format(row.total_tokens) }}</td>
+            <td>${{ '%.4f'|format(row.cost) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="usage-empty">No AI usage has been reported today.</p>
+      {% endif %}
+    </div>
+  </section>
 </main>
 {% endblock %}

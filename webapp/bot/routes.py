@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import get_jwt_identity
 from webapp.bot.decorators import bot_token_required
 from webapp.services.api_data_service import api_call
 from webapp.CCC_system_setup import scac, companydata, addpath, tpath
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from webapp.extensions import db
 from webapp.models import Orders, People, Drops, Terminals
 from webapp.bot_skills import get_bot_skill_setting
+from webapp.bot_usage import record_usage_events
 
 # adjust these imports to match your app
 from webapp.viewfuncs import newjo
@@ -37,6 +39,21 @@ def bot_skill_status(skill_key):
         'enabled': bool(setting.enabled),
         'updated_at': setting.updated_at.isoformat() if setting.updated_at else None,
     }), 200
+
+
+@bot_bp.route('/bot/usage', methods=['POST'])
+@bot_token_required(required_scopes={'write:orders'})
+def bot_usage_create():
+    payload = request.get_json(silent=True) or {}
+    events = payload.get('events')
+    if not isinstance(events, list) or not events or len(events) > 500:
+        return jsonify({'ok': False, 'error': 'events must contain 1 to 500 items'}), 400
+    try:
+        inserted, duplicates = record_usage_events(str(get_jwt_identity()), events)
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': str(exc)}), 400
+    return jsonify({'ok': True, 'inserted': inserted, 'duplicates': duplicates}), 200
 
 
 
