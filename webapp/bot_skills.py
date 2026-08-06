@@ -5,10 +5,15 @@ from webapp.models import BotSkillSetting
 
 
 QUOTE_SKILL_KEY = 'quote-request-extraction'
+DELIVERY_ORDER_SKILL_KEY = 'delivery-order-creation'
 SKILL_DEFINITIONS = {
     QUOTE_SKILL_KEY: {
         'name': 'Quote automation',
         'description': 'Review incoming quote requests and prepare quote response drafts.',
+    },
+    DELIVERY_ORDER_SKILL_KEY: {
+        'name': 'Work-order creation',
+        'description': 'Create database orders from messages placed in the Work Orders mailbox.',
     },
 }
 

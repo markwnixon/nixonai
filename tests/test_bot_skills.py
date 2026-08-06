@@ -4,6 +4,7 @@ from pathlib import Path
 
 from webapp.bot.routes import bot_bp
 from webapp.bot_skills import (
+    DELIVERY_ORDER_SKILL_KEY,
     QUOTE_SKILL_KEY,
     bot_skill_rows,
     get_bot_skill_setting,
@@ -39,6 +40,8 @@ def test_quote_skill_defaults_enabled_and_can_be_disabled():
         rows = bot_skill_rows()
         assert rows[0]['key'] == QUOTE_SKILL_KEY
         assert rows[0]['enabled'] is False
+        assert rows[1]['key'] == DELIVERY_ORDER_SKILL_KEY
+        assert rows[1]['enabled'] is True
 
 
 def test_unknown_skill_is_rejected():
