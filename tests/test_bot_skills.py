@@ -95,6 +95,8 @@ def test_usage_events_are_deduplicated_and_summarized():
         assert usage['rows'][0]['skill_key'] == DELIVERY_ORDER_SKILL_KEY
         assert usage['daily_rows'][0]['date'] == '2026-08-06'
         assert usage['daily_rows'][0]['tokens'] == 170
+        assert usage['skill_rows'][0]['skill_key'] == DELIVERY_ORDER_SKILL_KEY
+        assert str(usage['skill_rows'][0]['cost']) == '0.01230000'
 
 
 def test_bot_can_report_usage():
@@ -152,6 +154,8 @@ def test_admin_can_render_and_toggle_bot_skill_page():
     assert b'Bot automation' in response.data
     assert b'Quote automation' in response.data
     assert b'AI usage' in response.data
+    assert b'Cost by skill' in response.data
+    assert b'Work-order creation' in response.data
 
     response = client.post(
         '/admin/bot-skills',

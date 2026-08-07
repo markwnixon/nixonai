@@ -97,6 +97,13 @@ def usage_dashboard(now=None):
     ).filter(BotUsageEvent.occurred_at >= history_start).group_by(
         func.date(BotUsageEvent.occurred_at)
     ).order_by(func.date(BotUsageEvent.occurred_at).desc()).all()
+    skill_rows = db.session.query(
+        BotUsageEvent.skill_key, func.sum(BotUsageEvent.input_tokens),
+        func.sum(BotUsageEvent.output_tokens), func.sum(BotUsageEvent.cache_read_tokens),
+        func.sum(BotUsageEvent.total_tokens), func.sum(BotUsageEvent.cost_usd),
+    ).filter(BotUsageEvent.occurred_at >= history_start).group_by(
+        BotUsageEvent.skill_key
+    ).order_by(BotUsageEvent.skill_key).all()
     return {
         'hour': totals(hour_start), 'day': totals(day_start),
         'rows': [{'skill_key': r[0], 'model': r[1], 'input_tokens': int(r[2] or 0),
@@ -104,4 +111,7 @@ def usage_dashboard(now=None):
                   'total_tokens': int(r[5] or 0), 'cost': Decimal(r[6] or 0)} for r in rows],
         'daily_rows': [{'date': r[0], 'tokens': int(r[1] or 0),
                         'cost': Decimal(r[2] or 0)} for r in daily_rows],
+        'skill_rows': [{'skill_key': r[0], 'input_tokens': int(r[1] or 0),
+                        'output_tokens': int(r[2] or 0), 'cache_read_tokens': int(r[3] or 0),
+                        'total_tokens': int(r[4] or 0), 'cost': Decimal(r[5] or 0)} for r in skill_rows],
     }

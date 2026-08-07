@@ -111,13 +111,32 @@
     <div class="usage-totals">
       <div class="usage-total">
         <p class="usage-label">Current hour</p>
-        <p class="usage-value">${{ '%.4f'|format(usage.hour.cost) }} · {{ '{:,}'.format(usage.hour.tokens) }} tokens</p>
+        <p class="usage-value">${{ '%.4f'|format(usage.hour.cost) }} - {{ '{:,}'.format(usage.hour.tokens) }} tokens</p>
       </div>
       <div class="usage-total">
         <p class="usage-label">Today</p>
-        <p class="usage-value">${{ '%.4f'|format(usage.day.cost) }} · {{ '{:,}'.format(usage.day.tokens) }} tokens</p>
+        <p class="usage-value">${{ '%.4f'|format(usage.day.cost) }} - {{ '{:,}'.format(usage.day.tokens) }} tokens</p>
       </div>
     </div>
+    <h2 class="usage-history-heading">Cost by skill - last 14 days</h2>
+    <div class="usage-table-wrap">
+      <table class="usage-table">
+        <thead><tr><th>Skill</th><th>Input</th><th>Cached</th><th>Output</th><th>Total</th><th>Cost</th></tr></thead>
+        <tbody>
+        {% for skill in skills %}
+          <tr>
+            <td>{{ skill.name }}</td>
+            <td>{{ '{:,}'.format(skill.usage.input_tokens) }}</td>
+            <td>{{ '{:,}'.format(skill.usage.cache_read_tokens) }}</td>
+            <td>{{ '{:,}'.format(skill.usage.output_tokens) }}</td>
+            <td>{{ '{:,}'.format(skill.usage.total_tokens) }}</td>
+            <td>${{ '%.4f'|format(skill.usage.cost) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <h2 class="usage-history-heading">Today by model</h2>
     <div class="usage-table-wrap">
       {% if usage.rows %}
       <table class="usage-table">
@@ -140,7 +159,7 @@
       <p class="usage-empty">No AI usage has been reported today.</p>
       {% endif %}
     </div>
-    <h2 class="usage-history-heading">Daily history</h2>
+    <h2 class="usage-history-heading">Daily history - last 14 days</h2>
     <div class="usage-table-wrap">
       {% if usage.daily_rows %}
       <table class="usage-table">

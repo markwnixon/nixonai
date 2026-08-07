@@ -1339,12 +1339,21 @@ def BotSkillSettings():
         )
         return redirect(url_for('main.BotSkillSettings'))
 
+    skills = bot_skill_rows()
+    usage = usage_dashboard()
+    skill_usage = {row['skill_key']: row for row in usage['skill_rows']}
+    for skill in skills:
+        skill['usage'] = skill_usage.get(skill['key'], {
+            'input_tokens': 0, 'output_tokens': 0, 'cache_read_tokens': 0,
+            'total_tokens': 0, 'cost': 0,
+        })
+
     return render_template(
         'bot_skill_settings.html',
         cmpdata=cmpdata,
         scac=scac,
-        skills=bot_skill_rows(),
-        usage=usage_dashboard(),
+        skills=skills,
+        usage=usage,
         skill_definitions=SKILL_DEFINITIONS,
     )
 
