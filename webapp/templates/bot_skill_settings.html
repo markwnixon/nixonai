@@ -57,6 +57,7 @@
   .skill-toggle input:focus + .skill-toggle-track { box-shadow: 0 0 0 3px rgba(23, 50, 77, 0.2); }
   .usage-section { margin-top: 36px; }
   .usage-section h2 { color: #17324d; font-size: 1.35rem; margin: 0 0 14px; }
+  .usage-section .usage-history-heading { font-size: 1rem; margin-top: 22px; }
   .usage-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
   .usage-total { background: #fff; border: 1px solid #d7dde3; border-radius: 8px; padding: 18px 20px; }
   .usage-label { color: #5b6773; font-size: 0.82rem; margin: 0 0 5px; }
@@ -137,6 +138,21 @@
       </table>
       {% else %}
       <p class="usage-empty">No AI usage has been reported today.</p>
+      {% endif %}
+    </div>
+    <h2 class="usage-history-heading">Daily history</h2>
+    <div class="usage-table-wrap">
+      {% if usage.daily_rows %}
+      <table class="usage-table">
+        <thead><tr><th>Date</th><th>Tokens</th><th>Cost</th></tr></thead>
+        <tbody>
+        {% for row in usage.daily_rows %}
+          <tr><td>{{ row.date }}</td><td>{{ '{:,}'.format(row.tokens) }}</td><td>${{ '%.4f'|format(row.cost) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="usage-empty">No AI usage has been reported in the last 14 days.</p>
       {% endif %}
     </div>
   </section>

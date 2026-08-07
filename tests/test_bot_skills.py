@@ -93,6 +93,8 @@ def test_usage_events_are_deduplicated_and_summarized():
         assert usage['hour']['tokens'] == 170
         assert str(usage['day']['cost']) == '0.01230000'
         assert usage['rows'][0]['skill_key'] == DELIVERY_ORDER_SKILL_KEY
+        assert usage['daily_rows'][0]['date'] == '2026-08-06'
+        assert usage['daily_rows'][0]['tokens'] == 170
 
 
 def test_bot_can_report_usage():

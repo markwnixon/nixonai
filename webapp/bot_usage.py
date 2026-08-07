@@ -74,6 +74,7 @@ def usage_dashboard(now=None):
     now = now or utc_now()
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     hour_start = now.replace(minute=0, second=0, microsecond=0)
+    history_start = day_start - datetime.timedelta(days=13)
 
     def totals(since):
         row = db.session.query(
@@ -90,9 +91,17 @@ def usage_dashboard(now=None):
     ).filter(BotUsageEvent.occurred_at >= day_start).group_by(
         BotUsageEvent.skill_key, BotUsageEvent.model
     ).order_by(BotUsageEvent.skill_key, BotUsageEvent.model).all()
+    daily_rows = db.session.query(
+        func.date(BotUsageEvent.occurred_at), func.sum(BotUsageEvent.total_tokens),
+        func.sum(BotUsageEvent.cost_usd),
+    ).filter(BotUsageEvent.occurred_at >= history_start).group_by(
+        func.date(BotUsageEvent.occurred_at)
+    ).order_by(func.date(BotUsageEvent.occurred_at).desc()).all()
     return {
         'hour': totals(hour_start), 'day': totals(day_start),
         'rows': [{'skill_key': r[0], 'model': r[1], 'input_tokens': int(r[2] or 0),
                   'output_tokens': int(r[3] or 0), 'cache_read_tokens': int(r[4] or 0),
                   'total_tokens': int(r[5] or 0), 'cost': Decimal(r[6] or 0)} for r in rows],
+        'daily_rows': [{'date': r[0], 'tokens': int(r[1] or 0),
+                        'cost': Decimal(r[2] or 0)} for r in daily_rows],
     }
