@@ -15,6 +15,7 @@ from webapp.authenticate.routes import authenticate
 from webapp.extensions import db, jwt, login_manager
 from webapp.models import users
 from webapp.routes import main
+from webapp.iso_Q import get_equipment_text, tbox_from_flags
 
 
 def make_app():
@@ -50,6 +51,14 @@ def test_unknown_skill_is_rejected():
     with app.app_context():
         assert get_bot_skill_setting('not-a-skill') is None
         assert set_bot_skill_enabled('not-a-skill', False) is None
+
+
+def test_api_equipment_flags_control_equipment_text():
+    app = make_app()
+    with app.test_request_context('/'):
+        assert get_equipment_text(tbox_from_flags({'is_20std': True})) == '1 x 20ST'
+        assert get_equipment_text(tbox_from_flags({'is_45hc': True})) == '1 x 45HC'
+        assert get_equipment_text(tbox_from_flags({})) == '1 x 40HC'
 
 
 def test_bot_status_endpoint_returns_company_setting():
