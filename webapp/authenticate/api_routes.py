@@ -34,7 +34,11 @@ def api_login():
                 access_token = create_access_token(identity=user)
                 refresh_token = create_refresh_token(identity=user)
                 #return jsonify({"access_token": token})
-                return jsonify(access_token=access_token, refresh_token=refresh_token)
+                return jsonify(
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    authority=thisuser.authority,
+                )
 
         return jsonify({"message": "Invalid credentials"}), 401
 
