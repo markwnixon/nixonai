@@ -99,7 +99,7 @@ def clear_cached_body_text(qdat=None):
         EMAIL_BODY_CACHE.pop(cache_key, None)
 
 #Helper function for the equipment:
-def get_equipment_text():
+def get_equipment_text(tbox=None):
     text = ''
     def to_int(val):
         try:
@@ -116,6 +116,13 @@ def get_equipment_text():
     if num40s>0: text = f'{text} {num40s} x 40ST,'
     #Remove trailing comma
     text = text.rstrip(',')
+    if text == '' and tbox:
+        if tbox[24]:
+            text = '1 x 20ST and 1 x 40HC'
+        elif tbox[15]:
+            text = '1 x 20ST'
+        elif tbox[14]:
+            text = '1 x 45HC'
     if text == '': text = '1 x 40HC'
     return text
 
@@ -1185,7 +1192,7 @@ def bodymaker_direct(customer, cdata, bidthis, locto, tbox, expdata, distdata, m
             bidtypeamount[0] = 'live'
             bidtypeamount[1] = 0.00
         else:
-            equip = get_equipment_text()
+            equip = get_equipment_text(tbox)
             if tbox[24]: equip = '40HC and 20STD'
             com = 'General Freight'
             if sboxes[2] == 'com1':
