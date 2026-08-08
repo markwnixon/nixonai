@@ -267,10 +267,6 @@ def normalize_presend_collection_status(order):
     if invalid_rate_con_received_status(order):
         order.RCneeded = 1
         changed = True
-    status = collection_status(order)
-    if status in ['completed_not_invoiced', 'needs_rate_con', 'rate_con_requested'] and int_value(order.Istat, -1) == 3:
-        order.Istat = 2
-        changed = True
     return changed
 
 
