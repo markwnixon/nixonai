@@ -1,0 +1,83 @@
+{% set job = holdvec[0] %}
+{% set paydata = holdvec[1] %}
+{% set depolist = holdvec[2] %}
+{% set thisdepo = holdvec[3] %}
+{% set paymeths = holdvec[4] %}
+{% set invtotal = holdvec[5] %}
+{% set paidsofar = holdvec[6] %}
+{% set iter = holdvec[7] %}
+{% set customer = holdvec[8] %}
+
+<div class="card">
+    <div class="card-header">
+        Receive Freight Forwarding Payment
+    </div>
+    <div class="card-body">
+        <table class="table table-sm table-borderless mb-2">
+            <tr>
+                <td><strong>JO</strong></td>
+                <td>{{ job.Jo }}</td>
+                <td><strong>Customer</strong></td>
+                <td>{{ customer }}</td>
+            </tr>
+            <tr>
+                <td><strong>Invoice Amount</strong></td>
+                <td>${{ invtotal }}</td>
+                <td><strong>Paid So Far</strong></td>
+                <td>${{ paidsofar }}</td>
+            </tr>
+            <tr>
+                <td><strong>Container</strong></td>
+                <td>{{ job.Container or '' }}</td>
+                <td><strong>Booking</strong></td>
+                <td>{{ job.Booking or '' }}</td>
+            </tr>
+        </table>
+
+        <table>
+            <tr>
+                <td colspan="4">
+                    <button type="submit" class="btn btn-mdb-color btn-sm" name="update"
+                            data-toggle="tooltip" title="Refresh the payment form before recording">Update</button>
+                    {% if iter > 0 %}
+                        <button type="submit" class="btn btn-dark-green btn-sm" name="recordnow"
+                                data-toggle="tooltip" title="Record payment to the forwarding job and general ledger">Record Payment</button>
+                    {% else %}
+                        <button type="submit" class="btn btn-dark-green btn-sm" name="recordnow"
+                                data-toggle="tooltip" title="Record payment to the forwarding job and general ledger" disabled>Record Payment</button>
+                    {% endif %}
+                    <button type="submit" class="btn btn-blue btn-sm" name="Return"
+                            data-toggle="tooltip" title="Return to the Freight Forwarding table">Return</button>
+                </td>
+            </tr>
+            <tr>
+                <td><div class="input-group-text">Payment Amount:</div></td>
+                <td><input class="form-control" type="text" value="{{ paydata[0] }}" name="paidamt"></td>
+                <td><div class="input-group-text">Payment Date:</div></td>
+                <td><input class="form-control" type="date" value="{{ paydata[1] }}" name="paidon"></td>
+            </tr>
+            <tr>
+                <td><div class="input-group-text">Pay Method:</div></td>
+                <td>
+                    <select class="form-control" name="paymethod" onchange="this.form.submit()">
+                        {% for meth in paymeths %}
+                            <option {% if meth == paydata[3] %} selected {% endif %} value="{{ meth }}">{{ meth }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td><div class="input-group-text">Pay Reference:</div></td>
+                <td><input class="form-control" type="text" value="{{ paydata[2] }}" name="payref"></td>
+            </tr>
+            <tr>
+                <td><div class="input-group-text">Deposit Account:</div></td>
+                <td colspan="3">
+                    <select class="form-control" name="acctfordeposit">
+                        {% for depo in depolist %}
+                            <option {% if depo == thisdepo %} selected {% endif %} value="{{ depo }}">{{ depo }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>

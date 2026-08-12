@@ -1,0 +1,131 @@
+{% extends 'A_layout_portal.html' %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-sm-12">
+            <h2>Loan Interest Adjustments</h2>
+            <p class="text-muted">Reclassify known annual loan interest after SBA or lender interest detail becomes available.</p>
+        </div>
+    </div>
+
+    <form action="{{ url_for('main.LoanInterestAdjustments') }}" method="post">
+        <div class="row">
+            <div class="col-lg-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>Interest Adjustment</h5>
+                    <div class="alert alert-warning py-2">
+                        This does not record a bank payment. It debits interest expense and credits the selected loan liability.
+                    </div>
+                    <div class="form-group">
+                        <label for="adjustment_date">Adjustment Date</label>
+                        <input type="date" class="form-control" id="adjustment_date" name="adjustment_date" value="{{ selected.adjustment_date }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="period_year">Period / Year</label>
+                        <input type="text" class="form-control" id="period_year" name="period_year" value="{{ selected.period_year }}" placeholder="2026">
+                    </div>
+                    <div class="form-group">
+                        <label for="loan_account">Loan Liability Account</label>
+                        <select class="form-control" id="loan_account" name="loan_account">
+                            {% for account in loan_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.loan_account == account.Name %}selected{% endif %}>{{ account.Name }} ({{ account.Type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="interest_account">Interest Expense Account</label>
+                        <select class="form-control" id="interest_account" name="interest_account">
+                            {% for account in interest_accounts %}
+                                <option value="{{ account.Name }}" {% if selected.interest_account == account.Name %}selected{% endif %}>{{ account.Name }}{% if account.Category %} ({{ account.Category }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Interest Amount</label>
+                        <input type="text" class="form-control" id="amount" name="amount" value="{{ selected.amount }}" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="source">Lender / Source</label>
+                        <input type="text" class="form-control" id="source" name="source" value="{{ selected.source }}" placeholder="SBA">
+                    </div>
+                    <div class="form-group">
+                        <label for="ref">Reference</label>
+                        <input type="text" class="form-control" id="ref" name="ref" value="{{ selected.ref }}" placeholder="Statement, year, or lender reference">
+                    </div>
+                    <div class="form-group">
+                        <label for="memo">Memo</label>
+                        <textarea class="form-control" id="memo" name="memo" rows="3">{{ selected.memo }}</textarea>
+                    </div>
+                    <button type="submit" name="create_adjustment" value="1" class="btn btn-success btn-block"
+                            onclick="return confirm('Post this loan interest adjustment to the general ledger?');">
+                        Record Adjustment
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="alert alert-info" role="alert">
+                    <pre class="mb-0">{{ err }}</pre>
+                </div>
+
+                <h5>Recent Loan Interest Adjustments</h5>
+                <button type="submit" name="delete_adjustments" value="1" class="btn btn-danger btn-sm mb-2"
+                        onclick="return confirm('Delete the selected unreconciled loan interest adjustment journal entries?');">
+                    Undo Selected
+                </button>
+                <div class="table-responsive">
+                    <table id="dtLoanInterestAdjustments" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
+                        <thead class="thead-light">
+                            <tr>
+                                <th></th>
+                                <th>Date</th>
+                                <th>Tcode</th>
+                                <th>Interest Expense</th>
+                                <th>Loan Liability</th>
+                                <th>Source</th>
+                                <th>Ref</th>
+                                <th class="text-right">Amount</th>
+                                <th>Memo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in recent_adjustments %}
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" name="adjustment_journal" value="{{ item.JournalId }}">
+                                    </td>
+                                    <td>{% if item.Date %}{{ item.Date.strftime('%Y-%m-%d') }}{% endif %}</td>
+                                    <td>{{ item.Tcode }}</td>
+                                    <td>{{ item.Account }}</td>
+                                    <td>{{ item.loan_account }}</td>
+                                    <td>{{ item.Source }}</td>
+                                    <td>{{ item.Ref or '' }}</td>
+                                    <td class="text-right">{{ item.amount_fmt }}</td>
+                                    <td>{{ item.JournalMemo or '' }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.jQuery || !$.fn.DataTable || !document.getElementById('dtLoanInterestAdjustments')) {
+        return;
+    }
+    $('#dtLoanInterestAdjustments').DataTable({
+        "aaSorting": [[1, "desc"]],
+        "scrollX": true,
+        "scrollY": 500,
+        "stateSave": true,
+        "paging": false
+    });
+    $('.dataTables_length').addClass('bs-select');
+});
+</script>
+{% endblock %}
