@@ -12,6 +12,7 @@ from webapp.api.routes import api_bp
 from webapp.bot.routes import bot_bp
 from webapp.authenticate.bot_routes import bot_auth
 from webapp.routes import main
+from sqlalchemy import inspect, text
 
 ####################################################################
 ########## SET DATABASE STRUCTURES #################################
@@ -52,5 +53,54 @@ def create_app():
     app.register_blueprint(bot_auth)
     app.register_blueprint(main)
 
-    return app
+    @app.before_request
+    def ensure_lightweight_schema_updates():
+        if app.config.get('CLASS8_BILLS_RECONCILED_CHECKED'):
+            return
+        app.config['CLASS8_BILLS_RECONCILED_CHECKED'] = True
+        try:
+            inspector = inspect(db.engine)
+            if inspector.has_table('bills'):
+                columns = [column['name'] for column in inspector.get_columns('bills')]
+                if 'Reconciled' not in columns:
+                    db.session.execute(text(
+                        'ALTER TABLE bills ADD COLUMN Reconciled INT NOT NULL DEFAULT 0'
+                    ))
+                    db.session.commit()
+            if inspector.has_table('overseas'):
+                overseas_columns = [column['name'] for column in inspector.get_columns('overseas')]
+                overseas_adds = [
+                    ('IngateDate', 'DATETIME NULL'),
+                    ('InvoDate', 'DATETIME NULL'),
+                    ('PaidDate', 'DATETIME NULL'),
+                    ('InvoTotal', 'VARCHAR(45) NULL'),
+                    ('PaidAmt', 'VARCHAR(45) NULL'),
+                    ('BalDue', 'VARCHAR(45) NULL'),
+                    ('Payments', 'VARCHAR(45) NULL'),
+                    ('PayRef', 'VARCHAR(80) NULL'),
+                    ('PayMeth', 'VARCHAR(45) NULL'),
+                    ('PayAcct', 'VARCHAR(80) NULL'),
+                    ('Istat', 'INT NULL DEFAULT 0'),
+                    ('QBi', 'INT NULL'),
+                ]
+                for column_name, column_def in overseas_adds:
+                    if column_name not in overseas_columns:
+                        db.session.execute(text(
+                            f'ALTER TABLE overseas ADD COLUMN {column_name} {column_def}'
+                        ))
+                        db.session.commit()
+                db.session.execute(text(
+                    'ALTER TABLE overseas '
+                    'MODIFY COLUMN Exporter TEXT NULL, '
+                    'MODIFY COLUMN Consignee TEXT NULL, '
+                    'MODIFY COLUMN Notify TEXT NULL, '
+                    'MODIFY COLUMN Description TEXT NULL, '
+                    'MODIFY COLUMN Pol VARCHAR(100) NULL, '
+                    'MODIFY COLUMN FrFor VARCHAR(100) NULL'
+                ))
+                db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            print(f'Could not ensure lightweight schema updates: {exc}')
 
+    return app

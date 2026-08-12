@@ -6,6 +6,7 @@ co = companydata()
 #hello this is ubuntu1700
 genre = 'Trucking'
 jobcode = co[10] + genre[0]
+forwardingcode = co[10] + 'F'
 
 PublicSite_setup = {
     'OSLM': {
@@ -1377,6 +1378,105 @@ Exports_setup = {'name' : 'Exports',
                 'matchfrom': None
                 }
 
+FreightForwarding_genre = {'table': 'OverSeas',
+                  'genre_tables': ['OverSeas'],
+                  'genre_tables_on': ['on'],
+                  'quick_buttons': ['New Job', 'Edit Item'],
+                  'table_filters': [{'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
+                  'task_boxes': [{'Adding': ['New Job', 'Upload Invoice']},
+                                 {'Editing': ['Edit Item']},
+                                 {'Money Flow': ['Receive Payment']},
+                                 {'View Docs': ['Invoice']},
+                                 {'Undo': ['Delete Item', 'Undo Payment']}],
+                  'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"',
+                                      '20\' GP 8\'6\"', '45\' GP 9\'6\"', 'LCL', 'RORO', 'Vehicle', 'HHG'],
+                  'task_mapping': {'Job':'OverSeas', 'Invoice':'CT', 'View':'CT'},
+                  'task_box_map': {
+                                    'Quick' :
+                                        {
+                                            'New Job' : ['Table_Selected', 'New', 'OverSeas'],
+                                            'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form']
+                                        },
+                                    'Adding':
+                                        {
+                                         'New Job': ['Table_Selected', 'New', 'OverSeas'],
+                                         'Upload Invoice' : ['Single_Item_Selection', 'Upload', 'Invoice']
+                                         },
+
+                                    'Editing':
+                                        {
+                                         'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form']
+                                        },
+
+                                    'Money Flow':
+                                        {
+                                         'Receive Payment' : ['Single_Item_Selection', 'ForwardingReceivePay', 'PayInvoice']
+                                        },
+
+                                    'View Docs':
+                                        {
+                                         'Invoice' : ['Single_Item_Selection', 'View', 'Invoice']
+                                         },
+
+                                    'Undo':
+                                        {
+                                          'Delete Item': ['All_Item_Selection', 'Undo', 'Delete'],
+                                          'Undo Payment': ['All_Item_Selection', 'Undo', 'Payment']
+                                        }
+                                    }
+                    }
+
+OverSeas_setup = {'name' : 'Freight Forwarding Job',
+                'table': 'OverSeas',
+                'filter': None,
+                'filterval': None,
+                'checklocation': 2,
+                'creators': ['Jo'],
+                'ukey': 'Jo',
+                'simplify': ['Job', 'Parties', 'Money', 'Docs'],
+                'entry data': [['Jo', 'JO', 'JO', forwardingcode, 'text', 0, 'ok', 'cc', None, 'Always'],
+                               ['Exporter', 'Exporter', 'Exporter', 'multitext', 'text', 0, 'ok', 'll', 24, 'Always'],
+                               ['Consignee', 'Consignee', 'Consignee', 'multitext', 'text', 0, 'ok', 'll', 24, 'Parties'],
+                               ['Notify', 'Notify', 'Notify Party', 'multitext', 'text', 0, 'ok', 'll', 24, 'Parties'],
+                               ['IngateDate', 'Ingate', 'Date In-Gated', 'date', 'date', 0, 'ok', 'cc', None, 'Job'],
+                               ['InvoDate', 'Inv Date', 'Invoice Date', 'date', 'date', 0, 'ok', 'cc', None, 'Money'],
+                               ['PaidDate', 'Paid Date', 'Payment Received Date', 'date', 'date', 0, 'ok', 'cc', None, 'Money'],
+                               ['FrFor', 'Carrier', 'Carrier', 'text', 'text', 0, 'ok', 'cl', None, 'Job'],
+                               ['Pol', 'POL', 'Port of Loading', 'text', 'text', 0, 'ok', 'cl', None, 'Job'],
+                               ['Description', 'Contents', 'Contents', 'multitext', 'text', 0, 'ok', 'll', 30, 'Job'],
+                               ['Booking', 'Booking', 'Booking', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                               ['Container', 'Container', 'Container', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                               ['Seal', 'Seal', 'Seal', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                               ['AES', 'ITN', 'ITN', 'text', 'text', 0, 'ok', 'cc', None, 'Job'],
+                               ['InvoTotal', 'Inv$', 'Invoice Amount', 'text', 'float', 0, 'ok', 'cr', None, 'Money'],
+                               ['Payments', 'Paid$', 'Payments', 'text', None, 0, 'ok', 'cr', None, 'Money'],
+                               ['BalDue', 'Bal$', 'Balance Due', 'text', None, 0, 'ok', 'cr', None, 'Money'],
+                               ['PayRef', 'PayRef', 'Payment Reference', 'text', None, 0, 'ok', 'cl', None, 'Money'],
+                               ['PayMeth', 'PayMeth', 'Payment Method', 'text', None, 0, 'ok', 'cl', None, 'Money'],
+                               ['PayAcct', 'PayAcct', 'Payment Account', 'text', None, 0, 'ok', 'cl', None, 'Money'],
+                               ['Istat', 'Istat', 'Payment Status', 'text', None, 0, 'ok', 'cc', None, 'Money'],
+                               ['Invoice', 'IV', 'Invoice', 'text', None, 0, 'ok', 'cL', None, 'Docs']],
+                'hidden data' : [],
+                'colorfilter': None,
+                'filteron':  [],
+                'side data': [],
+                'default values': [],
+                'form show': {
+                   'New': ['Job', 'Parties', 'Money'],
+                   'Edit': ['Job', 'Parties', 'Money']
+                },
+                'form checks': {
+                   'New': ['Exporter', 'Consignee', 'FrFor', 'Booking'],
+                   'Edit': ['Exporter', 'Consignee', 'FrFor', 'Booking']
+                },
+                'jscript': 'dtTrucking',
+                'documents': ['Invoice'],
+                'sourcenaming': [None, None, 'Jo'],
+                'copyswaps' : {},
+                'haulmask' : {},
+                'matchfrom': {}
+                }
+
 billcode = co[10] + 'B'
 Billing_genre =   {'table': 'Bills',
                   'genre_tables': ['Bills', 'Vendors', 'Accounts'],
@@ -1476,6 +1576,7 @@ Bills_setup = {'name' : 'Billing',
                                 ['Company', 'Vendor', 'Select Vendor', 'select', 'vendordata', 0, 'ok', 'cl', 15, 'Always'],
                                 ['bAmount', 'Bill$', 'Bill$', 'text', 'float', 0, 'ok', 'cr', None, 'Always'],
                                 ['Co', 'Co', 'Co/Div', 'select', 'codata', 0, 'ok', 'cc', None, 'Always'],
+                                ['Reconciled', 'Rec', 'Reconciled', 'text', None, 0, 'ok', 'cc', None, 'Always'],
 
                                 ['bAccount','ExAcct', 'Bill Acct', 'select', 'expdata', 0, 'ok', 'cl', None, 'ExpType'],
                                 ['bType','Ptype', 'Ptype', 'disabled', 'disabled', 0, 'ok', 'cc', None, 'ExpType'],

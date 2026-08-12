@@ -114,7 +114,7 @@
                             <td>
                                 {% if batch.deposited %}
                                     {{ batch.deposit_ref }} {{ batch.deposit_account }} {{ batch.deposit_date_fmt }}
-                                {% elif batch.account == 'Undeposited Funds' and batch.type == 'ID' %}
+                                {% elif batch.account == 'Undeposited Funds' and batch.type in ['ID', 'DD'] %}
                                     Ready
                                 {% else %}
                                     Not check deposit

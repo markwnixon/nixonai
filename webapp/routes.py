@@ -3,7 +3,7 @@ from flask import Blueprint
 import json
 
 from webapp.extensions import db, bcrypt
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Driverlog, DispatchDriverMessage, DispatchDriverAssignment, Interchange, Reconciliations, users
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Driverlog, DispatchDriverMessage, DispatchDriverAssignment, Interchange, Reconciliations, OverSeas, users
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker, get_dispatch
 from webapp.revenues import get_revenues
@@ -7359,6 +7359,14 @@ def BankingPaymentDetail():
     def money(cents):
         return "${:,.2f}".format((cents or 0) / 100)
 
+    def forwarding_name(job):
+        if job is None:
+            return ''
+        for value in [job.Exporter, job.Consignee, job.Notify]:
+            if value:
+                return str(value).splitlines()[0].strip()
+        return ''
+
     ids = []
     for item in request.values.get('ids', '').split(','):
         try:
@@ -7390,7 +7398,12 @@ def BankingPaymentDetail():
             for allocation in allocation_rows:
                 order = Orders.query.filter(Orders.Jo == allocation.Tcode).first()
                 invoice = Invoices.query.filter(Invoices.Jo == allocation.Tcode).first()
-                invo_cents = cents_from_value(invoice.Total if invoice is not None else (order.InvoTotal if order is not None else 0))
+                forwarding_job = None if order is not None else OverSeas.query.filter(OverSeas.Jo == allocation.Tcode).first()
+                invo_cents = cents_from_value(
+                    invoice.Total if invoice is not None
+                    else (order.InvoTotal if order is not None
+                          else (forwarding_job.InvoTotal if forwarding_job is not None else 0))
+                )
                 received_cents = allocation.Credit or 0
                 balance_cents = invo_cents - received_cents
                 invoice_total += invo_cents
@@ -7398,9 +7411,9 @@ def BankingPaymentDetail():
                 detail_rows.append({
                     'ledger_id': allocation.id,
                     'jo': allocation.Tcode or '',
-                    'order_id': order.id if order is not None else '',
-                    'shipper': order.Shipper if order is not None else allocation.Source,
-                    'container': order.Container if order is not None else '',
+                    'order_id': order.id if order is not None else (forwarding_job.id if forwarding_job is not None else ''),
+                    'shipper': order.Shipper if order is not None else (forwarding_name(forwarding_job) or allocation.Source),
+                    'container': order.Container if order is not None else (forwarding_job.Container if forwarding_job is not None else ''),
                     'invoice': money(invo_cents),
                     'received': money(received_cents),
                     'balance': money(balance_cents),
@@ -7411,13 +7424,18 @@ def BankingPaymentDetail():
                 })
             continue
         order = Orders.query.filter(Orders.Jo == ledger_line.Tcode).first()
+        forwarding_job = None if order is not None else OverSeas.query.filter(OverSeas.Jo == ledger_line.Tcode).first()
         income = Deposits.query.filter(Deposits.Jo == ledger_line.Tcode).first()
         invoice = Invoices.query.filter(Invoices.Jo == ledger_line.Tcode).first()
         is_manual = ledger_line.SourceTable == 'ManualDeposit'
         original_payment = None
         if ledger_line.SourceTable == 'CounterDepositItem' and ledger_line.SourceId:
             original_payment = Gledger.query.get(ledger_line.SourceId)
-        invo_cents = 0 if is_manual else cents_from_value(invoice.Total if invoice is not None else (order.InvoTotal if order is not None else 0))
+        invo_cents = 0 if is_manual else cents_from_value(
+            invoice.Total if invoice is not None
+            else (order.InvoTotal if order is not None
+                  else (forwarding_job.InvoTotal if forwarding_job is not None else 0))
+        )
         received_cents = ledger_line.Debit or 0
         balance_cents = 0 if is_manual else invo_cents - received_cents
         invoice_total += invo_cents
@@ -7426,9 +7444,9 @@ def BankingPaymentDetail():
         detail_rows.append({
             'ledger_id': ledger_line.id,
             'jo': ledger_line.Tcode or '',
-            'order_id': order.id if order is not None else '',
-            'shipper': order.Shipper if order is not None else ledger_line.Source,
-            'container': order.Container if order is not None else '',
+            'order_id': order.id if order is not None else (forwarding_job.id if forwarding_job is not None else ''),
+            'shipper': order.Shipper if order is not None else (forwarding_name(forwarding_job) or ledger_line.Source),
+            'container': order.Container if order is not None else (forwarding_job.Container if forwarding_job is not None else ''),
             'invoice': '' if is_manual else money(invo_cents),
             'received': money(received_cents),
             'balance': '' if is_manual else money(balance_cents),
@@ -7560,7 +7578,7 @@ def ReceiveByAccount():
 
         payment_rows = Gledger.query.filter(
             (Gledger.id.in_(payment_ids)) &
-            (Gledger.Type == 'ID') &
+            (Gledger.Type.in_(['ID', 'DD'])) &
             (Gledger.Account == 'Undeposited Funds') &
             (Gledger.Com == cmpdata[10])
         ).order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
@@ -7568,7 +7586,7 @@ def ReceiveByAccount():
             err_list.append('Selected rows do not include undeposited check payments.')
             return err_list
         if len({row.id for row in payment_rows}) != len(set(payment_ids)):
-            err_list.append('Only undeposited check payment batches can be included in a counter deposit.')
+            err_list.append('Only undeposited check/deposit batches can be included in a counter deposit.')
             return err_list
 
         already_deposited = Gledger.query.filter(
@@ -7941,6 +7959,17 @@ def ReceiveByAccount():
                 (Gledger.Type == 'IC') &
                 (Gledger.Com == cmpdata[10])
             ).order_by(Gledger.JournalSeq.asc(), Gledger.id.asc()).all()
+            forwarding_allocations = [
+                row for row in allocation_rows
+                if Orders.query.filter(Orders.Jo == row.Tcode).first() is None
+                and OverSeas.query.filter(OverSeas.Jo == row.Tcode).first() is not None
+            ]
+            if forwarding_allocations:
+                err_list.append(
+                    'Freight forwarding received-payment batches can be reviewed or included in a counter deposit, '
+                    'but they cannot be reloaded in the trucking Receive By Account editor.'
+                )
+                return holdvec, err_list
         payment_detail_rows = allocation_rows or batch_rows
 
         lookbacktime, stopdate = receive_order_stopdate()
@@ -8492,6 +8521,193 @@ def GeneralDeposits():
         credit_accounts=credit_accounts,
         reimbursement_accounts=reimbursement_accounts,
         recent_deposits=recent_deposits,
+    )
+
+
+@main.route('/LoanInterestAdjustments', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def LoanInterestAdjustments():
+    from webapp.viewfuncs import newjo
+
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
+        except:
+            return 0
+
+    company_code = cmpdata[10]
+    today = datetime.date.today()
+    today_value = today.strftime('%Y-%m-%d')
+    err = []
+    selected = {
+        'adjustment_date': request.values.get('adjustment_date', today_value),
+        'loan_account': request.values.get('loan_account', ''),
+        'interest_account': request.values.get('interest_account', ''),
+        'period_year': request.values.get('period_year', str(today.year)),
+        'amount': request.values.get('amount', ''),
+        'source': request.values.get('source', 'SBA'),
+        'ref': request.values.get('ref', ''),
+        'memo': request.values.get('memo', ''),
+    }
+
+    loan_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (Accounts.Type.in_(['Current Liability', 'Long Term Liability']))
+    ).order_by(Accounts.Type, Accounts.Name).all()
+    interest_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (Accounts.Type == 'Expense') &
+        (
+            Accounts.Name.ilike('%interest%') |
+            Accounts.Category.ilike('%interest%') |
+            Accounts.Subcategory.ilike('%interest%')
+        )
+    ).order_by(Accounts.Category, Accounts.Subcategory, Accounts.Name).all()
+    if not interest_accounts:
+        interest_accounts = Accounts.query.filter(
+            (Accounts.Co == company_code) &
+            (Accounts.Type == 'Expense')
+        ).order_by(Accounts.Category, Accounts.Subcategory, Accounts.Name).all()
+
+    if not selected['loan_account'] and loan_accounts:
+        selected['loan_account'] = loan_accounts[0].Name
+    if not selected['interest_account'] and interest_accounts:
+        selected['interest_account'] = interest_accounts[0].Name
+
+    if request.method == 'POST' and request.values.get('delete_adjustments') is not None:
+        selected_journals = request.values.getlist('adjustment_journal')
+        if not selected_journals:
+            err.append('No loan interest adjustments selected for deletion')
+        else:
+            deleted_rows = 0
+            deleted_journals = 0
+            blocked_journals = []
+            for journal_id in selected_journals:
+                lines = Gledger.query.filter(
+                    (Gledger.JournalId == journal_id) &
+                    (Gledger.SourceTable == 'LoanInterestAdjustment') &
+                    (Gledger.Com == company_code)
+                ).all()
+                if not lines:
+                    continue
+                if any(line.Reconciled not in [None, 0, 25] for line in lines):
+                    blocked_journals.append(journal_id)
+                    continue
+                deleted_journals += 1
+                deleted_rows += len(lines)
+                for line in lines:
+                    db.session.delete(line)
+            db.session.commit()
+            if deleted_journals:
+                err.append(f'Deleted {deleted_journals} loan interest adjustment journal(s), {deleted_rows} ledger row(s)')
+            if blocked_journals:
+                err.append(f'Cannot delete reconciled adjustment(s): {", ".join(blocked_journals)}')
+
+    if request.method == 'POST' and request.values.get('create_adjustment') is not None:
+        adjustment_date = None
+        try:
+            adjustment_date = datetime.datetime.strptime(selected['adjustment_date'], '%Y-%m-%d')
+        except ValueError:
+            err.append('Adjustment date is invalid')
+
+        amount = money_to_cents(selected['amount'])
+        if amount <= 0:
+            err.append('Interest amount must be greater than zero')
+
+        loan_account = Accounts.query.filter(
+            (Accounts.Name == selected['loan_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        interest_account = Accounts.query.filter(
+            (Accounts.Name == selected['interest_account']) &
+            (Accounts.Co == company_code)
+        ).first()
+        if loan_account is None or loan_account.Type not in ['Current Liability', 'Long Term Liability']:
+            err.append('Loan liability account is required')
+        if interest_account is None or interest_account.Type != 'Expense':
+            err.append('Interest expense account is required')
+
+        if not err:
+            tcode = newjo(f'{company_code}L', selected['adjustment_date'])
+            period = selected['period_year'].strip() or str(adjustment_date.year)
+            memo = selected['memo'].strip() or f'Loan interest adjustment for {selected["source"].strip() or "loan"} {period}'
+            journal_id = f'LOANINT-{tcode}'
+            recorded = datetime.datetime.now()
+            err = post_balanced_journal(
+                [
+                    {
+                        'debit': amount,
+                        'credit': 0,
+                        'account': interest_account.Name,
+                        'aid': interest_account.id,
+                        'source': selected['source'].strip() or loan_account.Name,
+                        'sid': loan_account.id,
+                        'type': 'LI',
+                        'tcode': tcode,
+                        'com': company_code,
+                        'recorded': recorded,
+                        'date': adjustment_date,
+                        'ref': selected['ref'].strip() or period,
+                    },
+                    {
+                        'debit': 0,
+                        'credit': amount,
+                        'account': loan_account.Name,
+                        'aid': loan_account.id,
+                        'source': interest_account.Name,
+                        'sid': interest_account.id,
+                        'type': 'LC',
+                        'tcode': tcode,
+                        'com': company_code,
+                        'recorded': recorded,
+                        'date': adjustment_date,
+                        'ref': selected['ref'].strip() or period,
+                    },
+                ],
+                journal_id=journal_id,
+                journal_memo=memo,
+                posted_by='loan_interest_adjustments',
+                source_table='LoanInterestAdjustment',
+                source_id=None,
+            )
+            if not err:
+                err.append(f'Loan interest adjustment {tcode} recorded for ${amount / 100:,.2f}')
+                selected = {
+                    'adjustment_date': today_value,
+                    'loan_account': loan_account.Name,
+                    'interest_account': interest_account.Name,
+                    'period_year': str(today.year),
+                    'amount': '',
+                    'source': selected['source'],
+                    'ref': '',
+                    'memo': '',
+                }
+
+    recent_adjustments = Gledger.query.filter(
+        (Gledger.Type == 'LI') &
+        (Gledger.Com == company_code) &
+        (Gledger.SourceTable == 'LoanInterestAdjustment')
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(50).all()
+    for item in recent_adjustments:
+        item.amount_fmt = "${:,.2f}".format((item.Debit or 0) / 100)
+        credit_line = Gledger.query.filter(
+            (Gledger.JournalId == item.JournalId) &
+            (Gledger.Type == 'LC') &
+            (Gledger.Com == company_code)
+        ).first()
+        item.loan_account = credit_line.Account if credit_line is not None else ''
+
+    return render_template(
+        'loan_interest_adjustments.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        err='\n'.join(err) if err else 'Ready',
+        selected=selected,
+        loan_accounts=loan_accounts,
+        interest_accounts=interest_accounts,
+        recent_adjustments=recent_adjustments,
     )
 
 

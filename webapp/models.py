@@ -1230,7 +1230,7 @@ class OverSeas(db.Model):
     Direction = db.Column('Direction', db.String(25))
     Commodity = db.Column('Commodity', db.String(25))
     Pod = db.Column('Pod', db.String(50))
-    Pol = db.Column('Pol', db.String(25))
+    Pol = db.Column('Pol', db.String(100))
     Origin = db.Column('Origin', db.String(25))
     PuDate = db.Column('PuDate', db.DateTime)
     RetDate = db.Column('RetDate', db.DateTime)
@@ -1245,10 +1245,10 @@ class OverSeas(db.Model):
     FrForID = db.Column('FrForID', db.Integer)
     PreCarryID = db.Column('PreCarryID', db.Integer)
     BillTo = db.Column('BillTo', db.String(50))
-    Exporter = db.Column('Exporter', db.String(50))
-    Consignee = db.Column('Consignee', db.String(50))
-    Notify = db.Column('Notify', db.String(50))
-    FrFor = db.Column('FrFor', db.String(50))
+    Exporter = db.Column('Exporter', db.Text)
+    Consignee = db.Column('Consignee', db.Text)
+    Notify = db.Column('Notify', db.Text)
+    FrFor = db.Column('FrFor', db.String(100))
     PreCarry = db.Column('PreCarry', db.String(50))
     Estimate = db.Column('Estimate', db.String(25))
     Charge = db.Column('Charge', db.String(25))
@@ -1261,13 +1261,33 @@ class OverSeas(db.Model):
     Label = db.Column('Label', db.String(99))
     Driver = db.Column('Driver', db.String(50))
     Seal = db.Column('Seal', db.String(25))
-    Description = db.Column('Description', db.String(400))
+    Description = db.Column('Description', db.Text)
     RelType = db.Column('RelType', db.String(25))
     AES = db.Column('AES', db.String(50))
     ExpRef = db.Column('ExpRef', db.String(45))
     AddNote = db.Column('AddNote', db.String(45))
+    IngateDate = db.Column('IngateDate', db.DateTime)
+    InvoDate = db.Column('InvoDate', db.DateTime)
+    PaidDate = db.Column('PaidDate', db.DateTime)
+    InvoTotal = db.Column('InvoTotal', db.String(45))
+    PaidAmt = db.Column('PaidAmt', db.String(45))
+    BalDue = db.Column('BalDue', db.String(45))
+    Payments = db.Column('Payments', db.String(45))
+    PayRef = db.Column('PayRef', db.String(80))
+    PayMeth = db.Column('PayMeth', db.String(45))
+    PayAcct = db.Column('PayAcct', db.String(80))
+    Istat = db.Column('Istat', db.Integer)
+    QBi = db.Column('QBi', db.Integer)
 
-    def __init__(self, Jo, Pid, MoveType, Direction, Commodity, Pod, Pol, Origin, ContainerType, Container, Booking, CommoList, ExportID, ConsigID, NotifyID, FrForID, PreCarryID, BillTo, Exporter, Consignee, Notify, FrFor, PreCarry, Estimate, Charge, Dpath, Ipath, Apath, Cache, Status, Label, Driver, Seal, Description, Tpath, PuDate, RetDate, Itotal, RelType, AES, ExpRef, AddNote):
+    @property
+    def Invoice(self):
+        return self.Ipath
+
+    @Invoice.setter
+    def Invoice(self, value):
+        self.Ipath = value
+
+    def __init__(self, Jo, Pid, MoveType, Direction, Commodity, Pod, Pol, Origin, ContainerType, Container, Booking, CommoList, ExportID, ConsigID, NotifyID, FrForID, PreCarryID, BillTo, Exporter, Consignee, Notify, FrFor, PreCarry, Estimate, Charge, Dpath, Ipath, Apath, Cache, Status, Label, Driver, Seal, Description, Tpath, PuDate, RetDate, Itotal, RelType, AES, ExpRef, AddNote, **kwargs):
         self.Jo = Jo
         self.Pid = Pid
         self.MoveType = MoveType
@@ -1310,6 +1330,8 @@ class OverSeas(db.Model):
         self.AES = AES
         self.ExpRef = ExpRef
         self.AddNote = AddNote
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
 class Autos(db.Model):
@@ -1892,8 +1914,9 @@ class Bills(db.Model):
     MethList = db.Column('MethList', db.String(200))
     Pcache = db.Column('Pcache', db.Integer)
     pMeth = db.Column('pMeth', db.String(45))
+    Reconciled = db.Column('Reconciled', db.Integer)
 
-    def __init__(self, Jo, Pid, Company, Memo, Description, bAmount, Status, Scache, Source, Ref, Date, pDate, pAmount, pMulti, pAccount, bAccount, bType, bCat, bSubcat, Link, User, Co, Temp1, Temp2, Recurring, dDate, pAmount2, pDate2, Proof, Check, Ccache, QBi, iflag, PmtList, PacctList, RefList, MemoList, PdateList, CheckList, MethList, Pcache, pMeth):
+    def __init__(self, Jo, Pid, Company, Memo, Description, bAmount, Status, Scache, Source, Ref, Date, pDate, pAmount, pMulti, pAccount, bAccount, bType, bCat, bSubcat, Link, User, Co, Temp1, Temp2, Recurring, dDate, pAmount2, pDate2, Proof, Check, Ccache, QBi, iflag, PmtList, PacctList, RefList, MemoList, PdateList, CheckList, MethList, Pcache, pMeth, Reconciled=0):
         self.Jo = Jo
         self.Pid = Pid
         self.Company = Company
@@ -1936,6 +1959,7 @@ class Bills(db.Model):
         self.MethList = MethList
         self.Pcache = Pcache
         self.pMeth = pMeth
+        self.Reconciled = Reconciled
 
     def Bal(self):
         try:

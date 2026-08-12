@@ -2,7 +2,7 @@ from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
                           SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap, \
-                          Chassis, DepreciationAsset, Deposits, Reconciliations, DispatchDriverAssignment
+                          Chassis, DepreciationAsset, Deposits, Reconciliations, DispatchDriverAssignment, OverSeas
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail, dispatch_sender_key, require_invoice_cc, require_rate_con_cc
@@ -96,6 +96,143 @@ def reconciled_bill_ledger_entries(bill):
         row for row in bill_ledger_entries(bill)
         if row.Reconciled not in [None, 0, 25]
     ]
+
+
+def reconciled_bill_payment_ledger_entries(bill):
+    return [
+        row for row in bill_payment_ledger_entries(bill)
+        if row.Reconciled not in [None, 0, 25]
+    ]
+
+
+def bill_reconciled_value(bill):
+    # Payroll bills are reporting rows for payroll detail; reconciliation happens on
+    # the Gusto net-pay and tax withdrawal ledger lines for the batch journal.
+    if (
+        bill is not None and
+        getattr(bill, 'Temp1', None) == 'PayrollBatch' and
+        hasinput(getattr(bill, 'Temp2', None))
+    ):
+        payroll_bank_rows = Gledger.query.filter(
+            (Gledger.SourceTable == 'PayrollBatch') &
+            (Gledger.JournalId == bill.Temp2) &
+            (Gledger.Type.in_(['PC', 'XC']))
+        ).all()
+        if payroll_bank_rows and all(row.Reconciled not in [None, 0, 25] for row in payroll_bank_rows):
+            values = []
+            for row in payroll_bank_rows:
+                try:
+                    values.append(int(row.Reconciled or 0))
+                except:
+                    values.append(1)
+            return max(values) if values else 1
+        return 0
+
+    reconciled_rows = reconciled_bill_payment_ledger_entries(bill)
+    if not reconciled_rows:
+        return 0
+    values = []
+    for row in reconciled_rows:
+        try:
+            values.append(int(row.Reconciled or 0))
+        except:
+            values.append(1)
+    return max(values) if values else 1
+
+
+def sync_bill_reconciled_status(bill):
+    if bill is None:
+        return 0
+    reconciled_value = bill_reconciled_value(bill)
+    current_value = getattr(bill, 'Reconciled', None) or 0
+    try:
+        current_value = int(current_value)
+    except:
+        current_value = 0
+    if current_value != reconciled_value:
+        bill.Reconciled = reconciled_value
+        db.session.commit()
+    return reconciled_value
+
+
+def sync_bills_reconciled_status():
+    result = db.session.execute(text("""
+        UPDATE bills b
+        LEFT JOIN (
+            SELECT b2.id AS BillId, MAX(g.Reconciled) AS ReconciledValue
+            FROM bills b2
+            JOIN gledger g ON (
+                (g.SourceTable = 'Bills' AND g.SourceId = b2.id)
+                OR g.Tcode = b2.Jo
+                OR g.Tcode LIKE CONCAT(b2.Jo, '-%')
+                OR g.JournalId = CONCAT('PAYBILL-', b2.Jo)
+                OR g.JournalId LIKE CONCAT('PAYBILL-', b2.Jo, '-%')
+            )
+            WHERE g.Type IN ('PD', 'PC', 'DD', 'QD', 'QC')
+              AND g.Reconciled IS NOT NULL
+              AND g.Reconciled NOT IN (0, 25)
+            GROUP BY b2.id
+        ) r ON r.BillId = b.id
+        SET b.Reconciled = COALESCE(r.ReconciledValue, 0)
+        WHERE COALESCE(b.Reconciled, 0) <> COALESCE(r.ReconciledValue, 0)
+    """))
+    normal_count = result.rowcount or 0
+
+    # Keep payroll wage/tax bill rows locked with the reconciled payroll withdrawal
+    # pair instead of trying to match them to individual bill-payment ledger rows.
+    payroll_result = db.session.execute(text("""
+        UPDATE bills b
+        LEFT JOIN (
+            SELECT JournalId, MAX(Reconciled) AS ReconciledValue
+            FROM gledger
+            WHERE SourceTable = 'PayrollBatch'
+              AND Type IN ('PC', 'XC')
+            GROUP BY JournalId
+            HAVING COUNT(*) > 0
+               AND SUM(CASE
+                    WHEN Reconciled IS NOT NULL AND Reconciled NOT IN (0, 25)
+                    THEN 1 ELSE 0 END
+               ) = COUNT(*)
+        ) r ON r.JournalId = b.Temp2
+        SET b.Reconciled = COALESCE(r.ReconciledValue, 0)
+        WHERE b.Temp1 = 'PayrollBatch'
+          AND COALESCE(b.Reconciled, 0) <> COALESCE(r.ReconciledValue, 0)
+    """))
+    db.session.commit()
+    return normal_count + (payroll_result.rowcount or 0)
+
+
+def bill_has_protected_reconciled_change(bill, entrydata, holdvec, form_show):
+    if bill is None:
+        return []
+    if not sync_bill_reconciled_status(bill):
+        return []
+
+    protected_fields = {
+        'bAmount': 'Bill Amount',
+        'pAmount': 'Paid Amount',
+        'pAmount2': 'Multi-Payment Amount',
+        'pDate': 'Paid Date',
+        'pDate2': 'Second Paid Date',
+        'pAccount': 'Payment Account',
+        'pMeth': 'Payment Method',
+        'Ref': 'Reference',
+        'Status': 'Status',
+    }
+    changed = []
+    for jx, entry in enumerate(entrydata):
+        field = entry[0]
+        if field not in protected_fields:
+            continue
+        if entry[4] is None or not (entry[9] == 'Always' or entry[9] in form_show):
+            continue
+        old_value = getattr(bill, field, None)
+        new_value = holdvec[jx] if jx < len(holdvec) else None
+        old_text = '' if old_value is None else str(old_value).strip()
+        new_text = '' if new_value is None else str(new_value).strip()
+        if old_text != new_text:
+            changed.append(protected_fields[field])
+    return changed
 
 
 def bill_payment_account_names(company_code=None):
@@ -2455,6 +2592,14 @@ def Table_maker(genre):
     #Apply shortcut for filters for various tasks
     current_view = tfilters['Viewer']
     if invoicehit is not None: tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': 'Unsent', 'Haul Filter': 'Completed', 'Color Filter': 'Both', 'Viewer':current_view}
+    if genre == 'Billing':
+        try:
+            synced_count = sync_bills_reconciled_status()
+            if synced_count:
+                err.append(f'Synced reconciliation status for {synced_count} bill payment(s).')
+        except Exception as exc:
+            db.session.rollback()
+            err.append(f'Could not sync bill reconciliation status: {exc}')
 
     # Populate the tables that are on with data
     tabletitle, table_data, checked_data, jscripts, keydata, labpassvec = populate(tables_on,tabletitle,tfilters,jscripts)
@@ -2987,6 +3132,14 @@ def get_dbdata(table_setup, tfilters):
         if hold_row_color:
             rowcolors1[-1] = 'pink lighten-5 font-weight-bold'
             rowcolors2[-1] = 'pink lighten-5 font-weight-bold'
+        if table == 'Bills':
+            try:
+                bill_reconciled = int(getattr(odat, 'Reconciled', 0) or 0)
+            except:
+                bill_reconciled = 0
+            if bill_reconciled:
+                rowcolors1[-1] = 'cyan lighten-4 font-weight-bold'
+                rowcolors2[-1] = 'cyan lighten-4 font-weight-bold'
 
         for jx, colist in enumerate(entrydata):
             co = colist[0]
@@ -3565,6 +3718,12 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
 
     nextquery = f"{table}.query.get({sid})"
     olddat = eval(nextquery)
+    if table == 'Bills' and sync_bill_reconciled_status(olddat):
+        err.append(
+            f'Bill {olddat.Jo} is locked because its payment has been reconciled. '
+            'Reopen the reconciliation statement or undo the payment before editing this bill.'
+        )
+        return [], [], err, viewport, True
     old_account_name = olddat.Name if table == 'Accounts' else None
     old_account_type = olddat.Type if table == 'Accounts' else None
     old_account_category = olddat.Category if table == 'Accounts' else None
@@ -3678,6 +3837,16 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                 if thisvalue == -1: setattr(olddat, colorcol[0], 0)
             except:
                 thisvalue = 0
+
+            if failed == 0 and table == 'Bills':
+                protected_changes = bill_has_protected_reconciled_change(olddat, entrydata, holdvec, form_show)
+                if protected_changes:
+                    failed = failed + 1
+                    err.append(
+                        'Cannot change reconciled bill payment fields for '
+                        f'{olddat.Jo}: {", ".join(protected_changes)}. '
+                        'Reopen the reconciliation statement or undo the payment before changing these values.'
+                    )
 
             if failed == 0:
                 for jx, entry in enumerate(entrydata):
@@ -3996,6 +4165,70 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                         db.session.commit()
 
 
+                elif table == 'OverSeas' and task_focus == 'Payment':
+                    odat = OverSeas.query.get(sid)
+                    if odat is not None:
+                        payment_credit_rows = Gledger.query.filter(
+                            (Gledger.Tcode == odat.Jo) &
+                            (Gledger.Type == 'IC') &
+                            (Gledger.Com == (odat.Jo or companydata()[10] or 'K')[0])
+                        ).all()
+                        payment_ref_ids = list({row.Sid for row in payment_credit_rows if row.Sid})
+                        if not payment_ref_ids:
+                            err.append(f'No freight forwarding payment was found for {odat.Jo}.')
+                            continue
+
+                        payment_rows = Gledger.query.filter(
+                            (Gledger.Sid.in_(payment_ref_ids)) &
+                            (Gledger.Type.in_(['DD', 'ID', 'IC']))
+                        ).all()
+                        closed_rows = [
+                            row for row in payment_rows
+                            if row.Reconciled not in [None, 0, 25]
+                        ]
+                        if closed_rows:
+                            accounts = ', '.join(sorted({row.Account for row in closed_rows if row.Account}))
+                            err.append(
+                                f'Cannot undo payment for freight forwarding job {odat.Jo}. '
+                                f'Ledger activity is already reconciled for {accounts}. '
+                                'Reopen the reconciliation statement first.'
+                            )
+                            continue
+
+                        deposit_row_ids = [
+                            row.id for row in payment_rows
+                            if row.Type in ['DD', 'ID']
+                        ]
+                        counter_deposit = None
+                        if deposit_row_ids:
+                            counter_deposit = Gledger.query.filter(
+                                (Gledger.SourceTable == 'CounterDepositItem') &
+                                (Gledger.SourceId.in_(deposit_row_ids))
+                            ).first()
+                        if counter_deposit is not None:
+                            err.append(
+                                f'Cannot undo payment for freight forwarding job {odat.Jo}. '
+                                'One or more checks from this payment have already been included in a counter deposit.'
+                            )
+                            continue
+
+                        Gledger.query.filter(
+                            (Gledger.Sid.in_(payment_ref_ids)) &
+                            (Gledger.Type.in_(['DD', 'ID', 'IC']))
+                        ).delete(synchronize_session=False)
+                        PaymentsRec.query.filter(PaymentsRec.id.in_(payment_ref_ids)).delete(synchronize_session=False)
+                        odat.PaidDate = None
+                        odat.PaidAmt = None
+                        odat.PayRef = None
+                        odat.PayMeth = None
+                        odat.PayAcct = None
+                        odat.Payments = '0.00'
+                        odat.BalDue = odat.InvoTotal
+                        odat.QBi = None
+                        odat.Istat = 3 if hasinput(odat.InvoTotal) else 0
+                        db.session.commit()
+                        err.append(f'Undid freight forwarding payment for {odat.Jo}.')
+
 
                 elif table == 'Bills' and task_focus == 'Payment':
                     #print('In the unpay bill section')
@@ -4028,9 +4261,11 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                                     kdat.PacctList = None
                                     kdat.pMulti = None
                                     kdat.pAmount2 = None
+                                    kdat.Reconciled = 0
                                     delete_bill_payment_ledger_entries(kdat)
                             else:
                                 odat.Status = None
+                                odat.Reconciled = 0
                                 delete_bill_payment_ledger_entries(odat)
 
 
@@ -4203,6 +4438,208 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
     return holdvec, entrydata, err, viewport, completed
 
 
+def forwarding_money_cents(value):
+    try:
+        clean = str(value or '').replace('$', '').replace(',', '').strip()
+        if clean in ['', 'None', 'none']:
+            clean = '0'
+        return int(round(float(clean) * 100))
+    except:
+        return 0
+
+
+def forwarding_cents_text(value):
+    return d2s((value or 0) / 100.0)
+
+
+def forwarding_party_name(value):
+    if not hasinput(value):
+        return ''
+    try:
+        return str(value).splitlines()[0].strip()
+    except:
+        return str(value).strip()
+
+
+def forwarding_date_value(value):
+    if isinstance(value, datetime.datetime):
+        return value
+    if isinstance(value, datetime.date):
+        return datetime.datetime.combine(value, datetime.time.min)
+    try:
+        return datetime.datetime.strptime(str(value), '%Y-%m-%d')
+    except:
+        return datetime.datetime.today()
+
+
+def forwarding_date_input(value):
+    parsed = forwarding_date_value(value)
+    return parsed.strftime('%Y-%m-%d')
+
+
+def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
+    err = [f"Running Freight Forwarding Receive Payment task with task_iter {task_iter}"]
+    completed = False
+    viewport = ['0'] * 6
+    entrydata = []
+    job = OverSeas.query.get(sid)
+    if job is None:
+        return [], entrydata, ['Freight forwarding job could not be found.'], viewport, True
+
+    returnhit = request.values.get('Return') or request.values.get('Finished')
+    if returnhit is not None:
+        return [], entrydata, err, viewport, True
+
+    company_code = (job.Jo or companydata()[10] or scac or 'K')[0]
+    customer_name = forwarding_party_name(job.Exporter) or forwarding_party_name(job.Consignee) or 'Freight Forwarding'
+
+    invoice_cents = forwarding_money_cents(job.InvoTotal)
+    paid_so_far_cents = forwarding_money_cents(job.Payments)
+    default_payment_cents = max(invoice_cents - paid_so_far_cents, 0)
+
+    if task_iter == 0:
+        payment_cents = default_payment_cents
+        paidon = datetime.datetime.today()
+        payref = job.PayRef or ''
+        paymethod = job.PayMeth or 'Check'
+        depoacct = job.PayAcct or 'Undeposited Funds'
+    else:
+        payment_cents = forwarding_money_cents(request.values.get('paidamt'))
+        paidon = forwarding_date_value(request.values.get('paidon'))
+        payref = request.values.get('payref') or ''
+        paymethod = request.values.get('paymethod') or 'Check'
+        depoacct = request.values.get('acctfordeposit') or job.PayAcct or 'Undeposited Funds'
+
+    if paymethod in ['Cash', 'Check']:
+        depoacct = 'Undeposited Funds'
+
+    bank_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (Accounts.Type.in_(['Bank', 'Exch']))
+    ).order_by(Accounts.Name).all()
+    acctlist = ['Undeposited Funds']
+    for account in bank_accounts:
+        if account.Name not in acctlist:
+            acctlist.append(account.Name)
+    if depoacct not in acctlist:
+        acctlist.append(depoacct)
+
+    paymeths = ['Cash', 'Check', 'Credit Card', 'Direct Deposit', 'ACH', 'Wire', 'PayCargo']
+    record_requested = request.values.get('recordnow')
+    if record_requested is not None:
+        if invoice_cents <= 0:
+            err.append('Enter the invoice amount before receiving payment.')
+        elif payment_cents <= 0:
+            err.append('Enter a payment amount greater than zero.')
+        else:
+            deposit_account_name = 'Undeposited Funds' if paymethod in ['Cash', 'Check'] or 'Undeposited' in depoacct else depoacct
+            deposit_type = 'ID' if deposit_account_name == 'Undeposited Funds' else 'DD'
+            deposit_account = Accounts.query.filter(
+                (Accounts.Name == deposit_account_name) &
+                (Accounts.Co == company_code)
+            ).first()
+            ar_account = Accounts.query.filter(
+                (Accounts.Name == 'Accounts Receivable') &
+                (Accounts.Co == company_code)
+            ).first()
+            if deposit_account is None:
+                err.append(f'Could not find deposit account {deposit_account_name} for company {company_code}.')
+            elif ar_account is None:
+                err.append(f'Could not find Accounts Receivable for company {company_code}.')
+            else:
+                recorded = datetime.datetime.now()
+                payment_record = PaymentsRec(
+                    Amount=payment_cents,
+                    Account=deposit_account_name,
+                    Source=customer_name,
+                    Type=paymethod,
+                    Com=company_code,
+                    Recorded=recorded,
+                    Date=paidon,
+                    Ref=payref,
+                )
+                db.session.add(payment_record)
+                db.session.flush()
+                journal_id = f'RP-{company_code}-{payment_record.id}'
+                debit_line = Gledger(
+                    Debit=payment_cents,
+                    Credit=0,
+                    Account=deposit_account_name,
+                    Aid=deposit_account.id,
+                    Source=customer_name,
+                    Sid=payment_record.id,
+                    Type=deposit_type,
+                    Tcode=journal_id,
+                    Com=company_code,
+                    Recorded=recorded,
+                    Reconciled=0,
+                    Date=paidon,
+                    Ref=payref,
+                    JournalId=journal_id,
+                    JournalSeq=1,
+                    JournalMemo=f'Freight forwarding received payment {payref or payment_record.id}',
+                    PostedBy='freight_forwarding_receive_payment',
+                    PostedAt=recorded,
+                    SourceTable='ReceivePaymentBatch',
+                    SourceId=payment_record.id,
+                )
+                credit_line = Gledger(
+                    Debit=0,
+                    Credit=payment_cents,
+                    Account='Accounts Receivable',
+                    Aid=ar_account.id,
+                    Source=customer_name,
+                    Sid=payment_record.id,
+                    Type='IC',
+                    Tcode=job.Jo,
+                    Com=company_code,
+                    Recorded=recorded,
+                    Reconciled=0,
+                    Date=paidon,
+                    Ref=payref,
+                    JournalId=journal_id,
+                    JournalSeq=2,
+                    JournalMemo=f'Freight forwarding payment allocation {payref or payment_record.id}',
+                    PostedBy='freight_forwarding_receive_payment',
+                    PostedAt=recorded,
+                    SourceTable='ReceivePaymentAllocation',
+                    SourceId=payment_record.id,
+                )
+                db.session.add(debit_line)
+                db.session.add(credit_line)
+
+                total_paid_cents = paid_so_far_cents + payment_cents
+                balance_cents = invoice_cents - total_paid_cents
+                job.PaidDate = paidon
+                job.PaidAmt = forwarding_cents_text(payment_cents)
+                job.Payments = forwarding_cents_text(total_paid_cents)
+                job.BalDue = forwarding_cents_text(balance_cents)
+                job.PayRef = payref
+                job.PayMeth = paymethod
+                job.PayAcct = deposit_account_name
+                job.QBi = payment_record.id
+                job.Istat = 5 if balance_cents <= 1 else 4
+                db.session.commit()
+                err.append(
+                    f'Recorded {forwarding_cents_text(payment_cents)} payment for {job.Jo}; '
+                    f'balance due is {forwarding_cents_text(balance_cents)}.'
+                )
+                completed = True
+
+    holdvec = [
+        job,
+        [forwarding_cents_text(payment_cents), forwarding_date_input(paidon), payref, paymethod],
+        acctlist,
+        depoacct,
+        paymeths,
+        forwarding_cents_text(invoice_cents),
+        forwarding_cents_text(paid_so_far_cents),
+        task_iter,
+        customer_name,
+    ]
+    return holdvec, entrydata, err, viewport, completed
+
+
 
 def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
 
@@ -4292,6 +4729,10 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                     output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
                     #print(f'output1 for thistable {thistable}-{task_focus} = {output1}')
 
+                if thistable not in ['Orders', 'Interchange']:
+                    bn = 0
+                    filename1 = f'{task_focus}_{fileout}{ext}'
+                    output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
 
                 file.save(output1)
                 viewport[2] = '/'+tpath(f'{thistable}-{task_focus}', filename1)
@@ -5557,6 +5998,13 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             pamt_list.append(d2s(bdat.bAmount))
             bdat.pAmount = bdat.bAmount
             status_list.append(bdat.Status)
+            if sync_bill_reconciled_status(bdat):
+                err.append(f'Bill {bdat.Jo} is already reconciled and cannot be included in Pay Bill.')
+                completed = True
+                holdvec = []
+                entrydata = []
+                viewport = []
+                return holdvec, entrydata, err, viewport, completed
             ptot = ptot + float(bdat.bAmount)
             postdata.append([str(sid), bdat.Jo, bdat.bAmount, bdat.bAccount])
 
@@ -5644,6 +6092,7 @@ def MultiChecks_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
                                     nextquery = f"{table}.query.get({sid})"
                                     each_bdat = eval(nextquery)
                                     each_bdat.Status = 'Paid'
+                                    each_bdat.Reconciled = 0
                                 db.session.commit()
 
                             # Test of bring data-modify the database at this point
