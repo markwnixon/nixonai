@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+import json
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -7,9 +8,41 @@ from flask_jwt_extended import (
 )
 
 from webapp.extensions import bcrypt
-from webapp.models import users
+from webapp.models import users, DispatchDriverAssignment
 
 authenticate_api = Blueprint('authenticate_api', __name__)
+
+
+def _pending_driver_assignments_for_login(driver_name):
+    if not driver_name:
+        return []
+    try:
+        rows = DispatchDriverAssignment.query.filter(
+            DispatchDriverAssignment.Driver == driver_name,
+            DispatchDriverAssignment.Active == 1,
+            DispatchDriverAssignment.Status.in_(['pending', 'draft'])
+        ).order_by(DispatchDriverAssignment.CreatedAt, DispatchDriverAssignment.id).all()
+    except Exception:
+        return []
+
+    payloads = []
+    for row in rows:
+        route_payload = None
+        if getattr(row, 'RouteJson', None):
+            try:
+                route_payload = json.loads(row.RouteJson)
+            except (TypeError, ValueError):
+                route_payload = None
+        payloads.append({
+            'id': row.id,
+            'driver': row.Driver,
+            'assignment_type': row.AssignmentType,
+            'message_text': row.MessageText,
+            'route': route_payload,
+            'status': row.Status,
+            'created_at': row.CreatedAt.isoformat() if row.CreatedAt else None,
+        })
+    return payloads
 
 @authenticate_api.route('/api_login', methods=['POST'])
 def api_login():
@@ -38,6 +71,8 @@ def api_login():
                     access_token=access_token,
                     refresh_token=refresh_token,
                     authority=thisuser.authority,
+                    display_name=thisuser.name,
+                    pending_dispatch_assignments=_pending_driver_assignments_for_login(thisuser.name),
                 )
 
         return jsonify({"message": "Invalid credentials"}), 401

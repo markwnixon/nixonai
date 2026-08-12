@@ -272,11 +272,6 @@
             }
             const paymentLinksVisible = ['sent_current', 'over_30', 'over_60', 'partial_paid', 'bad_debts'].includes(job.status);
             const receiveLink = document.getElementById('collection-kanban-receive-link');
-            const receiveParams = new URLSearchParams({
-                collection_receive_order_id: job.id,
-                callfrom: 'collection_kanban'
-            });
-            receiveLink.href = `${packageLaunchUrl}?${receiveParams.toString()}`;
             receiveLink.classList.toggle('d-none', !paymentLinksVisible);
             document.getElementById('collection-kanban-ar-link').classList.toggle('d-none', !paymentLinksVisible);
             document.getElementById('collection-call-contact').value = job.customer || '';

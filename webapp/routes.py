@@ -1,10 +1,11 @@
 from flask import abort, render_template, redirect, url_for, jsonify, request, send_file, flash, session, Response
 from flask import Blueprint
+import json
 
 from webapp.extensions import db, bcrypt
-from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Interchange, Reconciliations
+from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Driverlog, DispatchDriverMessage, DispatchDriverAssignment, Interchange, Reconciliations, users
 #from webapp.forms import TruckingFormNew
-from webapp.class8_tasks import Table_maker
+from webapp.class8_tasks import Table_maker, get_dispatch
 from webapp.revenues import get_revenues
 from webapp.business_reports import ensure_interchange_port_trip_column, rebaseline_interchange_port_trips_for_year
 from flask_login import login_required, current_user
@@ -129,7 +130,7 @@ month = str(today.month)
 now = datetime.datetime.now()
 today_str = today.strftime('%Y-%m-%d')
 
-from webapp.CCC_system_setup import companydata, statpath, addpath, scac, tpath
+from webapp.CCC_system_setup import apikeys, companydata, statpath, addpath, scac, tpath
 from webapp.class8_dicts import PublicSite_setup
 cmpdata = companydata()
 
@@ -675,6 +676,704 @@ def ComplianceCheck():
         display_date=compliance_display_date,
         err=err,
         msg=msg,
+    )
+
+
+def _driver_log_filter_date(value, default_value):
+    if not value:
+        return default_value
+    try:
+        return datetime.date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return default_value
+
+
+def _driver_log_duration(clockin, clockout):
+    if not clockin or not clockout:
+        return ''
+    delta = clockout - clockin
+    total_minutes = max(0, int(delta.total_seconds() // 60))
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    return f'{hours}:{minutes:02d}'
+
+
+def _driver_log_aliases(driver_name):
+    aliases = [driver_name]
+    user_rows = users.query.filter(
+        (users.username == driver_name) | (users.name == driver_name)
+    ).all()
+    for user_row in user_rows:
+        for value in [user_row.username, user_row.name]:
+            if value and value not in aliases:
+                aliases.append(value)
+    return aliases
+
+
+def ensure_dispatch_driver_message_table():
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS dispatch_driver_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(12) NULL,
+            OrderId INT NULL,
+            Jo VARCHAR(25) NULL,
+            Container VARCHAR(50) NULL,
+            Driver VARCHAR(100) NULL,
+            SenderName VARCHAR(100) NULL,
+            SenderType VARCHAR(30) NULL,
+            MessageText TEXT NULL,
+            RouteJson TEXT NULL,
+            CreatedAt DATETIME NOT NULL,
+            ReadAt DATETIME NULL,
+            Active INT NOT NULL DEFAULT 1,
+            INDEX idx_dispatch_driver_msg_order (OrderId),
+            INDEX idx_dispatch_driver_msg_jo (Jo),
+            INDEX idx_dispatch_driver_msg_driver (Driver),
+            INDEX idx_dispatch_driver_msg_created (CreatedAt)
+        )
+    """))
+    inspector = inspect(db.engine)
+    existing_columns = [column['name'] for column in inspector.get_columns('dispatch_driver_messages')]
+    if 'RouteJson' not in existing_columns:
+        db.session.execute(text("ALTER TABLE dispatch_driver_messages ADD COLUMN RouteJson TEXT NULL"))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS dispatch_driver_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(12) NULL,
+            Driver VARCHAR(100) NULL,
+            AssignmentType VARCHAR(45) NULL,
+            PrimaryOrderId INT NULL,
+            SecondaryOrderId INT NULL,
+            PrimaryJo VARCHAR(25) NULL,
+            SecondaryJo VARCHAR(25) NULL,
+            PrimaryContainer VARCHAR(50) NULL,
+            SecondaryContainer VARCHAR(50) NULL,
+            RouteOrderId INT NULL,
+            DestinationName VARCHAR(100) NULL,
+            DestinationAddress VARCHAR(500) NULL,
+            MessageText TEXT NULL,
+            RouteJson TEXT NULL,
+            Status VARCHAR(45) NULL,
+            CreatedBy VARCHAR(100) NULL,
+            CreatedAt DATETIME NOT NULL,
+            Active INT NOT NULL DEFAULT 1,
+            INDEX idx_dispatch_driver_assign_driver (Driver),
+            INDEX idx_dispatch_driver_assign_primary (PrimaryOrderId),
+            INDEX idx_dispatch_driver_assign_secondary (SecondaryOrderId),
+            INDEX idx_dispatch_driver_assign_created (CreatedAt)
+        )
+    """))
+    existing_assignment_columns = [column['name'] for column in inspector.get_columns('dispatch_driver_assignments')]
+    if 'RouteJson' not in existing_assignment_columns:
+        db.session.execute(text("ALTER TABLE dispatch_driver_assignments ADD COLUMN RouteJson TEXT NULL"))
+    db.session.commit()
+
+
+def _dispatch_panel_clean_text(value):
+    return (value or '').replace('\r', ' ').replace('\n', ' ').strip()
+
+
+def _dispatch_panel_order_payload(order):
+    return {
+        'id': order.id,
+        'jo': order.Jo,
+        'container': order.Container,
+        'customer': order.Shipper,
+        'destination_name': order.Company2,
+        'destination_address': _dispatch_panel_clean_text(order.Dropblock2),
+        'delivery_date': order.Date3.strftime('%Y-%m-%d') if order.Date3 else None,
+        'delivery_time': order.Time3,
+        'truck': order.Truck,
+    }
+
+
+def _dispatch_panel_message_payload(row, dispatcher_name):
+    sender_type = (row.SenderType or '').lower()
+    direction = 'outbound' if sender_type == 'dispatch' else 'inbound'
+    if row.SenderName == dispatcher_name:
+        direction = 'outbound'
+    route_payload = None
+    if getattr(row, 'RouteJson', None):
+        try:
+            route_payload = json.loads(row.RouteJson)
+        except (TypeError, ValueError):
+            route_payload = None
+    return {
+        'id': row.id,
+        'direction': direction,
+        'message_flow': 'dispatch_to_driver' if sender_type == 'dispatch' else 'driver_to_dispatch',
+        'sender_name': row.SenderName,
+        'sender_type': row.SenderType,
+        'message': row.MessageText,
+        'route': route_payload,
+        'created_at': row.CreatedAt.strftime('%Y-%m-%d %H:%M') if row.CreatedAt else '',
+    }
+
+
+def _dispatch_panel_assignment_pending_payload(row):
+    route_payload = None
+    if getattr(row, 'RouteJson', None):
+        try:
+            route_payload = json.loads(row.RouteJson)
+        except (TypeError, ValueError):
+            route_payload = None
+    return {
+        'id': row.id,
+        'driver': row.Driver,
+        'assignment_type': row.AssignmentType,
+        'primary_order_id': row.PrimaryOrderId,
+        'secondary_order_id': row.SecondaryOrderId,
+        'primary_jo': row.PrimaryJo,
+        'secondary_jo': row.SecondaryJo,
+        'primary_container': row.PrimaryContainer,
+        'secondary_container': row.SecondaryContainer,
+        'route_order_id': row.RouteOrderId,
+        'destination_name': row.DestinationName,
+        'destination_address': row.DestinationAddress,
+        'message_text': row.MessageText,
+        'route': route_payload,
+        'status': row.Status,
+        'created_by': row.CreatedBy,
+        'created_at': row.CreatedAt.strftime('%Y-%m-%d %H:%M') if row.CreatedAt else '',
+    }
+
+
+def _driver_open_clock_log(driver_name):
+    if not driver_name:
+        return None
+    return Driverlog.query.filter(
+        Driverlog.Driver == driver_name,
+        Driverlog.Clockin.isnot(None),
+        Driverlog.Clockout.is_(None)
+    ).order_by(Driverlog.Clockin.desc()).first()
+
+
+def _pending_dispatch_assignments(driver_name):
+    if not driver_name:
+        return []
+    rows = DispatchDriverAssignment.query.filter(
+        DispatchDriverAssignment.Driver == driver_name,
+        DispatchDriverAssignment.Active == 1,
+        DispatchDriverAssignment.Status.in_(['pending', 'draft'])
+    ).order_by(DispatchDriverAssignment.CreatedAt, DispatchDriverAssignment.id).all()
+    return [_dispatch_panel_assignment_pending_payload(row) for row in rows]
+
+
+def _save_pending_dispatch_assignment(driver_name, order, message_text, route_payload, assignment_type, sender_name):
+    route_json = json.dumps(route_payload) if isinstance(route_payload, dict) else None
+    route_data = route_payload if isinstance(route_payload, dict) else {}
+    destination_name = order.Company2 if order else route_data.get('destination_name')
+    destination_address = route_data.get('destination_address')
+    assignment = DispatchDriverAssignment.query.filter(
+        DispatchDriverAssignment.Driver == driver_name,
+        DispatchDriverAssignment.Active == 1,
+        DispatchDriverAssignment.Status == 'draft',
+        DispatchDriverAssignment.MessageText == message_text
+    ).order_by(DispatchDriverAssignment.CreatedAt.desc(), DispatchDriverAssignment.id.desc()).first()
+    if assignment is not None:
+        assignment.AssignmentType = assignment_type
+        assignment.PrimaryOrderId = order.id if order else assignment.PrimaryOrderId
+        assignment.PrimaryJo = order.Jo if order else assignment.PrimaryJo
+        assignment.PrimaryContainer = order.Container if order else assignment.PrimaryContainer
+        assignment.RouteOrderId = order.id if order else assignment.RouteOrderId
+        assignment.DestinationName = destination_name
+        assignment.DestinationAddress = destination_address
+        assignment.RouteJson = route_json
+        assignment.Status = 'pending'
+        assignment.CreatedBy = sender_name
+        db.session.commit()
+        return assignment
+
+    assignment = DispatchDriverAssignment(
+        Co=scac,
+        Driver=driver_name,
+        AssignmentType=assignment_type,
+        PrimaryOrderId=order.id if order else None,
+        SecondaryOrderId=None,
+        PrimaryJo=order.Jo if order else None,
+        SecondaryJo=None,
+        PrimaryContainer=order.Container if order else None,
+        SecondaryContainer=None,
+        RouteOrderId=order.id if order else None,
+        DestinationName=destination_name,
+        DestinationAddress=destination_address,
+        MessageText=message_text,
+        Status='pending',
+        CreatedBy=sender_name,
+        CreatedAt=datetime.datetime.now(),
+        Active=1,
+        RouteJson=route_json,
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    return assignment
+
+
+def _dispatch_panel_google_distance(origin, destination):
+    api_key = ''
+    try:
+        api_key = apikeys.get('dkey') or ''
+    except Exception:
+        api_key = ''
+    if not api_key or not origin or not destination:
+        return None
+    try:
+        response = requests.get(
+            'https://maps.googleapis.com/maps/api/distancematrix/json',
+            params={
+                'units': 'imperial',
+                'origins': origin,
+                'destinations': destination,
+                'key': api_key,
+            },
+            timeout=6,
+        )
+        payload = response.json()
+        element = payload['rows'][0]['elements'][0]
+        if element.get('status') != 'OK':
+            return None
+        return {
+            'distance_text': element.get('distance', {}).get('text') or '',
+            'duration_text': element.get('duration', {}).get('text') or '',
+        }
+    except Exception:
+        return None
+
+
+def _dispatch_panel_route_payload(driver_name, order):
+    if not driver_name or order is None:
+        return None
+    open_log = Driverlog.query.filter(
+        Driverlog.Driver == driver_name,
+        Driverlog.Clockin.isnot(None),
+        Driverlog.Clockout.is_(None)
+    ).order_by(Driverlog.Clockin.desc()).first()
+    destination = _dispatch_panel_clean_text(order.Dropblock2 or order.Company2)
+    origin = open_log.GPSin if open_log and open_log.GPSin else ''
+    origin_label = open_log.Locationstart if open_log else ''
+    if origin and destination:
+        from urllib.parse import quote_plus
+        maps_url = (
+            'https://www.google.com/maps/dir/?api=1'
+            f'&origin={quote_plus(origin)}'
+            f'&destination={quote_plus(destination)}'
+        )
+    else:
+        maps_url = None
+    route = {
+        'origin_location': origin_label,
+        'origin_coordinates': origin,
+        'origin_clockin': open_log.Clockin.strftime('%Y-%m-%d %H:%M') if open_log and open_log.Clockin else '',
+        'destination_name': order.Company2,
+        'destination_address': destination,
+        'maps_url': maps_url,
+        'distance_text': '',
+        'duration_text': '',
+        'eta': '',
+        'status': 'ready' if maps_url else 'missing clock-in coordinates or destination',
+    }
+    route_data = _dispatch_panel_google_distance(origin, destination)
+    if route_data:
+        route.update(route_data)
+        route['eta'] = route_data.get('duration_text') or ''
+    elif maps_url:
+        route['eta'] = 'Open route link for live ETA'
+    return route
+
+
+def _dispatch_panel_port_origin(order):
+    return _dispatch_panel_clean_text(
+        getattr(order, 'Dropblock1', None)
+        or getattr(order, 'Company', None)
+        or getattr(order, 'Pickup', None)
+        or getattr(order, 'Location', None)
+    )
+
+
+def _dispatch_panel_route_destination(order):
+    dropblock = _dispatch_panel_clean_text(getattr(order, 'Dropblock2', None))
+    lines = [line.strip() for line in dropblock.replace('\r', '\n').split('\n') if line.strip()]
+    if len(lines) >= 3:
+        return _dispatch_panel_clean_text(f'{lines[1]} {lines[2]}')
+    if len(lines) == 2:
+        return _dispatch_panel_clean_text(f'{lines[0]} {lines[1]}')
+    return _dispatch_panel_clean_text(getattr(order, 'Location3', None) or getattr(order, 'Dropblock2', None) or getattr(order, 'Company2', None))
+
+
+def _dispatch_panel_route_from_port_payload(order):
+    if order is None:
+        return None
+    origin = _dispatch_panel_port_origin(order)
+    destination = _dispatch_panel_route_destination(order)
+    if origin and destination:
+        from urllib.parse import quote_plus
+        maps_url = (
+            'https://www.google.com/maps/dir/?api=1'
+            f'&origin={quote_plus(origin)}'
+            f'&destination={quote_plus(destination)}'
+        )
+    else:
+        maps_url = None
+    route = {
+        'origin_location': origin,
+        'origin_coordinates': '',
+        'origin_clockin': '',
+        'destination_name': order.Company2,
+        'destination_address': destination,
+        'maps_url': maps_url,
+        'distance_text': '',
+        'duration_text': '',
+        'eta': '',
+        'status': 'port gate to delivery' if maps_url else 'missing port gate or destination',
+    }
+    route_data = _dispatch_panel_google_distance(origin, destination)
+    if route_data:
+        route.update(route_data)
+        route['eta'] = route_data.get('duration_text') or ''
+    elif maps_url:
+        route['eta'] = 'Open route link for live ETA'
+    return route
+
+
+def _dispatch_panel_assignment_payload(row):
+    if row is None:
+        return None
+    return {
+        'id': row.id,
+        'driver': row.Driver,
+        'assignment_type': row.AssignmentType,
+        'primary_order_id': row.PrimaryOrderId,
+        'secondary_order_id': row.SecondaryOrderId,
+        'primary_jo': row.PrimaryJo,
+        'secondary_jo': row.SecondaryJo,
+        'primary_container': row.PrimaryContainer,
+        'secondary_container': row.SecondaryContainer,
+        'route_order_id': row.RouteOrderId,
+        'destination_name': row.DestinationName,
+        'destination_address': row.DestinationAddress,
+        'message_text': row.MessageText,
+        'status': row.Status,
+        'created_by': row.CreatedBy,
+        'created_at': row.CreatedAt.isoformat() if row.CreatedAt else None,
+    }
+
+
+def _is_import_order(order):
+    return 'import' in ((order.HaulType or '').lower())
+
+
+def _dispatch_delivery_lines(order):
+    dropblock = _dispatch_panel_clean_text(getattr(order, 'Dropblock2', None))
+    lines = [line.strip() for line in dropblock.replace('\r', '\n').split('\n') if line.strip()]
+    company = _dispatch_panel_clean_text(getattr(order, 'Company2', None))
+    city_state_zip = _dispatch_panel_clean_text(getattr(order, 'Location3', None))
+
+    if not lines and company:
+        lines.append(company)
+    elif company and lines and company.lower() not in lines[0].lower():
+        lines.insert(0, company)
+
+    if city_state_zip and all(city_state_zip.lower() not in line.lower() for line in lines):
+        lines.append(city_state_zip)
+
+    while len(lines) < 3:
+        lines.append('')
+    return lines[:3]
+
+
+def _dispatch_assignment_text(orders, assignment_type):
+    port_in_order = None
+    port_out_order = None
+    for order in orders:
+        hstat = order.Hstat if order.Hstat is not None else -1
+        if hstat >= 1 and port_in_order is None:
+            port_in_order = order
+        if hstat < 1 and port_out_order is None:
+            port_out_order = order
+
+    if port_in_order or port_out_order:
+        lines = []
+        if port_in_order:
+            if _is_import_order(port_in_order):
+                lines.append(f'Please hook up to empty container {port_in_order.Container} for return to port.')
+            else:
+                lines.append(f'Please hook up to container {port_in_order.Container} for return to port.')
+        if port_out_order:
+            pull_label = 'import' if _is_import_order(port_out_order) else 'export'
+            if assignment_type == 'pull_deliver':
+                lines.append(f'Pull {pull_label} {port_out_order.Container} for delivery to:')
+                lines.extend(_dispatch_delivery_lines(port_out_order))
+            elif assignment_type == 'pull_store':
+                lines.append(f'Pull {pull_label} {port_out_order.Container}.')
+                lines.append('Then pull and store.')
+            else:
+                lines.append(f'Pull {pull_label} {port_out_order.Container}.')
+        message = '\n'.join(line for line in lines if line is not None).strip()
+        route_order = port_out_order if assignment_type == 'pull_deliver' and port_out_order else port_in_order or port_out_order
+        return message, route_order
+
+    lines = []
+    for order in orders:
+        try:
+            dispatch_text = get_dispatch(order)
+        except Exception:
+            dispatch_text = ''
+        if not dispatch_text:
+            dispatch_text = f'Dispatch container {order.Container or ""} for job {order.Jo or ""}.'.strip()
+        lines.append(dispatch_text)
+    if assignment_type == 'pull_deliver':
+        lines.insert(0, 'Pull and deliver:')
+    elif assignment_type == 'pull_store':
+        lines.insert(0, 'Pull and store:')
+    route_order = orders[0] if orders else None
+    return '\n'.join(lines), route_order
+
+
+def _dispatch_panel_driver_names():
+    active_driver_rows = Drivers.query.filter(
+        (Drivers.Active == 1) | (Drivers.Active == None)
+    ).all()
+    active_driver_names = {
+        (driver.Name or '').strip()
+        for driver in active_driver_rows
+        if (driver.Name or '').strip()
+    }
+
+    allowed_names = []
+    user_rows = users.query.filter(
+        users.authority.in_(['driver', 'admin', 'superuser'])
+    ).order_by(users.name).all()
+    for user_row in user_rows:
+        name = (user_row.name or '').strip()
+        authority = (user_row.authority or '').strip().lower()
+        if not name:
+            continue
+        if authority == 'driver' or name in active_driver_names:
+            if name not in allowed_names:
+                allowed_names.append(name)
+    return allowed_names
+
+
+@main.route('/DriverDispatchPanel', methods=['GET', 'POST'])
+@login_required
+def DriverDispatchPanel():
+    ensure_dispatch_driver_message_table()
+    driver_names = _dispatch_panel_driver_names()
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        driver_name = data.get('driver') or ''
+        message_text = data.get('message') or ''
+        jo = data.get('jo') or ''
+        order = Orders.query.filter(Orders.Jo == jo).order_by(Orders.id.desc()).first() if jo else None
+        if not driver_name:
+            return jsonify({'error': 'Driver is required.'}), 400
+        if driver_name not in driver_names:
+            return jsonify({'error': 'Driver is not available for dispatch communications.'}), 400
+        if not message_text:
+            return jsonify({'error': 'Message is required.'}), 400
+        assignment_type = data.get('assignment_type') or 'general'
+        route_payload = data.get('route')
+        route_json = json.dumps(route_payload) if isinstance(route_payload, dict) else None
+        sender_name = getattr(current_user, 'name', None) or getattr(current_user, 'username', None) or 'Dispatch'
+        if assignment_type != 'general' and _driver_open_clock_log(driver_name) is None:
+            assignment = _save_pending_dispatch_assignment(
+                driver_name,
+                order,
+                message_text,
+                route_payload,
+                assignment_type,
+                sender_name,
+            )
+            return jsonify({
+                'message': 'Driver is not clocked in. Dispatch assignment queued.',
+                'queued': True,
+                'assignment': _dispatch_panel_assignment_pending_payload(assignment),
+                'pending_assignments': _pending_dispatch_assignments(driver_name),
+            }), 202
+
+        row = DispatchDriverMessage(
+            Co=scac,
+            OrderId=order.id if order else None,
+            Jo=order.Jo if order else jo,
+            Container=order.Container if order else data.get('container'),
+            Driver=driver_name,
+            SenderName=sender_name,
+            SenderType='dispatch',
+            MessageText=message_text,
+            CreatedAt=datetime.datetime.now(),
+            ReadAt=None,
+            Active=1,
+            RouteJson=route_json,
+        )
+        db.session.add(row)
+        db.session.commit()
+        return jsonify({
+            'message': 'Dispatch message saved.',
+            'queued': False,
+            'dispatch_message': _dispatch_panel_message_payload(row, sender_name),
+        }), 201
+
+    selected_driver = request.args.get('driver') or ''
+    selected_jo = request.args.get('jo') or ''
+    if selected_driver and selected_driver not in driver_names:
+        selected_driver = ''
+    assignments = []
+    if selected_driver:
+        assignment_rows = Orders.query.filter(
+            Orders.Driver == selected_driver,
+            (Orders.Hstat == None) | (Orders.Hstat < 2)
+        ).order_by(Orders.Date3, Orders.Jo).limit(30).all()
+        assignments = [_dispatch_panel_order_payload(order) for order in assignment_rows]
+
+    selected_order = Orders.query.filter(Orders.Jo == selected_jo).order_by(Orders.id.desc()).first() if selected_jo else None
+    msg_query = DispatchDriverMessage.query.filter(
+        DispatchDriverMessage.Active == 1,
+        DispatchDriverMessage.Driver == selected_driver,
+    )
+    if selected_order:
+        msg_query = msg_query.filter(DispatchDriverMessage.OrderId == selected_order.id)
+    elif selected_jo:
+        msg_query = msg_query.filter(DispatchDriverMessage.Jo == selected_jo)
+    messages = msg_query.order_by(DispatchDriverMessage.CreatedAt, DispatchDriverMessage.id).limit(100).all() if selected_driver else []
+    dispatcher_name = getattr(current_user, 'name', None) or getattr(current_user, 'username', None) or 'Dispatch'
+    return jsonify({
+        'drivers': driver_names,
+        'selected_driver': selected_driver,
+        'assignments': assignments,
+        'selected_order': _dispatch_panel_order_payload(selected_order) if selected_order else None,
+        'route': _dispatch_panel_route_payload(selected_driver, selected_order),
+        'pending_assignments': _pending_dispatch_assignments(selected_driver),
+        'messages': [_dispatch_panel_message_payload(row, dispatcher_name) for row in messages],
+    }), 200
+
+
+@main.route('/DriverDispatchPanel/assignment-text', methods=['POST'])
+@login_required
+def DriverDispatchAssignmentText():
+    data = request.get_json(silent=True) or {}
+    order_ids = data.get('order_ids') or []
+    assignment_type = data.get('assignment_type') or 'general'
+    driver_name = data.get('driver') or ''
+    driver_names = _dispatch_panel_driver_names()
+    try:
+        order_ids = [int(order_id) for order_id in order_ids]
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Order ids must be integers.'}), 400
+
+    if driver_name and driver_name not in driver_names:
+        return jsonify({'error': 'Driver is not available for dispatch communications.'}), 400
+    if not order_ids:
+        return jsonify({'error': 'Select one or two order rows first.'}), 400
+    if len(order_ids) > 2:
+        return jsonify({'error': 'Select no more than two order rows for dispatch copy.'}), 400
+
+    orders = [db.session.get(Orders, order_id) for order_id in order_ids]
+    orders = [order for order in orders if order is not None]
+    if not orders:
+        return jsonify({'error': 'Selected orders were not found.'}), 404
+
+    if len(orders) == 2:
+        first, second = orders[0], orders[1]
+        first_hstat = first.Hstat if first.Hstat is not None else -1
+        second_hstat = second.Hstat if second.Hstat is not None else -1
+        if first_hstat > second_hstat:
+            orders = [first, second]
+        else:
+            orders = [second, first]
+
+    message_text, route_order = _dispatch_assignment_text(orders, assignment_type)
+    if not message_text:
+        return jsonify({'error': 'Unable to generate dispatch assignment text for the selected orders.'}), 400
+
+    assignment = None
+    warning = ''
+    if driver_name:
+        primary_order = orders[0] if orders else None
+        secondary_order = orders[1] if len(orders) > 1 else None
+        dispatcher_name = getattr(current_user, 'name', None) or getattr(current_user, 'username', None) or 'Dispatch'
+        assignment = DispatchDriverAssignment(
+            Co=scac,
+            Driver=driver_name,
+            AssignmentType=assignment_type,
+            PrimaryOrderId=primary_order.id if primary_order else None,
+            SecondaryOrderId=secondary_order.id if secondary_order else None,
+            PrimaryJo=primary_order.Jo if primary_order else None,
+            SecondaryJo=secondary_order.Jo if secondary_order else None,
+            PrimaryContainer=primary_order.Container if primary_order else None,
+            SecondaryContainer=secondary_order.Container if secondary_order else None,
+            RouteOrderId=route_order.id if route_order else None,
+            DestinationName=route_order.Company2 if route_order else None,
+            DestinationAddress=_dispatch_panel_clean_text(route_order.Dropblock2) if route_order else None,
+            MessageText=message_text,
+            Status='draft',
+            CreatedBy=dispatcher_name,
+            CreatedAt=datetime.datetime.now(),
+            Active=1,
+        )
+        db.session.add(assignment)
+        db.session.commit()
+    else:
+        warning = 'Select a driver to save this as a dispatch assignment.'
+
+    return jsonify({
+        'message_text': message_text,
+        'assignment': _dispatch_panel_assignment_payload(assignment),
+        'warning': warning,
+        'selected_order': _dispatch_panel_order_payload(route_order) if route_order else None,
+        'route': _dispatch_panel_route_from_port_payload(route_order) if assignment_type == 'pull_deliver' else _dispatch_panel_route_payload(driver_name, route_order),
+    }), 200
+
+
+@main.route('/DriverLogs', methods=['GET'])
+@login_required
+def DriverLogs():
+    today = datetime.date.today()
+    default_start = today - datetime.timedelta(days=14)
+    default_end = today + datetime.timedelta(days=1)
+    start_date = _driver_log_filter_date(request.args.get('start_date'), default_start)
+    end_date = _driver_log_filter_date(request.args.get('end_date'), default_end)
+    selected_driver = request.args.get('driver') or 'All Drivers'
+
+    query = Driverlog.query.filter(
+        Driverlog.Date >= start_date,
+        Driverlog.Date <= end_date,
+    )
+    if selected_driver != 'All Drivers':
+        query = query.filter(Driverlog.Driver.in_(_driver_log_aliases(selected_driver)))
+
+    logs = query.order_by(
+        Driverlog.Date.desc(),
+        Driverlog.Driver,
+        Driverlog.Shift,
+        Driverlog.Clockin.desc(),
+    ).all()
+
+    driver_rows = Drivers.query.filter(
+        (Drivers.Active == 1) | (Drivers.Active == None)
+    ).order_by(Drivers.Name).all()
+    driver_names = ['All Drivers']
+    for driver in driver_rows:
+        if driver.Name and driver.Name not in driver_names:
+            driver_names.append(driver.Name)
+    user_driver_rows = users.query.filter(users.authority == 'driver').order_by(users.name, users.username).all()
+    for user_row in user_driver_rows:
+        driver_display = user_row.name or user_row.username
+        if driver_display and driver_display not in driver_names:
+            driver_names.append(driver_display)
+    for row in logs:
+        if row.Driver and row.Driver not in driver_names:
+            driver_names.append(row.Driver)
+
+    return render_template(
+        'driver_logs.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        logs=logs,
+        driver_names=driver_names,
+        selected_driver=selected_driver,
+        start_date=start_date,
+        end_date=end_date,
+        duration=_driver_log_duration,
     )
 
 
@@ -1452,6 +2151,14 @@ def Calculator():
 def Class8Main(genre):
 
     print('routes.py 237: The genre is',genre)
+    if (
+        genre == 'Trucking'
+        and request.method == 'POST'
+        and request.values.get('Money Flow') in ['Receive Payments', 'Receive by Acct']
+    ):
+        return redirect(url_for('main.ReceiveByAccount'))
+    if genre == 'Trucking' and request.args.get('collection_receive_order_id'):
+        return redirect(url_for('main.ReceiveByAccount'))
     if genre == 'Banking':
         return redirect(url_for('main.Banking'))
     if genre == 'Planning':
@@ -1533,6 +2240,7 @@ def ensure_business_report_tables():
             PeriodStart DATE NOT NULL,
             PeriodEnd DATE NOT NULL,
             AmountCents INT NOT NULL DEFAULT 0,
+            AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'daily',
             AutoUpdate TINYINT NOT NULL DEFAULT 0,
             Notes TEXT,
             Active TINYINT DEFAULT 1,
@@ -1552,6 +2260,12 @@ def ensure_business_report_tables():
             ADD COLUMN AutoUpdate TINYINT NOT NULL DEFAULT 0
         """))
         db.session.commit()
+    if 'AllocationBasis' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_indirect_allocations
+            ADD COLUMN AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'daily'
+        """))
+        db.session.commit()
     db.session.execute(text("""
         CREATE TABLE IF NOT EXISTS operations_ga_allocations (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1560,6 +2274,7 @@ def ensure_business_report_tables():
             PeriodStart DATE NOT NULL,
             PeriodEnd DATE NOT NULL,
             AmountCents INT NOT NULL DEFAULT 0,
+            AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'daily',
             AutoUpdate TINYINT NOT NULL DEFAULT 0,
             Notes TEXT,
             Active TINYINT DEFAULT 1,
@@ -1579,6 +2294,29 @@ def ensure_business_report_tables():
             ADD COLUMN AutoUpdate TINYINT NOT NULL DEFAULT 0
         """))
         db.session.commit()
+    if 'AllocationBasis' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_ga_allocations
+            ADD COLUMN AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'daily'
+        """))
+        db.session.commit()
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS business_report_cache (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(2) NOT NULL,
+            ReportMode VARCHAR(24) NOT NULL,
+            DateFrom DATE NOT NULL,
+            DateTo DATE NOT NULL,
+            PayloadJson LONGTEXT NOT NULL,
+            GeneratedBy VARCHAR(120),
+            Active TINYINT NOT NULL DEFAULT 1,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_business_report_cache_lookup (Co, ReportMode, DateFrom, DateTo, Active),
+            INDEX idx_business_report_cache_updated (UpdatedAt)
+        )
+    """))
+    db.session.commit()
 
 
 def business_report_parse_date(value, fallback):
@@ -1630,6 +2368,97 @@ def business_report_empty_operations_totals():
     }
 
 
+def business_report_jsonable(value):
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+    if isinstance(value, datetime.date):
+        return value.strftime('%Y-%m-%d')
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, dict):
+        return {key: business_report_jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [business_report_jsonable(item) for item in value]
+    return value
+
+
+def business_report_cache_load(company_code, report_mode, start_date, end_date):
+    row = db.session.execute(text("""
+        SELECT id, PayloadJson, GeneratedBy, UpdatedAt
+        FROM business_report_cache
+        WHERE Co = :company_code
+          AND ReportMode = :report_mode
+          AND DateFrom = :start_date
+          AND DateTo = :end_date
+          AND Active = 1
+        ORDER BY UpdatedAt DESC, id DESC
+        LIMIT 1
+    """), {
+        'company_code': company_code,
+        'report_mode': report_mode,
+        'start_date': start_date,
+        'end_date': end_date,
+    }).mappings().first()
+    if not row:
+        return None, None
+    payload = json.loads(row['PayloadJson'] or '{}')
+    if payload.get('cache_version') != BUSINESS_REPORT_CACHE_VERSION:
+        return None, None
+    return payload, row
+
+
+def business_report_cache_save(company_code, report_mode, start_date, end_date, payload):
+    now = datetime.datetime.utcnow()
+    payload = dict(payload or {})
+    payload['cache_version'] = BUSINESS_REPORT_CACHE_VERSION
+    db.session.execute(text("""
+        UPDATE business_report_cache
+        SET Active = 0, UpdatedAt = :updated_at
+        WHERE Co = :company_code
+          AND ReportMode = :report_mode
+          AND DateFrom = :start_date
+          AND DateTo = :end_date
+          AND Active = 1
+    """), {
+        'company_code': company_code,
+        'report_mode': report_mode,
+        'start_date': start_date,
+        'end_date': end_date,
+        'updated_at': now,
+    })
+    db.session.execute(text("""
+        INSERT INTO business_report_cache
+            (Co, ReportMode, DateFrom, DateTo, PayloadJson, GeneratedBy, Active, CreatedAt, UpdatedAt)
+        VALUES
+            (:company_code, :report_mode, :start_date, :end_date, :payload_json, :generated_by, 1, :created_at, :updated_at)
+    """), {
+        'company_code': company_code,
+        'report_mode': report_mode,
+        'start_date': start_date,
+        'end_date': end_date,
+        'payload_json': json.dumps(business_report_jsonable(payload)),
+        'generated_by': getattr(current_user, 'username', None) or getattr(current_user, 'email', None) or '',
+        'created_at': now,
+        'updated_at': now,
+    })
+    db.session.commit()
+    return business_report_cache_load(company_code, report_mode, start_date, end_date)
+
+
+def business_report_cache_info(row, source):
+    if not row:
+        return {'source': source, 'updated_at': '', 'generated_by': ''}
+    updated_at = row.get('UpdatedAt') if hasattr(row, 'get') else row['UpdatedAt']
+    generated_by = row.get('GeneratedBy') if hasattr(row, 'get') else row['GeneratedBy']
+    if isinstance(updated_at, datetime.datetime):
+        updated_at = updated_at.strftime('%Y-%m-%d %H:%M')
+    return {
+        'source': source,
+        'updated_at': updated_at or '',
+        'generated_by': generated_by or '',
+    }
+
+
 def business_report_number(value, places=2):
     return f"{value or 0:,.{places}f}"
 
@@ -1655,10 +2484,17 @@ def business_report_as_datetime(value, end_of_day=False):
     return value
 
 
+BUSINESS_REPORT_CACHE_VERSION = 3
+
 BUSINESS_REPORT_BASIS_TYPES = {
     'port_entry': 'Port Entries',
     'day': 'Days',
     'mile': 'Miles',
+}
+
+OPERATIONS_ALLOCATION_BASIS_TYPES = {
+    'daily': 'Daily Spread',
+    'port_trip': 'Port Trips',
 }
 
 
@@ -1708,6 +2544,58 @@ def business_report_allocate_cents_by_period(daily_totals, period_start, period_
         if include_start <= day <= include_end:
             cents_for_day = sign * (base_abs + (1 if index < remainder_abs else 0))
             daily_totals[day] = daily_totals.get(day, 0) + cents_for_day
+
+
+def business_report_port_trip_counts_by_day(start_date, end_date):
+    if not start_date or not end_date or end_date < start_date:
+        return {}
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    trip_day = func.date(Interchange.Date)
+    rows = db.session.query(
+        trip_day.label('trip_day'),
+        func.count(func.distinct(Interchange.PortTrip)).label('trip_count'),
+    ).filter(
+        Interchange.Date >= start_dt,
+        Interchange.Date <= end_dt,
+        Interchange.PortTrip.isnot(None),
+        Interchange.PortTrip > 0,
+    ).group_by(trip_day).all()
+    counts = {}
+    for row in rows:
+        day = business_report_parse_date(str(row.trip_day), None)
+        if day:
+            counts[day] = int(row.trip_count or 0)
+    return counts
+
+
+def business_report_allocate_cents_by_port_trip(daily_totals, period_start, period_end, amount_cents, include_start, include_end):
+    if not period_start or not period_end or period_end < period_start:
+        return
+    include_start = max(period_start, include_start)
+    include_end = min(period_end, include_end)
+    if include_end < include_start:
+        return
+    trip_counts = business_report_port_trip_counts_by_day(period_start, period_end)
+    total_trips = sum(trip_counts.values())
+    if not total_trips:
+        return
+    included_days = [day for day in business_report_each_day(include_start, include_end) if trip_counts.get(day, 0)]
+    included_trip_count = sum(trip_counts.get(day, 0) for day in included_days)
+    if not included_trip_count:
+        return
+    target_amount = int(amount_cents or 0) * included_trip_count // total_trips
+    shares = []
+    allocated = 0
+    for day in included_days:
+        numerator = int(amount_cents or 0) * trip_counts[day]
+        whole_share = numerator // total_trips
+        remainder = numerator % total_trips
+        shares.append((day, whole_share, remainder))
+        allocated += whole_share
+    remainder_cents = target_amount - allocated
+    for index, (day, whole_share, remainder) in enumerate(sorted(shares, key=lambda item: item[2], reverse=True)):
+        extra = 1 if index < remainder_cents else 0
+        daily_totals[day] = daily_totals.get(day, 0) + whole_share + extra
 
 
 def business_report_week_start(day):
@@ -2181,7 +3069,18 @@ def business_report_account_lookup(company_code):
     return by_id, by_name
 
 
-def business_report_account_for_line(line, account_by_id, account_by_name):
+def business_report_account_for_line(line, account_by_id, account_by_name, bill=None):
+    # The Bill row owns the expense account, but only the expense side of a
+    # bill-payment journal should inherit it. The offsetting bank/payment line
+    # must keep its own account or it will show as a duplicate expense.
+    if (
+        bill is not None
+        and (line.Type or '') in ['ED', 'XD', 'AD']
+        and (bill.bAccount or '').strip()
+    ):
+        bill_account = account_by_name.get(bill.bAccount or '')
+        if bill_account is not None:
+            return bill_account
     # Prefer Aid because account names may have been changed after the ledger
     # line was posted. A join on id-or-name can multiply one ledger line when
     # an old name and a new name both match account records.
@@ -2386,7 +3285,8 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
     by_path = {}
     seen_line_paths = set()
     for line in ledger_rows:
-        account = business_report_account_for_line(line, account_by_id, account_by_name)
+        bill = business_report_bill_for_ledger_line(line)
+        account = business_report_account_for_line(line, account_by_id, account_by_name, bill)
         if (
             account is None
             or account.Type != account_type
@@ -2397,7 +3297,6 @@ def business_report_tax_rollup_detail_lines(company_code, start_date, end_date, 
             amount_cents = int(line.Credit or 0) - int(line.Debit or 0)
         else:
             amount_cents = int(line.Debit or 0) - int(line.Credit or 0)
-        bill = business_report_bill_for_ledger_line(line)
         payroll_reconciled = business_report_payroll_reconciled_for_line(line)
         if payroll_reconciled is not None:
             reconciled = payroll_reconciled
@@ -2503,7 +3402,8 @@ def business_report_tax_rollup_pl(company_code, start_date, end_date):
 
     totals = {}
     for line in ledger_rows:
-        account = business_report_account_for_line(line, account_by_id, account_by_name)
+        bill = business_report_bill_for_ledger_line(line)
+        account = business_report_account_for_line(line, account_by_id, account_by_name, bill)
         if account is None or account.Type not in ['Income', 'Expense']:
             continue
         key = (
@@ -2818,7 +3718,7 @@ def business_report_allocation_calcs(allocations, report_start, report_end):
 
 def operations_indirect_allocations(company_code):
     rows = db.session.execute(text("""
-        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes
+        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes
         FROM operations_indirect_allocations
         WHERE Co = :company_code AND Active = 1
         ORDER BY PeriodStart DESC, AccountName, id
@@ -2832,6 +3732,8 @@ def operations_indirect_allocations(company_code):
             'period_end': business_report_date_text(row['PeriodEnd']),
             'amount_cents': int(row['AmountCents'] or 0),
             'amount': business_report_money(int(row['AmountCents'] or 0)),
+            'allocation_basis': row['AllocationBasis'] or 'daily',
+            'allocation_basis_label': OPERATIONS_ALLOCATION_BASIS_TYPES.get(row['AllocationBasis'] or 'daily', 'Daily Spread'),
             'auto_update': bool(row['AutoUpdate']),
             'notes': row['Notes'] or '',
         })
@@ -2840,7 +3742,7 @@ def operations_indirect_allocations(company_code):
 
 def operations_ga_allocations(company_code):
     rows = db.session.execute(text("""
-        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes
+        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes
         FROM operations_ga_allocations
         WHERE Co = :company_code AND Active = 1
         ORDER BY PeriodStart DESC, AccountName, id
@@ -2854,6 +3756,8 @@ def operations_ga_allocations(company_code):
             'period_end': business_report_date_text(row['PeriodEnd']),
             'amount_cents': int(row['AmountCents'] or 0),
             'amount': business_report_money(int(row['AmountCents'] or 0)),
+            'allocation_basis': row['AllocationBasis'] or 'daily',
+            'allocation_basis_label': OPERATIONS_ALLOCATION_BASIS_TYPES.get(row['AllocationBasis'] or 'daily', 'Daily Spread'),
             'auto_update': bool(row['AutoUpdate']),
             'notes': row['Notes'] or '',
         })
@@ -2949,6 +3853,198 @@ def operations_account_options(company_code, as_of_date, account_category):
     return output
 
 
+def operations_allocation_source_row(company_code, allocation_type, allocation_id):
+    table_name = 'operations_indirect_allocations' if allocation_type == 'indirect' else 'operations_ga_allocations'
+    if allocation_type not in ['indirect', 'ga']:
+        return None
+    return db.session.execute(text("""
+        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes
+        FROM """ + table_name + """
+        WHERE Co = :company_code
+          AND id = :allocation_id
+          AND Active = 1
+        LIMIT 1
+    """), {
+        'company_code': company_code,
+        'allocation_id': allocation_id,
+    }).mappings().first()
+
+
+def operations_weekly_allocation_plot(company_code, allocation_type, allocation_id, start_date, end_date):
+    if allocation_type in ['builtin_direct', 'builtin_driver_pay']:
+        daily_totals = operations_direct_daily_allocations(
+            company_code,
+            start_date,
+            end_date,
+            'driver_pay' if allocation_type == 'builtin_driver_pay' else None,
+        )
+        trip_counts = business_report_port_trip_counts_by_day(start_date, end_date)
+        label = 'Driver Pay' if allocation_type == 'builtin_driver_pay' else 'Direct Expenses'
+        return operations_weekly_plot_payload(
+            allocation_type=allocation_type,
+            allocation_id=allocation_id,
+            account=label,
+            allocation_basis='weekly_direct',
+            allocation_basis_label='Weekly Direct Allocation',
+            period_start=start_date,
+            period_end=end_date,
+            amount_cents=sum(daily_totals.values()),
+            daily_totals=daily_totals,
+            trip_counts=trip_counts,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    row = operations_allocation_source_row(company_code, allocation_type, allocation_id)
+    if row is None:
+        return None
+    period_start = business_report_as_date(row['PeriodStart'])
+    period_end = business_report_as_date(row['PeriodEnd'])
+    daily_totals = {}
+    allocation_basis = row['AllocationBasis'] or 'daily'
+    if allocation_basis == 'port_trip':
+        business_report_allocate_cents_by_port_trip(
+            daily_totals,
+            period_start,
+            period_end,
+            int(row['AmountCents'] or 0),
+            start_date,
+            end_date,
+        )
+    else:
+        business_report_allocate_cents_by_period(
+            daily_totals,
+            period_start,
+            period_end,
+            int(row['AmountCents'] or 0),
+            start_date,
+            end_date,
+        )
+
+    trip_counts = business_report_port_trip_counts_by_day(start_date, end_date)
+    return operations_weekly_plot_payload(
+        allocation_type=allocation_type,
+        allocation_id=row['id'],
+        account=row['AccountName'] or '',
+        allocation_basis=allocation_basis,
+        allocation_basis_label=OPERATIONS_ALLOCATION_BASIS_TYPES.get(allocation_basis, 'Daily Spread'),
+        period_start=business_report_as_date(row['PeriodStart']),
+        period_end=business_report_as_date(row['PeriodEnd']),
+        amount_cents=int(row['AmountCents'] or 0),
+        daily_totals=daily_totals,
+        trip_counts=trip_counts,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def operations_weekly_plot_payload(
+    allocation_type,
+    allocation_id,
+    account,
+    allocation_basis,
+    allocation_basis_label,
+    period_start,
+    period_end,
+    amount_cents,
+    daily_totals,
+    trip_counts,
+    start_date,
+    end_date,
+):
+    weeks = {}
+    for day in business_report_each_day(start_date, end_date):
+        week_start = business_report_week_start(day)
+        week_end = week_start + datetime.timedelta(days=6)
+        week = weeks.setdefault(week_start, {
+            'week_start': max(week_start, start_date),
+            'week_end': min(week_end, end_date),
+            'amount_cents': 0,
+            'port_trips': 0,
+        })
+        week['amount_cents'] += int(daily_totals.get(day, 0) or 0)
+        week['port_trips'] += int(trip_counts.get(day, 0) or 0)
+
+    points = []
+    for week_start in sorted(weeks):
+        week = weeks[week_start]
+        points.append({
+            'week_start': week['week_start'].strftime('%Y-%m-%d'),
+            'week_end': week['week_end'].strftime('%Y-%m-%d'),
+            'label': f"{week['week_start'].strftime('%m/%d')} - {week['week_end'].strftime('%m/%d')}",
+            'amount_cents': week['amount_cents'],
+            'amount': business_report_money(week['amount_cents']),
+            'amount_value': round(week['amount_cents'] / 100, 2),
+            'port_trips': week['port_trips'],
+        })
+
+    return {
+        'allocation_type': allocation_type,
+        'id': allocation_id,
+        'account': account or '',
+        'period_start': business_report_date_text(period_start),
+        'period_end': business_report_date_text(period_end),
+        'amount_cents': int(amount_cents or 0),
+        'amount': business_report_money(int(amount_cents or 0)),
+        'allocation_basis': allocation_basis,
+        'allocation_basis_label': allocation_basis_label,
+        'points': points,
+    }
+
+
+def operations_direct_account_matches_filter(account, account_filter=None):
+    if account_filter != 'driver_pay':
+        return True
+    name = (account.Name or '').lower()
+    taxrollup = (account.Taxrollup or '').lower()
+    return (
+        'driver labor' in name
+        or 'subcontracted trucking' in name
+        or 'contracted drivers' in taxrollup
+        or 'salaries and wages' in taxrollup
+    )
+
+
+def operations_direct_daily_allocations(company_code, start_date, end_date, account_filter=None):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    account_by_id, account_by_name = business_report_account_lookup(company_code)
+    ledger_rows = Gledger.query.filter(
+        Gledger.Com == company_code,
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).order_by(
+        Gledger.Date.asc(),
+        Gledger.id.asc(),
+    ).all()
+    totals = {}
+    for line in ledger_rows:
+        bill = business_report_bill_for_ledger_line(line)
+        account = business_report_account_for_line(line, account_by_id, account_by_name, bill)
+        if (
+            account is None
+            or account.Type != 'Expense'
+            or (account.Category or '').lower() != 'direct'
+            or not operations_direct_account_matches_filter(account, account_filter)
+        ):
+            continue
+        expense_date = business_report_as_date(line.Date)
+        if expense_date is None:
+            continue
+        key = (account.Name or line.Account or '', expense_date)
+        totals[key] = totals.get(key, 0) + int(line.Debit or 0) - int(line.Credit or 0)
+
+    direct_daily = {}
+    previous_date_by_account = {}
+    for (account_name, expense_date), amount_cents in sorted(totals.items(), key=lambda item: (item[0][0], item[0][1])):
+        previous_date = previous_date_by_account.get(account_name)
+        allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
+        allocation_start = max(allocation_start, start_date)
+        allocation_end = min(expense_date, end_date)
+        business_report_allocate_cents_by_day(direct_daily, allocation_start, allocation_end, int(amount_cents or 0))
+        previous_date_by_account[account_name] = expense_date
+    return direct_daily
+
+
 def operations_weekly_profit_loss(company_code, start_date, end_date):
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
     daily_income = {}
@@ -2982,37 +4078,11 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
             amount_cents = int(row.Credit or 0) - int(row.Debit or 0)
             daily_income[recognition_date] = daily_income.get(recognition_date, 0) + amount_cents
 
-    direct_daily = {}
-    direct_rows = db.session.query(
-        Gledger.Account,
-        Gledger.Date,
-        func.sum(func.coalesce(Gledger.Debit, 0) - func.coalesce(Gledger.Credit, 0)).label('amount_cents'),
-    ).join(
-        Accounts,
-        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
-    ).filter(
-        Accounts.Co == company_code,
-        Accounts.Type == 'Expense',
-        func.lower(Accounts.Category) == 'direct',
-        Gledger.Date >= start_dt,
-        Gledger.Date <= end_dt,
-    ).group_by(Gledger.Account, Gledger.Date).order_by(Gledger.Account, Gledger.Date).all()
-
-    previous_date_by_account = {}
-    for row in direct_rows:
-        if row.Date is None:
-            continue
-        expense_date = business_report_as_date(row.Date)
-        previous_date = previous_date_by_account.get(row.Account)
-        allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
-        allocation_start = max(allocation_start, start_date)
-        allocation_end = min(expense_date, end_date)
-        business_report_allocate_cents_by_day(direct_daily, allocation_start, allocation_end, int(row.amount_cents or 0))
-        previous_date_by_account[row.Account] = expense_date
+    direct_daily = operations_direct_daily_allocations(company_code, start_date, end_date)
 
     indirect_daily = {}
     for row in db.session.execute(text("""
-        SELECT PeriodStart, PeriodEnd, AmountCents
+        SELECT PeriodStart, PeriodEnd, AmountCents, AllocationBasis
         FROM operations_indirect_allocations
         WHERE Co = :company_code
           AND Active = 1
@@ -3026,18 +4096,28 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
         # Indirect rows represent a payment coverage period, for example an
         # insurance policy from June-to-June. Allocate across the full coverage
         # period, then include only the days that land in the report window.
-        business_report_allocate_cents_by_period(
-            indirect_daily,
-            period_start,
-            period_end,
-            int(row['AmountCents'] or 0),
-            start_date,
-            end_date,
-        )
+        if (row['AllocationBasis'] or 'daily') == 'port_trip':
+            business_report_allocate_cents_by_port_trip(
+                indirect_daily,
+                period_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
+        else:
+            business_report_allocate_cents_by_period(
+                indirect_daily,
+                period_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
 
     ga_daily = {}
     for row in db.session.execute(text("""
-        SELECT PeriodStart, PeriodEnd, AmountCents
+        SELECT PeriodStart, PeriodEnd, AmountCents, AllocationBasis
         FROM operations_ga_allocations
         WHERE Co = :company_code
           AND Active = 1
@@ -3048,14 +4128,24 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
         period_end = row['PeriodEnd']
         period_start = business_report_as_date(period_start)
         period_end = business_report_as_date(period_end)
-        business_report_allocate_cents_by_period(
-            ga_daily,
-            period_start,
-            period_end,
-            int(row['AmountCents'] or 0),
-            start_date,
-            end_date,
-        )
+        if (row['AllocationBasis'] or 'daily') == 'port_trip':
+            business_report_allocate_cents_by_port_trip(
+                ga_daily,
+                period_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
+        else:
+            business_report_allocate_cents_by_period(
+                ga_daily,
+                period_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
 
     weeks = {}
     for day in business_report_each_day(start_date, end_date):
@@ -3126,6 +4216,45 @@ def ProfitLossWeekly():
     return business_reports_page('weekly')
 
 
+@main.route('/api/business-reports/weekly-allocation-plot')
+@login_required
+@financial_mfa_required
+def WeeklyAllocationPlotApi():
+    if session.get('authority') not in ['admin', 'superuser']:
+        abort(403)
+    ensure_business_report_tables()
+    companies = tax_rollup_company_options()
+    selected_company = request.args.get('company') or cmpdata[10]
+    if selected_company not in companies:
+        selected_company = companies[0]
+    today_local = datetime.date.today()
+    selected_start = business_report_parse_date(request.args.get('date_from'), datetime.date(today_local.year, 1, 1))
+    selected_end = business_report_parse_date(request.args.get('date_to'), today_local)
+    allocation_type = (request.args.get('allocation_type') or '').strip()
+    try:
+        allocation_id = int(request.args.get('allocation_id') or 0)
+    except ValueError:
+        allocation_id = 0
+    if allocation_type not in ['indirect', 'ga', 'builtin_direct', 'builtin_driver_pay']:
+        return jsonify({'error': 'Choose a valid allocation row.'}), 400
+    if allocation_type in ['indirect', 'ga'] and not allocation_id:
+        return jsonify({'error': 'Choose a valid allocation row.'}), 400
+    try:
+        payload = operations_weekly_allocation_plot(
+            selected_company,
+            allocation_type,
+            allocation_id,
+            selected_start,
+            selected_end,
+        )
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc)}), 500
+    if payload is None:
+        return jsonify({'error': 'Allocation row was not found.'}), 404
+    return jsonify(payload)
+
+
 @main.route('/BusinessReports/YearToDate', methods=['GET', 'POST'])
 @login_required
 @financial_mfa_required
@@ -3149,13 +4278,17 @@ def business_reports_page(report_mode):
     selected_end = business_report_parse_date(request.values.get('date_to'), default_end)
     err = []
     msg = []
+    action = None
+    force_report_refresh = False
 
     if request.method == 'POST':
         action = request.form.get('action')
         selected_company = request.form.get('company') or selected_company
         if selected_company not in companies:
             selected_company = companies[0]
-        if action == 'add_allocation':
+        if action == 'refresh_report_cache':
+            force_report_refresh = True
+        elif action == 'add_allocation':
             account_name = (request.form.get('account_name') or '').strip()
             basis_type = (request.form.get('basis_type') or 'port_entry').strip()
             if basis_type not in BUSINESS_REPORT_BASIS_TYPES:
@@ -3204,6 +4337,9 @@ def business_reports_page(report_mode):
             period_start = business_report_parse_date(request.form.get('ops_period_start'), None)
             period_end = business_report_parse_date(request.form.get('ops_period_end'), None)
             amount_cents = business_report_cents(request.form.get('ops_amount'))
+            allocation_basis = (request.form.get('ops_allocation_basis') or 'daily').strip()
+            if allocation_basis not in OPERATIONS_ALLOCATION_BASIS_TYPES:
+                allocation_basis = 'daily'
             auto_update = 1 if request.form.get('ops_auto_update') else 0
             if auto_update:
                 period_start = datetime.date(today_local.year, 1, 1)
@@ -3220,15 +4356,16 @@ def business_reports_page(report_mode):
             else:
                 db.session.execute(text("""
                     INSERT INTO operations_indirect_allocations
-                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
+                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
                     VALUES
-                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :auto_update, :notes, 1, :created_at, :updated_at)
+                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :allocation_basis, :auto_update, :notes, 1, :created_at, :updated_at)
                 """), {
                     'company_code': selected_company,
                     'account_name': account_name,
                     'period_start': period_start,
                     'period_end': period_end,
                     'amount_cents': amount_cents,
+                    'allocation_basis': allocation_basis,
                     'auto_update': auto_update,
                     'notes': (request.form.get('ops_notes') or '').strip(),
                     'created_at': datetime.datetime.utcnow(),
@@ -3236,6 +4373,7 @@ def business_reports_page(report_mode):
                 })
                 db.session.commit()
                 msg.append('Operations indirect allocation added.')
+                force_report_refresh = report_mode == 'weekly'
         elif action == 'delete_ops_indirect_allocation':
             allocation_id = request.form.get('ops_allocation_id')
             db.session.execute(text("""
@@ -3249,11 +4387,15 @@ def business_reports_page(report_mode):
             })
             db.session.commit()
             msg.append('Operations indirect allocation removed.')
+            force_report_refresh = report_mode == 'weekly'
         elif action == 'add_ops_ga_allocation':
             account_name = (request.form.get('ops_ga_account_name') or '').strip()
             period_start = business_report_parse_date(request.form.get('ops_ga_period_start'), None)
             period_end = business_report_parse_date(request.form.get('ops_ga_period_end'), None)
             amount_cents = business_report_cents(request.form.get('ops_ga_amount'))
+            allocation_basis = (request.form.get('ops_ga_allocation_basis') or 'daily').strip()
+            if allocation_basis not in OPERATIONS_ALLOCATION_BASIS_TYPES:
+                allocation_basis = 'daily'
             auto_update = 1 if request.form.get('ops_ga_auto_update') else 0
             if auto_update:
                 period_start = datetime.date(today_local.year, 1, 1)
@@ -3270,15 +4412,16 @@ def business_reports_page(report_mode):
             else:
                 db.session.execute(text("""
                     INSERT INTO operations_ga_allocations
-                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
+                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
                     VALUES
-                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :auto_update, :notes, 1, :created_at, :updated_at)
+                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :allocation_basis, :auto_update, :notes, 1, :created_at, :updated_at)
                 """), {
                     'company_code': selected_company,
                     'account_name': account_name,
                     'period_start': period_start,
                     'period_end': period_end,
                     'amount_cents': amount_cents,
+                    'allocation_basis': allocation_basis,
                     'auto_update': auto_update,
                     'notes': (request.form.get('ops_ga_notes') or '').strip(),
                     'created_at': datetime.datetime.utcnow(),
@@ -3286,6 +4429,7 @@ def business_reports_page(report_mode):
                 })
                 db.session.commit()
                 msg.append('G&A allocation added.')
+                force_report_refresh = report_mode == 'weekly'
         elif action == 'delete_ops_ga_allocation':
             allocation_id = request.form.get('ops_ga_allocation_id')
             db.session.execute(text("""
@@ -3299,6 +4443,7 @@ def business_reports_page(report_mode):
             })
             db.session.commit()
             msg.append('G&A allocation removed.')
+            force_report_refresh = report_mode == 'weekly'
         elif action == 'export_expenses_csv':
             expenses = business_report_expenses(selected_start, selected_end, selected_company)
             lines = ['Account,Category,Subcategory,Amount']
@@ -3331,66 +4476,87 @@ def business_reports_page(report_mode):
             db.session.rollback()
             err.append(f'Auto allocation update skipped: {exc}')
 
-    try:
-        expense_rows = business_report_expenses(selected_start, selected_end, selected_company)
-    except Exception as exc:
-        db.session.rollback()
-        expense_rows = []
-        err.append(f'Expense summary could not be loaded: {exc}')
+    expense_rows = []
+    total_expenses = 0
+    tax_rollup_pl = business_report_empty_tax_rollup_pl()
+    operations_rows, operations_totals = [], business_report_empty_operations_totals()
+    unassigned_expense_lines = []
+    operations_effective_date_to = operations_end.strftime('%Y-%m-%d') if operations_end >= selected_start else ''
+    report_cache_info = {'source': 'empty', 'updated_at': '', 'generated_by': ''}
+    payload, cache_row = business_report_cache_load(selected_company, report_mode, selected_start, selected_end)
+    if force_report_refresh or payload is None:
+        try:
+            if report_mode == 'weekly':
+                operations_rows, operations_totals = operations_weekly_profit_loss(selected_company, selected_start, operations_end)
+                payload = {
+                    'operations_rows': operations_rows,
+                    'operations_totals': operations_totals,
+                    'operations_effective_date_to': operations_effective_date_to,
+                }
+            else:
+                tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
+                unassigned_expense_lines = business_report_unassigned_expense_lines(selected_company, selected_start, selected_end)
+                payload = {
+                    'tax_rollup_pl': tax_rollup_pl,
+                    'unassigned_expense_lines': unassigned_expense_lines,
+                    'expense_rows': [],
+                    'total_expenses_cents': tax_rollup_pl.get('total_expenses_cents', 0),
+                }
+            payload, cache_row = business_report_cache_save(selected_company, report_mode, selected_start, selected_end, payload)
+            report_cache_info = business_report_cache_info(cache_row, 'fresh')
+            msg.append('Report cache refreshed.')
+        except Exception as exc:
+            db.session.rollback()
+            payload = None
+            if report_mode == 'weekly':
+                err.append(f'Weekly operations report could not be loaded: {exc}')
+            else:
+                err.append(f'Tax rollup report could not be loaded: {exc}')
+    else:
+        report_cache_info = business_report_cache_info(cache_row, 'saved')
+
+    if payload:
+        if report_mode == 'weekly':
+            operations_rows = payload.get('operations_rows', [])
+            operations_totals = payload.get('operations_totals') or business_report_empty_operations_totals()
+            operations_effective_date_to = payload.get('operations_effective_date_to') or operations_effective_date_to
+        else:
+            tax_rollup_pl = payload.get('tax_rollup_pl') or business_report_empty_tax_rollup_pl()
+            unassigned_expense_lines = payload.get('unassigned_expense_lines', [])
+            expense_rows = payload.get('expense_rows', [])
+            total_expenses = int(payload.get('total_expenses_cents') or tax_rollup_pl.get('total_expenses_cents') or 0)
 
     try:
-        tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
-    except Exception as exc:
-        db.session.rollback()
-        tax_rollup_pl = business_report_empty_tax_rollup_pl()
-        err.append(f'Tax rollup report could not be loaded: {exc}')
-
-    try:
-        operations_rows, operations_totals = operations_weekly_profit_loss(selected_company, selected_start, operations_end)
-    except Exception as exc:
-        db.session.rollback()
-        operations_rows, operations_totals = [], business_report_empty_operations_totals()
-        err.append(f'Weekly operations report could not be loaded: {exc}')
-
-    try:
-        ops_indirect_rows = operations_indirect_allocations(selected_company)
+        ops_indirect_rows = operations_indirect_allocations(selected_company) if report_mode == 'weekly' else []
     except Exception as exc:
         db.session.rollback()
         ops_indirect_rows = []
         err.append(f'Indirect allocations could not be loaded: {exc}')
 
     try:
-        ops_ga_rows = operations_ga_allocations(selected_company)
+        ops_ga_rows = operations_ga_allocations(selected_company) if report_mode == 'weekly' else []
     except Exception as exc:
         db.session.rollback()
         ops_ga_rows = []
         err.append(f'G&A allocations could not be loaded: {exc}')
 
     try:
-        unassigned_expense_lines = business_report_unassigned_expense_lines(selected_company, selected_start, selected_end)
-    except Exception as exc:
-        db.session.rollback()
-        unassigned_expense_lines = []
-        err.append(f'Unassigned expense review could not be loaded: {exc}')
-
-    try:
-        ops_indirect_accounts = operations_account_options(selected_company, today_local, 'indirect')
+        ops_indirect_accounts = operations_account_options(selected_company, today_local, 'indirect') if report_mode == 'weekly' else []
     except Exception as exc:
         db.session.rollback()
         ops_indirect_accounts = []
         err.append(f'Indirect account options could not be loaded: {exc}')
 
     try:
-        ops_ga_accounts = operations_account_options(selected_company, today_local, 'g-a')
+        ops_ga_accounts = operations_account_options(selected_company, today_local, 'g-a') if report_mode == 'weekly' else []
     except Exception as exc:
         db.session.rollback()
         ops_ga_accounts = []
         err.append(f'G&A account options could not be loaded: {exc}')
-    total_expenses = sum(row['amount_cents'] for row in expense_rows)
     report_basis = {
-        'port_entries': business_report_number(business_report_basis_qty('port_entry', selected_start, selected_end), 0),
-        'days': business_report_number(business_report_basis_qty('day', selected_start, selected_end), 0),
-        'miles': business_report_number(business_report_basis_qty('mile', selected_start, selected_end), 2),
+        'port_entries': business_report_number(0, 0),
+        'days': business_report_number(0, 0),
+        'miles': business_report_number(0, 2),
     }
     return render_template(
         'business_reports.html',
@@ -3408,7 +4574,7 @@ def business_reports_page(report_mode):
         tax_rollup_pl=tax_rollup_pl,
         operations_rows=operations_rows,
         operations_totals=operations_totals,
-        operations_effective_date_to=operations_end.strftime('%Y-%m-%d') if operations_end >= selected_start else '',
+        operations_effective_date_to=operations_effective_date_to,
         ops_indirect_rows=ops_indirect_rows,
         ops_indirect_accounts=ops_indirect_accounts,
         ops_ga_rows=ops_ga_rows,
@@ -3417,7 +4583,9 @@ def business_reports_page(report_mode):
         expense_rows=expense_rows,
         total_expenses=business_report_money(total_expenses),
         basis_types=BUSINESS_REPORT_BASIS_TYPES,
+        operations_allocation_basis_types=OPERATIONS_ALLOCATION_BASIS_TYPES,
         report_basis=report_basis,
+        report_cache_info=report_cache_info,
         ops_default_start=datetime.date(today_local.year, 1, 1).strftime('%Y-%m-%d'),
         ops_default_end=today_local.strftime('%Y-%m-%d'),
         err=err,
@@ -6288,6 +7456,9 @@ def ReceiveByAccount():
     from webapp.class8_tasks import ReceiveByAccount_task
     from webapp.viewfuncs import d2s
 
+    if request.method == 'POST' and request.values.get('Return') is not None:
+        return redirect(url_for('main.Class8Main', genre='Trucking'))
+
     def receive_batch_date_range():
         today = datetime.date.today()
         default_start = today - datetime.timedelta(days=30)
@@ -6342,6 +7513,17 @@ def ReceiveByAccount():
                 except:
                     pass
         return ids
+
+    def receive_success_message(holdvec):
+        try:
+            checked_count = sum(1 for value in holdvec[3] if value == 1)
+        except:
+            checked_count = 0
+        customer = holdvec[0] or 'selected account'
+        total = holdvec[5] or '0.00'
+        ref = holdvec[8] or ''
+        ref_text = f' Reference {ref}.' if ref else ''
+        return f'Recorded received payment batch for {customer}: {checked_count} invoice(s), ${total}.{ref_text}'
 
     def create_counter_deposit(err_list):
         payment_ids = selected_payment_ledger_ids()
@@ -6871,6 +8053,7 @@ def ReceiveByAccount():
         request.values.get('update_reloaded_batch') is not None or
         request.values.get('recordpayment') is not None
     )
+    is_normal_record = request.values.get('recordpayment') is not None and not is_reloaded_batch
 
     if is_reloaded_record:
         completed = False
@@ -6885,6 +8068,9 @@ def ReceiveByAccount():
         )
     else:
         completed, err_list, holdvec = ReceiveByAccount_task([], [''] * 150, 0)
+        if completed and is_normal_record:
+            flash(receive_success_message(holdvec), 'success')
+            return redirect(url_for('main.ReceiveByAccount'))
 
     if request.values.get('create_counter_deposit') is not None:
         err_list = create_counter_deposit(err_list)
@@ -6997,6 +8183,7 @@ def GeneralDeposits():
     err = []
     selected = {
         'deposit_date': request.values.get('deposit_date', today_value),
+        'deposit_kind': request.values.get('deposit_kind', 'general'),
         'bank_account': request.values.get('bank_account', ''),
         'credit_account': request.values.get('credit_account', ''),
         'amount': request.values.get('amount', ''),
@@ -7005,6 +8192,8 @@ def GeneralDeposits():
         'memo': request.values.get('memo', ''),
         'edit_journal': request.values.get('edit_journal', ''),
     }
+    if selected['deposit_kind'] not in ['general', 'expense_reimbursement']:
+        selected['deposit_kind'] = 'general'
 
     bank_accounts = Accounts.query.filter(
         (Accounts.Type == 'Bank') &
@@ -7014,10 +8203,40 @@ def GeneralDeposits():
         (Accounts.Co == company_code) &
         (Accounts.Type.in_(['Income', 'Equity', 'Current Liability']))
     ).order_by(Accounts.Type, Accounts.Name).all()
+    reimbursement_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (Accounts.Type == 'Expense')
+    ).order_by(Accounts.Category, Accounts.Subcategory, Accounts.Name).all()
+    allowed_credit_types = ['Income', 'Equity', 'Current Liability']
+
+    def deposit_kind_for_account(account):
+        return 'expense_reimbursement' if account is not None and account.Type == 'Expense' else 'general'
+
+    def account_for_ledger_line(line):
+        if line is None:
+            return None
+        if line.Aid:
+            account = Accounts.query.get(line.Aid)
+            if account is not None:
+                return account
+        return Accounts.query.filter(
+            (Accounts.Name == (line.Account or '')) &
+            (Accounts.Co == company_code)
+        ).first()
+
+    def validate_credit_account(account):
+        if account is None:
+            err.append('Credit account is required')
+        elif selected['deposit_kind'] == 'expense_reimbursement' and account.Type != 'Expense':
+            err.append('Expense reimbursement deposits must credit an expense account')
+        elif selected['deposit_kind'] != 'expense_reimbursement' and account.Type not in allowed_credit_types:
+            err.append('General deposits can only credit income, equity, or current liability accounts')
 
     if not selected['bank_account'] and bank_accounts:
         selected['bank_account'] = bank_accounts[0].Name
-    if not selected['credit_account'] and credit_accounts:
+    if selected['deposit_kind'] == 'expense_reimbursement' and not selected['credit_account'] and reimbursement_accounts:
+        selected['credit_account'] = reimbursement_accounts[0].Name
+    elif not selected['credit_account'] and credit_accounts:
         selected['credit_account'] = credit_accounts[0].Name
 
     def load_manual_deposit(journal_id):
@@ -7035,8 +8254,10 @@ def GeneralDeposits():
         ).first()
         if debit_line is None or credit_line is None:
             return None
+        credit_account = account_for_ledger_line(credit_line)
         return {
             'deposit_date': debit_line.Date.strftime('%Y-%m-%d') if debit_line.Date else today_value,
+            'deposit_kind': deposit_kind_for_account(credit_account),
             'bank_account': debit_line.Account or '',
             'credit_account': credit_line.Account or '',
             'amount': "{:,.2f}".format((debit_line.Debit or 0) / 100),
@@ -7112,8 +8333,7 @@ def GeneralDeposits():
         ).first()
         if bank is None:
             err.append('Bank account is required')
-        if credit is None:
-            err.append('Credit account is required')
+        validate_credit_account(credit)
         if debit_line is None or credit_line is None:
             err.append('Manual deposit journal could not be found for update')
         if not selected['source'].strip():
@@ -7152,6 +8372,7 @@ def GeneralDeposits():
             err.append(f'General deposit {debit_line.Tcode} updated')
             selected = {
                 'deposit_date': today_value,
+                'deposit_kind': 'general',
                 'bank_account': bank.Name,
                 'credit_account': credit.Name,
                 'amount': '',
@@ -7182,8 +8403,7 @@ def GeneralDeposits():
         ).first()
         if bank is None:
             err.append('Bank account is required')
-        if credit is None:
-            err.append('Credit account is required')
+        validate_credit_account(credit)
         if not selected['source'].strip():
             err.append('Deposit source is required')
 
@@ -7233,6 +8453,7 @@ def GeneralDeposits():
                 err.append(f'General deposit {tcode} recorded for ${amount / 100:,.2f}')
                 selected = {
                     'deposit_date': today_value,
+                    'deposit_kind': 'general',
                     'bank_account': bank.Name,
                     'credit_account': credit.Name,
                     'amount': '',
@@ -7269,6 +8490,7 @@ def GeneralDeposits():
         selected=selected,
         bank_accounts=bank_accounts,
         credit_accounts=credit_accounts,
+        reimbursement_accounts=reimbursement_accounts,
         recent_deposits=recent_deposits,
     )
 

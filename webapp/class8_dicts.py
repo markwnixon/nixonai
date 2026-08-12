@@ -18,7 +18,7 @@ PublicSite_setup = {
 Trucking_genre = {'table': 'Orders',
                   'genre_tables': ['Orders', 'Interchange', 'Customers', 'Services', 'Summaries', 'Drivers', 'Trucks', 'Pins', 'Terminals'],
                   'genre_tables_on': ['on', 'off', 'off', 'off', 'off', 'off', 'off'],
-                  'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice',  'Receive Payment'],
+                  'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice'],
                   'table_filters': [{'Shipper Filter': ['get_Shippers', 'Show All']},
                                     {'Date Filter': ['Last 45 Days', 'Last 90 Days', 'Last 180 Days', 'Last 360 Days', 'This Year', 'Last Year', 'Year Before Last', 'Show All']},
                                     {'Pay Filter': ['Uninvoiced', 'Unrecorded', 'Unsent', 'Unpaid', 'InvoSummaries', 'Show All']},
@@ -78,8 +78,7 @@ Trucking_genre = {'table': 'Orders',
                                         {
                                             'New Job' : ['Table_Selected', 'New', 'Orders'],
                                             'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
-                                            'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
-                                            'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice']
+                                            'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice']
                                         },
                                     'Adding':
                                         {
@@ -120,7 +119,7 @@ Trucking_genre = {'table': 'Orders',
                                          'Edit Summary Inv' : ['One_Table_Multi_Item_Selection', 'MakeSummary', 'Invoice'],
                                          'Send Package' : ['Single_Item_Selection', 'MakePackage', 'Package'],
                                          'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
-                                         'Receive by Acct' : ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'ReceiveByAccount', '']
+                                         'Receive by Acct' : ['No_Display', 'ReceiveByAccountRedirect', '']
                                         },
 
                                     'View Docs':
@@ -948,7 +947,7 @@ CT_setup = {'table': '0'}
 Auto_genre =   {'table': 'Autos',
                   'genre_tables': ['Autos', 'Orders', 'Interchange', 'Customers', 'Services', 'Summaries'],
                   'genre_tables_on': ['on', 'off', 'off', 'off', 'off','off'],
-                  'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice',  'Receive Payment'],
+                  'quick_buttons': ['New Job', 'Edit Item', 'Edit Invoice'],
                   'table_filters': [{'Date Filter': ['Last 90 Days', 'Last 180 Days', 'Last 360 Days', 'Last Year', 'This Year', 'Show All']},
                                     {'Pay Filter': ['Uninvoiced', 'Unrecorded', 'Unsent', 'Unpaid', 'InvoSummaries', 'Show All']},
                                     {'Haul Filter': ['Not Started', 'In-Progress', 'Incomplete', 'Completed',
@@ -997,8 +996,7 @@ Auto_genre =   {'table': 'Autos',
                                         {
                                             'New Job' : ['Table_Selected', 'New', 'Orders'],
                                             'Edit Item' : ['Single_Item_Selection', 'Edit', 'Form'],
-                                            'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice'],
-                                            'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice']
+                                            'Edit Invoice' : ['Single_Item_Selection', 'MakeInvoice', 'Invoice']
                                         },
                                     'Adding':
                                         {
@@ -1033,7 +1031,7 @@ Auto_genre =   {'table': 'Autos',
                                          'Edit Summary Inv' : ['One_Table_Multi_Item_Selection', 'MakeSummary', 'Invoice'],
                                          'Send Package' : ['Single_Item_Selection', 'MakePackage', 'Package'],
                                          'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
-                                         'Receive by Acct' : ['No_Selection_Plus_Display_Plus_Left_Panel_Change', 'ReceiveByAccount', '']
+                                         'Receive by Acct' : ['No_Display', 'ReceiveByAccountRedirect', '']
                                         },
 
                                     'View Docs':

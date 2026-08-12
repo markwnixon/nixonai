@@ -2093,28 +2093,104 @@ class Driverlog(db.Model):
     id = db.Column('id', db.Integer, primary_key=True)
     Date = db.Column('Date', db.Date)
     Driver = db.Column('Driver', db.String(45))
-    GPSin= db.Column('GPSin', db.DateTime)
-    GPSout = db.Column('GPSout', db.DateTime)
-    Odomstart = db.Column('Odomstart', db.String(45))
-    Odomstop = db.Column('Odomstop', db.String(45))
+    GPSin= db.Column('GPSin', db.String(45))
+    GPSout = db.Column('GPSout', db.String(45))
+    Clockin= db.Column('Clockin', db.DateTime)
+    Clockout = db.Column('Clockout', db.DateTime)
     Truck = db.Column('Truck', db.String(45))
     Locationstart = db.Column('Locationstart', db.String(45))
     Locationstop = db.Column('Locationstop', db.String(45))
     Shift = db.Column('Shift', db.String(45))
     Status = db.Column('Status', db.String(45))
 
-    def __init__(self, Date, Driver, GPSin, GPSout, Odomstart, Odomstop, Truck, Locationstart, Locationstop, Shift, Status):
+    def __init__(self, Date, Driver, GPSin, GPSout, Clockin, Clockout, Truck, Locationstart, Locationstop, Shift, Status):
         self.Date = Date
         self.GPSin = GPSin
         self.GPSout = GPSout
-        self.Odomstart = Odomstart
-        self.Odomstop = Odomstop
+        self.Clockin = Clockin
+        self.Clockout = Clockout
         self.Truck = Truck
         self.Driver = Driver
         self.Locationstart = Locationstart
         self.Locationstop = Locationstop
         self.Shift = Shift
         self.Status = Status
+
+
+class DispatchDriverMessage(db.Model):
+    __tablename__ = 'dispatch_driver_messages'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Co = db.Column('Co', db.String(12))
+    OrderId = db.Column('OrderId', db.Integer)
+    Jo = db.Column('Jo', db.String(25))
+    Container = db.Column('Container', db.String(50))
+    Driver = db.Column('Driver', db.String(100))
+    SenderName = db.Column('SenderName', db.String(100))
+    SenderType = db.Column('SenderType', db.String(30))
+    MessageText = db.Column('MessageText', db.Text)
+    RouteJson = db.Column('RouteJson', db.Text)
+    CreatedAt = db.Column('CreatedAt', db.DateTime)
+    ReadAt = db.Column('ReadAt', db.DateTime)
+    Active = db.Column('Active', db.Integer)
+
+    def __init__(self, Co, OrderId, Jo, Container, Driver, SenderName, SenderType, MessageText, CreatedAt, ReadAt, Active, RouteJson=None):
+        self.Co = Co
+        self.OrderId = OrderId
+        self.Jo = Jo
+        self.Container = Container
+        self.Driver = Driver
+        self.SenderName = SenderName
+        self.SenderType = SenderType
+        self.MessageText = MessageText
+        self.RouteJson = RouteJson
+        self.CreatedAt = CreatedAt
+        self.ReadAt = ReadAt
+        self.Active = Active
+
+
+class DispatchDriverAssignment(db.Model):
+    __tablename__ = 'dispatch_driver_assignments'
+    id = db.Column('id', db.Integer, primary_key=True)
+    Co = db.Column('Co', db.String(12))
+    Driver = db.Column('Driver', db.String(100))
+    AssignmentType = db.Column('AssignmentType', db.String(45))
+    PrimaryOrderId = db.Column('PrimaryOrderId', db.Integer)
+    SecondaryOrderId = db.Column('SecondaryOrderId', db.Integer)
+    PrimaryJo = db.Column('PrimaryJo', db.String(25))
+    SecondaryJo = db.Column('SecondaryJo', db.String(25))
+    PrimaryContainer = db.Column('PrimaryContainer', db.String(50))
+    SecondaryContainer = db.Column('SecondaryContainer', db.String(50))
+    RouteOrderId = db.Column('RouteOrderId', db.Integer)
+    DestinationName = db.Column('DestinationName', db.String(100))
+    DestinationAddress = db.Column('DestinationAddress', db.String(500))
+    MessageText = db.Column('MessageText', db.Text)
+    RouteJson = db.Column('RouteJson', db.Text)
+    Status = db.Column('Status', db.String(45))
+    CreatedBy = db.Column('CreatedBy', db.String(100))
+    CreatedAt = db.Column('CreatedAt', db.DateTime)
+    Active = db.Column('Active', db.Integer)
+
+    def __init__(self, Co, Driver, AssignmentType, PrimaryOrderId, SecondaryOrderId,
+                 PrimaryJo, SecondaryJo, PrimaryContainer, SecondaryContainer, RouteOrderId,
+                 DestinationName, DestinationAddress, MessageText, Status, CreatedBy, CreatedAt, Active, RouteJson=None):
+        self.Co = Co
+        self.Driver = Driver
+        self.AssignmentType = AssignmentType
+        self.PrimaryOrderId = PrimaryOrderId
+        self.SecondaryOrderId = SecondaryOrderId
+        self.PrimaryJo = PrimaryJo
+        self.SecondaryJo = SecondaryJo
+        self.PrimaryContainer = PrimaryContainer
+        self.SecondaryContainer = SecondaryContainer
+        self.RouteOrderId = RouteOrderId
+        self.DestinationName = DestinationName
+        self.DestinationAddress = DestinationAddress
+        self.MessageText = MessageText
+        self.RouteJson = RouteJson
+        self.Status = Status
+        self.CreatedBy = CreatedBy
+        self.CreatedAt = CreatedAt
+        self.Active = Active
         
 class Drivers(db.Model):
     __tablename__ = 'drivers'

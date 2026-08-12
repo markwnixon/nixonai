@@ -2,7 +2,7 @@ from webapp import db
 from webapp.models import Vehicles, Orders, Gledger, Invoices, JO, Income, Accounts, LastMessage, People, \
                           Interchange, Drivers, ChalkBoard, Services, Drops, StreetTurns,\
                           SumInv, Autos, Bills, Divisions, Trucklog, Pins, PortClosed, PaymentsRec, Terminals, Accttypes, Taxmap, \
-                          Chassis, DepreciationAsset, Deposits, Reconciliations
+                          Chassis, DepreciationAsset, Deposits, Reconciliations, DispatchDriverAssignment
 from flask import render_template, flash, redirect, url_for, session, logging, request
 from webapp.CCC_system_setup import myoslist, addpath, tpath, companydata, scac, apikeys
 from webapp.class8_utils_email import etemplate_truck, info_mimemail, dispatch_sender_key, require_invoice_cc, require_rate_con_cc
@@ -785,6 +785,197 @@ def get_dispatch(odat):
         if 'Export' in ht: return f'Load In: *{newbook}  {odat.Container}* ({ctext} {city})'
         if 'Import' in ht: return f'Empty In: *{odat.Container}* ({ctext} {city})'
     return ''
+
+
+def clean_dispatch_text(value):
+    if value is None:
+        return ''
+    return str(value).strip()
+
+
+def is_import_dispatch_order(odat):
+    return 'import' in clean_dispatch_text(getattr(odat, 'HaulType', '')).lower()
+
+
+def dispatch_delivery_address(odat):
+    return clean_dispatch_text(getattr(odat, 'Dropblock2', None) or getattr(odat, 'Company2', None))
+
+
+def dispatch_route_destination(odat):
+    dropblock = clean_dispatch_text(getattr(odat, 'Dropblock2', None))
+    lines = [line.strip() for line in dropblock.replace('\r', '\n').split('\n') if line.strip()]
+    if len(lines) >= 3:
+        return clean_dispatch_text(f'{lines[1]} {lines[2]}')
+    if len(lines) == 2:
+        return clean_dispatch_text(f'{lines[0]} {lines[1]}')
+    return clean_dispatch_text(getattr(odat, 'Location3', None) or getattr(odat, 'Dropblock2', None) or getattr(odat, 'Company2', None))
+
+
+def dispatch_port_origin(odat):
+    return clean_dispatch_text(
+        getattr(odat, 'Dropblock1', None)
+        or getattr(odat, 'Company', None)
+        or getattr(odat, 'Pickup', None)
+        or getattr(odat, 'Location', None)
+    )
+
+
+def dispatch_route_payload_from_port(odat):
+    if odat is None:
+        return None
+    from urllib.parse import quote_plus
+    origin = dispatch_port_origin(odat)
+    destination = dispatch_route_destination(odat)
+    maps_url = None
+    if origin and destination:
+        maps_url = (
+            'https://www.google.com/maps/dir/?api=1'
+            f'&origin={quote_plus(origin)}'
+            f'&destination={quote_plus(destination)}'
+        )
+    return {
+        'origin_location': origin,
+        'origin_coordinates': '',
+        'origin_clockin': '',
+        'destination_name': clean_dispatch_text(getattr(odat, 'Company2', None)),
+        'destination_address': destination,
+        'maps_url': maps_url,
+        'distance_text': '',
+        'duration_text': '',
+        'eta': 'Open route link for live ETA' if maps_url else '',
+        'status': 'port gate to delivery' if maps_url else 'missing port gate or destination',
+    }
+
+
+def dispatch_delivery_lines(odat):
+    dropblock = clean_dispatch_text(getattr(odat, 'Dropblock2', None))
+    lines = [line.strip() for line in dropblock.replace('\r', '\n').split('\n') if line.strip()]
+    company = clean_dispatch_text(getattr(odat, 'Company2', None))
+    city_state_zip = clean_dispatch_text(getattr(odat, 'Location3', None))
+
+    if not lines and company:
+        lines.append(company)
+    elif company and lines and company.lower() not in lines[0].lower():
+        lines.insert(0, company)
+
+    if city_state_zip and all(city_state_zip.lower() not in line.lower() for line in lines):
+        lines.append(city_state_zip)
+
+    while len(lines) < 3:
+        lines.append('')
+    return lines[:3]
+
+
+def dispatch_assignment_text_from_orders(orders, assignment_type):
+    port_in_order = None
+    port_out_order = None
+    for odat in orders:
+        hstat = odat.Hstat if odat.Hstat is not None else -1
+        if hstat >= 1 and port_in_order is None:
+            port_in_order = odat
+        if hstat < 1 and port_out_order is None:
+            port_out_order = odat
+
+    if port_in_order or port_out_order:
+        lines = []
+        if port_in_order:
+            if is_import_dispatch_order(port_in_order):
+                lines.append(f'Please hook up to empty container {port_in_order.Container} for return to port.')
+            else:
+                lines.append(f'Please hook up to container {port_in_order.Container} for return to port.')
+        if port_out_order:
+            pull_label = 'import' if is_import_dispatch_order(port_out_order) else 'export'
+            if assignment_type == 'pull_deliver':
+                lines.append(f'Pull {pull_label} {port_out_order.Container} for delivery to:')
+                lines.extend(dispatch_delivery_lines(port_out_order))
+            elif assignment_type == 'pull_store':
+                lines.append(f'Pull {pull_label} {port_out_order.Container}.')
+                lines.append('Then pull and store.')
+            else:
+                lines.append(f'Pull {pull_label} {port_out_order.Container}.')
+        message = '\n'.join(line for line in lines if line is not None).strip()
+        route_order = port_out_order if assignment_type == 'pull_deliver' and port_out_order else port_in_order or port_out_order
+        return message, route_order
+
+    lines = []
+    for odat in orders:
+        try:
+            dispatch_text = get_dispatch(odat)
+        except Exception:
+            dispatch_text = ''
+        if not dispatch_text:
+            dispatch_text = f'Dispatch container {odat.Container or ""} for job {odat.Jo or ""}.'.strip()
+        lines.append(dispatch_text)
+    if assignment_type == 'pull_deliver':
+        lines.insert(0, 'Pull and deliver:')
+    elif assignment_type == 'pull_store':
+        lines.insert(0, 'Pull and store:')
+    route_order = orders[0] if orders else None
+    return '\n'.join(lines), route_order
+
+
+def save_dispatch_assignment_from_copy(driver, orders, assignment_type, message_text, route_order):
+    if not hasinput(driver) or not message_text:
+        return None
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS dispatch_driver_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(12) NULL,
+            Driver VARCHAR(120) NOT NULL,
+            AssignmentType VARCHAR(40) NULL,
+            PrimaryOrderId INT NULL,
+            SecondaryOrderId INT NULL,
+            PrimaryJo VARCHAR(80) NULL,
+            SecondaryJo VARCHAR(80) NULL,
+            PrimaryContainer VARCHAR(80) NULL,
+            SecondaryContainer VARCHAR(80) NULL,
+            RouteOrderId INT NULL,
+            DestinationName VARCHAR(200) NULL,
+            DestinationAddress TEXT NULL,
+            MessageText TEXT NOT NULL,
+            RouteJson TEXT NULL,
+            Status VARCHAR(40) NOT NULL DEFAULT 'draft',
+            CreatedBy VARCHAR(120) NULL,
+            CreatedAt DATETIME NOT NULL,
+            Active TINYINT NOT NULL DEFAULT 1,
+            INDEX idx_dispatch_assignment_driver (Driver, Active),
+            INDEX idx_dispatch_assignment_order (PrimaryOrderId, SecondaryOrderId),
+            INDEX idx_dispatch_assignment_created (CreatedAt)
+        )
+    """))
+    existing_assignment_columns = db.session.execute(text("""
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'dispatch_driver_assignments'
+    """)).fetchall()
+    assignment_column_names = [row[0] for row in existing_assignment_columns]
+    if 'RouteJson' not in assignment_column_names:
+        db.session.execute(text("ALTER TABLE dispatch_driver_assignments ADD COLUMN RouteJson TEXT NULL"))
+    primary_order = orders[0] if orders else None
+    secondary_order = orders[1] if len(orders) > 1 else None
+    assignment = DispatchDriverAssignment(
+        Co=scac,
+        Driver=driver,
+        AssignmentType=assignment_type,
+        PrimaryOrderId=primary_order.id if primary_order else None,
+        SecondaryOrderId=secondary_order.id if secondary_order else None,
+        PrimaryJo=primary_order.Jo if primary_order else None,
+        SecondaryJo=secondary_order.Jo if secondary_order else None,
+        PrimaryContainer=primary_order.Container if primary_order else None,
+        SecondaryContainer=secondary_order.Container if secondary_order else None,
+        RouteOrderId=route_order.id if route_order else None,
+        DestinationName=route_order.Company2 if route_order else None,
+        DestinationAddress=dispatch_delivery_address(route_order) if route_order else None,
+        MessageText=message_text,
+        Status='draft',
+        CreatedBy=session.get('username', 'Dispatch'),
+        CreatedAt=datetime.datetime.now(),
+        Active=1,
+    )
+    db.session.add(assignment)
+    db.session.commit()
+    return assignment
 
 def addtopins(thisdate, opair):
     driver = None
@@ -2477,6 +2668,12 @@ def Table_maker(genre):
         holdvec[96] = []
         #print(f'Doing the paste buffer for {checked_data} {tables_on}')
         sids = checked_data[0][2]
+        dispatch_panel_mode = request.values.get('dispatch_panel_mode') or ''
+        dispatch_driver = request.values.get('dispatch_driver') or ''
+        dispatch_assignment_type = request.values.get('dispatch_assignment_type') or 'general'
+        holdvec[130] = dispatch_panel_mode
+        holdvec[132] = dispatch_driver
+        holdvec[133] = dispatch_assignment_type
         if sids != []:
             if len(sids) <= 2:
                 if len(sids) == 2:
@@ -2495,30 +2692,46 @@ def Table_maker(genre):
                         indat = odat2
                         outdat = odat1
 
-                    for idate in range(4):
-                        addnow = request.values.get(f'add{idate}')
-                        movedate = thisdate + timedelta(idate)
-                        if addnow is not None:
-                            #print(f'Adding the dispatch selection to date {movedate}')
-                            addtopins(movedate, [indat,outdat])
-                    holdvec[95] = f'{get_dispatch(indat)}\n{get_dispatch(outdat)}'
+                    if putbuff is not None and dispatch_panel_mode == 'dispatch':
+                        orders = [indat, outdat]
+                        message_text, route_order = dispatch_assignment_text_from_orders(orders, dispatch_assignment_type)
+                        assignment = save_dispatch_assignment_from_copy(dispatch_driver, orders, dispatch_assignment_type, message_text, route_order)
+                        holdvec[131] = message_text
+                        holdvec[134] = f'Dispatch message drafted. Assignment #{assignment.id} created.' if assignment else 'Dispatch message drafted. Select a driver to save this as a dispatch assignment.'
+                        holdvec[135] = dispatch_route_payload_from_port(route_order) if dispatch_assignment_type == 'pull_deliver' else None
+                    else:
+                        for idate in range(4):
+                            addnow = request.values.get(f'add{idate}')
+                            movedate = thisdate + timedelta(idate)
+                            if addnow is not None:
+                                #print(f'Adding the dispatch selection to date {movedate}')
+                                addtopins(movedate, [indat,outdat])
+                        holdvec[95] = f'{get_dispatch(indat)}\n{get_dispatch(outdat)}'
                 else:
                     sid = sids[0]
                     odat = Orders.query.get(sid)
-                    holdvec[95] = get_dispatch(odat)
-                    for idate in range(4):
-                        addnow = request.values.get(f'add{idate}')
-                        movedate = thisdate + timedelta(idate)
-                        if addnow is not None:
-                            #print(f'Adding the dispatch selection to date {movedate}')
-                            addtopins(movedate,[odat])
+                    if putbuff is not None and dispatch_panel_mode == 'dispatch':
+                        orders = [odat]
+                        message_text, route_order = dispatch_assignment_text_from_orders(orders, dispatch_assignment_type)
+                        assignment = save_dispatch_assignment_from_copy(dispatch_driver, orders, dispatch_assignment_type, message_text, route_order)
+                        holdvec[131] = message_text
+                        holdvec[134] = f'Dispatch message drafted. Assignment #{assignment.id} created.' if assignment else 'Dispatch message drafted. Select a driver to save this as a dispatch assignment.'
+                        holdvec[135] = dispatch_route_payload_from_port(route_order) if dispatch_assignment_type == 'pull_deliver' else None
+                    else:
+                        holdvec[95] = get_dispatch(odat)
+                        for idate in range(4):
+                            addnow = request.values.get(f'add{idate}')
+                            movedate = thisdate + timedelta(idate)
+                            if addnow is not None:
+                                #print(f'Adding the dispatch selection to date {movedate}')
+                                addtopins(movedate,[odat])
             else:
                 err.append('Too many selections for paste buffer task')
+        else:
+            err.append('No selection made for paste buffer task')
         for idate in range(4):
             movedate = thisdate + timedelta(idate)
             holdvec[96].append([movedate, f'{idate}', Pins.query.filter(Pins.Date == movedate).all(), timedata])
-        else:
-            err.append('No selection made for paste buffer task')
     leftcheck = tfilters['Viewer']
     if leftcheck == '7x5': leftsize = 7
     if leftcheck == '8x4': leftsize = 8
@@ -3081,6 +3294,48 @@ def cascade_account_metadata_change(account_id, old_type, old_category, old_subc
     return [f'{name}: {count}' for name, count in sorted(counts.items())]
 
 
+def sync_bill_expense_ledger_account(bill):
+    """Keep bill-linked expense ledger classification aligned with Bills.bAccount.
+
+    This updates only classification fields on the expense side of the ledger
+    (Account and Aid). It intentionally leaves amount, date, reconciliation
+    status, and bank/payment lines untouched.
+    """
+    if bill is None or not hasinput(bill.bAccount):
+        return []
+    account = Accounts.query.filter(
+        (Accounts.Name == bill.bAccount) &
+        (Accounts.Co == bill.Co)
+    ).first()
+    if account is None:
+        return [f'Cannot sync ledger Aid: account "{bill.bAccount}" not found for {bill.Co}']
+
+    filters = [
+        (Gledger.SourceTable == 'Bills') & (Gledger.SourceId == bill.id),
+    ]
+    if hasinput(bill.Jo):
+        filters.extend([
+            Gledger.JournalId == f'BILL-{bill.id}',
+            Gledger.Tcode == bill.Jo,
+            Gledger.Tcode.like(f'{bill.Jo}-%'),
+        ])
+    rows = Gledger.query.filter(
+        or_(*filters),
+        Gledger.Com == bill.Co,
+        Gledger.Type.in_(['ED', 'XD', 'AD']),
+    ).all()
+
+    changed = 0
+    for row in rows:
+        if row.Account != account.Name or row.Aid != account.id:
+            row.Account = account.Name
+            row.Aid = account.id
+            changed += 1
+    if changed:
+        db.session.commit()
+    return [f'gledger expense Account/Aid synced: {changed}'] if changed else []
+
+
 def mask_apply(entrydata, masks, ht):
     mask_to_apply = request.values.get('HaulType')
     if mask_to_apply is None:
@@ -3463,6 +3718,9 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                         payment_err = gledger_write(['paybill'], bdat.Jo, bdat.bAccount, bdat.pAccount, 0)
                         if payment_err:
                             err.extend(payment_err)
+                    sync_report = sync_bill_expense_ledger_account(bdat)
+                    if sync_report:
+                        err.extend(sync_report)
                 if table == 'Orders':
                     #print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
@@ -4931,10 +5189,11 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
                         err_check = err_check+1
                         err.append(f'Amounts do no match for JO {each.Jo} {odat_amount} vs. {scheck.Amount}')
                 if err_check == 0:
+                    batch_total = d2s(sum(float(each.InvoTotal or 0) for each in odata))
                     for each in odata:
                         jo = each.Jo
                         amtpaid = each.InvoTotal
-                        jopaylist.append([jo, amtpaid, paidon,  payref, paymethod, depoacct])
+                        jopaylist.append([jo, amtpaid, paidon,  payref, paymethod, depoacct, batch_total])
                     err, success = income_record(jopaylist, err)
                     if success:
                         if email_requested: info_mimemail(emaildata, [sid])

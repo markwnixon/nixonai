@@ -2,9 +2,9 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from webapp.extensions import db
-from webapp.models import Orders, users, Pins, Vehicles, Drivers
+from webapp.models import Orders, users, Pins, Vehicles, Drivers, Driverlog, DispatchDriverMessage, DispatchDriverAssignment
 from webapp.viewfuncs import hasinput
-from webapp.CCC_system_setup import addpath, scac, tpath
+from webapp.CCC_system_setup import addpath, apikeys, scac, tpath
 from webapp.services.api_data_service import api_call
 from webapp.class8_tasks import get_address_details
 from webapp.financial_import_api import (
@@ -16,16 +16,661 @@ from webapp.financial_import_api import (
 
 import os
 import datetime
+import json
+import requests
+import pytz
 from datetime import timedelta
+from sqlalchemy import text
+from urllib.parse import quote_plus
 
 now = datetime.datetime.now()
 
 from flask import Blueprint
 api_bp = Blueprint('api_bp', __name__)
+APP_TIMEZONE = pytz.timezone('America/New_York')
+
+
+def _first_present(data, keys, default=''):
+    for key in keys:
+        value = data.get(key)
+        if value not in (None, ''):
+            return value
+    return default
+
+
+def _api_driver_identity(data, authenticated_username):
+    """Use the user's display name as the canonical driver key for driver-facing APIs."""
+    udat = users.query.filter(users.username == authenticated_username).first()
+    requested_driver = _first_present(data, ['driver', 'Driver', 'driver_name'])
+    display_name = (udat.name if udat is not None else '') or requested_driver
+    driver_name = requested_driver
+    if udat is not None and (udat.authority or '').lower() == 'driver':
+        driver_name = display_name
+    elif not driver_name and udat is not None:
+        driver_name = display_name
+    if udat is not None and requested_driver in [udat.username, udat.name]:
+        driver_name = display_name
+    if not display_name:
+        display_name = driver_name
+    return udat, driver_name, display_name
+
+
+def _api_driver_aliases(driver_name, udat=None):
+    aliases = []
+    for value in [driver_name, getattr(udat, 'name', None), getattr(udat, 'username', None)]:
+        if value and value not in aliases:
+            aliases.append(value)
+    if driver_name:
+        rows = users.query.filter(
+            (users.username == driver_name) | (users.name == driver_name)
+        ).all()
+        for row in rows:
+            for value in [row.name, row.username]:
+                if value and value not in aliases:
+                    aliases.append(value)
+    return aliases or [driver_name]
+
+
+def _parse_driver_log_datetime(data):
+    """Accept iOS ISO datetimes, or separate date/time values, and store naive datetimes."""
+    value = _first_present(data, ['datetime', 'timestamp', 'gps_time', 'log_datetime'])
+    if value:
+        if isinstance(value, str):
+            value = value.strip()
+            if value.endswith('Z'):
+                value = value[:-1] + '+00:00'
+            parsed = datetime.datetime.fromisoformat(value)
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(APP_TIMEZONE)
+            return parsed.replace(tzinfo=None)
+        if isinstance(value, datetime.datetime):
+            if value.tzinfo is not None:
+                value = value.astimezone(APP_TIMEZONE)
+            return value.replace(tzinfo=None)
+
+    date_value = _first_present(data, ['date', 'Date'])
+    time_value = _first_present(data, ['time', 'Time'])
+    if date_value and time_value:
+        parsed = datetime.datetime.fromisoformat(f'{date_value}T{time_value}')
+        return parsed.replace(tzinfo=None)
+    if date_value:
+        parsed_date = datetime.date.fromisoformat(str(date_value))
+        return datetime.datetime.combine(parsed_date, datetime.time())
+    return datetime.datetime.now(APP_TIMEZONE).replace(tzinfo=None)
+
+
+def _driver_log_location(data, log_action):
+    if log_action == 'in':
+        value = _first_present(data, ['locationstart', 'Locationstart', 'location_start'])
+    else:
+        value = _first_present(data, ['locationstop', 'Locationstop', 'location_stop'])
+    if value:
+        return str(value)[:45]
+
+    value = _first_present(data, ['location', 'Location'])
+    if value:
+        return str(value)[:45]
+
+    lat = _first_present(data, ['lat', 'latitude'])
+    lon = _first_present(data, ['lon', 'lng', 'longitude'])
+    if lat not in (None, '') and lon not in (None, ''):
+        return f'{lat},{lon}'[:45]
+    return ''
+
+
+def _driver_log_coordinates(data):
+    value = _first_present(data, ['gps', 'GPS', 'coordinates'])
+    if value:
+        return str(value)[:45]
+
+    lat = _first_present(data, ['lat', 'latitude'])
+    lon = _first_present(data, ['lon', 'lng', 'longitude'])
+    if lat not in (None, '') and lon not in (None, ''):
+        return f'{lat},{lon}'[:45]
+    return ''
+
+
+def _driver_log_action(data):
+    action = _first_present(data, ['action', 'indicator', 'status', 'event', 'direction'])
+    action = str(action).strip().lower()
+    if action in ['in', 'login', 'log-in', 'log_in', 'clock-in', 'clockin', 'clock_in', 'start', 'gpsin']:
+        return 'in'
+    if action in ['out', 'logout', 'log-out', 'log_out', 'clock-out', 'clockout', 'clock_out', 'stop', 'gpsout']:
+        return 'out'
+    return None
+
+
+def _driver_log_payload(row):
+    return {
+        'id': row.id,
+        'date': row.Date.isoformat() if row.Date else None,
+        'driver': row.Driver,
+        'clockin': row.Clockin.isoformat() if row.Clockin else None,
+        'clockout': row.Clockout.isoformat() if row.Clockout else None,
+        'truck': row.Truck,
+        'gps_start': row.GPSin,
+        'gps_stop': row.GPSout,
+        'locationstart': row.Locationstart,
+        'locationstop': row.Locationstop,
+        'shift': row.Shift,
+        'status': row.Status,
+    }
+
+
+def _ensure_dispatch_driver_message_table():
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS dispatch_driver_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(12) NULL,
+            OrderId INT NULL,
+            Jo VARCHAR(25) NULL,
+            Container VARCHAR(50) NULL,
+            Driver VARCHAR(100) NULL,
+            SenderName VARCHAR(100) NULL,
+            SenderType VARCHAR(30) NULL,
+            MessageText TEXT NULL,
+            RouteJson TEXT NULL,
+            CreatedAt DATETIME NOT NULL,
+            ReadAt DATETIME NULL,
+            Active INT NOT NULL DEFAULT 1,
+            INDEX idx_dispatch_driver_msg_order (OrderId),
+            INDEX idx_dispatch_driver_msg_jo (Jo),
+            INDEX idx_dispatch_driver_msg_driver (Driver),
+            INDEX idx_dispatch_driver_msg_created (CreatedAt)
+        )
+    """))
+    existing_columns = db.session.execute(text("""
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'dispatch_driver_messages'
+    """)).fetchall()
+    column_names = [row[0] for row in existing_columns]
+    if 'RouteJson' not in column_names:
+        db.session.execute(text("ALTER TABLE dispatch_driver_messages ADD COLUMN RouteJson TEXT NULL"))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS dispatch_driver_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(12) NULL,
+            Driver VARCHAR(100) NULL,
+            AssignmentType VARCHAR(45) NULL,
+            PrimaryOrderId INT NULL,
+            SecondaryOrderId INT NULL,
+            PrimaryJo VARCHAR(25) NULL,
+            SecondaryJo VARCHAR(25) NULL,
+            PrimaryContainer VARCHAR(50) NULL,
+            SecondaryContainer VARCHAR(50) NULL,
+            RouteOrderId INT NULL,
+            DestinationName VARCHAR(100) NULL,
+            DestinationAddress VARCHAR(500) NULL,
+            MessageText TEXT NULL,
+            RouteJson TEXT NULL,
+            Status VARCHAR(45) NULL,
+            CreatedBy VARCHAR(100) NULL,
+            CreatedAt DATETIME NOT NULL,
+            Active INT NOT NULL DEFAULT 1,
+            INDEX idx_dispatch_driver_assign_driver (Driver),
+            INDEX idx_dispatch_driver_assign_primary (PrimaryOrderId),
+            INDEX idx_dispatch_driver_assign_secondary (SecondaryOrderId),
+            INDEX idx_dispatch_driver_assign_created (CreatedAt)
+        )
+    """))
+    existing_assignment_columns = db.session.execute(text("""
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'dispatch_driver_assignments'
+    """)).fetchall()
+    assignment_column_names = [row[0] for row in existing_assignment_columns]
+    if 'RouteJson' not in assignment_column_names:
+        db.session.execute(text("ALTER TABLE dispatch_driver_assignments ADD COLUMN RouteJson TEXT NULL"))
+    db.session.commit()
+
+
+def _message_payload(row, display_name):
+    direction = 'outbound'
+    if (row.SenderName or '') == display_name or (row.SenderType or '').lower() == 'driver':
+        direction = 'inbound'
+    route_payload = None
+    if getattr(row, 'RouteJson', None):
+        try:
+            route_payload = json.loads(row.RouteJson)
+        except (TypeError, ValueError):
+            route_payload = None
+    return {
+        'id': row.id,
+        'co': row.Co,
+        'order_id': row.OrderId,
+        'jo': row.Jo,
+        'container': row.Container,
+        'driver': row.Driver,
+        'sender_name': row.SenderName,
+        'sender_type': row.SenderType,
+        'direction': direction,
+        'message_flow': 'driver_to_dispatch' if (row.SenderType or '').lower() == 'driver' else 'dispatch_to_driver',
+        'message': row.MessageText,
+        'route': route_payload,
+        'created_at': row.CreatedAt.isoformat() if row.CreatedAt else None,
+        'read_at': row.ReadAt.isoformat() if row.ReadAt else None,
+    }
+
+
+def _assignment_payload(row):
+    route_payload = None
+    if getattr(row, 'RouteJson', None):
+        try:
+            route_payload = json.loads(row.RouteJson)
+        except (TypeError, ValueError):
+            route_payload = None
+    return {
+        'id': row.id,
+        'driver': row.Driver,
+        'assignment_type': row.AssignmentType,
+        'primary_order_id': row.PrimaryOrderId,
+        'secondary_order_id': row.SecondaryOrderId,
+        'primary_jo': row.PrimaryJo,
+        'secondary_jo': row.SecondaryJo,
+        'primary_container': row.PrimaryContainer,
+        'secondary_container': row.SecondaryContainer,
+        'route_order_id': row.RouteOrderId,
+        'destination_name': row.DestinationName,
+        'destination_address': row.DestinationAddress,
+        'message_text': row.MessageText,
+        'route': route_payload,
+        'status': row.Status,
+        'created_by': row.CreatedBy,
+        'created_at': row.CreatedAt.isoformat() if row.CreatedAt else None,
+    }
+
+
+def _pending_dispatch_assignments(driver_name):
+    _ensure_dispatch_driver_message_table()
+    rows = DispatchDriverAssignment.query.filter(
+        DispatchDriverAssignment.Driver == driver_name,
+        DispatchDriverAssignment.Active == 1,
+        DispatchDriverAssignment.Status.in_(['pending', 'draft'])
+    ).order_by(DispatchDriverAssignment.CreatedAt, DispatchDriverAssignment.id).all()
+    return [_assignment_payload(row) for row in rows]
+
+
+def _dispatch_order_from_request(data):
+    order_id = _first_present(data, ['order_id', 'OrderId', 'id'])
+    jo = _first_present(data, ['jo', 'Jo'])
+    container = _first_present(data, ['container', 'Container'])
+
+    query = Orders.query
+    if order_id:
+        try:
+            return db.session.get(Orders, int(order_id))
+        except (TypeError, ValueError):
+            return None
+    if jo:
+        return query.filter(Orders.Jo == jo).order_by(Orders.id.desc()).first()
+    if container:
+        return query.filter(Orders.Container == container).order_by(Orders.id.desc()).first()
+    return None
+
+
+def _clean_route_text(value):
+    return (value or '').replace('\r', ' ').replace('\n', ' ').strip()
+
+
+def _parse_coordinate_pair(value):
+    if not value:
+        return None
+    try:
+        parts = str(value).replace(';', ',').split(',')
+        if len(parts) < 2:
+            return None
+        return float(parts[0].strip()), float(parts[1].strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _google_distance(origin, destination):
+    api_key = ''
+    try:
+        api_key = apikeys.get('dkey') or ''
+    except Exception:
+        api_key = ''
+    if not api_key or not origin or not destination:
+        return None
+    try:
+        response = requests.get(
+            'https://maps.googleapis.com/maps/api/distancematrix/json',
+            params={
+                'units': 'imperial',
+                'origins': origin,
+                'destinations': destination,
+                'key': api_key,
+            },
+            timeout=6,
+        )
+        payload = response.json()
+        element = payload['rows'][0]['elements'][0]
+        if element.get('status') != 'OK':
+            return None
+        return {
+            'distance_text': element.get('distance', {}).get('text'),
+            'duration_text': element.get('duration', {}).get('text'),
+            'provider': 'google_distance_matrix',
+        }
+    except Exception:
+        return None
+
+
+def _dispatch_route_payload(order, driver_name, data):
+    if order is None:
+        return None
+
+    origin_log = Driverlog.query.filter(
+        Driverlog.Driver == driver_name,
+        Driverlog.Clockin.isnot(None),
+        Driverlog.Clockout.is_(None)
+    ).order_by(Driverlog.Clockin.desc()).first()
+    if origin_log is None:
+        origin_log = Driverlog.query.filter(
+            Driverlog.Driver == driver_name,
+            Driverlog.Clockin.isnot(None)
+        ).order_by(Driverlog.Clockin.desc()).first()
+
+    origin_coordinates = _first_present(data, ['origin_coordinates', 'gps', 'coordinates'])
+    origin_location = _first_present(data, ['origin_location', 'location'])
+    if origin_log is not None:
+        origin_coordinates = origin_coordinates or origin_log.GPSin
+        origin_location = origin_location or origin_log.Locationstart
+
+    destination_address = _clean_route_text(order.Dropblock2 or order.Company2)
+    destination_name = _clean_route_text(order.Company2)
+    destination_coordinates = _first_present(data, ['destination_coordinates', 'destination_gps'])
+    dest_lat = _first_present(data, ['destination_lat', 'dest_lat'])
+    dest_lon = _first_present(data, ['destination_lon', 'destination_lng', 'dest_lon', 'dest_lng'])
+    if not destination_coordinates and dest_lat not in (None, '') and dest_lon not in (None, ''):
+        destination_coordinates = f'{dest_lat},{dest_lon}'
+
+    origin_for_route = origin_coordinates or origin_location
+    destination_for_route = destination_coordinates or destination_address
+    maps_url = None
+    if origin_for_route and destination_for_route:
+        maps_url = (
+            'https://www.google.com/maps/dir/?api=1'
+            f'&origin={quote_plus(origin_for_route)}'
+            f'&destination={quote_plus(destination_for_route)}'
+        )
+
+    route = {
+        'order_id': order.id,
+        'jo': order.Jo,
+        'container': order.Container,
+        'driver': driver_name,
+        'truck': order.Truck,
+        'origin_location': origin_location,
+        'origin_coordinates': origin_coordinates,
+        'origin_clockin': origin_log.Clockin.isoformat() if origin_log and origin_log.Clockin else None,
+        'destination_name': destination_name,
+        'destination_address': destination_address,
+        'destination_coordinates': destination_coordinates,
+        'maps_url': maps_url,
+        'distance_text': None,
+        'duration_text': None,
+        'provider': None,
+        'route_status': 'route_ready' if maps_url else 'missing_origin_or_destination',
+    }
+
+    google_route = _google_distance(origin_for_route, destination_for_route)
+    if google_route:
+        route.update(google_route)
+    elif maps_url:
+        route['provider'] = 'google_maps_url'
+        route['route_status'] = 'map_url_ready_distance_unavailable'
+
+    return route
 
 @api_bp.route('/api/test')
 def api_test():
     return {"message": "API blueprint working"}
+
+
+@api_bp.route('/api/driver/log', methods=['GET', 'POST'])
+@jwt_required()
+def driver_log_event():
+    current_user = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    if request.method == 'GET':
+        data = request.args.to_dict()
+
+    udat, driver_name, display_name = _api_driver_identity(data, current_user)
+    if not driver_name:
+        return jsonify({'error': 'Driver could not be determined from token or request.'}), 400
+    driver_aliases = _api_driver_aliases(driver_name, udat)
+
+    if request.method == 'GET':
+        log_dt = datetime.datetime.now()
+        try:
+            if _first_present(data, ['datetime', 'timestamp', 'gps_time', 'log_datetime', 'date', 'Date']):
+                log_dt = _parse_driver_log_datetime(data)
+        except (TypeError, ValueError):
+            return jsonify({
+                'error': 'Invalid datetime. Use an ISO value like 2026-08-08T07:30:00.'
+            }), 400
+
+        log_date = log_dt.date()
+        open_log = Driverlog.query.filter(
+            Driverlog.Driver.in_(driver_aliases),
+            Driverlog.Clockin.isnot(None),
+            Driverlog.Clockout.is_(None)
+        ).order_by(Driverlog.Clockin.desc()).first()
+
+        last_log = Driverlog.query.filter(
+            Driverlog.Driver.in_(driver_aliases),
+            Driverlog.Date == log_date
+        ).order_by(Driverlog.Clockin.desc()).first()
+
+        return jsonify({
+            'driver': driver_name,
+            'display_name': display_name,
+            'date': log_date.isoformat(),
+            'is_clocked_in': open_log is not None,
+            'next_action': 'clock-out' if open_log is not None else 'clock-in',
+            'open_log': _driver_log_payload(open_log) if open_log is not None else None,
+            'last_log': _driver_log_payload(last_log) if last_log is not None else None,
+            'pending_dispatch_assignments': _pending_dispatch_assignments(driver_name),
+        }), 200
+
+    log_action = _driver_log_action(data)
+    if log_action is None:
+        return jsonify({
+            'error': 'Missing or invalid clock action. Use action=clock-in or action=clock-out.'
+        }), 400
+
+    try:
+        log_dt = _parse_driver_log_datetime(data)
+    except (TypeError, ValueError):
+        return jsonify({
+            'error': 'Invalid datetime. Use an ISO value like 2026-08-08T07:30:00.'
+        }), 400
+    log_date = log_dt.date()
+    truck = str(_first_present(data, ['truck', 'Truck', 'unit', 'Unit']))[:45]
+    location = _driver_log_location(data, log_action)
+    gps_coordinates = _driver_log_coordinates(data)
+
+    if log_action == 'in':
+        open_log = Driverlog.query.filter(
+            Driverlog.Driver.in_(driver_aliases),
+            Driverlog.Clockout.is_(None)
+        ).order_by(Driverlog.Clockin.desc()).first()
+        if open_log is not None:
+            return jsonify({
+                'error': 'Driver is already clocked in.',
+                'display_name': display_name,
+                'log': _driver_log_payload(open_log),
+            }), 409
+
+        same_day_logs = Driverlog.query.filter(
+            Driverlog.Driver == driver_name,
+            Driverlog.Date == log_date
+        ).all()
+        shift_num = 1
+        for row in same_day_logs:
+            try:
+                shift_num = max(shift_num, int(row.Shift or 0) + 1)
+            except (TypeError, ValueError):
+                shift_num = max(shift_num, 2)
+
+        row = Driverlog(
+            Date=log_date,
+            Driver=driver_name,
+            GPSin=gps_coordinates,
+            GPSout=None,
+            Clockin=log_dt,
+            Clockout=None,
+            Truck=truck,
+            Locationstart=location,
+            Locationstop=None,
+            Shift=str(shift_num),
+            Status='1',
+        )
+        db.session.add(row)
+        db.session.commit()
+        return jsonify({
+            'message': 'Driver clocked in.',
+            'display_name': display_name,
+            'log': _driver_log_payload(row),
+            'pending_dispatch_assignments': _pending_dispatch_assignments(driver_name),
+        }), 201
+
+    open_log = Driverlog.query.filter(
+        Driverlog.Driver.in_(driver_aliases),
+        Driverlog.Clockin.isnot(None),
+        Driverlog.Clockout.is_(None)
+    ).order_by(Driverlog.Clockin.desc()).first()
+    if open_log is None:
+        return jsonify({
+            'success': False,
+            'failure_note': 'Open clock-in information not found for this driver.',
+            'driver': driver_name,
+            'display_name': display_name,
+            'date': log_date.isoformat(),
+        }), 404
+
+    open_log.Driver = driver_name
+    open_log.Clockout = log_dt
+    open_log.GPSout = gps_coordinates
+    open_log.Locationstop = location
+    if truck and not open_log.Truck:
+        open_log.Truck = truck
+    open_log.Status = '2'
+    db.session.commit()
+    return jsonify({
+        'message': 'Driver clocked out.',
+        'display_name': display_name,
+        'log': _driver_log_payload(open_log),
+        'pending_dispatch_assignments': _pending_dispatch_assignments(driver_name),
+    }), 200
+
+
+@api_bp.route('/api/driver/dispatch/messages', methods=['GET', 'POST'])
+@api_bp.route('/api/driver/dispatch-communications', methods=['GET', 'POST'])
+@jwt_required()
+def driver_dispatch_messages():
+    _ensure_dispatch_driver_message_table()
+    current_user = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    if request.method == 'GET':
+        data = request.args.to_dict()
+
+    udat, driver_name, display_name = _api_driver_identity(data, current_user)
+    if not driver_name:
+        return jsonify({'error': 'Driver could not be determined from token or request.'}), 400
+
+    order = _dispatch_order_from_request(data)
+    now_dt = datetime.datetime.now()
+
+    if request.method == 'POST':
+        message_text = _first_present(data, ['message', 'text', 'body', 'MessageText'])
+        if not message_text:
+            return jsonify({'error': 'Message text is required.'}), 400
+
+        sender_type = _first_present(data, ['sender_type', 'SenderType'])
+        if not sender_type:
+            sender_type = 'driver' if (udat is not None and udat.authority == 'driver') else 'dispatch'
+        sender_name = _first_present(data, ['sender_name', 'SenderName']) or display_name
+        route_payload = data.get('route')
+        route_json = json.dumps(route_payload) if isinstance(route_payload, dict) else None
+
+        row = DispatchDriverMessage(
+            Co=scac,
+            OrderId=order.id if order else None,
+            Jo=order.Jo if order else _first_present(data, ['jo', 'Jo']),
+            Container=order.Container if order else _first_present(data, ['container', 'Container']),
+            Driver=driver_name,
+            SenderName=sender_name,
+            SenderType=sender_type,
+            MessageText=str(message_text),
+            CreatedAt=now_dt,
+            ReadAt=None,
+            Active=1,
+            RouteJson=route_json,
+        )
+        db.session.add(row)
+        db.session.commit()
+        return jsonify({
+            'message': 'Dispatch message saved.',
+            'display_name': display_name,
+            'dispatch_message': _message_payload(row, display_name),
+            'route': route_payload if isinstance(route_payload, dict) else _dispatch_route_payload(order, driver_name, data),
+        }), 201
+
+    query = DispatchDriverMessage.query.filter(
+        DispatchDriverMessage.Active == 1,
+        DispatchDriverMessage.Driver == driver_name,
+    )
+    if order is not None:
+        query = query.filter(DispatchDriverMessage.OrderId == order.id)
+    else:
+        jo = _first_present(data, ['jo', 'Jo'])
+        container = _first_present(data, ['container', 'Container'])
+        if jo:
+            query = query.filter(DispatchDriverMessage.Jo == jo)
+        if container:
+            query = query.filter(DispatchDriverMessage.Container == container)
+
+    since_id = _first_present(data, ['since_id', 'since'])
+    if since_id:
+        try:
+            query = query.filter(DispatchDriverMessage.id > int(since_id))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'since_id must be an integer.'}), 400
+
+    rows = query.order_by(DispatchDriverMessage.CreatedAt, DispatchDriverMessage.id).all()
+    message_payloads = [_message_payload(row, display_name) for row in rows]
+    pending_assignments = _pending_dispatch_assignments(driver_name)
+    route_payload = _dispatch_route_payload(order, driver_name, data)
+    if route_payload is None:
+        for message in reversed(message_payloads):
+            if message.get('route'):
+                route_payload = message.get('route')
+                break
+    if route_payload is None:
+        for assignment in reversed(pending_assignments):
+            if assignment.get('route'):
+                route_payload = assignment.get('route')
+                break
+    return jsonify({
+        'driver': driver_name,
+        'display_name': display_name,
+        'order': {
+            'id': order.id,
+            'jo': order.Jo,
+            'container': order.Container,
+            'customer': order.Shipper,
+            'destination_name': order.Company2,
+            'destination_address': _clean_route_text(order.Dropblock2),
+        } if order else None,
+        'route': route_payload,
+        'pending_dispatch_assignments': pending_assignments,
+        'messages': message_payloads,
+    }), 200
 
 
 @api_bp.route("/api/financial/bill-payment/import", methods=["POST"])

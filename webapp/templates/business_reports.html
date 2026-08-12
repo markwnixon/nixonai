@@ -5,6 +5,10 @@
     .tax-rollup-detail-modal {
         max-width: 75vw;
     }
+    #allocationPlotCanvas {
+        width: 100%;
+        display: block;
+    }
 </style>
 <div class="container-fluid mt-4">
     <div class="row">
@@ -53,6 +57,22 @@
             </div>
         </div>
     </form>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div class="small text-muted">
+            {% if report_cache_info.updated_at %}
+                Loaded {{ report_cache_info.source }} report generated {{ report_cache_info.updated_at }}{% if report_cache_info.generated_by %} by {{ report_cache_info.generated_by }}{% endif %}.
+            {% else %}
+                No saved report has been generated for this period yet.
+            {% endif %}
+        </div>
+        <form action="{{ url_for(report_endpoint) }}" method="post" class="mb-0">
+            <input type="hidden" name="action" value="refresh_report_cache">
+            <input type="hidden" name="company" value="{{ filters.company }}">
+            <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+            <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+            <button type="submit" class="btn btn-sm btn-outline-primary">Refresh Report</button>
+        </form>
+    </div>
 
     {% if report_mode == 'weekly' %}
 
@@ -110,7 +130,43 @@
             </div>
         </div>
         <div class="card-footer small text-muted">
-            Weekly output stops at the most recent completed Sunday. Job income is recognized in the week following Gate In. Direct expenses are spread daily from each expense date back to the day after that same account's previous expense date. Indirect and G&amp;A payments are spread across their full coverage period, then included only for days inside this report period.
+            Weekly output stops at the most recent completed Sunday. Job income is recognized in the week following Gate In. Direct expenses are spread daily from each expense date back to the day after that same account's previous expense date. Indirect and G&amp;A allocations can be spread daily or allocated by each week's share of port trips inside the covered period.
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
+            <span>Allocation Trend</span>
+            <span class="text-muted small">Weekly allocation by selected expense row</span>
+        </div>
+        <div class="card-body">
+            <div class="form-row align-items-end">
+                <div class="form-group col-md-8">
+                    <label for="allocationPlotSelect">Expense Allocation</label>
+                    <select id="allocationPlotSelect" class="form-control"
+                            data-url="{{ url_for('main.WeeklyAllocationPlotApi') }}"
+                            data-company="{{ filters.company }}"
+                            data-date-from="{{ filters.date_from }}"
+                            data-date-to="{{ filters.date_to }}">
+                        <option value="">Choose allocation to plot</option>
+                        <option value="builtin_driver_pay:0">Driver Pay</option>
+                        <option value="builtin_direct:0">Direct Expenses</option>
+                        {% for row in ops_indirect_rows %}
+                            <option value="indirect:{{ row.id }}">Indirect - {{ row.account }} | {{ row.allocation_basis_label }} | {{ row.period_start }} to {{ row.period_end }}</option>
+                        {% endfor %}
+                        {% for row in ops_ga_rows %}
+                            <option value="ga:{{ row.id }}">G&amp;A - {{ row.account }} | {{ row.allocation_basis_label }} | {{ row.period_start }} to {{ row.period_end }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-4">
+                    <div id="allocationPlotSummary" class="small text-muted">Select an allocation row to review weekly amounts.</div>
+                </div>
+            </div>
+            <div class="border rounded p-2 bg-white">
+                <canvas id="allocationPlotCanvas" height="220"></canvas>
+            </div>
+            <div id="allocationPlotError" class="small text-danger mt-2"></div>
         </div>
     </div>
 
@@ -153,6 +209,14 @@
                             </div>
                         </div>
                         <div class="small text-muted mb-3">Selecting an account fills January 1 through today with the amount paid to date. Override the period for items like annual insurance policies.</div>
+                        <div class="form-group">
+                            <label for="ops_allocation_basis">Allocation Formula</label>
+                            <select id="ops_allocation_basis" name="ops_allocation_basis" class="form-control">
+                                {% for value, label in operations_allocation_basis_types.items() %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <div class="custom-control custom-checkbox mb-3">
                             <input type="checkbox" class="custom-control-input" id="ops_auto_update" name="ops_auto_update" value="1">
                             <label class="custom-control-label" for="ops_auto_update">Auto-update from Jan 1 through today when new expenses are added</label>
@@ -177,6 +241,7 @@
                                     <th>Account</th>
                                     <th>Covered Period</th>
                                     <th class="text-right">Amount</th>
+                                    <th>Formula</th>
                                     <th>Auto</th>
                                     <th>Notes</th>
                                     <th></th>
@@ -188,6 +253,7 @@
                                         <td>{{ row.account }}</td>
                                         <td>{{ row.period_start }} to {{ row.period_end }}</td>
                                         <td class="text-right">{{ row.amount }}</td>
+                                        <td>{{ row.allocation_basis_label }}</td>
                                         <td>{% if row.auto_update %}Yes{% else %}No{% endif %}</td>
                                         <td>{{ row.notes }}</td>
                                         <td class="text-right">
@@ -203,7 +269,7 @@
                                     </tr>
                                 {% else %}
                                     <tr>
-                                        <td colspan="6" class="text-muted">No indirect allocation periods have been added yet.</td>
+                                        <td colspan="7" class="text-muted">No indirect allocation periods have been added yet.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -253,6 +319,14 @@
                             </div>
                         </div>
                         <div class="small text-muted mb-3">Selecting an account fills January 1 through today with the amount paid to date. Override the period for items that need a custom coverage period.</div>
+                        <div class="form-group">
+                            <label for="ops_ga_allocation_basis">Allocation Formula</label>
+                            <select id="ops_ga_allocation_basis" name="ops_ga_allocation_basis" class="form-control">
+                                {% for value, label in operations_allocation_basis_types.items() %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <div class="custom-control custom-checkbox mb-3">
                             <input type="checkbox" class="custom-control-input" id="ops_ga_auto_update" name="ops_ga_auto_update" value="1">
                             <label class="custom-control-label" for="ops_ga_auto_update">Auto-update from Jan 1 through today when new expenses are added</label>
@@ -277,6 +351,7 @@
                                     <th>Account</th>
                                     <th>Covered Period</th>
                                     <th class="text-right">Amount</th>
+                                    <th>Formula</th>
                                     <th>Auto</th>
                                     <th>Notes</th>
                                     <th></th>
@@ -288,6 +363,7 @@
                                         <td>{{ row.account }}</td>
                                         <td>{{ row.period_start }} to {{ row.period_end }}</td>
                                         <td class="text-right">{{ row.amount }}</td>
+                                        <td>{{ row.allocation_basis_label }}</td>
                                         <td>{% if row.auto_update %}Yes{% else %}No{% endif %}</td>
                                         <td>{{ row.notes }}</td>
                                         <td class="text-right">
@@ -303,7 +379,7 @@
                                     </tr>
                                 {% else %}
                                     <tr>
-                                        <td colspan="6" class="text-muted">No G&amp;A allocation periods have been added yet.</td>
+                                        <td colspan="7" class="text-muted">No G&amp;A allocation periods have been added yet.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -642,4 +718,5 @@ document.addEventListener('DOMContentLoaded', function () {
     bindAllocationDefaults('ops_ga_account_name', 'ops_ga_period_start', 'ops_ga_period_end', 'ops_ga_amount', 'ops_ga_auto_update');
 });
 </script>
+<script src="{{ url_for('static', filename='js/business_reports.js') }}"></script>
 {% endblock %}

@@ -249,14 +249,30 @@ def update_suminv_totals(sinum):
         jo = sdat.Jo
         odat = Orders.query.filter(Orders.Jo == jo).first()
         if odat is not None:
-            istat = odat.Istat
-            if istat == 6 or istat == 7:
-                #The invoice is still active
-                baldue += float(sdat.Amount)
-                sdat.Pstat = 1
-            else:
-                paid += float(sdat.Amount)
-                sdat.Pstat = 1
+            # Summary invoice rollups must follow posted payment data, not
+            # only Istat. Istat can be manually advanced, while Payments/BalDue
+            # are updated only when Receive by Account posts the payment.
+            try:
+                line_amount = float(sdat.Amount or 0)
+            except:
+                line_amount = 0.00
+            try:
+                paid_so_far = float(odat.Payments or 0)
+            except:
+                paid_so_far = 0.00
+            if paid_so_far <= 0:
+                try:
+                    paid_so_far = float(odat.PaidAmt or 0)
+                except:
+                    paid_so_far = 0.00
+            if paid_so_far < 0:
+                paid_so_far = 0.00
+            if paid_so_far > line_amount:
+                paid_so_far = line_amount
+            line_baldue = line_amount - paid_so_far
+            paid += paid_so_far
+            baldue += line_baldue
+            sdat.Pstat = 1 if line_baldue <= .01 else 0
         else:
             sdat.Pstat = 3
     for sdat in sdata:
