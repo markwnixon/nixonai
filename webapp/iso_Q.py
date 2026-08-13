@@ -44,6 +44,8 @@ timenow = today_now.time()
 include_text = ''
 EMAIL_BODY_CACHE = {}
 EMAIL_BODY_CACHE_MAX = 50
+EMAIL_BODY_FETCH_TIMEOUT = 8
+EMAIL_META_CACHE = {}
 
 # Adding helper functions to cache the email text
 def get_cache_key_for_qdat(qdat):
@@ -72,7 +74,16 @@ def get_cached_body_text(qdat, force_refresh=False):
         return item.get('plaintext', ''), item.get('htmltext')
 
     print(f"[CACHE MISS] body text for qdat {qdat.id}", flush=True)
-    plaintext, htmltext = get_body_text(qdat)
+    try:
+        plaintext, htmltext = get_body_text(qdat)
+    except Exception as exc:
+        print(f"[EMAIL BODY UNAVAILABLE] qdat {qdat.id}: {exc}", flush=True)
+        plaintext = (
+            'Original email preview is temporarily unavailable because the mail server '
+            'could not be reached. You can continue working the quote and refresh the '
+            'email preview after the connection recovers.'
+        )
+        htmltext = f'<div style="font-family: sans-serif; padding: 1rem;">{escape(plaintext)}</div>'
 
     EMAIL_BODY_CACHE[cache_key] = {
         'plaintext': plaintext,
@@ -85,6 +96,13 @@ def get_cached_body_text(qdat, force_refresh=False):
         EMAIL_BODY_CACHE.pop(first_key, None)
 
     return plaintext, htmltext
+
+
+def quote_imap_ssl():
+    try:
+        return imaplib.IMAP4_SSL(imap_url, timeout=EMAIL_BODY_FETCH_TIMEOUT)
+    except TypeError:
+        return imaplib.IMAP4_SSL(imap_url)
 
 
 def clear_cached_body_text(qdat=None):
@@ -193,10 +211,15 @@ def get_original_message_meta(qdat):
     password = passwords['quot']
     mid = qdat.Mid.strip()
 
-    imap = imaplib.IMAP4_SSL(imap_url)
-    imap.login(username, password)
+    cache_key = get_cache_key_for_qdat(qdat)
+    if cache_key in EMAIL_META_CACHE:
+        return EMAIL_META_CACHE[cache_key]
+
+    imap = None
 
     try:
+        imap = quote_imap_ssl()
+        imap.login(username, password)
         imap.select('INBOX')
         result, data = imap.search(None, f'HEADER Message-ID "{mid}"')
         if result != 'OK' or not data or not data[0]:
@@ -216,7 +239,7 @@ def get_original_message_meta(qdat):
         reply_to_header = email_message.get('Reply-To', '')
         reply_to_email = parseaddr(reply_to_header)[1] or parseaddr(from_header)[1]
 
-        return {
+        original_meta = {
             'message_id': email_message.get('Message-ID', ''),
             'references': email_message.get('References', ''),
             'subject': email_message.get('Subject', qdat.Subject or ''),
@@ -224,12 +247,28 @@ def get_original_message_meta(qdat):
             'date': email_message.get('Date', ''),
             'reply_to_email': reply_to_email,
         }
+        EMAIL_META_CACHE[cache_key] = original_meta
+        return original_meta
+    except Exception as exc:
+        print(f"[EMAIL META UNAVAILABLE] qdat {qdat.id}: {exc}", flush=True)
+        return {
+            'message_id': qdat.Mid or '',
+            'references': '',
+            'subject': qdat.Subject or '',
+            'from': qdat.From or '',
+            'date': '',
+            'reply_to_email': parseaddr(qdat.From or '')[1],
+        }
     finally:
-        try:
-            imap.close()
-        except Exception:
-            pass
-        imap.logout()
+        if imap is not None:
+            try:
+                imap.close()
+            except Exception:
+                pass
+            try:
+                imap.logout()
+            except Exception:
+                pass
 
 
 def build_quoted_reply_html(new_html, original_meta, original_html=None, original_text=None):
@@ -450,7 +489,7 @@ def get_msgs():
     password = passwords['quot']
     dayback = 100
     #datefrom = (datetime.date.today() - datetime.timedelta(dayback)).strftime("%d-%b-%Y")
-    con = imaplib.IMAP4_SSL(imap_url)
+    con = quote_imap_ssl()
     con.login(username, password)
     con.select('INBOX')
     result, data = con.search(None,'ALL')
@@ -533,7 +572,7 @@ def extract_for_code(data):
 def add_quote_emails():
     username = usernames['quot']
     password = passwords['quot']
-    imap = imaplib.IMAP4_SSL(imap_url)
+    imap = quote_imap_ssl()
     imap.login(username, password)
     status, messages = imap.select('INBOX')
     # total number of emails
@@ -2599,7 +2638,7 @@ def get_body_text(qdat):
     password = passwords['quot']
     mid = qdat.Mid.strip()
 
-    imap = imaplib.IMAP4_SSL(imap_url)
+    imap = quote_imap_ssl()
     imap.login(username, password)
 
     plaintext = ''

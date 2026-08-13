@@ -3197,6 +3197,9 @@ def make_new_entry(tablesetup,holdvec):
     from sqlalchemy import inspect
     inst = eval(f"inspect({table})")
     attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
+    initial_defaults = {
+        ('Bills', 'Reconciled'): 0,
+    }
 
     for jx,entry in enumerate(entrydata):
         if entry[0] in creators:
@@ -3215,6 +3218,8 @@ def make_new_entry(tablesetup,holdvec):
                 uidtemp = uuid.uuid1().node
                 dbnew = dbnew + f", {col}='{uidtemp}'"
             elif col == filter: dbnew = dbnew + f", {col}='{filterval}'"
+            elif (table, col) in initial_defaults:
+                dbnew = dbnew + f", {col}={initial_defaults[(table, col)]}"
             else: dbnew = dbnew + f', {col}=None'
     dbnew = dbnew + ')'
     dbnew = dbnew.replace('(, ', '(')

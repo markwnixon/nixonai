@@ -974,7 +974,7 @@ class Gledger(db.Model):
     Tcode = db.Column('Tcode', db.String(20))
     Com = db.Column('Com',db.String(1))
     Recorded = db.Column('Recorded', db.DateTime)
-    Reconciled = db.Column('Reconciled', db.Integer)
+    Reconciled = db.Column('Reconciled', db.Integer, default=0)
     Date = db.Column('Date', db.DateTime)
     Ref = db.Column('Ref', db.String(45))
     JournalId = db.Column('JournalId', db.String(80))
