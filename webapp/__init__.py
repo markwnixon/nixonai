@@ -70,6 +70,7 @@ def create_app():
             if inspector.has_table('overseas'):
                 overseas_columns = [column['name'] for column in inspector.get_columns('overseas')]
                 overseas_adds = [
+                    ('Shipper', 'VARCHAR(100) NULL'),
                     ('IngateDate', 'DATETIME NULL'),
                     ('InvoDate', 'DATETIME NULL'),
                     ('PaidDate', 'DATETIME NULL'),

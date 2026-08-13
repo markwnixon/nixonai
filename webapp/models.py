@@ -1245,6 +1245,7 @@ class OverSeas(db.Model):
     FrForID = db.Column('FrForID', db.Integer)
     PreCarryID = db.Column('PreCarryID', db.Integer)
     BillTo = db.Column('BillTo', db.String(50))
+    Shipper = db.Column('Shipper', db.String(100))
     Exporter = db.Column('Exporter', db.Text)
     Consignee = db.Column('Consignee', db.Text)
     Notify = db.Column('Notify', db.Text)
@@ -1310,6 +1311,7 @@ class OverSeas(db.Model):
         self.FrForID = FrForID
         self.PreCarryID = PreCarryID
         self.BillTo = BillTo
+        self.Shipper = kwargs.pop('Shipper', None)
         self.Exporter = Exporter
         self.Consignee = Consignee
         self.Notify = Notify

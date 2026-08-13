@@ -55,6 +55,20 @@
                               <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Pay Bill"
                         data-toggle="tooltip" title="Pay a Bill">Pay<br>Bill</button>
                 {% endif %}
+                {% if leadtable == 'OverSeas' %}
+                    <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="New Job"
+                      data-toggle="tooltip" title="CREATE a New Freight Forwarding Job">  New<br>Job  </button>
+                ->
+                          <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Edit Item"
+                        data-toggle="tooltip" title="MODIFY information associated with any selected item">Edit<br>Item</button>
+                ->
+                              <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Invoice Upload"
+                        data-toggle="tooltip" title="Upload the invoice for the selected freight forwarding job">Invoice<br>Upload</button>
+                ->
+                            <button type="submit" class="btn btn-group-small btn-green my-small-btn" name="Receive Payment"
+                        data-toggle="tooltip" title="Receive money and apply toward a selected Freight Forwarding Job/Invoice">Receive<br>Payment</button>
+
+                {% endif %}
     </div>
 </div>
 
@@ -74,4 +88,3 @@
     &nbsp; &nbsp;
 </div>
 </div>
-

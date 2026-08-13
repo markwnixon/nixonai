@@ -1201,7 +1201,7 @@ def addtopins(thisdate, opair):
 
     return
 
-def get_custlist(table, tfilters):
+def get_custlist(table, tfilters, date_field='Date', shipper_field='Shipper'):
     dtest = tfilters['Date Filter']
     today = datetime.date.today()
     query_adds = []
@@ -1225,8 +1225,8 @@ def get_custlist(table, tfilters):
         else:
             daysback = 45
         if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
-        if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
-        if todate is not None: query_adds.append(f'{table}.Date <= todate')
+        if fromdate is not None: query_adds.append(f'{table}.{date_field} >= fromdate')
+        if todate is not None: query_adds.append(f'{table}.{date_field} <= todate')
 
     if query_adds == []:
         table_query = f'{table}.query.all()'
@@ -1240,7 +1240,7 @@ def get_custlist(table, tfilters):
     odata = eval(table_query)
     custlist = []
     for odat in odata:
-        shipper = odat.Shipper
+        shipper = getattr(odat, shipper_field)
         if shipper is not None:
             if len(shipper) > 20: shipper = shipper[0:20]
             if shipper not in custlist: custlist.append(shipper)
@@ -2454,7 +2454,15 @@ def Table_maker(genre):
             for filter in table_filters:
                 for key, value in filter.items(): tfilters[key] = request.values.get(key)
 
-            if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
+            if any('Shipper Filter' in filter for filter in table_filters):
+                primary_table = eval(f"{genre}_genre['table']")
+                primary_setup = eval(f"{primary_table}_setup")
+                table_filters[0]['Shipper Filter'] = get_custlist(
+                    primary_table,
+                    tfilters,
+                    primary_setup.get('datefilter_field', 'Date'),
+                    primary_setup.get('shipperfilter_field', 'Shipper')
+                )
 
         else:
 
@@ -2495,7 +2503,15 @@ def Table_maker(genre):
             for filter in table_filters:
                 for key, value in filter.items():
                     tfilters[key] = request.values.get(key)
-            if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
+            if any('Shipper Filter' in filter for filter in table_filters):
+                primary_table = eval(f"{genre}_genre['table']")
+                primary_setup = eval(f"{primary_table}_setup")
+                table_filters[0]['Shipper Filter'] = get_custlist(
+                    primary_table,
+                    tfilters,
+                    primary_setup.get('datefilter_field', 'Date'),
+                    primary_setup.get('shipperfilter_field', 'Shipper')
+                )
 
             #Reset Pay and Haul Filters if Show All selected (no filter applied)
             if 'Pay Filter' in tfilters:
@@ -2581,7 +2597,15 @@ def Table_maker(genre):
             else:
                 launch_update_emails_order_id = None
                 err.append('The selected collection job could not be opened for email updates.')
-        if 'Orders' in tables_on: table_filters[0]['Shipper Filter'] = get_custlist('Orders', tfilters)
+        if any('Shipper Filter' in filter for filter in table_filters):
+            primary_table = eval(f"{genre}_genre['table']")
+            primary_setup = eval(f"{primary_table}_setup")
+            table_filters[0]['Shipper Filter'] = get_custlist(
+                primary_table,
+                tfilters,
+                primary_setup.get('datefilter_field', 'Date'),
+                primary_setup.get('shipperfilter_field', 'Shipper')
+            )
 
 ###########All done in this section##################################################################################################################
     # Execute these parts whether it is a Post or Not:
@@ -2966,6 +2990,8 @@ def get_dbdata(table_setup, tfilters):
     highfilter_value = table_setup['filterval']
     entrydata = table_setup['entry data']
     filteron = table_setup['filteron']
+    date_filter_field = table_setup.get('datefilter_field', 'Date')
+    shipper_filter_field = table_setup.get('shipperfilter_field', 'Shipper')
     #print(entrydata)
     color_selector = table_setup['colorfilter']
     #print(f' For table {table} the color selector is {color_selector}')
@@ -3027,18 +3053,18 @@ def get_dbdata(table_setup, tfilters):
                 else:
                     daysback = 45
                 if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
-                if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
-                if todate is not None: query_adds.append(f'{table}.Date <= todate')
+                if fromdate is not None: query_adds.append(f'{table}.{date_filter_field} >= fromdate')
+                if todate is not None: query_adds.append(f'{table}.{date_filter_field} <= todate')
                 #print(f'This time filter applied from fromdate = {fromdate} to todate = {todate}')
             elif 'Date' in filteron:
                 daysback = 45
                 if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
-                if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
+                if fromdate is not None: query_adds.append(f'{table}.{date_filter_field} >= fromdate')
 
         elif 'Date' in filteron:
             daysback = 45
             if daysback is not None: fromdate = today - datetime.timedelta(days=daysback)
-            if fromdate is not None: query_adds.append(f'{table}.Date >= fromdate')
+            if fromdate is not None: query_adds.append(f'{table}.{date_filter_field} >= fromdate')
 
 
         # Determine if pay filter applies to query:
@@ -3075,7 +3101,7 @@ def get_dbdata(table_setup, tfilters):
         if 'Shipper Filter' in tfilters:
             stest = tfilters['Shipper Filter']
             if stest is not None and stest != 'Show All' and 'Shipper' in filteron:
-                sfilter = f"{table}.Shipper.contains('{stest}')"
+                sfilter = f"{table}.{shipper_filter_field}.contains('{stest}')"
                 query_adds.append(sfilter)
 
     # Determine if haul filter applies to query:
@@ -3199,6 +3225,7 @@ def make_new_entry(tablesetup,holdvec):
     attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
     initial_defaults = {
         ('Bills', 'Reconciled'): 0,
+        ('OverSeas', 'Istat'): 0,
     }
 
     for jx,entry in enumerate(entrydata):
