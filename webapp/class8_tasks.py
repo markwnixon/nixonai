@@ -4421,7 +4421,7 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
             #print(f'Viewing for table: {table} and focus {task_focus}')
             try:
                 viewport[0] = 'show_doc_left'
-                viewport[2] = '/' + tpath(f'{tpointer}', docref)
+                viewport[2] = document_view_url(table, task_focus, docref)
                 #print(f'path director:{tpointer} and path found:{viewport[2]}')
                 err.append(f'Viewing {viewport[2]}')
                 err.append('Hit Return to End Viewing and Return to Table View')
@@ -4436,6 +4436,31 @@ def View_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
         if returnhit is not None: completed = True
 
     return holdvec, entrydata, err, viewport, completed
+
+
+def document_storage_path(table, task_focus, filename):
+    if not hasinput(filename):
+        return ''
+    filename = str(filename).strip()
+    if filename.startswith('/'):
+        filename = filename[1:]
+    if filename.startswith('static/'):
+        return filename
+    pointer = f'{table}-{task_focus}'
+    mapped = tpath(pointer, filename)
+    if mapped and mapped != filename:
+        return mapped
+    # Freight forwarding invoice files use the shared company invoice folder.
+    if table == 'OverSeas' and task_focus == 'Invoice':
+        return f'static/{scac}/data/vInvoice/{filename}'
+    return mapped or filename
+
+
+def document_view_url(table, task_focus, filename):
+    storage_path = document_storage_path(table, task_focus, filename)
+    if not storage_path:
+        return ''
+    return '/' + storage_path.lstrip('/')
 
 
 def forwarding_money_cents(value):
@@ -4732,10 +4757,10 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                 if thistable not in ['Orders', 'Interchange']:
                     bn = 0
                     filename1 = f'{task_focus}_{fileout}{ext}'
-                    output1 = addpath(tpath(f'{thistable}-{task_focus}', filename1))
+                    output1 = addpath(document_storage_path(thistable, task_focus, filename1))
 
                 file.save(output1)
-                viewport[2] = '/'+tpath(f'{thistable}-{task_focus}', filename1)
+                viewport[2] = document_view_url(thistable, task_focus, filename1)
 
                 if bn > 0:
                     if thistable == 'Orders':
