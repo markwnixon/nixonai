@@ -1133,18 +1133,22 @@ def income_record(jopaylist, err):
                 else:
                     istat = odat.Istat
                     hstat = odat.Hstat
-                    if istat < 5:
-                        odat.Istat = 5
+                    if deposit_account_name == 'Undeposited Funds':
+                        odat.Istat = 10
                         if hstat == 2 or hstat == 3: odat.Hstat = 5
-                    if istat == 6 or istat == 7:
-                        odat.Istat = 8
-                        if hstat == 2 or hstat == 3: odat.Hstat = 8
-                        jo = odat.Jo
-                        sumdat = SumInv.query.filter(SumInv.Jo == jo).first()
-                        if sumdat is not None:
-                            sumdat.Paid = d2s(totpaid)
-                            sumdat.Baldue = d2s(baldue)
-                            sumdat.Pstat = 1
+                    else:
+                        if istat < 5:
+                            odat.Istat = 5
+                            if hstat == 2 or hstat == 3: odat.Hstat = 5
+                        if istat == 6 or istat == 7:
+                            odat.Istat = 8
+                            if hstat == 2 or hstat == 3: odat.Hstat = 8
+                            jo = odat.Jo
+                            sumdat = SumInv.query.filter(SumInv.Jo == jo).first()
+                            if sumdat is not None:
+                                sumdat.Paid = d2s(totpaid)
+                                sumdat.Baldue = d2s(baldue)
+                                sumdat.Pstat = 1
 
                 db.session.commit()
 

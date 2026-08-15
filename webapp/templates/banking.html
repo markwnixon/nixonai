@@ -287,7 +287,7 @@
                                     <tr>
                                         <th>JO</th>
                                         <th>Order ID</th>
-                                        <th>Shipper</th>
+                                        <th>Customer</th>
                                         <th>Container</th>
                                         <th class="text-right">Invoice</th>
                                         <th class="text-right">Received</th>
@@ -469,7 +469,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         '<tr' + rowClass + '>' +
                         '<td>' + escapeHtml(detail.jo) + '</td>' +
                         '<td>' + escapeHtml(detail.order_id) + '</td>' +
-                        '<td>' + escapeHtml(detail.shipper) + '</td>' +
+                        '<td>' + escapeHtml(detail.customer || detail.shipper) +
+                        (detail.cargo_shipper ? '<div class="small text-muted">Cargo shipper: ' + escapeHtml(detail.cargo_shipper) + '</div>' : '') +
+                        '</td>' +
                         '<td>' + escapeHtml(detail.container) + '</td>' +
                         '<td class="text-right">' + escapeHtml(detail.invoice) + '</td>' +
                         '<td class="text-right">' + escapeHtml(detail.received) + '</td>' +

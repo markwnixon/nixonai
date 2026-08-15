@@ -51,7 +51,17 @@
                 <label for="date_to">Period To</label>
                 <input type="date" class="form-control" id="date_to" name="date_to" value="{{ filters.date_to }}">
             </div>
-            <div class="form-group col-md-4">
+            {% if report_mode == 'weekly' %}
+                <div class="form-group col-md-2">
+                    <label for="division">Division</label>
+                    <select class="form-control" id="division" name="division">
+                        {% for value, label in operations_division_filters.items() %}
+                            <option value="{{ value }}" {% if value == selected_division %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            <div class="form-group col-md-{% if report_mode == 'weekly' %}2{% else %}4{% endif %}">
                 <button type="submit" class="btn btn-primary">Apply Period</button>
                 <a href="{{ url_for(report_endpoint) }}" class="btn btn-outline-secondary">Reset</a>
             </div>
@@ -70,7 +80,8 @@
             <input type="hidden" name="company" value="{{ filters.company }}">
             <input type="hidden" name="date_from" value="{{ filters.date_from }}">
             <input type="hidden" name="date_to" value="{{ filters.date_to }}">
-            <button type="submit" class="btn btn-sm btn-outline-primary">Refresh Report</button>
+            <input type="hidden" name="division" value="{{ filters.division }}">
+            <button type="submit" class="btn btn-sm btn-outline-primary">Recalculate Report</button>
         </form>
     </div>
 
@@ -79,7 +90,7 @@
     <div class="card mb-4">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
             <span>Operations Profit &amp; Loss - Weekly</span>
-            <span class="text-muted small">{{ selected_company }} | {{ filters.date_from }} to {{ operations_effective_date_to or filters.date_to }}</span>
+            <span class="text-muted small">{{ selected_company }} | {{ operations_division_filters[selected_division] }} | {{ ops_income_recognition_label }} | {{ filters.date_from }} to {{ operations_effective_date_to or filters.date_to }}</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -101,7 +112,18 @@
                             <tr class="{% if row.net_profit_cents < 0 %}table-warning{% endif %}">
                                 <td>{{ row.week_start_text }} to {{ row.week_end_text }}</td>
                                 <td class="text-right">{{ row.income }}</td>
-                                <td class="text-right">{{ row.direct }}</td>
+                                <td class="text-right">
+                                    {% if row.direct_details %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-link p-0"
+                                                data-toggle="modal"
+                                                data-target="#directExpenseDetailModal{{ loop.index }}">
+                                            {{ row.direct }}
+                                        </button>
+                                    {% else %}
+                                        {{ row.direct }}
+                                    {% endif %}
+                                </td>
                                 <td class="text-right">{{ row.gross_profit }}</td>
                                 <td class="text-right">{{ row.indirect }}</td>
                                 <td class="text-right">{{ row.net_ops }}</td>
@@ -130,9 +152,68 @@
             </div>
         </div>
         <div class="card-footer small text-muted">
-            Weekly output stops at the most recent completed Sunday. Job income is recognized in the week following Gate In. Direct expenses are spread daily from each expense date back to the day after that same account's previous expense date. Indirect and G&amp;A allocations can be spread daily or allocated by each week's share of port trips inside the covered period.
+            Weekly output stops at the most recent completed Sunday. Income and direct expense timing follow the selected methods below. Indirect and G&amp;A allocations can be spread daily, allocated by port trips, or weighted by income inside the covered period.
         </div>
     </div>
+
+    {% for row in operations_rows %}
+        {% if row.direct_details %}
+            <div class="modal fade" id="directExpenseDetailModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="directExpenseDetailModalLabel{{ loop.index }}" aria-hidden="true">
+                <div class="modal-dialog modal-xl" style="max-width: 75vw;" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header py-2">
+                            <div>
+                                <h5 class="modal-title mb-0" id="directExpenseDetailModalLabel{{ loop.index }}">Direct Expense Allocation Detail</h5>
+                                <div class="text-muted small">{{ row.week_start_text }} to {{ row.week_end_text }} | Total {{ row.direct }}</div>
+                            </div>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body p-2">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Account</th>
+                                            <th>Expense Date</th>
+                                            <th>Allocation Period</th>
+                                            <th>Formula</th>
+                                            <th class="text-right">Source Amount</th>
+                                            <th class="text-right">Week Alloc</th>
+                                            <th>Source Rows</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for detail in row.direct_details %}
+                                            <tr>
+                                                <td>{{ detail.account }}</td>
+                                                <td>{{ detail.expense_date }}</td>
+                                                <td>{{ detail.allocation_period }}</td>
+                                                <td>{{ detail.allocation_basis }}</td>
+                                                <td class="text-right">{{ detail.source_amount }}</td>
+                                                <td class="text-right font-weight-bold">{{ detail.allocated }}</td>
+                                                <td>
+                                                    {% for source in detail.sources %}
+                                                        <div class="small">{{ source }}</div>
+                                                    {% else %}
+                                                        <span class="text-muted small">{{ detail.source_count }} source rows</span>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer py-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
 
     <div class="card mb-4">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
@@ -142,25 +223,29 @@
         <div class="card-body">
             <div class="form-row align-items-end">
                 <div class="form-group col-md-8">
-                    <label for="allocationPlotSelect">Expense Allocation</label>
-                    <select id="allocationPlotSelect" class="form-control"
+                    <label for="allocationPlotSelect">Weekly Amount to Plot</label>
+                    <select id="allocationPlotSelect" class="form-control" multiple size="6"
                             data-url="{{ url_for('main.WeeklyAllocationPlotApi') }}"
                             data-company="{{ filters.company }}"
                             data-date-from="{{ filters.date_from }}"
-                            data-date-to="{{ filters.date_to }}">
-                        <option value="">Choose allocation to plot</option>
+                            data-date-to="{{ filters.date_to }}"
+                            data-division="{{ filters.division }}">
+                        <option value="builtin_income:0">Income</option>
                         <option value="builtin_driver_pay:0">Driver Pay</option>
                         <option value="builtin_direct:0">Direct Expenses</option>
+                        <option value="builtin_ga:0">G&amp;A Group</option>
+                        <option value="builtin_port_trips:0">Port Trips</option>
+                        <option value="builtin_toll_transactions:0">Toll Transactions</option>
+                        {% for row in ops_direct_rows %}
+                            <option value="direct:{{ row.id }}">Direct - {{ row.account }} | {{ row.allocation_basis_label }}</option>
+                        {% endfor %}
                         {% for row in ops_indirect_rows %}
                             <option value="indirect:{{ row.id }}">Indirect - {{ row.account }} | {{ row.allocation_basis_label }} | {{ row.period_start }} to {{ row.period_end }}</option>
-                        {% endfor %}
-                        {% for row in ops_ga_rows %}
-                            <option value="ga:{{ row.id }}">G&amp;A - {{ row.account }} | {{ row.allocation_basis_label }} | {{ row.period_start }} to {{ row.period_end }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="form-group col-md-4">
-                    <div id="allocationPlotSummary" class="small text-muted">Select an allocation row to review weekly amounts.</div>
+                    <div id="allocationPlotSummary" class="small text-muted">Select one or more rows to compare weekly amounts.</div>
                 </div>
             </div>
             <div class="border rounded p-2 bg-white">
@@ -171,15 +256,136 @@
     </div>
 
     <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header">Income Recognition</div>
+                <div class="card-body">
+                    <form action="{{ url_for(report_endpoint) }}" method="post" class="form-inline mb-2">
+                        <input type="hidden" name="action" value="update_ops_income_recognition">
+                        <input type="hidden" name="company" value="{{ filters.company }}">
+                        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                        <input type="hidden" name="division" value="{{ filters.division }}">
+                        <label for="ops_income_recognition" class="mr-2">Recognition Method</label>
+                        <select id="ops_income_recognition" name="ops_income_recognition" class="form-control mr-2">
+                            {% for value, label in operations_income_recognition_types.items() %}
+                                <option value="{{ value }}" {% if value == ops_income_recognition %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Save Method</button>
+                    </form>
+                    <div class="small text-muted">
+                        Date Job Completed uses the trucking In-Gate/return date and freight forwarding In-Gate date.
+                        Date Job Invoiced uses the invoice date.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
         <div class="col-lg-5">
             <div class="card mb-4">
-                <div class="card-header">Operations Indirect Allocation Setup</div>
+                <div class="card-header">Direct Expense Allocation Setup</div>
+                <div class="card-body">
+                    <form action="{{ url_for(report_endpoint) }}" method="post">
+                        <input type="hidden" name="action" value="add_ops_direct_allocation">
+                        <input type="hidden" name="company" value="{{ filters.company }}">
+                        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                        <input type="hidden" name="division" value="{{ filters.division }}">
+                        <div class="form-group">
+                            <label for="ops_direct_account_name">Direct Expense Account</label>
+                            <select id="ops_direct_account_name" name="ops_direct_account_name" class="form-control">
+                                <option value="">Choose direct account</option>
+                                {% for account in ops_direct_accounts %}
+                                    <option value="{{ account.name }}">{{ account.name }}{% if account.default_amount_display != '$0.00' %} - YTD {{ account.default_amount_display }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ops_direct_allocation_basis">Allocation Formula</label>
+                            <select id="ops_direct_allocation_basis" name="ops_direct_allocation_basis" class="form-control">
+                                {% for value, label in operations_direct_allocation_types.items() %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ops_direct_days_prior">X Days Prior to TD</label>
+                            <input type="number" min="0" step="1" id="ops_direct_days_prior" name="ops_direct_days_prior" class="form-control" value="7">
+                            <div class="small text-muted">Used only when the allocation formula is X Days Prior to TD.</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="ops_direct_notes">Notes</label>
+                            <input type="text" id="ops_direct_notes" name="ops_direct_notes" class="form-control" placeholder="Example: fuel tracks income, tolls track port trips">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Direct Allocation</button>
+                    </form>
+                    <div class="small text-muted mt-3">
+                        Unlisted direct accounts default to Bill to Bill Prior Spread. Saving a row for an account replaces the previous active setup for that same account.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card mb-4">
+                <div class="card-header">Direct Expense Allocation Methods</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Formula</th>
+                                    <th>X</th>
+                                    <th>Notes</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in ops_direct_rows %}
+                                    <tr>
+                                        <td>{{ row.account }}</td>
+                                        <td>{{ row.allocation_basis_label }}</td>
+                                        <td>{% if row.allocation_basis == 'days_prior' %}{{ row.allocation_days_prior }}{% endif %}</td>
+                                        <td>{{ row.notes }}</td>
+                                        <td class="text-right">
+                                            <form action="{{ url_for(report_endpoint) }}" method="post" class="mb-0">
+                                                <input type="hidden" name="action" value="delete_ops_direct_allocation">
+                                                <input type="hidden" name="ops_direct_allocation_id" value="{{ row.id }}">
+                                                <input type="hidden" name="company" value="{{ filters.company }}">
+                                                <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                                                <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                                                <input type="hidden" name="division" value="{{ filters.division }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-muted">No direct allocation overrides have been added yet. Direct accounts will use Bill to Bill Prior Spread.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-header">Operations Indirect Allocation Overrides</div>
                 <div class="card-body">
                     <form action="{{ url_for(report_endpoint) }}" method="post">
                         <input type="hidden" name="action" value="add_ops_indirect_allocation">
                         <input type="hidden" name="company" value="{{ filters.company }}">
                         <input type="hidden" name="date_from" value="{{ filters.date_from }}">
                         <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                        <input type="hidden" name="division" value="{{ filters.division }}">
                         <div class="form-group">
                             <label for="ops_indirect_account_name">Indirect Expense Account</label>
                             <select id="ops_indirect_account_name" name="ops_indirect_account_name" class="form-control">
@@ -208,7 +414,7 @@
                                 <input type="number" step="0.01" id="ops_amount" name="ops_amount" class="form-control" placeholder="0.00">
                             </div>
                         </div>
-                        <div class="small text-muted mb-3">Selecting an account fills January 1 through today with the amount paid to date. Override the period for items like annual insurance policies.</div>
+                        <div class="small text-muted mb-3">Indirect accounts without an override use Daily Spread from actual ledger expense entries. Add an override only when an account needs a different allocation method or a manually controlled amount/period.</div>
                         <div class="form-group">
                             <label for="ops_allocation_basis">Allocation Formula</label>
                             <select id="ops_allocation_basis" name="ops_allocation_basis" class="form-control">
@@ -216,6 +422,11 @@
                                     <option value="{{ value }}">{{ label }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ops_days_prior">X Days Prior to TD</label>
+                            <input type="number" min="0" step="1" id="ops_days_prior" name="ops_days_prior" class="form-control" value="7">
+                            <div class="small text-muted">Used only when the allocation formula is X Days Prior to TD.</div>
                         </div>
                         <div class="custom-control custom-checkbox mb-3">
                             <input type="checkbox" class="custom-control-input" id="ops_auto_update" name="ops_auto_update" value="1">
@@ -225,14 +436,14 @@
                             <label for="ops_notes">Notes</label>
                             <input type="text" id="ops_notes" name="ops_notes" class="form-control" placeholder="Example: monthly insurance allocation">
                         </div>
-                        <button type="submit" class="btn btn-primary">Add Indirect Allocation</button>
+                        <button type="submit" class="btn btn-primary">Save Indirect Override</button>
                     </form>
                 </div>
             </div>
         </div>
         <div class="col-lg-7">
             <div class="card mb-4">
-                <div class="card-header">Operations Indirect Allocation Periods</div>
+                <div class="card-header">Operations Indirect Allocation Overrides</div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-striped mb-0">
@@ -242,6 +453,7 @@
                                     <th>Covered Period</th>
                                     <th class="text-right">Amount</th>
                                     <th>Formula</th>
+                                    <th>X</th>
                                     <th>Auto</th>
                                     <th>Notes</th>
                                     <th></th>
@@ -254,6 +466,7 @@
                                         <td>{{ row.period_start }} to {{ row.period_end }}</td>
                                         <td class="text-right">{{ row.amount }}</td>
                                         <td>{{ row.allocation_basis_label }}</td>
+                                        <td>{% if row.allocation_basis == 'days_prior' %}{{ row.allocation_days_prior }}{% endif %}</td>
                                         <td>{% if row.auto_update %}Yes{% else %}No{% endif %}</td>
                                         <td>{{ row.notes }}</td>
                                         <td class="text-right">
@@ -263,13 +476,14 @@
                                                 <input type="hidden" name="company" value="{{ filters.company }}">
                                                 <input type="hidden" name="date_from" value="{{ filters.date_from }}">
                                                 <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                                                <input type="hidden" name="division" value="{{ filters.division }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
                                             </form>
                                         </td>
                                     </tr>
                                 {% else %}
                                     <tr>
-                                        <td colspan="7" class="text-muted">No indirect allocation periods have been added yet.</td>
+                                        <td colspan="8" class="text-muted">No indirect overrides have been added yet. Indirect accounts will use Daily Spread from ledger expense entries.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -280,111 +494,63 @@
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-5">
-            <div class="card mb-4">
-                <div class="card-header">G&amp;A Allocation Setup</div>
-                <div class="card-body">
-                    <form action="{{ url_for(report_endpoint) }}" method="post">
-                        <input type="hidden" name="action" value="add_ops_ga_allocation">
-                        <input type="hidden" name="company" value="{{ filters.company }}">
-                        <input type="hidden" name="date_from" value="{{ filters.date_from }}">
-                        <input type="hidden" name="date_to" value="{{ filters.date_to }}">
-                        <div class="form-group">
-                            <label for="ops_ga_account_name">G&amp;A Expense Account</label>
-                            <select id="ops_ga_account_name" name="ops_ga_account_name" class="form-control">
-                                <option value="">Choose G&amp;A account</option>
-                                {% for account in ops_ga_accounts %}
-                                    <option value="{{ account.name }}"
-                                            data-default-start="{{ account.default_start }}"
-                                            data-default-end="{{ account.default_end }}"
-                                            data-default-amount="{{ account.default_amount }}">
-                                        {{ account.name }}{% if account.default_amount_display != '$0.00' %} - YTD {{ account.default_amount_display }}{% endif %}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-4">
-                                <label for="ops_ga_period_start">Period From</label>
-                                <input type="date" id="ops_ga_period_start" name="ops_ga_period_start" class="form-control" value="{{ ops_default_start }}">
-                            </div>
-                            <div class="form-group col-md-4">
-                                <label for="ops_ga_period_end">Period To</label>
-                                <input type="date" id="ops_ga_period_end" name="ops_ga_period_end" class="form-control" value="{{ ops_default_end }}">
-                            </div>
-                            <div class="form-group col-md-4">
-                                <label for="ops_ga_amount">Amount</label>
-                                <input type="number" step="0.01" id="ops_ga_amount" name="ops_ga_amount" class="form-control" placeholder="0.00">
-                            </div>
-                        </div>
-                        <div class="small text-muted mb-3">Selecting an account fills January 1 through today with the amount paid to date. Override the period for items that need a custom coverage period.</div>
-                        <div class="form-group">
-                            <label for="ops_ga_allocation_basis">Allocation Formula</label>
-                            <select id="ops_ga_allocation_basis" name="ops_ga_allocation_basis" class="form-control">
-                                {% for value, label in operations_allocation_basis_types.items() %}
-                                    <option value="{{ value }}">{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="custom-control custom-checkbox mb-3">
-                            <input type="checkbox" class="custom-control-input" id="ops_ga_auto_update" name="ops_ga_auto_update" value="1">
-                            <label class="custom-control-label" for="ops_ga_auto_update">Auto-update from Jan 1 through today when new expenses are added</label>
-                        </div>
-                        <div class="form-group">
-                            <label for="ops_ga_notes">Notes</label>
-                            <input type="text" id="ops_ga_notes" name="ops_ga_notes" class="form-control" placeholder="Example: office/admin allocation">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Add G&amp;A Allocation</button>
-                    </form>
-                </div>
+    <div class="card mb-4">
+        <div class="card-header">G&amp;A Group Allocation</div>
+        <div class="card-body">
+            <form action="{{ url_for(report_endpoint) }}" method="post" class="form-inline mb-2">
+                <input type="hidden" name="action" value="update_ops_ga_allocation_basis">
+                <input type="hidden" name="company" value="{{ filters.company }}">
+                <input type="hidden" name="date_from" value="{{ filters.date_from }}">
+                <input type="hidden" name="date_to" value="{{ filters.date_to }}">
+                <input type="hidden" name="division" value="{{ filters.division }}">
+                <label for="ops_ga_global_allocation_basis" class="mr-2">Allocation Formula</label>
+                <select id="ops_ga_global_allocation_basis" name="ops_ga_global_allocation_basis" class="form-control mr-2">
+                    {% for value, label in operations_allocation_basis_types.items() %}
+                        <option value="{{ value }}" {% if value == ops_ga_allocation_basis %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-primary">Save Formula</button>
+            </form>
+            <div class="small text-muted">
+                All Chart of Accounts expense accounts categorized as G-A are grouped automatically.
+                The weekly report applies the selected division income share first, then allocates the grouped G&amp;A amount using this formula.
             </div>
         </div>
-        <div class="col-lg-7">
-            <div class="card mb-4">
-                <div class="card-header">G&amp;A Allocation Periods</div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Account</th>
-                                    <th>Covered Period</th>
-                                    <th class="text-right">Amount</th>
-                                    <th>Formula</th>
-                                    <th>Auto</th>
-                                    <th>Notes</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in ops_ga_rows %}
-                                    <tr>
-                                        <td>{{ row.account }}</td>
-                                        <td>{{ row.period_start }} to {{ row.period_end }}</td>
-                                        <td class="text-right">{{ row.amount }}</td>
-                                        <td>{{ row.allocation_basis_label }}</td>
-                                        <td>{% if row.auto_update %}Yes{% else %}No{% endif %}</td>
-                                        <td>{{ row.notes }}</td>
-                                        <td class="text-right">
-                                            <form action="{{ url_for(report_endpoint) }}" method="post" class="mb-0">
-                                                <input type="hidden" name="action" value="delete_ops_ga_allocation">
-                                                <input type="hidden" name="ops_ga_allocation_id" value="{{ row.id }}">
-                                                <input type="hidden" name="company" value="{{ filters.company }}">
-                                                <input type="hidden" name="date_from" value="{{ filters.date_from }}">
-                                                <input type="hidden" name="date_to" value="{{ filters.date_to }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                {% else %}
-                                    <tr>
-                                        <td colspan="7" class="text-muted">No G&amp;A allocation periods have been added yet.</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Allocation Method Notes</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Expense Allocation Methods</h6>
+                    <dl class="mb-0">
+                        <dt>On Transaction Date</dt>
+                        <dd class="small text-muted">Recognizes the full expense on its transaction date. For manual allocation rows, the Period To date is used as the transaction anchor.</dd>
+                        <dt>X Days Prior to TD</dt>
+                        <dd class="small text-muted">Recognizes the full expense a selected number of days before the transaction date. Example: driver pay with X = 7 recognizes payroll one week before the payment date.</dd>
+                        <dt>Daily Spread</dt>
+                        <dd class="small text-muted">Spreads the amount evenly by day across the full selected report period or the manually entered allocation period.</dd>
+                        <dt>Bill to Bill Prior Spread</dt>
+                        <dd class="small text-muted">For the selected expense account, uses actual ledger bill/payment dates and spreads each amount from the day after the previous same-account bill/payment through the current transaction date.</dd>
+                        <dt>Port Trips</dt>
+                        <dd class="small text-muted">Allocates by the weekly count of port trips built from gate tickets. Paired gate tickets count as one trip; unpaired tickets count as one trip each.</dd>
+                        <dt>Toll Transaction Weighted</dt>
+                        <dd class="small text-muted">Keeps the paid expense total from accounting but spreads each amount by actual toll transaction amounts in the matching allocation window.</dd>
+                        <dt>Income Weighted</dt>
+                        <dd class="small text-muted">Allocates the amount based on each day or week&apos;s share of recognized income in the covered period.</dd>
+                        <dt>Rolling Income Weighted</dt>
+                        <dd class="small text-muted mb-0">Allocates each expense over the prior four weeks, weighted by income in that four-week window.</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <h6>Income Recognition</h6>
+                    <dl class="mb-0">
+                        <dt>On Date Job Completed</dt>
+                        <dd class="small text-muted">Recognizes trucking income by the in-gate/return completion date and freight forwarding income by the in-gate date.</dd>
+                        <dt>On Date Job Invoiced</dt>
+                        <dd class="small text-muted mb-0">Recognizes income by the invoice date when available.</dd>
+                    </dl>
                 </div>
             </div>
         </div>
@@ -715,7 +881,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
     bindAllocationDefaults('ops_indirect_account_name', 'ops_period_start', 'ops_period_end', 'ops_amount', 'ops_auto_update');
-    bindAllocationDefaults('ops_ga_account_name', 'ops_ga_period_start', 'ops_ga_period_end', 'ops_ga_amount', 'ops_ga_auto_update');
 });
 </script>
 <script src="{{ url_for('static', filename='js/business_reports.js') }}"></script>

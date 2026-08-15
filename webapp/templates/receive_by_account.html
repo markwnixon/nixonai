@@ -10,6 +10,9 @@
     </div>
 
     <form action="{{ url_for('main.ReceiveByAccount') }}" method="post" enctype="multipart/form-data">
+        {% if highlight_tcode %}
+            <input type="hidden" name="highlight_tcode" value="{{ highlight_tcode }}">
+        {% endif %}
         <div class="row">
             <div class="col-sm-12">
                 <div class="alert alert-info" role="alert">
@@ -17,6 +20,16 @@
                 </div>
             </div>
         </div>
+        {% if highlight_tcode %}
+            <div class="alert alert-warning py-2" role="alert">
+                Showing undeposited funds review for <strong>{{ highlight_tcode }}</strong>.
+                {% if highlight_found %}
+                    Matching payment batch rows are highlighted.
+                {% else %}
+                    No undeposited payment batch was found in the current company ledger for this job.
+                {% endif %}
+            </div>
+        {% endif %}
 
         {% include 'c8_table_ReceiveByAccount.html' %}
         {% if holdvec[21] %}
@@ -44,6 +57,13 @@
                 </button>
                 <button type="submit" class="btn btn-sm btn-primary receive-action-button" name="reload_batch">
                     Reload Selected
+                </button>
+                <button type="submit"
+                        class="btn btn-sm btn-outline-danger receive-action-button"
+                        name="undo_counter_deposit"
+                        value="selected"
+                        onclick="return confirm('Undo the counter deposit for the selected received payment batch? The original received payment will remain in Undeposited Funds.');">
+                    Undo Deposit
                 </button>
             </div>
         </div>
@@ -95,7 +115,7 @@
                 <tbody>
                     {% set seen_batch_ids = [] %}
                     {% for batch in recent_batches %}
-                        <tr>
+                        <tr class="{% if batch.highlighted %}table-warning font-weight-bold{% endif %}">
                             <td class="text-center align-middle">
                                 {% if batch.id_value in seen_batch_ids %}
                                     <input class="align-middle" type="checkbox" disabled title="This row is already included in the grouped receipt above.">
@@ -107,7 +127,12 @@
                             <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
                             <td>{{ batch.source }}</td>
                             <td>{{ batch.ref }}</td>
-                            <td>{{ batch.account }}</td>
+                            <td>
+                                {{ batch.account_display }}
+                                {% if batch.deposited and batch.account != batch.account_display %}
+                                    <div class="small text-muted">from {{ batch.account }}</div>
+                                {% endif %}
+                            </td>
                             <td>{{ batch.type }}</td>
                             <td class="text-right">{{ batch.amount_fmt }}</td>
                             <td class="text-center">{{ batch.count }}</td>
@@ -152,7 +177,7 @@
                                     <tr>
                                         <th>JO</th>
                                         <th>Order ID</th>
-                                        <th>Shipper</th>
+                                        <th>Customer</th>
                                         <th>Container</th>
                                         <th class="text-right">Invoice</th>
                                         <th class="text-right">Received</th>
@@ -221,7 +246,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         '<tr' + rowClass + '>' +
                         '<td>' + escapeHtml(detail.jo) + '</td>' +
                         '<td>' + escapeHtml(detail.order_id) + '</td>' +
-                        '<td>' + escapeHtml(detail.shipper) + '</td>' +
+                        '<td>' + escapeHtml(detail.customer || detail.shipper) +
+                        (detail.cargo_shipper ? '<div class="small text-muted">Cargo shipper: ' + escapeHtml(detail.cargo_shipper) + '</div>' : '') +
+                        '</td>' +
                         '<td>' + escapeHtml(detail.container) + '</td>' +
                         '<td class="text-right">' + escapeHtml(detail.invoice) + '</td>' +
                         '<td class="text-right">' + escapeHtml(detail.received) + '</td>' +

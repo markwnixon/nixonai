@@ -486,7 +486,8 @@ def form_check(input,text,type,task,req, task_iter, haultype, sid, itable):
 def colorcode(table, incol):
     #print(f'This table for color is {table}')
     if table == 'Orders' or table == 'OverSeas':
-        if incol == 9: return 'teal text-white font-weight-bold'
+        if incol == 10: return 'pink lighten-4 font-weight-bold'
+        elif incol == 9: return 'teal text-white font-weight-bold'
         elif incol == 5: return 'green text-white font-weight-bold'
         elif incol == 3: return'amber font-weight-bold'
         elif incol == 2: return'purple text-white font-weight-bold'

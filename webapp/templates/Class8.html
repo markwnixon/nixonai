@@ -95,6 +95,7 @@
 
                                 {% if showit == 'on' %}
                                     {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
+                                    {%  if genre == 'FreightForwarding' %} {% include 'includes/_freight_forwarding_colorcode.html' %} {% endif %}
                                 {% endif %}
                         </div>
                         <div class="col-sm-8" align = "center">
@@ -125,6 +126,7 @@
                         {% include 'includes/_controlpanelheader.html' %}
                         {% if showit == 'on' %}
                             {%  if genre == 'Trucking' %} {% include 'includes/_truckcolorcode.html' %} {% endif %}
+                            {%  if genre == 'FreightForwarding' %} {% include 'includes/_freight_forwarding_colorcode.html' %} {% endif %}
                         {%  endif %}
                         {% if genre == 'Billing' %}
                         <br>

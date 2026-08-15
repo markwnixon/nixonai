@@ -203,32 +203,47 @@
     </section>
 
     <section class="compliance-panel">
-        <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
-            <h5 class="mb-1">General Information Items</h5>
-            <div class="form-inline mb-1">
-                <label class="mr-2">Category</label>
-                <select id="general-category-filter" class="form-control form-control-sm mr-2">
-                    <option value="">All</option>
-                    {% for category in categories %}
-                        <option value="{{ category }}">{{ category }}</option>
-                    {% endfor %}
-                </select>
-                <label class="mr-2">Search</label>
-                <input id="general-search-filter" class="form-control form-control-sm" placeholder="title, user, note">
+        <div class="d-flex flex-wrap align-items-center mb-2">
+            <h5 class="mb-1 mr-3">General Information Items</h5>
+            <div class="d-flex flex-wrap align-items-center">
+                <div class="form-inline mb-1 mr-2">
+                    <label class="mr-2">Category</label>
+                    <select id="general-category-filter" class="form-control form-control-sm mr-2">
+                        <option value="">All</option>
+                        {% for category in categories %}
+                            <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="mr-2">Search</label>
+                    <input id="general-search-filter" class="form-control form-control-sm" placeholder="title, user, note">
+                </div>
+                <div class="btn-group btn-group-sm mb-1 mr-2" role="group" aria-label="Selected general information actions">
+                    <button type="button" id="general-view-selected" class="btn btn-sm btn-outline-info" disabled>View</button>
+                    <button type="button" id="general-reveal-selected" class="btn btn-sm btn-outline-warning" disabled>Reveal</button>
+                    <button type="button" id="general-edit-selected" class="btn btn-sm btn-outline-primary" disabled>Edit</button>
+                </div>
+                <form method="post" id="general-delete-selected-form" class="mb-1">
+                    <input type="hidden" name="action" value="delete_item">
+                    <input type="hidden" id="delete-general-item-kind" name="item_kind">
+                    <input type="hidden" id="delete-general-item-id" name="item_id">
+                    <input type="hidden" id="delete-general-payment-method-id" name="payment_method_id">
+                    <button type="submit" id="general-delete-selected" class="btn btn-sm btn-outline-danger" disabled>Delete</button>
+                </form>
             </div>
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-striped compliance-table mb-0">
                 <thead>
                     <tr>
+                        <th>Select</th>
                         <th>Category</th>
                         <th>Title</th>
+                        <th>Details</th>
                         <th>Website</th>
                         <th>Email</th>
                         <th>Phone</th>
                         <th>User</th>
-                        <th>Details</th>
-                        <th></th>
+                        <th>Notes</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -236,65 +251,50 @@
                         <tr class="general-info-row"
                             data-category="{{ item.Category or '' }}"
                             data-search="{{ ((item.Category or '') ~ ' ' ~ (item.Title or '') ~ ' ' ~ (item.DetailText or '') ~ ' ' ~ (item.WebsiteUrl or '') ~ ' ' ~ (item.Username or '') ~ ' ' ~ (item.Email or '') ~ ' ' ~ (item.Phone or '') ~ ' ' ~ (item.Notes or ''))|lower }}">
+                            <td>
+                                <input type="checkbox"
+                                       class="general-info-select"
+                                       aria-label="Select {{ item.Title or 'general information item' }}"
+                                       data-view-target="#generalInfoModal{{ item.id }}"
+                                       data-reveal-target="{% if item.IsSecurePayment %}#revealPaymentMethodModal{{ item.SourceId }}{% endif %}"
+                                       data-is-secure="{{ 1 if item.IsSecurePayment else 0 }}"
+                                       data-item-kind="{{ item.ItemKind or 'general' }}"
+                                       data-item-id="{{ item.id if not item.IsSecurePayment else '' }}"
+                                       data-payment-method-id="{{ item.SourceId if item.IsSecurePayment else '' }}"
+                                       data-item="{{ {
+                                           "id": item.id,
+                                           "SourceId": item.SourceId,
+                                           "ItemKind": item.ItemKind,
+                                           "Category": item.Category,
+                                           "Title": item.Title,
+                                           "Email": item.Email,
+                                           "Phone": item.Phone,
+                                           "WebsiteUrl": item.WebsiteUrl,
+                                           "Username": item.Username,
+                                           "PasswordValue": "" if item.IsSecurePayment else item.PasswordValue,
+                                           "Sensitive": item.Sensitive,
+                                           "DetailText": item.DetailText,
+                                           "Notes": item.Notes,
+                                           "AccountHint": item.AccountHint
+                                       }|tojson|forceescape }}">
+                            </td>
                             <td>{{ item.Category or '' }}</td>
                             <td>
                                 {{ item.Title or '' }}
                                 {% if item.Sensitive %}<span class="badge badge-warning ml-1">Sensitive</span>{% endif %}
                             </td>
+                            <td>{{ item.DetailText or '' }}</td>
                             <td>{% if item.WebsiteUrl %}<a href="{{ item.WebsiteUrl }}" target="_blank">Open</a>{% endif %}</td>
                             <td>{{ item.Email or '' }}</td>
                             <td>{{ item.Phone or '' }}</td>
                             <td>{{ item.Username or '' }}</td>
-                            <td>
-                                {% if item.IsSecurePayment %}
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-warning"
-                                            data-toggle="modal"
-                                            data-target="#revealPaymentMethodModal{{ item.SourceId }}">
-                                        Reveal
-                                    </button>
-                                {% else %}
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-info"
-                                            data-toggle="modal"
-                                            data-target="#generalInfoModal{{ item.id }}">
-                                        View
-                                    </button>
-                                {% endif %}
-                            </td>
-                            <td class="text-right">
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-primary general-edit"
-                                        data-item="{{ {
-                                            "id": item.id,
-                                            "SourceId": item.SourceId,
-                                            "ItemKind": item.ItemKind,
-                                            "Category": item.Category,
-                                            "Title": item.Title,
-                                            "Email": item.Email,
-                                            "Phone": item.Phone,
-                                            "WebsiteUrl": item.WebsiteUrl,
-                                            "Username": item.Username,
-                                            "PasswordValue": "" if item.IsSecurePayment else item.PasswordValue,
-                                            "Sensitive": item.Sensitive,
-                                            "DetailText": item.DetailText,
-                                            "Notes": item.Notes,
-                                            "AccountHint": item.AccountHint
-                                        }|tojson|forceescape }}">Edit</button>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="action" value="delete_item">
-                                    <input type="hidden" name="item_kind" value="{{ item.ItemKind or 'general' }}">
-                                    <input type="hidden" name="item_id" value="{{ item.id if not item.IsSecurePayment else '' }}">
-                                    <input type="hidden" name="payment_method_id" value="{{ item.SourceId if item.IsSecurePayment else '' }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                </form>
-                            </td>
+                            <td>{{ item.Notes or '' }}</td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="8" class="text-muted">No general information items have been entered.</td></tr>
+                        <tr><td colspan="9" class="text-muted">No general information items have been entered.</td></tr>
                     {% endfor %}
                     <tr id="general-filter-empty-row" class="d-none">
-                        <td colspan="8" class="text-muted">No general information items match this filter.</td>
+                        <td colspan="9" class="text-muted">No general information items match this filter.</td>
                     </tr>
                 </tbody>
             </table>
@@ -302,7 +302,6 @@
     </section>
 
     {% for item in items %}
-        {% if not item.IsSecurePayment %}
             <div class="modal fade" id="generalInfoModal{{ item.id }}" tabindex="-1" role="dialog" aria-labelledby="generalInfoModalLabel{{ item.id }}" aria-hidden="true">
             <div class="modal-dialog modal-lg compliance-document-modal-dialog" role="document">
                 <div class="modal-content">
@@ -321,8 +320,18 @@
                             <dd class="col-sm-9">{% if item.WebsiteUrl %}<a href="{{ item.WebsiteUrl }}" target="_blank">{{ item.WebsiteUrl }}</a>{% endif %}</dd>
                             <dt class="col-sm-3">Username</dt>
                             <dd class="col-sm-9">{{ item.Username or '' }}</dd>
-                            <dt class="col-sm-3">Password / Access</dt>
-                            <dd class="col-sm-9">{{ item.PasswordValue or '' }}</dd>
+                            {% if item.IsSecurePayment %}
+                                <dt class="col-sm-3">Account Hint</dt>
+                                <dd class="col-sm-9">{{ item.AccountHint or '' }}</dd>
+                                <dt class="col-sm-3">Protected Access</dt>
+                                <dd class="col-sm-9">
+                                    Password, PIN, and security notes are encrypted.
+                                    Use Reveal to access those protected fields.
+                                </dd>
+                            {% else %}
+                                <dt class="col-sm-3">Password / Access</dt>
+                                <dd class="col-sm-9">{{ item.PasswordValue or '' }}</dd>
+                            {% endif %}
                             <dt class="col-sm-3">Email</dt>
                             <dd class="col-sm-9">{{ item.Email or '' }}</dd>
                             <dt class="col-sm-3">Phone</dt>
@@ -339,7 +348,6 @@
                 </div>
             </div>
         </div>
-        {% endif %}
     {% endfor %}
 
     {% for item in items %}
@@ -465,29 +473,122 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    document.querySelectorAll('.general-edit').forEach(function (button) {
-        button.addEventListener('click', function () {
-            const item = JSON.parse(button.dataset.item);
-            fields.id.value = item.ItemKind === 'payment_method' ? '' : (item.id || '');
-            fields.payment_method_id.value = item.ItemKind === 'payment_method' ? (item.SourceId || '') : '';
-            fields.category.value = item.Category || 'General Notes';
-            fields.title.value = item.Title || '';
-            fields.email.value = item.Email || '';
-            fields.phone.value = item.Phone || '';
-            fields.website_url.value = item.WebsiteUrl || '';
-            fields.username.value = item.Username || '';
-            fields.password_value.value = item.PasswordValue || '';
-            fields.sensitive.checked = Number(item.Sensitive || 0) === 1;
-            fields.detail_text.value = item.DetailText || '';
-            fields.notes.value = item.Notes || '';
-            fields.account_hint.value = item.AccountHint || '';
-            fields.secure_pin.value = '';
-            fields.secure_security_notes.value = '';
-            updatePaymentFieldVisibility();
-            showGeneralEditor();
-            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const rowSelectors = document.querySelectorAll('.general-info-select');
+    const viewSelectedButton = document.getElementById('general-view-selected');
+    const revealSelectedButton = document.getElementById('general-reveal-selected');
+    const editSelectedButton = document.getElementById('general-edit-selected');
+    const deleteSelectedButton = document.getElementById('general-delete-selected');
+    const deleteSelectedForm = document.getElementById('general-delete-selected-form');
+
+    function selectedGeneralItem() {
+        return document.querySelector('.general-info-select:checked');
+    }
+
+    function selectedGeneralItemData() {
+        const selected = selectedGeneralItem();
+        if (!selected || !selected.dataset.item) {
+            return null;
+        }
+        return JSON.parse(selected.dataset.item);
+    }
+
+    function setActionButtons() {
+        const selected = selectedGeneralItem();
+        const hasSelection = Boolean(selected);
+        const canReveal = hasSelection && selected.dataset.isSecure === '1';
+        if (viewSelectedButton) {
+            viewSelectedButton.disabled = !hasSelection;
+        }
+        if (revealSelectedButton) {
+            revealSelectedButton.disabled = !canReveal;
+        }
+        if (editSelectedButton) {
+            editSelectedButton.disabled = !hasSelection;
+        }
+        if (deleteSelectedButton) {
+            deleteSelectedButton.disabled = !hasSelection;
+        }
+    }
+
+    function loadGeneralItemForEdit(item) {
+        if (!item) {
+            return;
+        }
+        fields.id.value = item.ItemKind === 'payment_method' ? '' : (item.id || '');
+        fields.payment_method_id.value = item.ItemKind === 'payment_method' ? (item.SourceId || '') : '';
+        fields.category.value = item.Category || 'General Notes';
+        fields.title.value = item.Title || '';
+        fields.email.value = item.Email || '';
+        fields.phone.value = item.Phone || '';
+        fields.website_url.value = item.WebsiteUrl || '';
+        fields.username.value = item.Username || '';
+        fields.password_value.value = item.PasswordValue || '';
+        fields.sensitive.checked = Number(item.Sensitive || 0) === 1;
+        fields.detail_text.value = item.DetailText || '';
+        fields.notes.value = item.Notes || '';
+        fields.account_hint.value = item.AccountHint || '';
+        fields.secure_pin.value = '';
+        fields.secure_security_notes.value = '';
+        updatePaymentFieldVisibility();
+        showGeneralEditor();
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    rowSelectors.forEach(function (selector) {
+        selector.addEventListener('change', function () {
+            if (selector.checked) {
+                rowSelectors.forEach(function (otherSelector) {
+                    if (otherSelector !== selector) {
+                        otherSelector.checked = false;
+                    }
+                });
+            }
+            setActionButtons();
         });
     });
+
+    if (viewSelectedButton) {
+        viewSelectedButton.addEventListener('click', function () {
+            const selected = selectedGeneralItem();
+            if (!selected) {
+                return;
+            }
+            $(selected.dataset.viewTarget).modal('show');
+        });
+    }
+
+    if (revealSelectedButton) {
+        revealSelectedButton.addEventListener('click', function () {
+            const selected = selectedGeneralItem();
+            if (!selected || !selected.dataset.revealTarget) {
+                return;
+            }
+            $(selected.dataset.revealTarget).modal('show');
+        });
+    }
+
+    if (editSelectedButton) {
+        editSelectedButton.addEventListener('click', function () {
+            loadGeneralItemForEdit(selectedGeneralItemData());
+        });
+    }
+
+    if (deleteSelectedForm) {
+        deleteSelectedForm.addEventListener('submit', function (event) {
+            const selected = selectedGeneralItem();
+            if (!selected) {
+                event.preventDefault();
+                return;
+            }
+            document.getElementById('delete-general-item-kind').value = selected.dataset.itemKind || 'general';
+            document.getElementById('delete-general-item-id').value = selected.dataset.itemId || '';
+            document.getElementById('delete-general-payment-method-id').value = selected.dataset.paymentMethodId || '';
+            if (!window.confirm('Delete the selected general information item?')) {
+                event.preventDefault();
+            }
+        });
+    }
+    setActionButtons();
 
     document.getElementById('clear-general-form').addEventListener('click', function () {
         showGeneralEditor();
@@ -573,6 +674,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const searchMatch = !search || (row.dataset.search || '').indexOf(search) !== -1;
             const shouldShow = categoryMatch && searchMatch;
             row.classList.toggle('d-none', !shouldShow);
+            if (!shouldShow) {
+                const selector = row.querySelector('.general-info-select');
+                if (selector) {
+                    selector.checked = false;
+                }
+            }
             if (shouldShow) {
                 visibleCount += 1;
             }
@@ -580,6 +687,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (emptyRow) {
             emptyRow.classList.toggle('d-none', visibleCount > 0);
         }
+        setActionButtons();
     }
 
     if (categoryFilter) {

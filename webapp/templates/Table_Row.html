@@ -9,7 +9,7 @@
         {% for tt in genre_tables %}
             <div class="custom-control custom-checkbox custom-control-inline">
                 <input type="checkbox" class="custom-control-input" id="inline{{ genre_tables[loop.index - 1] }}" {% if genre_tables_on[loop.index - 1]=='on' %} checked {% endif %} name="{{ tt }}box" onchange="this.form.submit()">
-                <label class="custom-control-label" for="inline{{ genre_tables[loop.index - 1] }}">{{ genre_tables[loop.index - 1] }}</label>
+                <label class="custom-control-label" for="inline{{ genre_tables[loop.index - 1] }}">{% if genre_tables[loop.index - 1] == 'OceanCustomers' %}Customers{% else %}{{ genre_tables[loop.index - 1] }}{% endif %}</label>
             </div>
          {% endfor %}
     </div>

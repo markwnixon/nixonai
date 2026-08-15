@@ -33,7 +33,7 @@ Trucking_genre = {'table': 'Orders',
                                  {'Editing': ['Edit Item', 'Match', 'Accept', 'Haul+1', 'Haul-1', 'Haul Done', 'Inv+1',
                                                  'Inv-1', 'Inv Emailed', 'Inv Paid', 'Set Col To']},
                                  {'Money Flow': ['Edit Invoice', 'Edit Summary Inv', 'Send Package', 'Receive Payment',
-                                                  'Receive by Acct']},
+                                                  'Receive by Acct', 'Deposit Undeposited']},
                                  {'View Docs': ['Source', 'Proof', 'Manifest', 'Interchange', 'Invoice',
                                                 'Paid Invoice', 'Package']},
                                  {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment', 'Undo Docs', 'Undo Docs xSource', 'Undo Proof', 'Undo 2nd Proof', 'Undo RateCon']},
@@ -120,7 +120,8 @@ Trucking_genre = {'table': 'Orders',
                                          'Edit Summary Inv' : ['One_Table_Multi_Item_Selection', 'MakeSummary', 'Invoice'],
                                          'Send Package' : ['Single_Item_Selection', 'MakePackage', 'Package'],
                                          'Receive Payment' : ['Single_Item_Selection', 'ReceivePay', 'PayInvoice'],
-                                         'Receive by Acct' : ['No_Display', 'ReceiveByAccountRedirect', '']
+                                         'Receive by Acct' : ['No_Display', 'ReceiveByAccountRedirect', ''],
+                                         'Deposit Undeposited' : ['Single_Item_Selection', 'DepositUndeposited', '']
                                         },
 
                                     'View Docs':
@@ -1379,21 +1380,21 @@ Exports_setup = {'name' : 'Exports',
                 }
 
 FreightForwarding_genre = {'table': 'OverSeas',
-                  'genre_tables': ['OverSeas'],
-                  'genre_tables_on': ['on'],
+                  'genre_tables': ['OverSeas', 'OceanCustomers'],
+                  'genre_tables_on': ['on', 'off'],
                   'quick_buttons': ['New Job', 'Edit Item', 'Invoice Upload', 'Receive Payment'],
                   'table_filters': [{'Shipper Filter': ['get_Shippers', 'Show All']},
                                     {'Date Filter': ['Last 45 Days', 'Last 90 Days', 'Last 180 Days', 'Last 360 Days', 'This Year', 'Last Year', 'Year Before Last', 'Show All']},
                                     {'Pay Filter': ['Uninvoiced', 'Unrecorded', 'Unsent', 'Unpaid', 'Show All']},
                                     {'Viewer': ['7x5', '8x4', '9x3', '10x2', 'Top-Bot']}],
-                  'task_boxes': [{'Adding': ['New Job', 'Upload Invoice']},
+                  'task_boxes': [{'Adding': ['New Job', 'New Customer', 'Upload Invoice']},
                                  {'Editing': ['Edit Item']},
-                                 {'Money Flow': ['Receive Payment']},
+                                 {'Money Flow': ['Receive Payment', 'Deposit Undeposited']},
                                  {'View Docs': ['Invoice']},
                                  {'Undo': ['Delete Item', 'Undo Payment']}],
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"',
                                       '20\' GP 8\'6\"', '45\' GP 9\'6\"', 'LCL', 'RORO', 'Vehicle', 'HHG'],
-                  'task_mapping': {'Job':'OverSeas', 'Invoice':'CT', 'View':'CT'},
+                  'task_mapping': {'Job':'OverSeas', 'Customer':'OceanCustomers', 'Invoice':'CT', 'View':'CT'},
                   'task_box_map': {
                                     'Quick' :
                                         {
@@ -1405,6 +1406,7 @@ FreightForwarding_genre = {'table': 'OverSeas',
                                     'Adding':
                                         {
                                          'New Job': ['Table_Selected', 'New', 'OverSeas'],
+                                         'New Customer' : ['Table_Selected', 'New', 'OceanCustomers'],
                                          'Upload Invoice' : ['Single_Item_Selection', 'Upload', 'Invoice']
                                          },
 
@@ -1415,7 +1417,8 @@ FreightForwarding_genre = {'table': 'OverSeas',
 
                                     'Money Flow':
                                         {
-                                         'Receive Payment' : ['Single_Item_Selection', 'ForwardingReceivePay', 'PayInvoice']
+                                         'Receive Payment' : ['Single_Item_Selection', 'ForwardingReceivePay', 'PayInvoice'],
+                                         'Deposit Undeposited' : ['Single_Item_Selection', 'DepositUndeposited', '']
                                         },
 
                                     'View Docs':
@@ -1440,7 +1443,7 @@ OverSeas_setup = {'name' : 'Freight Forwarding Job',
                 'ukey': 'Jo',
                 'simplify': ['Job', 'Parties', 'Money', 'Docs'],
                 'entry data': [['Jo', 'JO', 'JO', forwardingcode, 'text', 0, 'ok', 'cc', None, 'Always'],
-                               ['Shipper', 'Customer', 'Customer Paying Invoice', 'text', 'text', 0, 'ok', 'cl', 20, 'Always'],
+                               ['Shipper', 'Customer', 'Customer Paying Invoice', 'select', 'customerdata', 0, 'ok', 'cl', 20, 'Always'],
                                ['InvoTotal', 'Inv$', 'Invoice Amount', 'text', 'float', 0, 'ok', 'cr', None, 'Always'],
                                ['Payments', 'Paid$', 'Amount Paid', 'text', None, 0, 'ok', 'cr', None, 'Always'],
                                ['BalDue', 'Bal$', 'Balance Due', 'text', None, 0, 'ok', 'cr', None, 'Money'],
@@ -1467,7 +1470,7 @@ OverSeas_setup = {'name' : 'Freight Forwarding Job',
                 'filteron':  ['Date', 'Invoice', 'Shipper'],
                 'datefilter_field': 'IngateDate',
                 'shipperfilter_field': 'Shipper',
-                'side data': [],
+                'side data': [{'customerdata': ['People', [['Ptype', 'Ocean']], 'Company']}],
                 'default values': [],
                 'form show': {
                    'New': ['Job', 'Parties', 'Money'],
@@ -1484,6 +1487,47 @@ OverSeas_setup = {'name' : 'Freight Forwarding Job',
                 'haulmask' : {},
                 'matchfrom': {}
                 }
+
+OceanCustomers_setup = {'name' : 'Customer',
+                   'table': 'People',
+                   'filter': 'Ptype',
+                   'filterval': 'Ocean',
+                   'filter logic': '==',
+                   'button flip': None,
+                   'checklocation': 1,
+                   'creators': [],
+                   'ukey' : 'Company',
+                   'simplify': [],
+                   'entry data': [['Company', 'Company/Name', 'Company/Name', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Addr1', 'Addr1', 'Address Line 1', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Addr2', 'Addr2', 'Address Line 2', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Telephone', 'Telephone', 'Telephone', 'text', 'text', 0, 'ok', 'cc', None, 'Always'],
+                                  ['Email', 'Email Status', 'Email Status', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Associate1', 'Email Docs', 'Email Docs', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Associate2', 'Email AP', 'Email AP', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Saljp', 'Primary Name', 'Primary Name','text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Saloa', 'Ops Name', 'Ops Name', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Salap', 'Acct Paybl Name', 'Acct Payble Name', 'text', 'text', 0, 'ok', 'cl', None, 'Always'],
+                                  ['Date1', 'Added Date', 'Added Date', 'date', 'date', 0, 'ok', 'cc', None, 'Always']],
+                   'hidden data' : [],
+                   'haulmask': [],
+                   'colorfilter': None,
+                   'filteron':  [],
+                   'side data': [],
+                   'default values': {'get_Shipper': 'Fill This Later'},
+                   'form show': {
+                       'New': [ ],
+                       'Edit': [ ]
+                   },
+                   'form checks': {
+                       'New': ['Company'],
+                       'Edit': ['Company']
+                   },
+                   'jscript': 'dtHorizontalVerticalExample3',
+                   'documents': ['Source'],
+                   'sourcenaming': [None, None,'Company'],
+                   'copyswaps' : {}
+                   }
 
 billcode = co[10] + 'B'
 Billing_genre =   {'table': 'Bills',

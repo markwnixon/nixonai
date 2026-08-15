@@ -7,7 +7,12 @@ from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits,
 #from webapp.forms import TruckingFormNew
 from webapp.class8_tasks import Table_maker, get_dispatch
 from webapp.revenues import get_revenues
-from webapp.business_reports import ensure_interchange_port_trip_column, rebaseline_interchange_port_trips_for_year
+from webapp.business_reports import (
+    ensure_interchange_port_trip_column,
+    rebaseline_interchange_port_trips_for_year,
+    assign_port_trip_sequence,
+    interchange_service_date,
+)
 from flask_login import login_required, current_user
 from sqlalchemy import func, inspect, or_, text
 from webapp.financial_mfa import FINANCIAL_GENRES, financial_mfa_redirect, financial_mfa_required
@@ -35,6 +40,7 @@ from webapp.bot_skills import bot_skill_rows, set_bot_skill_enabled, SKILL_DEFIN
 from webapp.bot_usage import usage_dashboard
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 from datetime import date, timedelta
 import datetime
@@ -2152,6 +2158,28 @@ def Class8Main(genre):
 
     print('routes.py 237: The genre is',genre)
     if (
+        genre in ['Trucking', 'FreightForwarding']
+        and request.method == 'POST'
+        and request.values.get('Money Flow') == 'Deposit Undeposited'
+    ):
+        selected_jobs = []
+        if genre == 'Trucking':
+            for key in request.values:
+                if key.startswith('Orders') and key.replace('Orders', '').isdigit():
+                    order = Orders.query.get(int(key.replace('Orders', '')))
+                    if order is not None:
+                        selected_jobs.append(order.Jo)
+        else:
+            for key in request.values:
+                if key.startswith('OverSeas') and key.replace('OverSeas', '').isdigit():
+                    job = OverSeas.query.get(int(key.replace('OverSeas', '')))
+                    if job is not None:
+                        selected_jobs.append(job.Jo)
+        if len(selected_jobs) != 1:
+            flash('Select exactly one job before choosing Deposit Undeposited.', 'warning')
+            return redirect(url_for('main.Class8Main', genre=genre))
+        return redirect(url_for('main.ReceiveByAccount', highlight_tcode=selected_jobs[0]))
+    if (
         genre == 'Trucking'
         and request.method == 'POST'
         and request.values.get('Money Flow') in ['Receive Payments', 'Receive by Acct']
@@ -2241,6 +2269,7 @@ def ensure_business_report_tables():
             PeriodEnd DATE NOT NULL,
             AmountCents INT NOT NULL DEFAULT 0,
             AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'daily',
+            AllocationDaysPrior INT NOT NULL DEFAULT 0,
             AutoUpdate TINYINT NOT NULL DEFAULT 0,
             Notes TEXT,
             Active TINYINT DEFAULT 1,
@@ -2266,6 +2295,86 @@ def ensure_business_report_tables():
             ADD COLUMN AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'daily'
         """))
         db.session.commit()
+    if 'AllocationDaysPrior' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_indirect_allocations
+            ADD COLUMN AllocationDaysPrior INT NOT NULL DEFAULT 0
+        """))
+        db.session.commit()
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS operations_direct_allocations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(2) NOT NULL,
+            AccountName VARCHAR(100) NOT NULL,
+            AllocationBasis VARCHAR(45) NOT NULL DEFAULT 'bill_to_bill_prior',
+            AllocationDaysPrior INT NOT NULL DEFAULT 0,
+            AllocationLabelVersion INT NOT NULL DEFAULT 1,
+            Notes TEXT,
+            Active TINYINT DEFAULT 1,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ops_direct_alloc_co (Co),
+            INDEX idx_ops_direct_alloc_account (AccountName),
+            INDEX idx_ops_direct_alloc_active (Active)
+        )
+    """))
+    db.session.commit()
+    columns = [column['name'] for column in inspector.get_columns('operations_direct_allocations')]
+    if 'AllocationDaysPrior' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_direct_allocations
+            ADD COLUMN AllocationDaysPrior INT NOT NULL DEFAULT 0
+        """))
+        db.session.commit()
+    if 'AllocationLabelVersion' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_direct_allocations
+            ADD COLUMN AllocationLabelVersion INT NOT NULL DEFAULT 0
+        """))
+        db.session.execute(text("""
+            UPDATE operations_direct_allocations
+            SET AllocationLabelVersion = 1
+            WHERE AllocationLabelVersion = 0
+        """))
+        db.session.commit()
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS operations_port_trip_weeks (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            WeekStart DATE NOT NULL,
+            WeekEnd DATE NOT NULL,
+            TripCount INT NOT NULL DEFAULT 0,
+            TicketCount INT NOT NULL DEFAULT 0,
+            GeneratedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_ops_port_trip_week (WeekStart),
+            INDEX idx_ops_port_trip_week_range (WeekStart, WeekEnd)
+        )
+    """))
+    db.session.commit()
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS toll_transactions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Scac VARCHAR(12) NOT NULL,
+            SourceFile VARCHAR(255),
+            StatementMonth VARCHAR(20),
+            PostingDate DATE,
+            TransactionDate DATE,
+            Agency VARCHAR(100),
+            ExitPlaza VARCHAR(120),
+            ExitDate DATE,
+            ExitTime TIME,
+            ExitTimeText VARCHAR(45),
+            CL VARCHAR(20),
+            Amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+            RowHash VARCHAR(64),
+            RawLine TEXT,
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_toll_transactions_scac_txdate (Scac, TransactionDate),
+            INDEX idx_toll_transactions_scac_statement (Scac, StatementMonth),
+            UNIQUE KEY uq_toll_transactions_rowhash (RowHash)
+        )
+    """))
+    db.session.commit()
     db.session.execute(text("""
         CREATE TABLE IF NOT EXISTS operations_ga_allocations (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -2301,10 +2410,42 @@ def ensure_business_report_tables():
         """))
         db.session.commit()
     db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS operations_report_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            Co VARCHAR(2) NOT NULL,
+            GABasis VARCHAR(45) NOT NULL DEFAULT 'daily',
+            IncomeRecognition VARCHAR(45) NOT NULL DEFAULT 'completed',
+            DirectBasis VARCHAR(45) NOT NULL DEFAULT 'bill_to_bill_prior',
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_operations_report_settings_co (Co)
+        )
+    """))
+    db.session.commit()
+    columns = [column['name'] for column in inspector.get_columns('operations_report_settings')]
+    if 'GABasis' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_report_settings
+            ADD COLUMN GABasis VARCHAR(45) NOT NULL DEFAULT 'daily'
+        """))
+        db.session.commit()
+    if 'IncomeRecognition' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_report_settings
+            ADD COLUMN IncomeRecognition VARCHAR(45) NOT NULL DEFAULT 'completed'
+        """))
+        db.session.commit()
+    if 'DirectBasis' not in columns:
+        db.session.execute(text("""
+            ALTER TABLE operations_report_settings
+            ADD COLUMN DirectBasis VARCHAR(45) NOT NULL DEFAULT 'bill_to_bill_prior'
+        """))
+        db.session.commit()
+    db.session.execute(text("""
         CREATE TABLE IF NOT EXISTS business_report_cache (
             id INT AUTO_INCREMENT PRIMARY KEY,
             Co VARCHAR(2) NOT NULL,
-            ReportMode VARCHAR(24) NOT NULL,
+            ReportMode VARCHAR(64) NOT NULL,
             DateFrom DATE NOT NULL,
             DateTo DATE NOT NULL,
             PayloadJson LONGTEXT NOT NULL,
@@ -2317,6 +2458,13 @@ def ensure_business_report_tables():
         )
     """))
     db.session.commit()
+    report_mode_column = next((column for column in inspector.get_columns('business_report_cache') if column['name'] == 'ReportMode'), None)
+    if report_mode_column is not None and getattr(report_mode_column.get('type'), 'length', 0) < 64:
+        db.session.execute(text("""
+            ALTER TABLE business_report_cache
+            MODIFY COLUMN ReportMode VARCHAR(64) NOT NULL
+        """))
+        db.session.commit()
 
 
 def business_report_parse_date(value, fallback):
@@ -2484,17 +2632,36 @@ def business_report_as_datetime(value, end_of_day=False):
     return value
 
 
-BUSINESS_REPORT_CACHE_VERSION = 3
+BUSINESS_REPORT_CACHE_VERSION = 16
+
+OPERATIONS_DIVISION_FILTERS = {
+    'all': 'Everything',
+    'trucking': 'Trucking Only',
+    'freight_forwarding': 'Freight Forwarding Only',
+}
+
+OPERATIONS_INCOME_RECOGNITION_TYPES = {
+    'completed': 'On Date Job Completed',
+    'invoiced': 'On Date Job Invoiced',
+}
+
+OPERATIONS_DIRECT_ALLOCATION_TYPES = {
+    'bill_to_bill_prior': 'Bill to Bill Prior Spread',
+    'daily': 'Daily Spread',
+    'transaction_date': 'On Transaction Date',
+    'days_prior': 'X Days Prior to TD',
+    'toll_transaction': 'Toll Transaction Weighted',
+    'rolling_income': 'Rolling Income Weighted',
+    'income_share': 'Income Weighted',
+    'port_trip': 'Port Trips',
+}
+
+OPERATIONS_ALLOCATION_BASIS_TYPES = OPERATIONS_DIRECT_ALLOCATION_TYPES
 
 BUSINESS_REPORT_BASIS_TYPES = {
     'port_entry': 'Port Entries',
     'day': 'Days',
     'mile': 'Miles',
-}
-
-OPERATIONS_ALLOCATION_BASIS_TYPES = {
-    'daily': 'Daily Spread',
-    'port_trip': 'Port Trips',
 }
 
 
@@ -2526,6 +2693,17 @@ def business_report_allocate_cents_by_day(daily_totals, start_date, end_date, am
         daily_totals[day] = daily_totals.get(day, 0) + cents_for_day
 
 
+def business_report_allocate_cents_on_date(daily_totals, transaction_date, amount_cents, include_start, include_end):
+    transaction_date = business_report_as_date(transaction_date)
+    if transaction_date is None or not amount_cents:
+        return
+    if include_start and transaction_date < include_start:
+        return
+    if include_end and transaction_date > include_end:
+        return
+    daily_totals[transaction_date] = daily_totals.get(transaction_date, 0) + int(amount_cents or 0)
+
+
 def business_report_allocate_cents_by_period(daily_totals, period_start, period_end, amount_cents, include_start, include_end):
     if period_start is None or period_end is None or period_end < period_start or not amount_cents:
         return
@@ -2546,9 +2724,109 @@ def business_report_allocate_cents_by_period(daily_totals, period_start, period_
             daily_totals[day] = daily_totals.get(day, 0) + cents_for_day
 
 
+def business_report_rebuild_port_trip_weeks(start_date, end_date):
+    if not start_date or not end_date or end_date < start_date:
+        return {}
+    summary_start = business_report_week_start(start_date)
+    summary_end = business_report_week_start(end_date) + datetime.timedelta(days=6)
+    start_dt, end_dt = business_report_period_bounds(summary_start, summary_end)
+    rows = Interchange.query.filter(
+        Interchange.Date >= start_dt,
+        Interchange.Date <= end_dt,
+    ).order_by(
+        Interchange.Date.asc(),
+        Interchange.TruckNumber.asc(),
+        Interchange.Driver.asc(),
+        Interchange.id.asc(),
+    ).all()
+    trip_rows = []
+    for row in rows:
+        trip_rows.append(SimpleNamespace(
+            id=row.id,
+            Date=row.Date,
+            Type=row.Type,
+            TruckNumber=row.TruckNumber,
+            Driver=row.Driver,
+            Path=row.Path,
+            Source=row.Source,
+            Company=row.Company,
+            Time=row.Time,
+            PortTrip=None,
+        ))
+    assign_port_trip_sequence(trip_rows, start_count=1)
+    week_counts = {}
+    week_tickets = {}
+    for row in trip_rows:
+        service_date = interchange_service_date(row)
+        if not service_date or not row.PortTrip:
+            continue
+        week_start = business_report_week_start(service_date)
+        if summary_start <= week_start <= summary_end:
+            week_counts.setdefault(week_start, set()).add(row.PortTrip)
+            week_tickets[week_start] = week_tickets.get(week_start, 0) + 1
+
+    db.session.execute(text("""
+        DELETE FROM operations_port_trip_weeks
+        WHERE WeekStart >= :summary_start AND WeekStart <= :summary_end
+    """), {'summary_start': summary_start, 'summary_end': summary_end})
+    now = datetime.datetime.utcnow()
+    for week_start in business_report_each_day(summary_start, summary_end):
+        if week_start.weekday() != 0:
+            continue
+        db.session.execute(text("""
+            INSERT INTO operations_port_trip_weeks
+                (WeekStart, WeekEnd, TripCount, TicketCount, GeneratedAt)
+            VALUES
+                (:week_start, :week_end, :trip_count, :ticket_count, :generated_at)
+        """), {
+            'week_start': week_start,
+            'week_end': week_start + datetime.timedelta(days=6),
+            'trip_count': len(week_counts.get(week_start, set())),
+            'ticket_count': week_tickets.get(week_start, 0),
+            'generated_at': now,
+        })
+    db.session.commit()
+    return {week_start: len(trips) for week_start, trips in week_counts.items()}
+
+
+def business_report_port_trip_week_counts(start_date, end_date):
+    if not start_date or not end_date or end_date < start_date:
+        return {}
+    summary_start = business_report_week_start(start_date)
+    summary_end = business_report_week_start(end_date)
+    rows = db.session.execute(text("""
+        SELECT WeekStart, TripCount
+        FROM operations_port_trip_weeks
+        WHERE WeekStart >= :summary_start AND WeekStart <= :summary_end
+        ORDER BY WeekStart
+    """), {'summary_start': summary_start, 'summary_end': summary_end}).mappings().all()
+    expected_weeks = ((summary_end - summary_start).days // 7) + 1
+    if len(rows) < expected_weeks:
+        business_report_rebuild_port_trip_weeks(start_date, end_date)
+        rows = db.session.execute(text("""
+            SELECT WeekStart, TripCount
+            FROM operations_port_trip_weeks
+            WHERE WeekStart >= :summary_start AND WeekStart <= :summary_end
+            ORDER BY WeekStart
+        """), {'summary_start': summary_start, 'summary_end': summary_end}).mappings().all()
+    output = {}
+    for row in rows:
+        week_start = business_report_as_date(row['WeekStart'])
+        if week_start:
+            output[week_start] = int(row['TripCount'] or 0)
+    return output
+
+
 def business_report_port_trip_counts_by_day(start_date, end_date):
     if not start_date or not end_date or end_date < start_date:
         return {}
+    week_counts = business_report_port_trip_week_counts(start_date, end_date)
+    if week_counts and sum(week_counts.values()) > 0:
+        return {
+            week_start: trip_count
+            for week_start, trip_count in week_counts.items()
+            if trip_count
+        }
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
     trip_day = func.date(Interchange.Date)
     rows = db.session.query(
@@ -2596,6 +2874,108 @@ def business_report_allocate_cents_by_port_trip(daily_totals, period_start, peri
     for index, (day, whole_share, remainder) in enumerate(sorted(shares, key=lambda item: item[2], reverse=True)):
         extra = 1 if index < remainder_cents else 0
         daily_totals[day] = daily_totals.get(day, 0) + whole_share + extra
+
+
+def business_report_allocate_cents_by_income_share(daily_totals, period_start, period_end, amount_cents, include_start, include_end, income_daily):
+    if not period_start or not period_end or period_end < period_start or not amount_cents:
+        return
+    if include_start is None:
+        include_start = period_start
+    if include_end is None:
+        include_end = period_end
+    include_start = max(include_start, period_start)
+    include_end = min(include_end, period_end)
+    if include_end < include_start:
+        return
+    period_income = {
+        day: max(int(income_daily.get(day, 0) or 0), 0)
+        for day in business_report_each_day(period_start, period_end)
+    }
+    total_income = sum(period_income.values())
+    if total_income <= 0:
+        return
+    included_days = [day for day in business_report_each_day(include_start, include_end) if period_income.get(day, 0)]
+    included_income = sum(period_income.get(day, 0) for day in included_days)
+    if included_income <= 0:
+        return
+    target_amount = int(amount_cents or 0) * included_income // total_income
+    shares = []
+    allocated = 0
+    for day in included_days:
+        numerator = int(amount_cents or 0) * period_income[day]
+        whole_share = numerator // total_income
+        remainder = numerator % total_income
+        shares.append((day, whole_share, remainder))
+        allocated += whole_share
+    remainder_cents = target_amount - allocated
+    for index, (day, whole_share, remainder) in enumerate(sorted(shares, key=lambda item: item[2], reverse=True)):
+        extra = 1 if index < remainder_cents else 0
+        daily_totals[day] = daily_totals.get(day, 0) + whole_share + extra
+
+
+def business_report_scac_candidates(company_code):
+    candidates = [company_code, str(company_code or '').lower(), scac, str(scac or '').lower()]
+    output = []
+    for candidate in candidates:
+        candidate = (candidate or '').strip()
+        if candidate and candidate not in output:
+            output.append(candidate)
+    return output
+
+
+def business_report_toll_transaction_daily_amounts(company_code, start_date, end_date):
+    if not start_date or not end_date or end_date < start_date:
+        return {}, {}
+    candidates = business_report_scac_candidates(company_code)
+    if not candidates:
+        return {}, {}
+    scac_filters = []
+    params = {
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    for index, candidate in enumerate(candidates):
+        key = f'scac_{index}'
+        scac_filters.append(f'Scac = :{key}')
+        params[key] = candidate
+    rows = db.session.execute(text(f"""
+        SELECT COALESCE(TransactionDate, ExitDate, PostingDate) AS TollDate,
+               SUM(Amount) AS TollAmount,
+               COUNT(*) AS TollCount
+        FROM toll_transactions
+        WHERE ({' OR '.join(scac_filters)})
+          AND COALESCE(TransactionDate, ExitDate, PostingDate) >= :start_date
+          AND COALESCE(TransactionDate, ExitDate, PostingDate) <= :end_date
+        GROUP BY COALESCE(TransactionDate, ExitDate, PostingDate)
+    """), params).mappings().all()
+    daily_amounts = {}
+    daily_counts = {}
+    for row in rows:
+        day = business_report_as_date(row['TollDate'])
+        if not day:
+            continue
+        amount_cents = int((Decimal(str(row['TollAmount'] or 0)) * Decimal('100')).quantize(Decimal('1')))
+        daily_amounts[day] = daily_amounts.get(day, 0) + amount_cents
+        daily_counts[day] = daily_counts.get(day, 0) + int(row['TollCount'] or 0)
+    return daily_amounts, daily_counts
+
+
+def business_report_allocate_cents_by_toll_transactions(daily_totals, company_code, period_start, period_end, amount_cents, include_start, include_end):
+    toll_daily, _toll_counts = business_report_toll_transaction_daily_amounts(company_code, period_start, period_end)
+    weighted_daily = {
+        day: abs(int(cents or 0))
+        for day, cents in toll_daily.items()
+        if cents
+    }
+    operations_allocate_cents_by_weight_or_daily(
+        daily_totals,
+        period_start,
+        period_end,
+        amount_cents,
+        include_start,
+        include_end,
+        weighted_daily,
+    )
 
 
 def business_report_week_start(day):
@@ -3718,7 +4098,7 @@ def business_report_allocation_calcs(allocations, report_start, report_end):
 
 def operations_indirect_allocations(company_code):
     rows = db.session.execute(text("""
-        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes
+        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AllocationDaysPrior, AutoUpdate, Notes
         FROM operations_indirect_allocations
         WHERE Co = :company_code AND Active = 1
         ORDER BY PeriodStart DESC, AccountName, id
@@ -3733,10 +4113,56 @@ def operations_indirect_allocations(company_code):
             'amount_cents': int(row['AmountCents'] or 0),
             'amount': business_report_money(int(row['AmountCents'] or 0)),
             'allocation_basis': row['AllocationBasis'] or 'daily',
-            'allocation_basis_label': OPERATIONS_ALLOCATION_BASIS_TYPES.get(row['AllocationBasis'] or 'daily', 'Daily Spread'),
+            'allocation_days_prior': int(row['AllocationDaysPrior'] or 0),
+            'allocation_basis_label': (
+                f"{int(row['AllocationDaysPrior'] or 0)} Days Prior to TD"
+                if (row['AllocationBasis'] or 'daily') == 'days_prior'
+                else OPERATIONS_ALLOCATION_BASIS_TYPES.get(row['AllocationBasis'] or 'daily', 'Daily Spread')
+            ),
             'auto_update': bool(row['AutoUpdate']),
             'notes': row['Notes'] or '',
         })
+    return output
+
+
+def operations_direct_allocations(company_code):
+    rows = db.session.execute(text("""
+        SELECT id, Co, AccountName, AllocationBasis, AllocationDaysPrior, Notes
+        FROM operations_direct_allocations
+        WHERE Co = :company_code AND Active = 1
+        ORDER BY AccountName, id
+    """), {'company_code': company_code}).mappings().all()
+    output = []
+    for row in rows:
+        basis = row['AllocationBasis'] or 'bill_to_bill_prior'
+        output.append({
+            'id': row['id'],
+            'account': row['AccountName'] or '',
+            'allocation_basis': basis,
+            'allocation_days_prior': int(row['AllocationDaysPrior'] or 0),
+            'allocation_basis_label': (
+                f"{int(row['AllocationDaysPrior'] or 0)} Days Prior to TD"
+                if basis == 'days_prior'
+                else OPERATIONS_DIRECT_ALLOCATION_TYPES.get(basis, 'Daily Spread')
+            ),
+            'notes': row['Notes'] or '',
+        })
+    return output
+
+
+def operations_direct_allocation_map(company_code):
+    rows = db.session.execute(text("""
+        SELECT AccountName, AllocationBasis, AllocationDaysPrior
+        FROM operations_direct_allocations
+        WHERE Co = :company_code AND Active = 1
+    """), {'company_code': company_code}).mappings().all()
+    output = {}
+    for row in rows:
+        basis = row['AllocationBasis'] or 'bill_to_bill_prior'
+        output[row['AccountName'] or ''] = {
+            'basis': basis if basis in OPERATIONS_DIRECT_ALLOCATION_TYPES else 'bill_to_bill_prior',
+            'days_prior': max(int(row['AllocationDaysPrior'] or 0), 0),
+        }
     return output
 
 
@@ -3764,6 +4190,96 @@ def operations_ga_allocations(company_code):
     return output
 
 
+def operations_ga_allocation_basis(company_code):
+    row = db.session.execute(text("""
+        SELECT GABasis
+        FROM operations_report_settings
+        WHERE Co = :company_code
+        LIMIT 1
+    """), {'company_code': company_code}).mappings().first()
+    basis = row['GABasis'] if row else 'daily'
+    return basis if basis in OPERATIONS_ALLOCATION_BASIS_TYPES else 'daily'
+
+
+def operations_save_ga_allocation_basis(company_code, allocation_basis):
+    allocation_basis = allocation_basis if allocation_basis in OPERATIONS_ALLOCATION_BASIS_TYPES else 'daily'
+    now = datetime.datetime.utcnow()
+    db.session.execute(text("""
+        INSERT INTO operations_report_settings (Co, GABasis, CreatedAt, UpdatedAt)
+        VALUES (:company_code, :allocation_basis, :created_at, :updated_at)
+        ON DUPLICATE KEY UPDATE
+            GABasis = VALUES(GABasis),
+            UpdatedAt = VALUES(UpdatedAt)
+    """), {
+        'company_code': company_code,
+        'allocation_basis': allocation_basis,
+        'created_at': now,
+        'updated_at': now,
+    })
+    db.session.commit()
+    return allocation_basis
+
+
+def operations_income_recognition_method(company_code):
+    row = db.session.execute(text("""
+        SELECT IncomeRecognition
+        FROM operations_report_settings
+        WHERE Co = :company_code
+        LIMIT 1
+    """), {'company_code': company_code}).mappings().first()
+    method = row['IncomeRecognition'] if row else 'completed'
+    return method if method in OPERATIONS_INCOME_RECOGNITION_TYPES else 'completed'
+
+
+def operations_save_income_recognition_method(company_code, recognition_method):
+    recognition_method = recognition_method if recognition_method in OPERATIONS_INCOME_RECOGNITION_TYPES else 'completed'
+    now = datetime.datetime.utcnow()
+    db.session.execute(text("""
+        INSERT INTO operations_report_settings (Co, IncomeRecognition, CreatedAt, UpdatedAt)
+        VALUES (:company_code, :recognition_method, :created_at, :updated_at)
+        ON DUPLICATE KEY UPDATE
+            IncomeRecognition = VALUES(IncomeRecognition),
+            UpdatedAt = VALUES(UpdatedAt)
+    """), {
+        'company_code': company_code,
+        'recognition_method': recognition_method,
+        'created_at': now,
+        'updated_at': now,
+    })
+    db.session.commit()
+    return recognition_method
+
+
+def operations_direct_allocation_basis(company_code):
+    row = db.session.execute(text("""
+        SELECT DirectBasis
+        FROM operations_report_settings
+        WHERE Co = :company_code
+        LIMIT 1
+    """), {'company_code': company_code}).mappings().first()
+    basis = row['DirectBasis'] if row else 'bill_to_bill_prior'
+    return basis if basis in OPERATIONS_DIRECT_ALLOCATION_TYPES else 'bill_to_bill_prior'
+
+
+def operations_save_direct_allocation_basis(company_code, allocation_basis):
+    allocation_basis = allocation_basis if allocation_basis in OPERATIONS_DIRECT_ALLOCATION_TYPES else 'bill_to_bill_prior'
+    now = datetime.datetime.utcnow()
+    db.session.execute(text("""
+        INSERT INTO operations_report_settings (Co, DirectBasis, CreatedAt, UpdatedAt)
+        VALUES (:company_code, :allocation_basis, :created_at, :updated_at)
+        ON DUPLICATE KEY UPDATE
+            DirectBasis = VALUES(DirectBasis),
+            UpdatedAt = VALUES(UpdatedAt)
+    """), {
+        'company_code': company_code,
+        'allocation_basis': allocation_basis,
+        'created_at': now,
+        'updated_at': now,
+    })
+    db.session.commit()
+    return allocation_basis
+
+
 def operations_account_ytd_cents(company_code, account_name, as_of_date, account_category):
     year_start = datetime.date(as_of_date.year, 1, 1)
     start_dt, end_dt = business_report_period_bounds(year_start, as_of_date)
@@ -3781,6 +4297,28 @@ def operations_account_ytd_cents(company_code, account_name, as_of_date, account
         Gledger.Date <= end_dt,
     ).scalar()
     return int(amount or 0)
+
+
+def operations_expense_category_cents(company_code, start_date, end_date, account_category):
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    account_by_id, account_by_name = business_report_account_lookup(company_code)
+    rows = Gledger.query.filter(
+        Gledger.Com == company_code,
+        Gledger.Date >= start_dt,
+        Gledger.Date <= end_dt,
+    ).order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
+    total_cents = 0
+    account_category = (account_category or '').lower()
+    for line in rows:
+        bill = business_report_bill_for_ledger_line(line)
+        account = business_report_account_for_line(line, account_by_id, account_by_name, bill)
+        if (
+            account is not None
+            and account.Type == 'Expense'
+            and (account.Category or '').lower() == account_category
+        ):
+            total_cents += int(line.Debit or 0) - int(line.Credit or 0)
+    return total_cents
 
 
 def operations_sync_auto_allocations(company_code, as_of_date, table_name, account_category):
@@ -3857,8 +4395,11 @@ def operations_allocation_source_row(company_code, allocation_type, allocation_i
     table_name = 'operations_indirect_allocations' if allocation_type == 'indirect' else 'operations_ga_allocations'
     if allocation_type not in ['indirect', 'ga']:
         return None
+    select_columns = 'id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes'
+    if allocation_type == 'indirect':
+        select_columns = 'id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AllocationDaysPrior, AutoUpdate, Notes'
     return db.session.execute(text("""
-        SELECT id, Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes
+        SELECT """ + select_columns + """
         FROM """ + table_name + """
         WHERE Co = :company_code
           AND id = :allocation_id
@@ -3870,25 +4411,327 @@ def operations_allocation_source_row(company_code, allocation_type, allocation_i
     }).mappings().first()
 
 
-def operations_weekly_allocation_plot(company_code, allocation_type, allocation_id, start_date, end_date):
-    if allocation_type in ['builtin_direct', 'builtin_driver_pay']:
+def operations_direct_allocation_source_row(company_code, allocation_id):
+    return db.session.execute(text("""
+        SELECT id, Co, AccountName, AllocationBasis, AllocationDaysPrior, Notes
+        FROM operations_direct_allocations
+        WHERE Co = :company_code
+          AND id = :allocation_id
+          AND Active = 1
+        LIMIT 1
+    """), {
+        'company_code': company_code,
+        'allocation_id': allocation_id,
+    }).mappings().first()
+
+
+def operations_income_recognition_date(row, recognition_method):
+    recognition_method = recognition_method if recognition_method in OPERATIONS_INCOME_RECOGNITION_TYPES else 'completed'
+    if recognition_method == 'invoiced':
+        return row.trucking_invoice_date or row.forwarding_invoice_date or row.Date
+    return row.gate_in_date or row.forwarding_gate_in_date or row.Date
+
+
+def operations_filtered_daily_income(company_code, start_date, end_date, division_filter, recognition_method=None):
+    division_filter = operations_normalize_division_filter(division_filter)
+    recognition_method = recognition_method or operations_income_recognition_method(company_code)
+    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
+    income_rows = db.session.query(
+        Gledger.Date,
+        Gledger.Debit,
+        Gledger.Credit,
+        Accounts.Subcategory,
+        Accounts.Taxrollup,
+        Accounts.Name,
+        Orders.Date2.label('gate_in_date'),
+        Orders.InvoDate.label('trucking_invoice_date'),
+        Orders.Jo.label('trucking_jo'),
+        OverSeas.IngateDate.label('forwarding_gate_in_date'),
+        OverSeas.InvoDate.label('forwarding_invoice_date'),
+        OverSeas.Jo.label('forwarding_jo'),
+    ).join(
+        Accounts,
+        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
+    ).outerjoin(
+        Orders,
+        Gledger.Tcode == Orders.Jo,
+    ).outerjoin(
+        OverSeas,
+        Gledger.Tcode == OverSeas.Jo,
+    ).filter(
+        Accounts.Co == company_code,
+        Accounts.Type == 'Income',
+        or_(
+            (Gledger.Date >= start_dt) & (Gledger.Date <= end_dt),
+            (Orders.Date2 >= start_dt) & (Orders.Date2 <= end_dt),
+            (Orders.InvoDate >= start_dt) & (Orders.InvoDate <= end_dt),
+            (OverSeas.IngateDate >= start_dt) & (OverSeas.IngateDate <= end_dt),
+            (OverSeas.InvoDate >= start_dt) & (OverSeas.InvoDate <= end_dt),
+        ),
+    ).all()
+    daily_income = {}
+    total_income_cents = 0
+    division_income_cents = 0
+    for row in income_rows:
+        source_date = operations_income_recognition_date(row, recognition_method)
+        if source_date is None:
+            continue
+        recognition_date = business_report_as_date(source_date)
+        if start_date <= recognition_date <= end_date:
+            amount_cents = int(row.Credit or 0) - int(row.Debit or 0)
+            total_income_cents += amount_cents
+            if operations_income_row_matches_division(row, division_filter):
+                division_income_cents += amount_cents
+                daily_income[recognition_date] = daily_income.get(recognition_date, 0) + amount_cents
+    return daily_income, total_income_cents, division_income_cents
+
+
+def operations_division_income_share(company_code, start_date, end_date, division_filter, recognition_method=None):
+    division_filter = operations_normalize_division_filter(division_filter)
+    if division_filter == 'all':
+        return 1, 1
+    _daily_income, total_income_cents, division_income_cents = operations_filtered_daily_income(
+        company_code,
+        start_date,
+        end_date,
+        division_filter,
+        recognition_method,
+    )
+    if total_income_cents > 0 and division_income_cents > 0:
+        return division_income_cents, total_income_cents
+    return 0, 1
+
+
+def operations_grouped_ga_daily_allocations(company_code, start_date, end_date, division_filter, daily_income=None, recognition_method=None):
+    allocation_basis = operations_ga_allocation_basis(company_code)
+    total_ga_cents = operations_expense_category_cents(company_code, start_date, end_date, 'g-a')
+    income_numerator, income_denominator = operations_division_income_share(
+        company_code,
+        start_date,
+        end_date,
+        division_filter,
+        recognition_method,
+    )
+    allocated_amount_cents = int(total_ga_cents * income_numerator / income_denominator) if income_denominator else 0
+    daily_totals = {}
+    if allocation_basis == 'transaction_date':
+        business_report_allocate_cents_on_date(
+            daily_totals,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+        )
+    elif allocation_basis == 'days_prior':
+        business_report_allocate_cents_on_date(
+            daily_totals,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+        )
+    elif allocation_basis == 'toll_transaction':
+        business_report_allocate_cents_by_toll_transactions(
+            daily_totals,
+            company_code,
+            start_date,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+        )
+    elif allocation_basis == 'rolling_income':
+        if daily_income is None:
+            daily_income, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+                company_code,
+                start_date,
+                end_date,
+                division_filter,
+                recognition_method,
+            )
+        allocation_start = max(start_date, end_date - datetime.timedelta(days=27))
+        operations_allocate_cents_by_income_or_daily(
+            daily_totals,
+            allocation_start,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+            daily_income,
+        )
+    elif allocation_basis == 'income_share':
+        if daily_income is None:
+            daily_income, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+                company_code,
+                start_date,
+                end_date,
+                division_filter,
+                recognition_method,
+            )
+        business_report_allocate_cents_by_income_share(
+            daily_totals,
+            start_date,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+            daily_income,
+        )
+    elif allocation_basis == 'port_trip':
+        business_report_allocate_cents_by_port_trip(
+            daily_totals,
+            start_date,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+        )
+    else:
+        business_report_allocate_cents_by_period(
+            daily_totals,
+            start_date,
+            end_date,
+            allocated_amount_cents,
+            start_date,
+            end_date,
+        )
+    return daily_totals, allocated_amount_cents, allocation_basis
+
+
+def operations_weekly_allocation_plot(company_code, allocation_type, allocation_id, start_date, end_date, division_filter='all'):
+    income_recognition_method = operations_income_recognition_method(company_code)
+    if allocation_type == 'builtin_port_trips':
+        weekly_counts = business_report_port_trip_week_counts(start_date, end_date)
+        return operations_weekly_count_plot_payload(
+            allocation_type=allocation_type,
+            allocation_id=allocation_id,
+            account='Port Trips',
+            allocation_basis_label='Weekly Port Trip Count',
+            weekly_counts=weekly_counts,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    if allocation_type == 'builtin_toll_transactions':
+        toll_daily, _toll_counts = business_report_toll_transaction_daily_amounts(company_code, start_date, end_date)
+        amount_cents = sum(toll_daily.values())
+        return operations_weekly_plot_payload(
+            allocation_type=allocation_type,
+            allocation_id=allocation_id,
+            account='Toll Transactions',
+            allocation_basis='toll_transaction',
+            allocation_basis_label='Weekly Toll Transaction Detail',
+            period_start=start_date,
+            period_end=end_date,
+            amount_cents=amount_cents,
+            daily_totals=toll_daily,
+            trip_counts=business_report_port_trip_counts_by_day(start_date, end_date),
+            start_date=start_date,
+            end_date=end_date,
+        )
+    if allocation_type == 'direct':
+        row = operations_direct_allocation_source_row(company_code, allocation_id)
+        if row is None:
+            return None
+        account_name = row['AccountName'] or ''
+        allocation_basis = row['AllocationBasis'] or 'bill_to_bill_prior'
+        allocation_days_prior = max(int(row['AllocationDaysPrior'] or 0), 0)
+        income_daily, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+            company_code,
+            start_date,
+            end_date,
+            division_filter,
+            income_recognition_method,
+        )
         daily_totals = operations_direct_daily_allocations(
             company_code,
             start_date,
             end_date,
-            'driver_pay' if allocation_type == 'builtin_driver_pay' else None,
+            f'account:{account_name}',
+            division_filter=division_filter,
+            direct_basis=allocation_basis,
+            direct_days_prior=allocation_days_prior,
+            daily_income=income_daily,
         )
+        amount_cents = sum(daily_totals.values())
+        return operations_weekly_plot_payload(
+            allocation_type=allocation_type,
+            allocation_id=allocation_id,
+            account=account_name,
+            allocation_basis=allocation_basis,
+            allocation_basis_label=(
+                f"{allocation_days_prior} Days Prior to TD"
+                if allocation_basis == 'days_prior'
+                else OPERATIONS_DIRECT_ALLOCATION_TYPES.get(allocation_basis, 'Daily Spread')
+            ),
+            period_start=start_date,
+            period_end=end_date,
+            amount_cents=amount_cents,
+            daily_totals=daily_totals,
+            trip_counts=business_report_port_trip_counts_by_day(start_date, end_date),
+            start_date=start_date,
+            end_date=end_date,
+        )
+    if allocation_type in ['builtin_income', 'builtin_direct', 'builtin_driver_pay', 'builtin_ga']:
+        if allocation_type == 'builtin_income':
+            daily_totals, _total_income_cents, selected_income_cents = operations_filtered_daily_income(
+                company_code,
+                start_date,
+                end_date,
+                division_filter,
+                income_recognition_method,
+            )
+            amount_cents = selected_income_cents
+            label = 'Income'
+            allocation_basis_label = OPERATIONS_INCOME_RECOGNITION_TYPES.get(income_recognition_method, 'On Date Job Completed')
+            allocation_basis = f'income_{income_recognition_method}'
+        elif allocation_type == 'builtin_ga':
+            income_daily, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+                company_code,
+                start_date,
+                end_date,
+                division_filter,
+                income_recognition_method,
+            )
+            daily_totals, amount_cents, allocation_basis = operations_grouped_ga_daily_allocations(
+                company_code,
+                start_date,
+                end_date,
+                division_filter,
+                income_daily,
+                income_recognition_method,
+            )
+            label = 'G&A Group'
+            allocation_basis_label = OPERATIONS_ALLOCATION_BASIS_TYPES.get(allocation_basis, 'Daily Spread')
+        else:
+            income_daily, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+                company_code,
+                start_date,
+                end_date,
+                division_filter,
+                income_recognition_method,
+            )
+            daily_totals = operations_direct_daily_allocations(
+                company_code,
+                start_date,
+                end_date,
+                'driver_pay' if allocation_type == 'builtin_driver_pay' else None,
+                division_filter=division_filter,
+                daily_income=income_daily,
+            )
+            amount_cents = sum(daily_totals.values())
+            label = 'Driver Pay' if allocation_type == 'builtin_driver_pay' else 'Direct Expenses'
+            allocation_basis_label = 'Per Account Direct Setup'
+            allocation_basis = 'direct_account_setup'
         trip_counts = business_report_port_trip_counts_by_day(start_date, end_date)
-        label = 'Driver Pay' if allocation_type == 'builtin_driver_pay' else 'Direct Expenses'
         return operations_weekly_plot_payload(
             allocation_type=allocation_type,
             allocation_id=allocation_id,
             account=label,
-            allocation_basis='weekly_direct',
-            allocation_basis_label='Weekly Direct Allocation',
+            allocation_basis=allocation_basis,
+            allocation_basis_label=allocation_basis_label,
             period_start=start_date,
             period_end=end_date,
-            amount_cents=sum(daily_totals.values()),
+            amount_cents=amount_cents,
             daily_totals=daily_totals,
             trip_counts=trip_counts,
             start_date=start_date,
@@ -3901,13 +4744,93 @@ def operations_weekly_allocation_plot(company_code, allocation_type, allocation_
     period_start = business_report_as_date(row['PeriodStart'])
     period_end = business_report_as_date(row['PeriodEnd'])
     daily_totals = {}
-    allocation_basis = row['AllocationBasis'] or 'daily'
-    if allocation_basis == 'port_trip':
+    allocation_basis = operations_ga_allocation_basis(company_code) if allocation_type == 'ga' else (row['AllocationBasis'] or 'daily')
+    allocation_days_prior = max(int(row['AllocationDaysPrior'] or 0), 0) if allocation_type == 'indirect' else 0
+    amount_cents = int(row['AmountCents'] or 0)
+    if allocation_type == 'ga':
+        income_numerator, income_denominator = operations_division_income_share(
+            company_code,
+            start_date,
+            end_date,
+            division_filter,
+        )
+        amount_cents = int(amount_cents * income_numerator / income_denominator) if income_denominator else 0
+    if allocation_basis == 'bill_to_bill_prior' and allocation_type == 'indirect':
+        daily_totals = operations_ledger_expense_daily_allocations(
+            company_code,
+            start_date,
+            end_date,
+            'indirect',
+            account_filter=f"account:{row['AccountName'] or ''}",
+            division_filter=division_filter,
+            override_basis='bill_to_bill_prior',
+        )
+        amount_cents = sum(daily_totals.values())
+    elif allocation_basis == 'transaction_date':
+        business_report_allocate_cents_on_date(
+            daily_totals,
+            period_end,
+            amount_cents,
+            start_date,
+            end_date,
+        )
+    elif allocation_basis == 'days_prior':
+        business_report_allocate_cents_on_date(
+            daily_totals,
+            period_end - datetime.timedelta(days=allocation_days_prior),
+            amount_cents,
+            start_date,
+            end_date,
+        )
+    elif allocation_basis == 'toll_transaction':
+        business_report_allocate_cents_by_toll_transactions(
+            daily_totals,
+            company_code,
+            period_start,
+            period_end,
+            amount_cents,
+            start_date,
+            end_date,
+        )
+    elif allocation_basis == 'rolling_income':
+        income_daily, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+            company_code,
+            start_date,
+            end_date,
+            division_filter,
+        )
+        allocation_start = max(period_start, period_end - datetime.timedelta(days=27))
+        operations_allocate_cents_by_income_or_daily(
+            daily_totals,
+            allocation_start,
+            period_end,
+            amount_cents,
+            start_date,
+            end_date,
+            income_daily,
+        )
+    elif allocation_basis == 'income_share':
+        income_daily, _total_income_cents, _selected_income_cents = operations_filtered_daily_income(
+            company_code,
+            start_date,
+            end_date,
+            division_filter,
+        )
+        business_report_allocate_cents_by_income_share(
+            daily_totals,
+            period_start,
+            period_end,
+            amount_cents,
+            start_date,
+            end_date,
+            income_daily,
+        )
+    elif allocation_basis == 'port_trip':
         business_report_allocate_cents_by_port_trip(
             daily_totals,
             period_start,
             period_end,
-            int(row['AmountCents'] or 0),
+            amount_cents,
             start_date,
             end_date,
         )
@@ -3916,7 +4839,7 @@ def operations_weekly_allocation_plot(company_code, allocation_type, allocation_
             daily_totals,
             period_start,
             period_end,
-            int(row['AmountCents'] or 0),
+            amount_cents,
             start_date,
             end_date,
         )
@@ -3927,10 +4850,14 @@ def operations_weekly_allocation_plot(company_code, allocation_type, allocation_
         allocation_id=row['id'],
         account=row['AccountName'] or '',
         allocation_basis=allocation_basis,
-        allocation_basis_label=OPERATIONS_ALLOCATION_BASIS_TYPES.get(allocation_basis, 'Daily Spread'),
+        allocation_basis_label=(
+            f"{allocation_days_prior} Days Prior to TD"
+            if allocation_basis == 'days_prior'
+            else OPERATIONS_ALLOCATION_BASIS_TYPES.get(allocation_basis, 'Daily Spread')
+        ),
         period_start=business_report_as_date(row['PeriodStart']),
         period_end=business_report_as_date(row['PeriodEnd']),
-        amount_cents=int(row['AmountCents'] or 0),
+        amount_cents=amount_cents,
         daily_totals=daily_totals,
         trip_counts=trip_counts,
         start_date=start_date,
@@ -3992,7 +4919,46 @@ def operations_weekly_plot_payload(
     }
 
 
+def operations_weekly_count_plot_payload(allocation_type, allocation_id, account, allocation_basis_label, weekly_counts, start_date, end_date):
+    points = []
+    total_count = 0
+    week_start = business_report_week_start(start_date)
+    final_week_start = business_report_week_start(end_date)
+    while week_start <= final_week_start:
+        week_end = week_start + datetime.timedelta(days=6)
+        display_start = max(week_start, start_date)
+        display_end = min(week_end, end_date)
+        count = int(weekly_counts.get(week_start, 0) or 0)
+        total_count += count
+        points.append({
+            'week_start': display_start.strftime('%Y-%m-%d'),
+            'week_end': display_end.strftime('%Y-%m-%d'),
+            'label': f"{display_start.strftime('%m/%d')} - {display_end.strftime('%m/%d')}",
+            'amount_cents': count,
+            'amount': str(count),
+            'amount_value': count,
+            'port_trips': count,
+            'is_count': True,
+        })
+        week_start += datetime.timedelta(days=7)
+    return {
+        'allocation_type': allocation_type,
+        'id': allocation_id,
+        'account': account,
+        'period_start': business_report_date_text(start_date),
+        'period_end': business_report_date_text(end_date),
+        'amount_cents': total_count,
+        'amount': str(total_count),
+        'allocation_basis': 'count',
+        'allocation_basis_label': allocation_basis_label,
+        'is_count': True,
+        'points': points,
+    }
+
+
 def operations_direct_account_matches_filter(account, account_filter=None):
+    if account_filter and account_filter.startswith('account:'):
+        return (account.Name or '') == account_filter.split(':', 1)[1]
     if account_filter != 'driver_pay':
         return True
     name = (account.Name or '').lower()
@@ -4005,7 +4971,119 @@ def operations_direct_account_matches_filter(account, account_filter=None):
     )
 
 
-def operations_direct_daily_allocations(company_code, start_date, end_date, account_filter=None):
+def operations_normalize_division_filter(value):
+    value = (value or 'all').strip().lower()
+    return value if value in OPERATIONS_DIVISION_FILTERS else 'all'
+
+
+def operations_weekly_cache_mode(division_filter, recognition_method='completed'):
+    division_filter = operations_normalize_division_filter(division_filter)
+    recognition_method = recognition_method if recognition_method in OPERATIONS_INCOME_RECOGNITION_TYPES else 'completed'
+    base_mode = {
+        'all': 'wk',
+        'trucking': 'wk:tr',
+        'freight_forwarding': 'wk:ff',
+    }[division_filter]
+    recognition_code = 'inv' if recognition_method == 'invoiced' else 'cmp'
+    return f'{base_mode}:{recognition_code}'
+
+
+def operations_account_division(account):
+    subcategory = (getattr(account, 'Subcategory', '') or '').strip().lower()
+    taxrollup = (getattr(account, 'Taxrollup', '') or '').strip().lower()
+    name = (getattr(account, 'Name', '') or '').strip().lower()
+    check_text = f'{subcategory} {taxrollup} {name}'
+    if 'freight fwd' in check_text or 'freight forward' in check_text or 'ocean' in check_text:
+        return 'freight_forwarding'
+    if 'truck' in check_text or 'driver' in check_text or 'dray' in check_text:
+        return 'trucking'
+    return ''
+
+
+def operations_line_matches_division(account, tcode, trucking_tcodes, forwarding_tcodes, division_filter):
+    division_filter = operations_normalize_division_filter(division_filter)
+    if division_filter == 'all':
+        return True
+    account_division = operations_account_division(account)
+    if account_division:
+        return account_division == division_filter
+    tcode = (tcode or '').strip()
+    if not tcode:
+        return False
+    if division_filter == 'trucking':
+        return tcode in trucking_tcodes
+    if division_filter == 'freight_forwarding':
+        return tcode in forwarding_tcodes
+    return True
+
+
+def operations_income_row_matches_division(row, division_filter):
+    division_filter = operations_normalize_division_filter(division_filter)
+    if division_filter == 'all':
+        return True
+    account_stub = type('AccountStub', (), {
+        'Subcategory': row.Subcategory,
+        'Taxrollup': row.Taxrollup,
+        'Name': row.Name,
+    })()
+    account_division = operations_account_division(account_stub)
+    if account_division:
+        return account_division == division_filter
+    if division_filter == 'trucking':
+        return bool(row.trucking_jo)
+    if division_filter == 'freight_forwarding':
+        return bool(row.forwarding_jo)
+    return True
+
+
+def operations_allocate_cents_by_weight_or_daily(daily_totals, period_start, period_end, amount_cents, include_start, include_end, weight_daily):
+    weighted_totals = {}
+    business_report_allocate_cents_by_income_share(
+        weighted_totals,
+        period_start,
+        period_end,
+        amount_cents,
+        include_start,
+        include_end,
+        weight_daily or {},
+    )
+    if weighted_totals:
+        for day, cents in weighted_totals.items():
+            daily_totals[day] = daily_totals.get(day, 0) + cents
+    else:
+        business_report_allocate_cents_by_day(daily_totals, include_start, include_end, int(amount_cents or 0))
+
+
+def operations_allocate_cents_by_income_or_daily(daily_totals, period_start, period_end, amount_cents, include_start, include_end, income_daily):
+    operations_allocate_cents_by_weight_or_daily(
+        daily_totals,
+        period_start,
+        period_end,
+        amount_cents,
+        include_start,
+        include_end,
+        income_daily,
+    )
+
+
+def operations_ledger_expense_daily_allocations(
+    company_code,
+    start_date,
+    end_date,
+    account_category,
+    account_filter=None,
+    exclude_account_names=None,
+    include_details=False,
+    division_filter='all',
+    allocation_basis_by_account=None,
+    override_basis=None,
+    override_days_prior=None,
+    daily_income=None,
+):
+    allocation_basis_by_account = allocation_basis_by_account or {}
+    exclude_account_names = set(exclude_account_names or [])
+    override_basis = override_basis if override_basis in OPERATIONS_ALLOCATION_BASIS_TYPES else None
+    override_days_prior = max(int(override_days_prior or 0), 0) if override_basis else None
     start_dt, end_dt = business_report_period_bounds(start_date, end_date)
     account_by_id, account_by_name = business_report_account_lookup(company_code)
     ledger_rows = Gledger.query.filter(
@@ -4016,79 +5094,273 @@ def operations_direct_daily_allocations(company_code, start_date, end_date, acco
         Gledger.Date.asc(),
         Gledger.id.asc(),
     ).all()
+    tcodes = {row.Tcode for row in ledger_rows if row.Tcode}
+    trucking_tcodes = set()
+    forwarding_tcodes = set()
+    if tcodes:
+        trucking_tcodes = {row.Jo for row in Orders.query.with_entities(Orders.Jo).filter(Orders.Jo.in_(tcodes)).all()}
+        forwarding_tcodes = {row.Jo for row in OverSeas.query.with_entities(OverSeas.Jo).filter(OverSeas.Jo.in_(tcodes)).all()}
     totals = {}
+    sources = {}
     for line in ledger_rows:
         bill = business_report_bill_for_ledger_line(line)
         account = business_report_account_for_line(line, account_by_id, account_by_name, bill)
         if (
             account is None
             or account.Type != 'Expense'
-            or (account.Category or '').lower() != 'direct'
-            or not operations_direct_account_matches_filter(account, account_filter)
+            or (account_category and (account.Category or '').lower() != account_category)
+            or not operations_line_matches_division(account, bill.Jo if bill else line.Tcode, trucking_tcodes, forwarding_tcodes, division_filter)
         ):
             continue
+        if (account.Name or '') in exclude_account_names:
+            continue
+        if account_filter:
+            if account_filter.startswith('account:') and (account.Name or '') != account_filter.split(':', 1)[1]:
+                continue
+            if account_filter == 'driver_pay' and not operations_direct_account_matches_filter(account, account_filter):
+                continue
         expense_date = business_report_as_date(line.Date)
         if expense_date is None:
             continue
         key = (account.Name or line.Account or '', expense_date)
-        totals[key] = totals.get(key, 0) + int(line.Debit or 0) - int(line.Credit or 0)
+        line_amount_cents = int(line.Debit or 0) - int(line.Credit or 0)
+        totals[key] = totals.get(key, 0) + line_amount_cents
+        if include_details:
+            sources.setdefault(key, []).append({
+                'date': business_report_date_text(line.Date),
+                'tcode': line.Tcode or '',
+                'ref': line.Ref or '',
+                'source': line.Source or '',
+                'vendor': bill.Company if bill else '',
+                'description': bill.Description if bill else (line.JournalMemo or ''),
+                'amount_cents': line_amount_cents,
+                'amount': business_report_money(line_amount_cents),
+            })
 
-    direct_daily = {}
+    expense_daily = {}
+    expense_detail_daily = {} if include_details else None
     previous_date_by_account = {}
     for (account_name, expense_date), amount_cents in sorted(totals.items(), key=lambda item: (item[0][0], item[0][1])):
+        account_setup = allocation_basis_by_account.get(account_name, {})
+        account_basis = override_basis or account_setup.get('basis', 'bill_to_bill_prior')
+        if account_basis not in OPERATIONS_ALLOCATION_BASIS_TYPES:
+            account_basis = 'bill_to_bill_prior'
+        account_days_prior = override_days_prior if override_days_prior is not None else max(int(account_setup.get('days_prior') or 0), 0)
         previous_date = previous_date_by_account.get(account_name)
-        allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
-        allocation_start = max(allocation_start, start_date)
-        allocation_end = min(expense_date, end_date)
-        business_report_allocate_cents_by_day(direct_daily, allocation_start, allocation_end, int(amount_cents or 0))
+        if account_basis == 'rolling_income':
+            allocation_start = max(start_date, expense_date - datetime.timedelta(days=27))
+            allocation_end = min(expense_date, end_date)
+        elif account_basis == 'transaction_date':
+            allocation_start = expense_date
+            allocation_end = expense_date
+        elif account_basis == 'days_prior':
+            allocation_start = expense_date - datetime.timedelta(days=account_days_prior)
+            allocation_end = allocation_start
+        elif account_basis == 'toll_transaction':
+            allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
+            allocation_start = max(allocation_start, start_date)
+            allocation_end = min(expense_date, end_date)
+        elif account_basis in ['income_share', 'port_trip']:
+            allocation_start = start_date
+            allocation_end = end_date
+        elif account_basis == 'daily':
+            allocation_start = start_date
+            allocation_end = end_date
+        else:
+            allocation_start = previous_date + datetime.timedelta(days=1) if previous_date else start_date
+            allocation_start = max(allocation_start, start_date)
+            allocation_end = min(expense_date, end_date)
+        if include_details:
+            entry_daily = {}
+            if account_basis == 'transaction_date':
+                business_report_allocate_cents_on_date(
+                    entry_daily,
+                    expense_date,
+                    int(amount_cents or 0),
+                    start_date,
+                    end_date,
+                )
+            elif account_basis == 'days_prior':
+                business_report_allocate_cents_on_date(
+                    entry_daily,
+                    expense_date - datetime.timedelta(days=account_days_prior),
+                    int(amount_cents or 0),
+                    start_date,
+                    end_date,
+                )
+            elif account_basis == 'toll_transaction':
+                business_report_allocate_cents_by_toll_transactions(
+                    entry_daily,
+                    company_code,
+                    allocation_start,
+                    allocation_end,
+                    int(amount_cents or 0),
+                    allocation_start,
+                    allocation_end,
+                )
+            elif account_basis in ['income_share', 'rolling_income']:
+                operations_allocate_cents_by_income_or_daily(
+                    entry_daily,
+                    allocation_start,
+                    allocation_end,
+                    int(amount_cents or 0),
+                    allocation_start,
+                    allocation_end,
+                    daily_income,
+                )
+            elif account_basis == 'port_trip':
+                business_report_allocate_cents_by_port_trip(
+                    entry_daily,
+                    allocation_start,
+                    allocation_end,
+                    int(amount_cents or 0),
+                    allocation_start,
+                    allocation_end,
+                )
+            else:
+                business_report_allocate_cents_by_day(entry_daily, allocation_start, allocation_end, int(amount_cents or 0))
+            for day, cents_for_day in entry_daily.items():
+                expense_daily[day] = expense_daily.get(day, 0) + cents_for_day
+                expense_detail_daily.setdefault(day, []).append({
+                    'account': account_name,
+                    'expense_date': expense_date,
+                    'allocation_start': allocation_start,
+                    'allocation_end': allocation_end,
+                    'source_amount_cents': int(amount_cents or 0),
+                    'allocated_cents': cents_for_day,
+                    'allocation_basis': account_basis,
+                    'allocation_basis_label': (
+                        f"{account_days_prior} Days Prior to TD"
+                        if account_basis == 'days_prior'
+                        else OPERATIONS_ALLOCATION_BASIS_TYPES.get(account_basis, 'Daily Spread')
+                    ),
+                    'sources': sources.get((account_name, expense_date), []),
+                })
+        else:
+            if account_basis == 'transaction_date':
+                business_report_allocate_cents_on_date(
+                    expense_daily,
+                    expense_date,
+                    int(amount_cents or 0),
+                    start_date,
+                    end_date,
+                )
+            elif account_basis == 'days_prior':
+                business_report_allocate_cents_on_date(
+                    expense_daily,
+                    expense_date - datetime.timedelta(days=account_days_prior),
+                    int(amount_cents or 0),
+                    start_date,
+                    end_date,
+                )
+            elif account_basis == 'toll_transaction':
+                business_report_allocate_cents_by_toll_transactions(
+                    expense_daily,
+                    company_code,
+                    allocation_start,
+                    allocation_end,
+                    int(amount_cents or 0),
+                    allocation_start,
+                    allocation_end,
+                )
+            elif account_basis in ['income_share', 'rolling_income']:
+                operations_allocate_cents_by_income_or_daily(
+                    expense_daily,
+                    allocation_start,
+                    allocation_end,
+                    int(amount_cents or 0),
+                    allocation_start,
+                    allocation_end,
+                    daily_income,
+                )
+            elif account_basis == 'port_trip':
+                business_report_allocate_cents_by_port_trip(
+                    expense_daily,
+                    allocation_start,
+                    allocation_end,
+                    int(amount_cents or 0),
+                    allocation_start,
+                    allocation_end,
+                )
+            else:
+                business_report_allocate_cents_by_day(expense_daily, allocation_start, allocation_end, int(amount_cents or 0))
         previous_date_by_account[account_name] = expense_date
-    return direct_daily
+    if include_details:
+        return expense_daily, expense_detail_daily
+    return expense_daily
 
 
-def operations_weekly_profit_loss(company_code, start_date, end_date):
-    start_dt, end_dt = business_report_period_bounds(start_date, end_date)
-    daily_income = {}
-    income_rows = db.session.query(
-        Gledger.Date,
-        Gledger.Debit,
-        Gledger.Credit,
-        Orders.Date2.label('gate_in_date'),
-    ).join(
-        Accounts,
-        or_(Gledger.Aid == Accounts.id, (Gledger.Account == Accounts.Name) & (Gledger.Com == Accounts.Co)),
-    ).outerjoin(
-        Orders,
-        Gledger.Tcode == Orders.Jo,
-    ).filter(
-        Accounts.Co == company_code,
-        Accounts.Type == 'Income',
-        or_(
-            (Gledger.Date >= start_dt) & (Gledger.Date <= end_dt),
-            (Orders.Date2 >= start_dt - datetime.timedelta(days=7)) & (Orders.Date2 <= end_dt - datetime.timedelta(days=7)),
-        ),
-    ).all()
-    for row in income_rows:
-        source_date = row.gate_in_date or row.Date
-        if source_date is None:
-            continue
-        recognition_date = business_report_as_date(source_date)
-        if row.gate_in_date:
-            recognition_date = recognition_date + datetime.timedelta(days=7)
-        if start_date <= recognition_date <= end_date:
-            amount_cents = int(row.Credit or 0) - int(row.Debit or 0)
-            daily_income[recognition_date] = daily_income.get(recognition_date, 0) + amount_cents
+def operations_direct_daily_allocations(
+    company_code,
+    start_date,
+    end_date,
+    account_filter=None,
+    include_details=False,
+    division_filter='all',
+    direct_basis=None,
+    direct_days_prior=None,
+    daily_income=None,
+):
+    return operations_ledger_expense_daily_allocations(
+        company_code,
+        start_date,
+        end_date,
+        'direct',
+        account_filter=account_filter,
+        include_details=include_details,
+        division_filter=division_filter,
+        allocation_basis_by_account=operations_direct_allocation_map(company_code),
+        override_basis=direct_basis,
+        override_days_prior=direct_days_prior,
+        daily_income=daily_income,
+    )
 
-    direct_daily = operations_direct_daily_allocations(company_code, start_date, end_date)
+
+def operations_weekly_profit_loss(company_code, start_date, end_date, division_filter='all', income_recognition_method=None, direct_basis=None):
+    division_filter = operations_normalize_division_filter(division_filter)
+    income_recognition_method = income_recognition_method or operations_income_recognition_method(company_code)
+    daily_income, _total_income_cents, _selected_division_income_cents = operations_filtered_daily_income(
+        company_code,
+        start_date,
+        end_date,
+        division_filter,
+        income_recognition_method,
+    )
+
+    direct_daily, direct_detail_daily = operations_direct_daily_allocations(
+        company_code,
+        start_date,
+        end_date,
+        include_details=True,
+        division_filter=division_filter,
+        direct_basis=direct_basis,
+        daily_income=daily_income,
+    )
 
     indirect_daily = {}
-    for row in db.session.execute(text("""
-        SELECT PeriodStart, PeriodEnd, AmountCents, AllocationBasis
+    indirect_rows = db.session.execute(text("""
+        SELECT AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AllocationDaysPrior
         FROM operations_indirect_allocations
         WHERE Co = :company_code
           AND Active = 1
           AND PeriodEnd >= :start_date
           AND PeriodStart <= :end_date
-    """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all():
+    """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all()
+    explicit_indirect_accounts = {row['AccountName'] or '' for row in indirect_rows if row['AccountName']}
+    default_indirect_daily = operations_ledger_expense_daily_allocations(
+        company_code,
+        start_date,
+        end_date,
+        'indirect',
+        exclude_account_names=explicit_indirect_accounts,
+        division_filter=division_filter,
+        override_basis='daily',
+        daily_income=daily_income,
+    )
+    for day, cents in default_indirect_daily.items():
+        indirect_daily[day] = indirect_daily.get(day, 0) + cents
+
+    for row in indirect_rows:
         period_start = row['PeriodStart']
         period_end = row['PeriodEnd']
         period_start = business_report_as_date(period_start)
@@ -4096,7 +5368,71 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
         # Indirect rows represent a payment coverage period, for example an
         # insurance policy from June-to-June. Allocate across the full coverage
         # period, then include only the days that land in the report window.
-        if (row['AllocationBasis'] or 'daily') == 'port_trip':
+        allocation_basis = row['AllocationBasis'] or 'daily'
+        if allocation_basis not in OPERATIONS_ALLOCATION_BASIS_TYPES:
+            allocation_basis = 'daily'
+        allocation_days_prior = max(int(row['AllocationDaysPrior'] or 0), 0)
+        if allocation_basis == 'bill_to_bill_prior':
+            account_daily = operations_ledger_expense_daily_allocations(
+                company_code,
+                start_date,
+                end_date,
+                'indirect',
+                account_filter=f"account:{row['AccountName'] or ''}",
+                division_filter=division_filter,
+                override_basis='bill_to_bill_prior',
+                daily_income=daily_income,
+            )
+            for day, cents in account_daily.items():
+                indirect_daily[day] = indirect_daily.get(day, 0) + cents
+        elif allocation_basis == 'transaction_date':
+            business_report_allocate_cents_on_date(
+                indirect_daily,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
+        elif allocation_basis == 'days_prior':
+            business_report_allocate_cents_on_date(
+                indirect_daily,
+                period_end - datetime.timedelta(days=allocation_days_prior),
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
+        elif allocation_basis == 'toll_transaction':
+            business_report_allocate_cents_by_toll_transactions(
+                indirect_daily,
+                company_code,
+                period_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+            )
+        elif allocation_basis == 'rolling_income':
+            allocation_start = max(period_start, period_end - datetime.timedelta(days=27))
+            operations_allocate_cents_by_income_or_daily(
+                indirect_daily,
+                allocation_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+                daily_income,
+            )
+        elif allocation_basis == 'income_share':
+            business_report_allocate_cents_by_income_share(
+                indirect_daily,
+                period_start,
+                period_end,
+                int(row['AmountCents'] or 0),
+                start_date,
+                end_date,
+                daily_income,
+            )
+        elif allocation_basis == 'port_trip':
             business_report_allocate_cents_by_port_trip(
                 indirect_daily,
                 period_start,
@@ -4115,37 +5451,14 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
                 end_date,
             )
 
-    ga_daily = {}
-    for row in db.session.execute(text("""
-        SELECT PeriodStart, PeriodEnd, AmountCents, AllocationBasis
-        FROM operations_ga_allocations
-        WHERE Co = :company_code
-          AND Active = 1
-          AND PeriodEnd >= :start_date
-          AND PeriodStart <= :end_date
-    """), {'company_code': company_code, 'start_date': start_date, 'end_date': end_date}).mappings().all():
-        period_start = row['PeriodStart']
-        period_end = row['PeriodEnd']
-        period_start = business_report_as_date(period_start)
-        period_end = business_report_as_date(period_end)
-        if (row['AllocationBasis'] or 'daily') == 'port_trip':
-            business_report_allocate_cents_by_port_trip(
-                ga_daily,
-                period_start,
-                period_end,
-                int(row['AmountCents'] or 0),
-                start_date,
-                end_date,
-            )
-        else:
-            business_report_allocate_cents_by_period(
-                ga_daily,
-                period_start,
-                period_end,
-                int(row['AmountCents'] or 0),
-                start_date,
-                end_date,
-            )
+    ga_daily, _ga_amount_cents, _ga_allocation_basis = operations_grouped_ga_daily_allocations(
+        company_code,
+        start_date,
+        end_date,
+        division_filter,
+        daily_income,
+        income_recognition_method,
+    )
 
     weeks = {}
     for day in business_report_each_day(start_date, end_date):
@@ -4158,11 +5471,31 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
             'direct_cents': 0,
             'indirect_cents': 0,
             'ga_cents': 0,
+            '_direct_detail_map': {},
         })
         week['income_cents'] += daily_income.get(day, 0)
         week['direct_cents'] += direct_daily.get(day, 0)
         week['indirect_cents'] += indirect_daily.get(day, 0)
         week['ga_cents'] += ga_daily.get(day, 0)
+        for detail in direct_detail_daily.get(day, []):
+            key = (
+                detail['account'],
+                detail['expense_date'],
+                detail['allocation_start'],
+                detail['allocation_end'],
+                detail.get('allocation_basis'),
+            )
+            week_detail = week['_direct_detail_map'].setdefault(key, {
+                'account': detail['account'],
+                'expense_date': detail['expense_date'],
+                'allocation_start': detail['allocation_start'],
+                'allocation_end': detail['allocation_end'],
+                'allocation_basis_label': detail.get('allocation_basis_label', 'Daily Spread'),
+                'source_amount_cents': detail['source_amount_cents'],
+                'allocated_cents': 0,
+                'sources': detail['sources'],
+            })
+            week_detail['allocated_cents'] += detail['allocated_cents']
 
     output = []
     for week_start in sorted(weeks):
@@ -4179,6 +5512,34 @@ def operations_weekly_profit_loss(company_code, start_date, end_date):
         row['net_ops'] = business_report_money(row['net_ops_cents'])
         row['ga'] = business_report_money(row['ga_cents'])
         row['net_profit'] = business_report_money(row['net_profit_cents'])
+        row['direct_details'] = []
+        for detail in sorted(row.pop('_direct_detail_map', {}).values(), key=lambda item: abs(item['allocated_cents']), reverse=True):
+            sources = detail.get('sources') or []
+            source_labels = []
+            for source in sources[:6]:
+                label_parts = [
+                    source.get('tcode') or source.get('ref') or source.get('date') or '',
+                    source.get('vendor') or source.get('source') or '',
+                    source.get('description') or '',
+                    source.get('amount') or '',
+                ]
+                source_labels.append(' | '.join([part for part in label_parts if part]))
+            if len(sources) > 6:
+                source_labels.append(f'+{len(sources) - 6} more')
+            row['direct_details'].append({
+                'account': detail['account'],
+                'expense_date': business_report_date_text(detail['expense_date']),
+                'allocation_period': (
+                    f"{business_report_date_text(detail['allocation_start'])} to "
+                    f"{business_report_date_text(detail['allocation_end'])}"
+                ),
+                'allocation_basis': detail.get('allocation_basis_label', 'Daily Spread'),
+                'source_amount': business_report_money(detail['source_amount_cents']),
+                'allocated': business_report_money(detail['allocated_cents']),
+                'allocated_cents': detail['allocated_cents'],
+                'source_count': len(sources),
+                'sources': source_labels,
+            })
         output.append(row)
 
     totals = {
@@ -4230,14 +5591,15 @@ def WeeklyAllocationPlotApi():
     today_local = datetime.date.today()
     selected_start = business_report_parse_date(request.args.get('date_from'), datetime.date(today_local.year, 1, 1))
     selected_end = business_report_parse_date(request.args.get('date_to'), today_local)
+    selected_division = operations_normalize_division_filter(request.args.get('division'))
     allocation_type = (request.args.get('allocation_type') or '').strip()
     try:
         allocation_id = int(request.args.get('allocation_id') or 0)
     except ValueError:
         allocation_id = 0
-    if allocation_type not in ['indirect', 'ga', 'builtin_direct', 'builtin_driver_pay']:
+    if allocation_type not in ['direct', 'indirect', 'ga', 'builtin_income', 'builtin_direct', 'builtin_driver_pay', 'builtin_ga', 'builtin_port_trips', 'builtin_toll_transactions']:
         return jsonify({'error': 'Choose a valid allocation row.'}), 400
-    if allocation_type in ['indirect', 'ga'] and not allocation_id:
+    if allocation_type in ['direct', 'indirect', 'ga'] and not allocation_id:
         return jsonify({'error': 'Choose a valid allocation row.'}), 400
     try:
         payload = operations_weekly_allocation_plot(
@@ -4246,6 +5608,7 @@ def WeeklyAllocationPlotApi():
             allocation_id,
             selected_start,
             selected_end,
+            selected_division,
         )
     except Exception as exc:
         db.session.rollback()
@@ -4276,6 +5639,7 @@ def business_reports_page(report_mode):
     default_end = datetime.date(today_local.year, 12, 31)
     selected_start = business_report_parse_date(request.values.get('date_from'), default_start)
     selected_end = business_report_parse_date(request.values.get('date_to'), default_end)
+    selected_division = operations_normalize_division_filter(request.values.get('division'))
     err = []
     msg = []
     action = None
@@ -4338,6 +5702,10 @@ def business_reports_page(report_mode):
             period_end = business_report_parse_date(request.form.get('ops_period_end'), None)
             amount_cents = business_report_cents(request.form.get('ops_amount'))
             allocation_basis = (request.form.get('ops_allocation_basis') or 'daily').strip()
+            try:
+                allocation_days_prior = max(int(request.form.get('ops_days_prior') or 0), 0)
+            except ValueError:
+                allocation_days_prior = 0
             if allocation_basis not in OPERATIONS_ALLOCATION_BASIS_TYPES:
                 allocation_basis = 'daily'
             auto_update = 1 if request.form.get('ops_auto_update') else 0
@@ -4356,9 +5724,9 @@ def business_reports_page(report_mode):
             else:
                 db.session.execute(text("""
                     INSERT INTO operations_indirect_allocations
-                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
+                        (Co, AccountName, PeriodStart, PeriodEnd, AmountCents, AllocationBasis, AllocationDaysPrior, AutoUpdate, Notes, Active, CreatedAt, UpdatedAt)
                     VALUES
-                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :allocation_basis, :auto_update, :notes, 1, :created_at, :updated_at)
+                        (:company_code, :account_name, :period_start, :period_end, :amount_cents, :allocation_basis, :allocation_days_prior, :auto_update, :notes, 1, :created_at, :updated_at)
                 """), {
                     'company_code': selected_company,
                     'account_name': account_name,
@@ -4366,6 +5734,7 @@ def business_reports_page(report_mode):
                     'period_end': period_end,
                     'amount_cents': amount_cents,
                     'allocation_basis': allocation_basis,
+                    'allocation_days_prior': allocation_days_prior,
                     'auto_update': auto_update,
                     'notes': (request.form.get('ops_notes') or '').strip(),
                     'created_at': datetime.datetime.utcnow(),
@@ -4388,14 +5757,64 @@ def business_reports_page(report_mode):
             db.session.commit()
             msg.append('Operations indirect allocation removed.')
             force_report_refresh = report_mode == 'weekly'
+        elif action == 'add_ops_direct_allocation':
+            account_name = (request.form.get('ops_direct_account_name') or '').strip()
+            allocation_basis = (request.form.get('ops_direct_allocation_basis') or 'daily').strip()
+            try:
+                allocation_days_prior = max(int(request.form.get('ops_direct_days_prior') or 0), 0)
+            except ValueError:
+                allocation_days_prior = 0
+            if allocation_basis not in OPERATIONS_DIRECT_ALLOCATION_TYPES:
+                allocation_basis = 'bill_to_bill_prior'
+            if not account_name:
+                err.append('Direct expense account is required.')
+            else:
+                db.session.execute(text("""
+                    UPDATE operations_direct_allocations
+                    SET Active = 0, UpdatedAt = :updated_at
+                    WHERE Co = :company_code AND AccountName = :account_name AND Active = 1
+                """), {
+                    'company_code': selected_company,
+                    'account_name': account_name,
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.execute(text("""
+                    INSERT INTO operations_direct_allocations
+                        (Co, AccountName, AllocationBasis, AllocationDaysPrior, AllocationLabelVersion, Notes, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:company_code, :account_name, :allocation_basis, :allocation_days_prior, 1, :notes, 1, :created_at, :updated_at)
+                """), {
+                    'company_code': selected_company,
+                    'account_name': account_name,
+                    'allocation_basis': allocation_basis,
+                    'allocation_days_prior': allocation_days_prior,
+                    'notes': (request.form.get('ops_direct_notes') or '').strip(),
+                    'created_at': datetime.datetime.utcnow(),
+                    'updated_at': datetime.datetime.utcnow(),
+                })
+                db.session.commit()
+                msg.append('Operations direct allocation setup saved.')
+                force_report_refresh = report_mode == 'weekly'
+        elif action == 'delete_ops_direct_allocation':
+            allocation_id = request.form.get('ops_direct_allocation_id')
+            db.session.execute(text("""
+                UPDATE operations_direct_allocations
+                SET Active = 0, UpdatedAt = :updated_at
+                WHERE id = :allocation_id AND Co = :company_code
+            """), {
+                'allocation_id': allocation_id,
+                'company_code': selected_company,
+                'updated_at': datetime.datetime.utcnow(),
+            })
+            db.session.commit()
+            msg.append('Operations direct allocation setup removed.')
+            force_report_refresh = report_mode == 'weekly'
         elif action == 'add_ops_ga_allocation':
             account_name = (request.form.get('ops_ga_account_name') or '').strip()
             period_start = business_report_parse_date(request.form.get('ops_ga_period_start'), None)
             period_end = business_report_parse_date(request.form.get('ops_ga_period_end'), None)
             amount_cents = business_report_cents(request.form.get('ops_ga_amount'))
-            allocation_basis = (request.form.get('ops_ga_allocation_basis') or 'daily').strip()
-            if allocation_basis not in OPERATIONS_ALLOCATION_BASIS_TYPES:
-                allocation_basis = 'daily'
+            allocation_basis = operations_ga_allocation_basis(selected_company)
             auto_update = 1 if request.form.get('ops_ga_auto_update') else 0
             if auto_update:
                 period_start = datetime.date(today_local.year, 1, 1)
@@ -4430,6 +5849,16 @@ def business_reports_page(report_mode):
                 db.session.commit()
                 msg.append('G&A allocation added.')
                 force_report_refresh = report_mode == 'weekly'
+        elif action == 'update_ops_ga_allocation_basis':
+            allocation_basis = (request.form.get('ops_ga_global_allocation_basis') or 'daily').strip()
+            allocation_basis = operations_save_ga_allocation_basis(selected_company, allocation_basis)
+            msg.append(f'G&A allocation formula updated to {OPERATIONS_ALLOCATION_BASIS_TYPES.get(allocation_basis, "Daily Spread")}.')
+            force_report_refresh = report_mode == 'weekly'
+        elif action == 'update_ops_income_recognition':
+            recognition_method = (request.form.get('ops_income_recognition') or 'completed').strip()
+            recognition_method = operations_save_income_recognition_method(selected_company, recognition_method)
+            msg.append(f'Income recognition updated to {OPERATIONS_INCOME_RECOGNITION_TYPES.get(recognition_method, "On Date Job Completed")}.')
+            force_report_refresh = report_mode == 'weekly'
         elif action == 'delete_ops_ga_allocation':
             allocation_id = request.form.get('ops_ga_allocation_id')
             db.session.execute(text("""
@@ -4483,15 +5912,31 @@ def business_reports_page(report_mode):
     unassigned_expense_lines = []
     operations_effective_date_to = operations_end.strftime('%Y-%m-%d') if operations_end >= selected_start else ''
     report_cache_info = {'source': 'empty', 'updated_at': '', 'generated_by': ''}
-    payload, cache_row = business_report_cache_load(selected_company, report_mode, selected_start, selected_end)
+    try:
+        ops_income_recognition = operations_income_recognition_method(selected_company) if report_mode == 'weekly' else 'completed'
+    except Exception as exc:
+        db.session.rollback()
+        ops_income_recognition = 'completed'
+        err.append(f'Income recognition setting could not be loaded: {exc}')
+    cache_report_mode = operations_weekly_cache_mode(selected_division, ops_income_recognition) if report_mode == 'weekly' else report_mode
+    payload, cache_row = business_report_cache_load(selected_company, cache_report_mode, selected_start, selected_end)
     if force_report_refresh or payload is None:
         try:
             if report_mode == 'weekly':
-                operations_rows, operations_totals = operations_weekly_profit_loss(selected_company, selected_start, operations_end)
+                business_report_rebuild_port_trip_weeks(selected_start, operations_end)
+                operations_rows, operations_totals = operations_weekly_profit_loss(
+                    selected_company,
+                    selected_start,
+                    operations_end,
+                    selected_division,
+                    ops_income_recognition,
+                )
                 payload = {
                     'operations_rows': operations_rows,
                     'operations_totals': operations_totals,
                     'operations_effective_date_to': operations_effective_date_to,
+                    'division': selected_division,
+                    'income_recognition': ops_income_recognition,
                 }
             else:
                 tax_rollup_pl = business_report_tax_rollup_pl(selected_company, selected_start, selected_end)
@@ -4502,9 +5947,9 @@ def business_reports_page(report_mode):
                     'expense_rows': [],
                     'total_expenses_cents': tax_rollup_pl.get('total_expenses_cents', 0),
                 }
-            payload, cache_row = business_report_cache_save(selected_company, report_mode, selected_start, selected_end, payload)
+            payload, cache_row = business_report_cache_save(selected_company, cache_report_mode, selected_start, selected_end, payload)
             report_cache_info = business_report_cache_info(cache_row, 'fresh')
-            msg.append('Report cache refreshed.')
+            msg.append('Report recalculated and saved to cache.')
         except Exception as exc:
             db.session.rollback()
             payload = None
@@ -4534,6 +5979,13 @@ def business_reports_page(report_mode):
         err.append(f'Indirect allocations could not be loaded: {exc}')
 
     try:
+        ops_direct_rows = operations_direct_allocations(selected_company) if report_mode == 'weekly' else []
+    except Exception as exc:
+        db.session.rollback()
+        ops_direct_rows = []
+        err.append(f'Direct allocation setup could not be loaded: {exc}')
+
+    try:
         ops_ga_rows = operations_ga_allocations(selected_company) if report_mode == 'weekly' else []
     except Exception as exc:
         db.session.rollback()
@@ -4541,11 +5993,25 @@ def business_reports_page(report_mode):
         err.append(f'G&A allocations could not be loaded: {exc}')
 
     try:
+        ops_ga_allocation_basis = operations_ga_allocation_basis(selected_company) if report_mode == 'weekly' else 'daily'
+    except Exception as exc:
+        db.session.rollback()
+        ops_ga_allocation_basis = 'daily'
+        err.append(f'G&A allocation formula could not be loaded: {exc}')
+
+    try:
         ops_indirect_accounts = operations_account_options(selected_company, today_local, 'indirect') if report_mode == 'weekly' else []
     except Exception as exc:
         db.session.rollback()
         ops_indirect_accounts = []
         err.append(f'Indirect account options could not be loaded: {exc}')
+
+    try:
+        ops_direct_accounts = operations_account_options(selected_company, today_local, 'direct') if report_mode == 'weekly' else []
+    except Exception as exc:
+        db.session.rollback()
+        ops_direct_accounts = []
+        err.append(f'Direct account options could not be loaded: {exc}')
 
     try:
         ops_ga_accounts = operations_account_options(selected_company, today_local, 'g-a') if report_mode == 'weekly' else []
@@ -4566,24 +6032,35 @@ def business_reports_page(report_mode):
             'company': selected_company,
             'date_from': selected_start.strftime('%Y-%m-%d'),
             'date_to': selected_end.strftime('%Y-%m-%d'),
+            'division': selected_division,
         },
         report_mode=report_mode,
         report_endpoint='main.ProfitLossWeekly' if report_mode == 'weekly' else 'main.ProfitLossYearToDate',
         companies=companies,
         selected_company=selected_company,
+        selected_division=selected_division,
+        operations_division_filters=OPERATIONS_DIVISION_FILTERS,
         tax_rollup_pl=tax_rollup_pl,
         operations_rows=operations_rows,
         operations_totals=operations_totals,
         operations_effective_date_to=operations_effective_date_to,
+        ops_direct_rows=ops_direct_rows,
+        ops_direct_accounts=ops_direct_accounts,
         ops_indirect_rows=ops_indirect_rows,
         ops_indirect_accounts=ops_indirect_accounts,
         ops_ga_rows=ops_ga_rows,
+        ops_ga_allocation_basis=ops_ga_allocation_basis,
+        ops_ga_allocation_basis_label=OPERATIONS_ALLOCATION_BASIS_TYPES.get(ops_ga_allocation_basis, 'Daily Spread'),
         ops_ga_accounts=ops_ga_accounts,
+        ops_income_recognition=ops_income_recognition,
+        ops_income_recognition_label=OPERATIONS_INCOME_RECOGNITION_TYPES.get(ops_income_recognition, 'On Date Job Completed'),
         unassigned_expense_lines=unassigned_expense_lines,
         expense_rows=expense_rows,
         total_expenses=business_report_money(total_expenses),
         basis_types=BUSINESS_REPORT_BASIS_TYPES,
         operations_allocation_basis_types=OPERATIONS_ALLOCATION_BASIS_TYPES,
+        operations_income_recognition_types=OPERATIONS_INCOME_RECOGNITION_TYPES,
+        operations_direct_allocation_types=OPERATIONS_DIRECT_ALLOCATION_TYPES,
         report_basis=report_basis,
         report_cache_info=report_cache_info,
         ops_default_start=datetime.date(today_local.year, 1, 1).strftime('%Y-%m-%d'),
@@ -7367,6 +8844,14 @@ def BankingPaymentDetail():
                 return str(value).splitlines()[0].strip()
         return ''
 
+    def forwarding_customer_name(job, fallback=''):
+        if job is None:
+            return fallback or ''
+        for value in [getattr(job, 'BillTo', None), getattr(job, 'Shipper', None), fallback]:
+            if value:
+                return str(value).splitlines()[0].strip()
+        return ''
+
     ids = []
     for item in request.values.get('ids', '').split(','):
         try:
@@ -7412,7 +8897,9 @@ def BankingPaymentDetail():
                     'ledger_id': allocation.id,
                     'jo': allocation.Tcode or '',
                     'order_id': order.id if order is not None else (forwarding_job.id if forwarding_job is not None else ''),
-                    'shipper': order.Shipper if order is not None else (forwarding_name(forwarding_job) or allocation.Source),
+                    'customer': order.Shipper if order is not None else forwarding_customer_name(forwarding_job, allocation.Source),
+                    'shipper': order.Shipper if order is not None else forwarding_customer_name(forwarding_job, allocation.Source),
+                    'cargo_shipper': '' if order is not None else forwarding_name(forwarding_job),
                     'container': order.Container if order is not None else (forwarding_job.Container if forwarding_job is not None else ''),
                     'invoice': money(invo_cents),
                     'received': money(received_cents),
@@ -7445,7 +8932,9 @@ def BankingPaymentDetail():
             'ledger_id': ledger_line.id,
             'jo': ledger_line.Tcode or '',
             'order_id': order.id if order is not None else (forwarding_job.id if forwarding_job is not None else ''),
-            'shipper': order.Shipper if order is not None else (forwarding_name(forwarding_job) or ledger_line.Source),
+            'customer': order.Shipper if order is not None else forwarding_customer_name(forwarding_job, ledger_line.Source),
+            'shipper': order.Shipper if order is not None else forwarding_customer_name(forwarding_job, ledger_line.Source),
+            'cargo_shipper': '' if order is not None else forwarding_name(forwarding_job),
             'container': order.Container if order is not None else (forwarding_job.Container if forwarding_job is not None else ''),
             'invoice': '' if is_manual else money(invo_cents),
             'received': money(received_cents),
@@ -7477,6 +8966,32 @@ def ReceiveByAccount():
     if request.method == 'POST' and request.values.get('Return') is not None:
         return redirect(url_for('main.Class8Main', genre='Trucking'))
 
+    highlight_tcode = (request.values.get('highlight_tcode') or '').strip()
+
+    def undeposited_rows_for_tcode(tcode):
+        if not tcode:
+            return []
+        rows = Gledger.query.filter(
+            (Gledger.Tcode == tcode) &
+            (Gledger.Type.in_(['DD', 'ID'])) &
+            (Gledger.Account == 'Undeposited Funds') &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        allocation_rows = Gledger.query.filter(
+            (Gledger.Tcode == tcode) &
+            (Gledger.Type == 'IC') &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        payment_sids = {row.Sid for row in allocation_rows if row.Sid}
+        if payment_sids:
+            rows.extend(Gledger.query.filter(
+                (Gledger.Sid.in_(payment_sids)) &
+                (Gledger.Type.in_(['DD', 'ID'])) &
+                (Gledger.Account == 'Undeposited Funds') &
+                (Gledger.Com == cmpdata[10])
+            ).all())
+        return list({row.id: row for row in rows}.values())
+
     def receive_batch_date_range():
         today = datetime.date.today()
         default_start = today - datetime.timedelta(days=30)
@@ -7495,6 +9010,20 @@ def ReceiveByAccount():
         if end_date < start_date:
             start_date, end_date = end_date, start_date
             start_text, end_text = end_text, start_text
+        if highlight_tcode and not request.values.get('batch_start_date'):
+            highlighted_rows = undeposited_rows_for_tcode(highlight_tcode)
+            row_dates = [row.Date for row in highlighted_rows if row.Date is not None]
+            if row_dates:
+                earliest = min(row_dates)
+                latest = max(row_dates)
+                earliest_date = earliest.date() if hasattr(earliest, 'date') else earliest
+                latest_date = latest.date() if hasattr(latest, 'date') else latest
+                if datetime.datetime.combine(earliest_date, datetime.time.min) < start_date:
+                    start_date = datetime.datetime.combine(earliest_date, datetime.time.min)
+                    start_text = start_date.strftime('%Y-%m-%d')
+                if datetime.datetime.combine(latest_date, datetime.time.min) > end_date:
+                    end_date = datetime.datetime.combine(latest_date, datetime.time.min)
+                    end_text = end_date.strftime('%Y-%m-%d')
         end_exclusive = end_date + datetime.timedelta(days=1)
         return start_text, end_text, start_date, end_exclusive
 
@@ -7660,6 +9189,23 @@ def ReceiveByAccount():
             err_list.append('Counter deposit total is zero.')
             return err_list
 
+        deposited_tcodes = {row.Tcode for row in payment_rows if row.Tcode}
+        payment_sids = {row.Sid for row in payment_rows if row.Sid}
+        if payment_sids:
+            allocation_rows = Gledger.query.filter(
+                (Gledger.Sid.in_(payment_sids)) &
+                (Gledger.Type == 'IC') &
+                (Gledger.Com == cmpdata[10])
+            ).all()
+            deposited_tcodes.update(row.Tcode for row in allocation_rows if row.Tcode)
+        for tcode in deposited_tcodes:
+            order = Orders.query.filter(Orders.Jo == tcode).first()
+            if order is not None and order.Istat == 10:
+                order.Istat = 5
+            forwarding_job = OverSeas.query.filter(OverSeas.Jo == tcode).first()
+            if forwarding_job is not None and forwarding_job.Istat == 10:
+                forwarding_job.Istat = 5
+
         db.session.commit()
         err_list.append(f'Counter deposit {deposit_ref} posted to {bank_account.Name} for ${total_amount / 100:,.2f}.')
         return err_list
@@ -7698,10 +9244,105 @@ def ReceiveByAccount():
         if paid_total > 0:
             if balance_due > .01:
                 order.Istat = 4
+            elif order.PayAcct == 'Undeposited Funds':
+                order.Istat = 10
             elif order.Istat in [6, 7, 8]:
                 order.Istat = 8
             else:
                 order.Istat = 5
+
+    def refresh_forwarding_payment_status(job):
+        payment_rows = Gledger.query.filter(
+            (Gledger.Tcode == job.Jo) &
+            (Gledger.Type == 'IC') &
+            (Gledger.Com == cmpdata[10])
+        ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
+        paid_cents = sum(row.Credit or 0 for row in payment_rows)
+        latest = payment_rows[0] if payment_rows else None
+        invoice_total = money_to_cents(job.InvoTotal)
+        paid_total = float(paid_cents) / 100
+        balance_due = float(invoice_total - paid_cents) / 100
+        job.Payments = d2s(paid_total)
+        job.BalDue = d2s(balance_due)
+        if latest is not None:
+            pay_record = PaymentsRec.query.get(latest.Sid) if latest.Sid else None
+            job.PaidDate = latest.Date
+            job.PaidAmt = d2s(float(latest.Credit or 0) / 100)
+            job.PayRef = latest.Ref
+            job.PayMeth = pay_record.Type if pay_record is not None else job.PayMeth
+            job.PayAcct = pay_record.Account if pay_record is not None else job.PayAcct
+            job.QBi = latest.Sid
+        else:
+            job.PaidDate = None
+            job.PaidAmt = '0.00'
+            job.PayRef = None
+            job.QBi = None
+
+        if paid_cents > 0:
+            if invoice_total - paid_cents > 1:
+                job.Istat = 4
+            elif job.PayAcct == 'Undeposited Funds':
+                job.Istat = 10
+            else:
+                job.Istat = 5
+
+    def undo_counter_deposit(err_list):
+        original_ids = selected_payment_ledger_ids()
+        if not original_ids:
+            err_list.append('Select a received payment batch with a counter deposit to undo.')
+            return err_list
+
+        deposit_rows = Gledger.query.filter(
+            (Gledger.SourceTable == 'CounterDepositItem') &
+            (Gledger.SourceId.in_(original_ids)) &
+            (Gledger.Type == 'XD') &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        if not deposit_rows:
+            err_list.append('No counter deposit was found for the selected received payment batch.')
+            return err_list
+
+        journal_ids = {row.JournalId for row in deposit_rows if row.JournalId}
+        counter_rows = Gledger.query.filter(
+            (Gledger.JournalId.in_(journal_ids)) &
+            (Gledger.SourceTable == 'CounterDepositItem') &
+            (Gledger.Type.in_(['XD', 'XC'])) &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        if any(row.Reconciled not in [None, 0, 25] for row in counter_rows):
+            err_list.append('This counter deposit has reconciled ledger lines. Reopen the reconciliation before undoing it.')
+            return err_list
+
+        all_original_ids = {row.SourceId for row in counter_rows if row.SourceId}
+        original_rows = Gledger.query.filter(
+            (Gledger.id.in_(all_original_ids)) &
+            (Gledger.Type.in_(['DD', 'ID'])) &
+            (Gledger.Com == cmpdata[10])
+        ).all()
+        affected_tcodes = {row.Tcode for row in original_rows if row.Tcode}
+        payment_sids = {row.Sid for row in original_rows if row.Sid}
+        if payment_sids:
+            allocation_rows = Gledger.query.filter(
+                (Gledger.Sid.in_(payment_sids)) &
+                (Gledger.Type == 'IC') &
+                (Gledger.Com == cmpdata[10])
+            ).all()
+            affected_tcodes.update(row.Tcode for row in allocation_rows if row.Tcode)
+
+        for row in counter_rows:
+            db.session.delete(row)
+
+        for tcode in affected_tcodes:
+            order = Orders.query.filter(Orders.Jo == tcode).first()
+            if order is not None:
+                refresh_order_payment_status(order)
+            forwarding_job = OverSeas.query.filter(OverSeas.Jo == tcode).first()
+            if forwarding_job is not None:
+                refresh_forwarding_payment_status(forwarding_job)
+
+        db.session.commit()
+        err_list.append(f'Undid counter deposit {deposit_rows[0].Ref or deposit_rows[0].JournalId}; original payment batch is back in Undeposited Funds.')
+        return err_list
 
     def update_reloaded_receive_batch(err_list):
         selected_ids = request.values.get('reloaded_batch_ids', '')
@@ -8077,6 +9718,7 @@ def ReceiveByAccount():
         return holdvec, err_list
 
     batch_start_date, batch_end_date, batch_start, batch_end_exclusive = receive_batch_date_range()
+    highlighted_payment_ids = {row.id for row in undeposited_rows_for_tcode(highlight_tcode)}
     is_reloaded_batch = request.values.get('reloaded_batch_ids') is not None
     is_reloaded_record = is_reloaded_batch and (
         request.values.get('update_reloaded_batch') is not None or
@@ -8103,6 +9745,8 @@ def ReceiveByAccount():
 
     if request.values.get('create_counter_deposit') is not None:
         err_list = create_counter_deposit(err_list)
+    elif request.values.get('undo_counter_deposit') is not None:
+        err_list = undo_counter_deposit(err_list)
     elif request.values.get('reload_batch') is not None:
         holdvec, err_list = reload_receive_batch(holdvec, request.values.getlist('payment_batch'), err_list)
     elif is_reloaded_batch and not is_reloaded_record:
@@ -8153,10 +9797,13 @@ def ReceiveByAccount():
             'deposit_ref': '',
             'deposit_account': '',
             'deposit_date': None,
+            'highlighted': False,
         })
         group['ids'].append(row.id)
         group['amount'] += row.Debit or 0
         group['count'] += 1
+        if row.id in highlighted_payment_ids:
+            group['highlighted'] = True
         if counter_deposit is not None:
             group['deposited'] = True
             group['deposit_ref'] = counter_deposit.Ref or ''
@@ -8172,6 +9819,7 @@ def ReceiveByAccount():
         batch['id_value'] = ','.join(str(row_id) for row_id in batch['ids'])
         batch['amount_fmt'] = "${:,.2f}".format(batch['amount'] / 100)
         batch['deposit_date_fmt'] = batch['deposit_date'].strftime('%Y-%m-%d') if batch['deposit_date'] else ''
+        batch['account_display'] = batch['deposit_account'] if batch['deposited'] and batch['deposit_account'] else batch['account']
 
     counter_deposit_accounts = Accounts.query.filter(
         (Accounts.Type == 'Bank') &
@@ -8190,6 +9838,8 @@ def ReceiveByAccount():
         batch_end_date=batch_end_date,
         counter_deposit_accounts=counter_deposit_accounts,
         today_value=datetime.date.today().strftime('%Y-%m-%d'),
+        highlight_tcode=highlight_tcode,
+        highlight_found=bool(highlighted_payment_ids),
     )
 
 

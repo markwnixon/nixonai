@@ -13,7 +13,7 @@ from webapp.class8_tasks_money import MakeInvoice_task, MakeSummary_task, income
 from webapp.class8_utils_package import makepackage, getdocs, blendticks, combine_ticks
 from webapp.class8_utils_email import emaildata_update
 from webapp.class8_utils_invoice import make_invo_doc, make_summary_doc, addpayment, writechecks
-from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job
+from webapp.class8_tasks_gledger import gledger_write, gledger_multi_job, post_balanced_journal
 from webapp.InterchangeFuncs import Order_Container_Update, Gate_Update
 from webapp.class8_tasks_money import get_all_sids
 from webapp.class8_tasks_scripts import Container_Update_task, Street_Turn_task, Unpulled_Containers_task, Exports_Pulled_task, Exports_Returned_task, Exports_Bk_Diff_task
@@ -3720,6 +3720,10 @@ def New_task(tablesetup, task_iter):
                                 db.session.commit()
                                 bdat = Bills.query.get(bid)
                             err = gledger_write(['newbill'], bdat.Jo, bdat.bAccount, bdat.pAccount, 0)
+                    if tablesetup['table'] == 'OverSeas':
+                        fdat = OverSeas.query.get(sid)
+                        if fdat is not None:
+                            err.extend(sync_forwarding_invoice_ledger(fdat))
                 else:
                     err.append(f'Cannot create entry until input errors shown in red below are resolved')
 
@@ -3922,6 +3926,10 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     sync_report = sync_bill_expense_ledger_account(bdat)
                     if sync_report:
                         err.extend(sync_report)
+                if table == 'OverSeas':
+                    fdat = OverSeas.query.get(sid)
+                    if fdat is not None:
+                        err.extend(sync_forwarding_invoice_ledger(fdat))
                 if table == 'Orders':
                     #print(f'Updating Orders with {sid}')
                     Order_Addresses_Update(sid)
@@ -4534,6 +4542,157 @@ def forwarding_date_input(value):
     return parsed.strftime('%Y-%m-%d')
 
 
+def is_undeposited_payment(paymethod=None, depoacct=None):
+    method = str(paymethod or '').strip()
+    account = str(depoacct or '').strip()
+    return method in ['Cash', 'Check'] or account == 'Undeposited Funds' or 'Undeposited' in account
+
+
+def forwarding_invoice_ledger_entries(job):
+    if job is None:
+        return []
+    journal_id = f'FFINV-{job.id}'
+    return Gledger.query.filter(
+        ((Gledger.SourceTable == 'OverSeas') & (Gledger.SourceId == job.id)) |
+        ((Gledger.JournalId == journal_id) & (Gledger.Tcode == job.Jo))
+    ).all()
+
+
+def forwarding_revenue_account(company_code):
+    candidates = [
+        'Freight Forwarding Revenues',
+        'Ocean Freight Revenues',
+        'Freight Fwd Revenues',
+        'Revenues',
+    ]
+    for account_name in candidates:
+        account = Accounts.query.filter(
+            (Accounts.Name == account_name) &
+            (Accounts.Co == company_code)
+        ).first()
+        if account is not None:
+            return account
+
+    account = Accounts(
+        Name='Freight Forwarding Revenues',
+        Balance=0.00,
+        AcctNumber=None,
+        Routing=None,
+        Payee=None,
+        Type='Income',
+        Description='Freight forwarding revenue',
+        Category='Direct',
+        Subcategory='Freight Fwd',
+        Taxrollup='Income:Gross receipts or sales',
+        Co=company_code,
+        QBmap=None,
+        Shared=None,
+    )
+    db.session.add(account)
+    db.session.commit()
+    return account
+
+
+def sync_forwarding_payment_sources(job, customer_name):
+    warnings = []
+    rows = Gledger.query.filter(
+        ((Gledger.Tcode == job.Jo) & (Gledger.SourceTable == 'ReceivePaymentAllocation')) |
+        ((Gledger.SourceTable == 'ReceivePaymentBatch') & (Gledger.SourceId == job.QBi))
+    ).all()
+    for row in rows:
+        if row.Reconciled not in [None, 0, 25]:
+            warnings.append(
+                f'Payment ledger line {row.Tcode} {row.Type} is reconciled; '
+                'reopen the reconciliation before changing its customer source.'
+            )
+            continue
+        row.Source = customer_name
+
+    if job.QBi:
+        payment = PaymentsRec.query.get(job.QBi)
+        if payment is not None:
+            payment.Source = customer_name
+    return warnings
+
+
+def sync_forwarding_invoice_ledger(job):
+    if job is None:
+        return []
+
+    err = []
+    company_code = (job.Jo or companydata()[10] or scac or 'K')[0]
+    customer_name = forwarding_party_name(job.Shipper) or forwarding_party_name(job.Exporter) or forwarding_party_name(job.Consignee) or 'Freight Forwarding'
+    invoice_cents = forwarding_money_cents(job.InvoTotal)
+    paid_cents = forwarding_money_cents(job.Payments)
+    invoice_rows = forwarding_invoice_ledger_entries(job)
+    reconciled_rows = [row for row in invoice_rows if row.Reconciled not in [None, 0, 25]]
+
+    if invoice_cents <= 0:
+        if reconciled_rows:
+            return [
+                f'Cannot remove invoice ledger for {job.Jo}; invoice ledger has reconciled line(s). '
+                'Reopen the reconciliation before removing the invoice amount.'
+            ]
+        if invoice_rows:
+            for row in invoice_rows:
+                db.session.delete(row)
+            job.BalDue = None
+            if paid_cents <= 0:
+                job.Istat = 0
+            db.session.commit()
+            return [f'Removed freight forwarding invoice ledger for {job.Jo}.']
+        if paid_cents <= 0:
+            job.BalDue = None
+            job.Istat = 0
+            db.session.commit()
+        return []
+
+    ar_account = Accounts.query.filter(
+        (Accounts.Name == 'Accounts Receivable') &
+        (Accounts.Co == company_code)
+    ).first()
+    revenue_account = forwarding_revenue_account(company_code)
+    if ar_account is None:
+        return [f'Could not find Accounts Receivable for company {company_code}.']
+    if revenue_account is None:
+        return [f'Could not find or create freight forwarding revenue account for company {company_code}.']
+
+    customer = People.query.filter(People.Company == customer_name).first()
+    sid_value = customer.id if customer is not None else job.id
+    invoice_date = forwarding_date_value(job.InvoDate or job.IngateDate or datetime.datetime.today())
+    recorded = datetime.datetime.now()
+    journal_id = f'FFINV-{job.id}'
+    journal_memo = f'Freight forwarding invoice {job.Jo} for {customer_name}'
+
+    err = post_balanced_journal([
+        {'debit': invoice_cents, 'credit': 0, 'account': ar_account.Name, 'aid': ar_account.id,
+         'source': customer_name, 'sid': sid_value, 'type': 'VD', 'tcode': job.Jo,
+         'com': company_code, 'recorded': recorded, 'date': invoice_date, 'ref': job.Invoice or job.Booking,
+         'source_table': 'OverSeas', 'source_id': job.id},
+        {'debit': 0, 'credit': invoice_cents, 'account': revenue_account.Name, 'aid': revenue_account.id,
+         'source': customer_name, 'sid': sid_value, 'type': 'VC', 'tcode': job.Jo,
+         'com': company_code, 'recorded': recorded, 'date': invoice_date, 'ref': job.Invoice or job.Booking,
+         'source_table': 'OverSeas', 'source_id': job.id},
+    ], journal_id=journal_id,
+        journal_memo=journal_memo,
+        posted_by='freight_forwarding_invoice_sync',
+        source_table='OverSeas',
+        source_id=job.id)
+    if err:
+        return err
+
+    balance_cents = invoice_cents - paid_cents
+    job.BalDue = forwarding_cents_text(balance_cents)
+    if paid_cents > 0:
+        job.Istat = 10 if balance_cents <= 1 and is_undeposited_payment(job.PayMeth, job.PayAcct) else (5 if balance_cents <= 1 else 4)
+    elif getattr(job, 'Istat', None) is None or job.Istat < 1:
+        job.Istat = 3 if hasinput(job.Invoice) else 1
+
+    source_warnings = sync_forwarding_payment_sources(job, customer_name)
+    db.session.commit()
+    return [f'Synced freight forwarding invoice ledger for {job.Jo}.'] + source_warnings
+
+
 def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable, sid):
     err = [f"Running Freight Forwarding Receive Payment task with task_iter {task_iter}"]
     completed = False
@@ -4548,7 +4707,8 @@ def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_
         return [], entrydata, err, viewport, True
 
     company_code = (job.Jo or companydata()[10] or scac or 'K')[0]
-    customer_name = forwarding_party_name(job.Exporter) or forwarding_party_name(job.Consignee) or 'Freight Forwarding'
+    # Freight forwarding AR follows the selected Ocean customer in People/OverSeas.Shipper.
+    customer_name = forwarding_party_name(job.Shipper) or forwarding_party_name(job.Exporter) or forwarding_party_name(job.Consignee) or 'Freight Forwarding'
 
     invoice_cents = forwarding_money_cents(job.InvoTotal)
     paid_so_far_cents = forwarding_money_cents(job.Payments)
@@ -4626,7 +4786,7 @@ def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_
                     Source=customer_name,
                     Sid=payment_record.id,
                     Type=deposit_type,
-                    Tcode=journal_id,
+                    Tcode=job.Jo,
                     Com=company_code,
                     Recorded=recorded,
                     Reconciled=0,
@@ -4675,7 +4835,7 @@ def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_
                 job.PayMeth = paymethod
                 job.PayAcct = deposit_account_name
                 job.QBi = payment_record.id
-                job.Istat = 5 if balance_cents <= 1 else 4
+                job.Istat = 10 if balance_cents <= 1 and deposit_account_name == 'Undeposited Funds' else (5 if balance_cents <= 1 else 4)
                 db.session.commit()
                 err.append(
                     f'Recorded {forwarding_cents_text(payment_cents)} payment for {job.Jo}; '
@@ -4815,6 +4975,8 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                     setattr(dat, sname, bn)
                     setattr(dat, 'Other', 'File Upload Manually')
                 db.session.commit()
+                if thistable == 'OverSeas' and task_focus == 'Invoice':
+                    err.extend(sync_forwarding_invoice_ledger(dat))
                 err.append(f'Viewing {filename1}')
                 err.append('Hit Return to End Viewing and Return to Table View')
                 returnhit = request.values.get('Return')

@@ -1,4 +1,15 @@
 webapp/CCC_system_setup.py
-webapp/static/css
+webapp/static/css/*
 webapp/static/font
-webapp/static/js
+webapp/static/js/*
+!webapp/static/css/admin_calendar.css
+!webapp/static/css/collection_kanban.css
+!webapp/static/css/compliance_check.css
+!webapp/static/css/dispatch_planning_calendar.css
+!webapp/static/css/dispatch_kanban.css
+!webapp/static/css/oslm_professional_front.css
+!webapp/static/js/admin_calendar.js
+!webapp/static/js/business_reports.js
+!webapp/static/js/collection_kanban.js
+!webapp/static/js/dispatch_planning_calendar.js
+!webapp/static/js/dispatch_kanban.js
