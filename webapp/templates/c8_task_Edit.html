@@ -1,4 +1,11 @@
 <br>
+{% for dict_item in table_filters %}
+    {% for key, value in dict_item.items() %}
+        {% if tfilters[key] is not none %}
+            <input type="hidden" name="{{ key }}" value="{{ tfilters[key] }}">
+        {% endif %}
+    {% endfor %}
+{% endfor %}
 <div class="card">
 <div class="card-header">
     <div class="d-flex justify-content-around align-items-center">

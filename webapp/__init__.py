@@ -71,9 +71,9 @@ def create_app():
                 overseas_columns = [column['name'] for column in inspector.get_columns('overseas')]
                 overseas_adds = [
                     ('Shipper', 'VARCHAR(100) NULL'),
-                    ('IngateDate', 'DATETIME NULL'),
-                    ('InvoDate', 'DATETIME NULL'),
-                    ('PaidDate', 'DATETIME NULL'),
+                    ('IngateDate', 'DATE NULL'),
+                    ('InvoDate', 'DATE NULL'),
+                    ('PaidDate', 'DATE NULL'),
                     ('InvoTotal', 'VARCHAR(45) NULL'),
                     ('PaidAmt', 'VARCHAR(45) NULL'),
                     ('BalDue', 'VARCHAR(45) NULL'),
@@ -92,6 +92,9 @@ def create_app():
                         db.session.commit()
                 db.session.execute(text(
                     'ALTER TABLE overseas '
+                    'MODIFY COLUMN IngateDate DATE NULL, '
+                    'MODIFY COLUMN InvoDate DATE NULL, '
+                    'MODIFY COLUMN PaidDate DATE NULL, '
                     'MODIFY COLUMN Exporter TEXT NULL, '
                     'MODIFY COLUMN Consignee TEXT NULL, '
                     'MODIFY COLUMN Notify TEXT NULL, '

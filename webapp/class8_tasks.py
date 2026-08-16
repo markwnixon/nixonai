@@ -3122,7 +3122,7 @@ def get_dbdata(table_setup, tfilters):
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})).all()'
     elif len(query_adds) == 4:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]})).all()'
-    elif len(queery_adds) == 5:
+    elif len(query_adds) == 5:
         table_query = f'{table}.query.filter(({query_adds[0]}) & ({query_adds[1]}) & ({query_adds[2]})  & ({query_adds[3]}) & ({query_adds[4]})).all()'
     #print(table_query)
 

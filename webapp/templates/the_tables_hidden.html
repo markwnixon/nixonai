@@ -19,7 +19,7 @@
 {% for dict_item in task_boxes %}
     {% for key, value in dict_item.items() %}
         {% for case in value %}
-            {% if tfilters[key] == case %}  <input type = "hidden" name="{{ key }}"  value="{{ case }}">  {% endif %}
+            {% if tboxes[key] == case %}  <input type = "hidden" name="{{ key }}"  value="{{ case }}">  {% endif %}
         {% endfor %}
     {% endfor %}
 {% endfor %}
@@ -40,6 +40,5 @@
             <input type = "hidden" {% if data1id[outer_loop.index - 1] in avec %} value="on" {% endif %} name="{{ thistable }}{{data1id[outer_loop.index-1]}}">
     {% endfor %}
 {% endfor %}
-
 
 
