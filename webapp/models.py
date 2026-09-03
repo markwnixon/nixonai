@@ -1874,7 +1874,7 @@ class Adjusting(db.Model):
 class Bills(db.Model):
     __tablename__ = 'bills'
     id = db.Column('id', db.Integer, primary_key=True)
-    Jo = db.Column('Jo', db.String(25))
+    Jo = db.Column('Jo', db.String(25), unique=True)
     Pid = db.Column('Pid', db.Integer)
     Company = db.Column('Company', db.String(50))
     Memo = db.Column('Memo', db.String(50))

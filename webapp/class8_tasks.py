@@ -30,6 +30,7 @@ import subprocess
 #from func_cal import calmodalupdate
 import json
 import numbers
+import re
 
 #Python functions that require database access
 from webapp.class8_utils import *
@@ -3189,6 +3190,32 @@ def get_new_Jo(input):
     return newjo(input, sdate)
 
 
+def unique_key_candidate(model, key_name, proposed, exclude_id=None):
+    """Return an unused key for the target table, preserving existing JO-style codes."""
+    base = str(proposed or '').strip()
+    if not base or not hasattr(model, key_name):
+        return proposed
+
+    key_col = getattr(model, key_name)
+    candidate = base
+    attempt = 0
+    match = re.match(r'^([A-Za-z]+)(\d+)$', base)
+
+    while True:
+        query = model.query.filter(key_col == candidate)
+        if exclude_id is not None and hasattr(model, 'id'):
+            query = query.filter(model.id != exclude_id)
+        if query.first() is None:
+            return candidate
+
+        attempt = attempt + 1
+        if match:
+            prefix, digits = match.groups()
+            candidate = f"{prefix}{int(digits) + attempt:0{len(digits)}d}"
+        else:
+            candidate = f"{base}-{attempt + 1}"
+
+
 def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -3221,6 +3248,7 @@ def make_new_entry(tablesetup,holdvec):
     err = []
     #err = ['No Jo Created']
     from sqlalchemy import inspect
+    model = eval(table)
     inst = eval(f"inspect({table})")
     attr_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
     initial_defaults = {
@@ -3232,6 +3260,11 @@ def make_new_entry(tablesetup,holdvec):
         if entry[0] in creators:
             creation = [ix for ix in creators if ix == entry[0]][0]
             holdvec[jx] = eval(f"get_new_{creation}('{entry[3]}')")
+            if entry[0] == ukey:
+                unique_value = unique_key_candidate(model, ukey, holdvec[jx])
+                if unique_value != holdvec[jx]:
+                    err.append(f'{table} {ukey} {holdvec[jx]} already exists; assigned {unique_value} instead.')
+                    holdvec[jx] = unique_value
             #err = [f'New {creation} {holdvec[jx]} created']
 
     #print('The attr_names are:',attr_names)
@@ -3264,7 +3297,14 @@ def make_new_entry(tablesetup,holdvec):
         for jx,entry in enumerate(entrydata):
             if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                 #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
-                setattr(dat, f'{entry[0]}', holdvec[jx])
+                thisvalue = holdvec[jx]
+                if entry[0] == ukey:
+                    unique_value = unique_key_candidate(model, ukey, thisvalue, exclude_id=id)
+                    if unique_value != thisvalue:
+                        err.append(f'{table} {ukey} {thisvalue} already exists; assigned {unique_value} instead.')
+                        thisvalue = unique_value
+                        holdvec[jx] = unique_value
+                setattr(dat, f'{entry[0]}', thisvalue)
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
                 thisvalue = getattr(dat, entry[2])

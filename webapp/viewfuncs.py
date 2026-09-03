@@ -332,7 +332,6 @@ def newjo(jtype,sdate):
     month=str(dt.month)
     lv=JO.query.get(1)
     nextid=lv.nextid
-    eval=str(nextid%100).zfill(2)
     day2="{0:0=2d}".format(int(day))
     if month=='10':
         month='X'
@@ -341,7 +340,14 @@ def newjo(jtype,sdate):
     if month=='12':
         month='Z'
 
+    eval=str(nextid%100).zfill(2)
     nextjo = jtype+month+day2+year[3]+eval
+    attempts = 0
+    while JO.query.filter(JO.jo == nextjo).first() is not None:
+        nextid = nextid + 1
+        attempts = attempts + 1
+        eval = str(nextid % 100).zfill(2) if attempts <= 100 else str(nextid).zfill(3)
+        nextjo = jtype + month + day2 + year[3] + eval
     input2 = JO(jo=nextjo, nextid=0, date=sdate, status=1)
     db.session.add(input2)
     lv.nextid=nextid+1
