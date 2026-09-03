@@ -1,0 +1,251 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h3 class="mb-1">Asset Purchase</h3>
+            <div class="text-muted">Record trailer, truck, chassis, and equipment purchases without running them through expense accounts.</div>
+        </div>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('main.DepreciationSchedules') }}">Depreciation Schedules</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category else 'info' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    {% if err %}
+        <div class="alert alert-warning white-space-pre-line">{{ err }}</div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-lg-7">
+            <form method="post" action="{{ url_for('main.AssetPurchase') }}">
+                <div class="card mb-3">
+                    <div class="card-header py-2 font-weight-bold">Purchase Entry</div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group col-md-2">
+                                <label for="company">Co</label>
+                                <input type="text" class="form-control form-control-sm" id="company" name="company" value="{{ selected.company }}" readonly>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="purchase_date">Purchase Date</label>
+                                <input type="date" class="form-control form-control-sm" id="purchase_date" name="purchase_date" value="{{ selected.purchase_date }}">
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="purchase_amount">Amount</label>
+                                <input type="text" class="form-control form-control-sm text-right" id="purchase_amount" name="purchase_amount" value="{{ selected.purchase_amount }}" placeholder="0.00">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="purchase_ref">Reference</label>
+                                <input type="text" class="form-control form-control-sm" id="purchase_ref" name="purchase_ref" value="{{ selected.purchase_ref }}" placeholder="Check, loan, title, or bill ref">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="vendor_id">Vendor / Seller</label>
+                                <select class="form-control form-control-sm" id="vendor_id" name="vendor_id">
+                                    <option value="">Choose vendor</option>
+                                    {% for vendor in vendors %}
+                                        <option value="{{ vendor.id }}" {% if selected.vendor_id|string == vendor.id|string %}selected{% endif %}>{{ vendor.Company }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="asset_account">Debit Asset Account</label>
+                                <select class="form-control form-control-sm" id="asset_account" name="asset_account">
+                                    <option value="">Choose asset account</option>
+                                    {% for account in asset_accounts %}
+                                        <option value="{{ account.Name }}" {% if selected.asset_account == account.Name %}selected{% endif %}>{{ account.Type }} - {{ account.Name }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% if not asset_accounts %}
+                                    <small class="text-danger">No non-bank asset accounts found for {{ selected.company }}. Add a Fixed Asset account in Chart of Accounts first.</small>
+                                {% endif %}
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="funding_account">Credit Funding Account</label>
+                                <select class="form-control form-control-sm" id="funding_account" name="funding_account">
+                                    <option value="">Choose account</option>
+                                    {% for account in funding_accounts %}
+                                        <option value="{{ account.Name }}" {% if selected.funding_account == account.Name %}selected{% endif %}>{{ account.Type }} - {{ account.Name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="asset_name">Asset Name</label>
+                                <input type="text" class="form-control form-control-sm" id="asset_name" name="asset_name" value="{{ selected.asset_name }}" placeholder="2026 Trailer, Unit 900">
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="asset_identifier">Asset Identifier</label>
+                                <input type="text" class="form-control form-control-sm" id="asset_identifier" name="asset_identifier" value="{{ selected.asset_identifier }}" placeholder="VIN, title, plate, or unit">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header py-2 font-weight-bold">Operational Asset</div>
+                    <div class="card-body">
+                        <div class="form-row align-items-end">
+                            <div class="form-group col-md-8">
+                                <label for="source_vehicle_id">Existing Vehicle / Asset</label>
+                                <select class="form-control form-control-sm" id="source_vehicle_id" name="source_vehicle_id">
+                                    <option value="">Create new or choose existing</option>
+                                    {% for vehicle in vehicle_options %}
+                                        <option value="{{ vehicle.id }}" {% if selected.source_vehicle_id|string == vehicle.id|string %}selected{% endif %}>
+                                            {{ vehicle.Type or 'Asset' }} {{ vehicle.Unit or vehicle.id }} {{ vehicle.Year or '' }} {{ vehicle.Make or '' }} {{ vehicle.Model or '' }} {{ vehicle.VIN or '' }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <div class="custom-control custom-checkbox mt-4">
+                                    <input type="checkbox" class="custom-control-input" id="create_vehicle" name="create_vehicle" {% if selected.create_vehicle %}checked{% endif %}>
+                                    <label class="custom-control-label" for="create_vehicle">Create Vehicle Asset</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-2">
+                                <label for="unit">Unit</label>
+                                <input type="text" class="form-control form-control-sm" id="unit" name="unit" value="{{ selected.unit }}">
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="vehicle_type">Type</label>
+                                <select class="form-control form-control-sm" id="vehicle_type" name="vehicle_type">
+                                    {% for item in ['Trailer', 'Tractor', 'Chassis', 'Equipment'] %}
+                                        <option value="{{ item }}" {% if selected.vehicle_type == item %}selected{% endif %}>{{ item }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="year">Year</label>
+                                <input type="text" class="form-control form-control-sm" id="year" name="year" value="{{ selected.year }}">
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="make">Make</label>
+                                <input type="text" class="form-control form-control-sm" id="make" name="make" value="{{ selected.make }}">
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="model">Model</label>
+                                <input type="text" class="form-control form-control-sm" id="model" name="model" value="{{ selected.model }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-5">
+                                <label for="vin">VIN</label>
+                                <input type="text" class="form-control form-control-sm" id="vin" name="vin" value="{{ selected.vin }}">
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="plate">Tag / Plate</label>
+                                <input type="text" class="form-control form-control-sm" id="plate" name="plate" value="{{ selected.plate }}">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="title">Title</label>
+                                <input type="text" class="form-control form-control-sm" id="title" name="title" value="{{ selected.title }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header py-2 font-weight-bold">Depreciation Setup</div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="accum_dep_account">Accumulated Depreciation</label>
+                                <select class="form-control form-control-sm" id="accum_dep_account" name="accum_dep_account">
+                                    <option value="">Choose later</option>
+                                    {% for account in accum_accounts %}
+                                        <option value="{{ account.Name }}" {% if selected.accum_dep_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="dep_expense_account">Depreciation Expense</label>
+                                <select class="form-control form-control-sm" id="dep_expense_account" name="dep_expense_account">
+                                    <option value="">Choose later</option>
+                                    {% for account in expense_accounts %}
+                                        <option value="{{ account.Name }}" {% if selected.dep_expense_account == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="book_life_months">Book Months</label>
+                                <input type="number" class="form-control form-control-sm" id="book_life_months" name="book_life_months" value="{{ selected.book_life_months }}">
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="tax_life_months">Tax Months</label>
+                                <input type="number" class="form-control form-control-sm" id="tax_life_months" name="tax_life_months" value="{{ selected.tax_life_months }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="tax_class">Tax Class</label>
+                                <input type="text" class="form-control form-control-sm" id="tax_class" name="tax_class" value="{{ selected.tax_class }}" placeholder="5-year, 7-year, etc.">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="section179">Section 179</label>
+                                <input type="text" class="form-control form-control-sm text-right" id="section179" name="section179" value="{{ selected.section179 }}">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="bonus_depreciation">Bonus Depreciation</label>
+                                <input type="text" class="form-control form-control-sm text-right" id="bonus_depreciation" name="bonus_depreciation" value="{{ selected.bonus_depreciation }}">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success">Post Asset Purchase</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header py-2 font-weight-bold">Recent Depreciation Assets</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Identifier</th>
+                            <th>Account</th>
+                            <th class="text-right">Basis</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for asset in recent_assets %}
+                            <tr>
+                                <td>{{ asset.AssetName }}</td>
+                                <td>{{ asset.AssetIdentifier or '' }}</td>
+                                <td>{{ asset.AssetAccount or '' }}</td>
+                                <td class="text-right">{{ asset.cost_fmt }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-muted">No depreciation assets found for this company.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-3">
+                Asset purchases post as debit to the selected asset account and credit to the selected funding account.
+                Depreciation expense is handled later through the depreciation setup.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
