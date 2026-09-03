@@ -1628,7 +1628,7 @@ Bills_setup = {'name' : 'Billing',
                                 ['Company', 'Vendor', 'Select Vendor', 'select', 'vendordata', 0, 'ok', 'cl', 15, 'Always'],
                                 ['bAmount', 'Bill$', 'Bill$', 'text', 'float', 0, 'ok', 'cr', None, 'Always'],
                                 ['Co', 'Co', 'Co/Div', 'select', 'codata', 0, 'ok', 'cc', None, 'Always'],
-                                ['Reconciled', 'Rec', 'Reconciled', 'text', None, 0, 'ok', 'cc', None, 'Always'],
+                                ['Reconciled', 'Rec', 'Reconciled', 'text', None, 0, 'ok', 'cc', None, 'RecInfo'],
 
                                 ['bAccount','ExAcct', 'Bill Acct', 'select', 'expdata', 0, 'ok', 'cl', None, 'ExpType'],
                                 ['bType','Ptype', 'Ptype', 'disabled', 'disabled', 0, 'ok', 'cc', None, 'ExpType'],

@@ -12,10 +12,12 @@ from webapp.report_maker import reportmaker
 from webapp.viewfuncs import d2s
 from webapp.CCC_system_setup import scac
 
-def reset_trial(ix, bankacct=None):
+def reset_trial(ix, bankacct=None, ledger_ids=None):
     query = Gledger.query.filter(Gledger.Reconciled == 25)
     if bankacct is not None:
         query = query.filter(Gledger.Account == bankacct)
+    if ledger_ids is not None:
+        query = query.filter(Gledger.id.in_(ledger_ids))
     gdata = query.all()
     for gdat in gdata:
         gdat.Reconciled = ix
@@ -616,7 +618,7 @@ def isoBank():
                     err.append(f'Cannot finalize because the statement is out of balance by ${acctinfo[5]}.')
 
                 if finalize is not None and abs(parse_money(acctinfo[5])) <= .01:
-                    reset_trial(recmo, acname)
+                    reset_trial(recmo, acname, odervec)
                     reconciled_jobs = mark_reconciled_payment_jobs(odervec)
                     hv[1] = [0]
                     rdat = Reconciliations.query.filter((Reconciliations.Rdate == hv[0]) & (Reconciliations.Account == acname)).first()

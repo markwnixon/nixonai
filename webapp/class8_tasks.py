@@ -3280,6 +3280,11 @@ def make_new_entry(tablesetup,holdvec):
                     #print(f'setting {entry[0]} to {entry[1]}')
                     setattr(dat, f'{entry[0]}', entry[1])
             db.session.commit()
+        if table == 'Bills':
+            # New bill rows are never reconciled at creation time. Reconciliation is
+            # synced later from matched general-ledger payment rows.
+            dat.Reconciled = 0
+            db.session.commit()
         #err.append(f"Updated entry in {tablesetup['table']}")
 
         if sourcekeys is not None:

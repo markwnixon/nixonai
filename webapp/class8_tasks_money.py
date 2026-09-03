@@ -49,7 +49,27 @@ def addr2break(adv):
     ecity = ecity.title()
     return ecity, estate, ezip
 
+def invoice_record_status(current_status, requested_status):
+    """Do not let invoice ledger refreshes move sent/paid invoices backward."""
+    try:
+        current_status = int(current_status)
+    except (TypeError, ValueError):
+        current_status = 0
+    try:
+        requested_status = int(requested_status)
+    except (TypeError, ValueError):
+        requested_status = 0
+    if requested_status == 2 and current_status >= 3:
+        return current_status
+    return requested_status
+
+
+def set_invoice_record_status(order, requested_status):
+    order.Istat = invoice_record_status(getattr(order, 'Istat', None), requested_status)
+
+
 def loginvo_m(odat,ix):
+    err = []
     alink = odat.Links
     #print(f'ix is {ix} and alink is {alink}')
     if hasinput(alink):
@@ -62,13 +82,13 @@ def loginvo_m(odat,ix):
                 #print(aoder,thisodat.Istat)
                 jo = thisodat.Jo
                 gledger_write(['invoice',amtinvo], jo, 0, 0, 0)
-                thisodat.Istat = ix
+                set_invoice_record_status(thisodat, ix)
                 db.session.commit()
     else:
         jo = odat.Jo
         amtinvo = odat.InvoTotal
         err = gledger_write(['invoice', amtinvo], jo, 0, 0, 0)
-        odat.Istat = ix
+        set_invoice_record_status(odat, ix)
         db.session.commit()
     return err
 
@@ -554,7 +574,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             odat = eval(nextquery)
             err = loginvo_m(odat, 2)
             if 'Error' not in err:
-                odat.Istat = 2
+                set_invoice_record_status(odat, 2)
                 db.session.commit()
                 completed = True
         logemail = request.values.get('emailInvo')

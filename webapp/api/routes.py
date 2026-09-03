@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from webapp.extensions import db
-from webapp.models import Orders, users, Pins, Vehicles, Drivers, Driverlog, DispatchDriverMessage, DispatchDriverAssignment
+from webapp.models import Orders, users, Pins, Vehicles, Drivers, Driverlog, DispatchDriverMessage, DispatchDriverAssignment, Quoteinput
 from webapp.viewfuncs import hasinput
 from webapp.CCC_system_setup import addpath, apikeys, scac, tpath
 from webapp.services.api_data_service import api_call
@@ -357,6 +357,621 @@ def _google_distance(origin, destination):
         }
     except Exception:
         return None
+
+
+def _route_point_from_value(value):
+    if isinstance(value, dict):
+        lat = _first_present(value, ['lat', 'latitude'])
+        lng = _first_present(value, ['lng', 'lon', 'longitude'])
+        if lat not in (None, '') and lng not in (None, ''):
+            try:
+                lat_float = float(lat)
+                lng_float = float(lng)
+            except (TypeError, ValueError):
+                return None, ''
+            return {
+                'location': {
+                    'latLng': {
+                        'latitude': lat_float,
+                        'longitude': lng_float,
+                    }
+                }
+            }, f'{lat_float},{lng_float}'
+
+        address = _first_present(value, ['address', 'location', 'name', 'text'])
+        if address:
+            return {'address': str(address)}, str(address)
+        return None, ''
+
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        try:
+            lat_float = float(value[0])
+            lng_float = float(value[1])
+        except (TypeError, ValueError):
+            return None, ''
+        return {
+            'location': {
+                'latLng': {
+                    'latitude': lat_float,
+                    'longitude': lng_float,
+                }
+            }
+        }, f'{lat_float},{lng_float}'
+
+    text_value = _clean_route_text(value)
+    if not text_value:
+        return None, ''
+
+    coordinates = _parse_coordinate_pair(text_value)
+    if coordinates is not None:
+        lat_float, lng_float = coordinates
+        return {
+            'location': {
+                'latLng': {
+                    'latitude': lat_float,
+                    'longitude': lng_float,
+                }
+            }
+        }, f'{lat_float},{lng_float}'
+
+    return {'address': text_value}, text_value
+
+
+def _route_point_from_request(data, point_names, lat_names, lng_names):
+    for point_name in point_names:
+        value = data.get(point_name)
+        route_point, label = _route_point_from_value(value)
+        if route_point:
+            return route_point, label
+
+    lat = _first_present(data, lat_names)
+    lng = _first_present(data, lng_names)
+    if lat not in (None, '') and lng not in (None, ''):
+        return _route_point_from_value({'lat': lat, 'lng': lng})
+    return None, ''
+
+
+def _google_duration_seconds(value):
+    if not value:
+        return None
+    try:
+        if isinstance(value, str) and value.endswith('s'):
+            return int(round(float(value[:-1])))
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_route_duration(seconds):
+    if seconds is None:
+        return ''
+    minutes = int(round(seconds / 60.0))
+    hours = minutes // 60
+    remainder = minutes % 60
+    if hours and remainder:
+        return f'{hours} hr {remainder} min'
+    if hours:
+        return f'{hours} hr'
+    return f'{remainder} min'
+
+
+def _format_route_distance(meters):
+    if meters is None:
+        return ''
+    miles = float(meters) / 1609.344
+    return f'{miles:.1f} mi'
+
+
+def _route_api_key():
+    try:
+        return apikeys.get('dkey') or ''
+    except Exception:
+        return ''
+
+
+def _google_routes_payload(origin, destination, avoid_tolls=False, departure_time=None):
+    body = {
+        'origin': origin,
+        'destination': destination,
+        'travelMode': 'DRIVE',
+        'routingPreference': 'TRAFFIC_AWARE',
+        'computeAlternativeRoutes': True,
+        'units': 'IMPERIAL',
+    }
+    if avoid_tolls:
+        body['routeModifiers'] = {'avoidTolls': True}
+    if departure_time:
+        body['departureTime'] = departure_time
+    return body
+
+
+def _normalize_google_route(route, route_set, index):
+    duration_seconds = _google_duration_seconds(route.get('duration'))
+    static_duration_seconds = _google_duration_seconds(route.get('staticDuration'))
+    distance_meters = route.get('distanceMeters')
+    polyline = route.get('polyline') or {}
+    advisory = route.get('travelAdvisory') or {}
+    steps = []
+    for leg in route.get('legs') or []:
+        for step in leg.get('steps') or []:
+            instruction = (step.get('navigationInstruction') or {}).get('instructions') or ''
+            steps.append({
+                'instruction': instruction,
+                'distance_meters': step.get('distanceMeters'),
+                'duration_seconds': _google_duration_seconds(step.get('staticDuration') or step.get('duration')),
+                'polyline': (step.get('polyline') or {}).get('encodedPolyline'),
+            })
+
+    return {
+        'route_id': f'{route_set}_{index + 1}',
+        'route_set': route_set,
+        'description': route.get('description') or '',
+        'distance_meters': distance_meters,
+        'distance_text': _format_route_distance(distance_meters),
+        'duration_seconds': duration_seconds,
+        'duration_text': _format_route_duration(duration_seconds),
+        'static_duration_seconds': static_duration_seconds,
+        'static_duration_text': _format_route_duration(static_duration_seconds),
+        'encoded_polyline': polyline.get('encodedPolyline'),
+        'has_toll_info': bool(advisory.get('tollInfo')),
+        'travel_advisory': advisory,
+        'steps': steps,
+    }
+
+
+def _decode_google_polyline(encoded):
+    if not encoded:
+        return []
+    index = 0
+    lat = 0
+    lng = 0
+    coordinates = []
+    while index < len(encoded):
+        result = 0
+        shift = 0
+        while True:
+            value = ord(encoded[index]) - 63
+            index += 1
+            result |= (value & 0x1f) << shift
+            shift += 5
+            if value < 0x20:
+                break
+        lat += ~(result >> 1) if result & 1 else result >> 1
+
+        result = 0
+        shift = 0
+        while True:
+            value = ord(encoded[index]) - 63
+            index += 1
+            result |= (value & 0x1f) << shift
+            shift += 5
+            if value < 0x20:
+                break
+        lng += ~(result >> 1) if result & 1 else result >> 1
+        coordinates.append((lat / 100000.0, lng / 100000.0))
+    return coordinates
+
+
+def _route_crosses_box(points, tollbox):
+    if len(points) < 2:
+        return False
+    lah = max([tollbox[0], tollbox[2]])
+    lal = min([tollbox[0], tollbox[2]])
+    loh = max([tollbox[1], tollbox[3]])
+    lol = min([tollbox[1], tollbox[3]])
+    for index in range(1, len(points)):
+        la_last, lo_last = points[index - 1]
+        la, lo = points[index]
+        lanow = la_last
+        lonow = lo_last
+        lastep = (la - la_last) / 100
+        lostep = (lo - lo_last) / 100
+        for _step in range(100):
+            lanow += lastep
+            lonow += lostep
+            if lanow > lal and lanow < lah and lonow > lol and lonow < loh:
+                return True
+    return False
+
+
+def _route_coordinate_points(coordinates):
+    points = []
+    for point in coordinates or []:
+        if not isinstance(point, dict):
+            continue
+        lat = _first_present(point, ['latitude', 'lat'])
+        lng = _first_present(point, ['longitude', 'lng', 'lon'])
+        try:
+            points.append((float(lat), float(lng)))
+        except (TypeError, ValueError):
+            continue
+    return points
+
+
+def _route_cost_inputs():
+    qidat = Quoteinput.query.order_by(Quoteinput.id.desc()).first()
+    if qidat is None:
+        return None
+    return {
+        'source': 'quoteinput',
+        'quoteinput_id': qidat.id,
+        'driver_hourly_cost': float(qidat.ph_driver or 0) / 100,
+        'fuel_price_per_gallon': float(qidat.fuelpergal or 0) / 100,
+        'mpg': float(qidat.mpg or 0) / 100,
+        'standard_toll_amount': float(qidat.toll or 0) / 100,
+    }
+
+
+def _route_toll_analysis(route, cost_inputs):
+    road_tolls = [
+        ('I-76', 0.784),
+        ('NJ Tpke', 0.275),
+        ('MD-200', 0.35),
+    ]
+    plaza_tolls = [
+        ('FM', [39.267757, -76.610192, 39.261248, -76.563158], cost_inputs['standard_toll_amount']),
+        ('BHT', [39.269962, -76.566240, 39.239063, -76.58], cost_inputs['standard_toll_amount']),
+        ('FSK', [39.232770, -76.502453, 39.202279, -76.569906], cost_inputs['standard_toll_amount']),
+        ('BAY', [39.026893, -76.417512, 38.964938, -76.290104], cost_inputs['standard_toll_amount']),
+        ('SUS', [39.478100, -76.112203, 39.608403, -76.062308], cost_inputs['standard_toll_amount']),
+        ('NEW', [39.634568, -75.773041, 39.657970, -75.754566], cost_inputs['standard_toll_amount']),
+        ('DMB', [39.644216, -75.570003, 39.721472, -75.465073], cost_inputs['standard_toll_amount']),
+        ('DTR', [38.932101, -77.243797, 38.942280, -77.230473], 10.50),
+    ]
+    tolls = []
+    total = 0.0
+
+    instruction_steps = route.get('steps') or []
+    if route.get('route_name'):
+        instruction_steps = instruction_steps + [{
+            'instruction': route.get('route_name') or '',
+            'distance_meters': route.get('distance_meters') or 0,
+        }]
+
+    for step in instruction_steps:
+        instruction = step.get('instruction') or ''
+        step_miles = (step.get('distance_meters') or 0) / 1609.344
+        for road_name, cost_per_mile in road_tolls:
+            if road_name in instruction and step_miles:
+                amount = step_miles * cost_per_mile
+                tolls.append({
+                    'code': road_name,
+                    'source': 'road_instruction',
+                    'amount': round(amount, 2),
+                    'basis': f'{step_miles:.1f} mi at ${cost_per_mile:.3f}/mi',
+                })
+                total += amount
+
+    points = route.get('coordinates') or _decode_google_polyline(route.get('encoded_polyline'))
+    for code, tollbox, amount in plaza_tolls:
+        if _route_crosses_box(points, tollbox):
+            tolls.append({
+                'code': code,
+                'source': 'route_crossing',
+                'amount': round(amount, 2),
+                'basis': 'configured toll plaza crossing',
+            })
+            total += amount
+
+    return {
+        'toll_cost': round(total, 2),
+        'toll_count': len(tolls),
+        'tolls': tolls,
+    }
+
+
+def _attach_route_cost(route, cost_inputs):
+    miles = (route.get('distance_meters') or 0) / 1609.344
+    duration_seconds = route.get('duration_seconds') or route.get('static_duration_seconds') or 0
+    hours = duration_seconds / 3600.0
+    mpg = cost_inputs.get('mpg') or 0
+    fuel_cost = (miles / mpg) * cost_inputs['fuel_price_per_gallon'] if mpg else 0.0
+    driver_cost = hours * cost_inputs['driver_hourly_cost']
+    toll_analysis = _route_toll_analysis(route, cost_inputs)
+    total_cost = fuel_cost + driver_cost + toll_analysis['toll_cost']
+    route['cost_analysis'] = {
+        'distance_miles': round(miles, 2),
+        'duration_hours': round(hours, 2),
+        'fuel_price_per_gallon': round(cost_inputs['fuel_price_per_gallon'], 2),
+        'mpg': round(mpg, 2),
+        'driver_hourly_cost': round(cost_inputs['driver_hourly_cost'], 2),
+        'fuel_cost': round(fuel_cost, 2),
+        'driver_cost': round(driver_cost, 2),
+        'toll_cost': toll_analysis['toll_cost'],
+        'total_cost': round(total_cost, 2),
+        'tolls': toll_analysis['tolls'],
+    }
+    return route
+
+
+def _attach_costs_to_routes(routes, cost_inputs):
+    return [_attach_route_cost(route, cost_inputs) for route in routes]
+
+
+def _normalize_ios_route_candidate(candidate, index):
+    if not isinstance(candidate, dict):
+        return None, f'Candidate {index + 1} is not an object.'
+
+    candidate_id = _first_present(candidate, ['candidate_id', 'id']) or f'candidate_{index + 1}'
+    try:
+        distance_meters = float(candidate.get('distance_meters') or 0)
+    except (TypeError, ValueError):
+        return None, f'Candidate {candidate_id} has invalid distance_meters.'
+    try:
+        duration_seconds = float(candidate.get('expected_travel_seconds') or candidate.get('duration_seconds') or 0)
+    except (TypeError, ValueError):
+        return None, f'Candidate {candidate_id} has invalid expected_travel_seconds.'
+
+    points = _route_coordinate_points(candidate.get('coordinates') or [])
+    warnings = []
+    if distance_meters <= 0:
+        warnings.append('distance_meters is missing or zero')
+    if duration_seconds <= 0:
+        warnings.append('expected_travel_seconds is missing or zero')
+    if len(points) < 2:
+        warnings.append('coordinates are missing or insufficient for toll geofence analysis')
+
+    route = {
+        'candidate_id': candidate_id,
+        'route_id': candidate_id,
+        'route_set': candidate.get('source_preference') or '',
+        'source_preference': candidate.get('source_preference') or '',
+        'route_name': candidate.get('route_name') or '',
+        'distance_meters': distance_meters,
+        'distance_text': _format_route_distance(distance_meters),
+        'duration_seconds': duration_seconds,
+        'duration_text': _format_route_duration(duration_seconds),
+        'apple_has_tolls': bool(candidate.get('apple_has_tolls')),
+        'apple_has_highways': bool(candidate.get('apple_has_highways')),
+        'coordinate_count': len(points),
+        # Keep all MapKit polyline points server-side during evaluation. Do not
+        # simplify before toll geofence detection, because small geofences can
+        # be missed by aggressive geometry reduction.
+        'coordinates': points,
+        'warnings': warnings,
+    }
+    return route, ''
+
+
+def _route_operating_cost(route):
+    costs = route.get('cost_analysis') or {}
+    return round((costs.get('fuel_cost') or 0) + (costs.get('driver_cost') or 0), 2)
+
+
+def _route_evaluation_payload(route):
+    costs = route.get('cost_analysis') or {}
+    return {
+        'candidate_id': route.get('candidate_id'),
+        'truck_toll_cost': costs.get('toll_cost') or 0.0,
+        'estimated_operating_cost': _route_operating_cost(route),
+        'estimated_total_cost': costs.get('total_cost') or 0.0,
+        'toll_facilities': [
+            {
+                'name': toll.get('code') or '',
+                'cost': toll.get('amount') or 0.0,
+            }
+            for toll in costs.get('tolls') or []
+        ],
+    }
+
+
+def _route_recommendation_payload(selected_route, evaluated_candidates):
+    selected_costs = selected_route.get('cost_analysis') or {}
+    standard_routes = [
+        route for route in evaluated_candidates
+        if (route.get('source_preference') or '').lower() == 'standard'
+    ]
+    comparison_route = standard_routes[0] if standard_routes else None
+    if comparison_route is None:
+        comparison_route = next(
+            (route for route in evaluated_candidates if route.get('candidate_id') != selected_route.get('candidate_id')),
+            selected_route,
+        )
+    comparison_costs = comparison_route.get('cost_analysis') or {}
+
+    toll_savings = round((comparison_costs.get('toll_cost') or 0) - (selected_costs.get('toll_cost') or 0), 2)
+    additional_distance = int(round((selected_route.get('distance_meters') or 0) - (comparison_route.get('distance_meters') or 0)))
+    additional_seconds = int(round((selected_route.get('duration_seconds') or 0) - (comparison_route.get('duration_seconds') or 0)))
+    additional_operating = round(_route_operating_cost(selected_route) - _route_operating_cost(comparison_route), 2)
+    net_savings = round((comparison_costs.get('total_cost') or 0) - (selected_costs.get('total_cost') or 0), 2)
+
+    if selected_route.get('candidate_id') == comparison_route.get('candidate_id'):
+        reason = f"Lowest calculated total cost is ${selected_costs.get('total_cost', 0):.2f}."
+    elif toll_savings > 0 and additional_seconds > 0:
+        reason = f"Avoids ${toll_savings:.2f} in truck tolls for {round(additional_seconds / 60)} additional minutes."
+    elif toll_savings > 0:
+        reason = f"Avoids ${toll_savings:.2f} in truck tolls."
+    else:
+        reason = f"Lowest calculated total cost is ${selected_costs.get('total_cost', 0):.2f}."
+
+    return {
+        'route_name': selected_route.get('route_name') or '',
+        'reason': reason,
+        'truck_toll_cost': selected_costs.get('toll_cost') or 0.0,
+        'toll_savings': toll_savings,
+        'additional_distance_meters': additional_distance,
+        'additional_travel_seconds': additional_seconds,
+        'estimated_additional_operating_cost': additional_operating,
+        'estimated_net_savings': net_savings,
+    }
+
+
+@api_bp.route('/api/driver/route/evaluate', methods=['POST'])
+@jwt_required()
+def driver_route_evaluate():
+    _current_user = get_jwt_identity()
+    data = request.get_json(silent=True) or {}
+    candidates = data.get('candidates') or []
+    if not isinstance(candidates, list) or not candidates:
+        return jsonify({
+            'success': False,
+            'error': 'At least one route candidate is required.',
+        }), 400
+
+    cost_inputs = _route_cost_inputs()
+    if cost_inputs is None:
+        return jsonify({
+            'success': False,
+            'error': 'No Quoteinput pricing row found for route cost analysis.',
+        }), 500
+
+    evaluated_candidates = []
+    rejected_candidates = []
+    for index, candidate in enumerate(candidates):
+        route, error = _normalize_ios_route_candidate(candidate, index)
+        if error:
+            rejected_candidates.append({
+                'candidate_index': index,
+                'error': error,
+            })
+            continue
+        evaluated_candidates.append(_attach_route_cost(route, cost_inputs))
+
+    favored_route, selection_reason = _choose_favored_route(evaluated_candidates, [])
+    if favored_route is None:
+        return jsonify({
+            'success': False,
+            'request_id': data.get('request_id'),
+            'error': 'No route candidates could be evaluated.',
+            'rejected_candidates': rejected_candidates,
+        }), 400
+
+    # Avoid sending the entire polyline back unless the client already has it.
+    for route in evaluated_candidates:
+        route.pop('coordinates', None)
+
+    favored_payload = dict(favored_route)
+    favored_payload.pop('coordinates', None)
+    return jsonify({
+        'request_id': data.get('request_id'),
+        'selected_candidate_id': favored_payload.get('candidate_id'),
+        'recommendation': _route_recommendation_payload(favored_payload, evaluated_candidates),
+        'evaluations': [_route_evaluation_payload(route) for route in evaluated_candidates],
+        'metadata': {
+            'success': True,
+            'provider': 'apple_mapkit_candidates',
+            'selection_reason': selection_reason,
+            'departure_at': data.get('departure_at'),
+            'truck': data.get('truck'),
+            'origin': data.get('origin'),
+            'destination': data.get('destination'),
+            'cost_inputs': cost_inputs,
+            'rejected_candidates': rejected_candidates,
+        },
+    }), 200
+
+
+def _fetch_google_routes(origin, destination, route_set, avoid_tolls=False, departure_time=None):
+    api_key = _route_api_key()
+    if not api_key:
+        return [], 'Google route API key is not configured.'
+
+    field_mask = (
+        'routes.duration,routes.staticDuration,routes.distanceMeters,routes.description,'
+        'routes.polyline.encodedPolyline,routes.travelAdvisory.tollInfo,'
+        'routes.legs.steps.distanceMeters,routes.legs.steps.staticDuration,'
+        'routes.legs.steps.navigationInstruction,routes.legs.steps.polyline.encodedPolyline'
+    )
+    try:
+        response = requests.post(
+            'https://routes.googleapis.com/directions/v2:computeRoutes',
+            headers={
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': api_key,
+                'X-Goog-FieldMask': field_mask,
+            },
+            json=_google_routes_payload(origin, destination, avoid_tolls=avoid_tolls, departure_time=departure_time),
+            timeout=10,
+        )
+        if response.status_code >= 400:
+            return [], f'Google Routes API returned HTTP {response.status_code}.'
+        payload = response.json()
+    except Exception as exc:
+        return [], f'Google Routes API request failed: {exc}'
+
+    routes = payload.get('routes') or []
+    if not routes:
+        return [], 'Google Routes API returned no routes.'
+    return [_normalize_google_route(route, route_set, index) for index, route in enumerate(routes)], ''
+
+
+def _choose_favored_route(normal_routes, toll_avoidance_routes):
+    candidates = normal_routes + toll_avoidance_routes
+    if not candidates:
+        return None, 'No candidate route was available.'
+    favored = min(
+        candidates,
+        key=lambda route: (route.get('cost_analysis') or {}).get('total_cost', 999999999),
+    )
+    cost = (favored.get('cost_analysis') or {}).get('total_cost')
+    return favored, f'Lowest calculated route cost: ${cost:.2f}.'
+
+
+@api_bp.route('/api/driver/truck-route', methods=['POST'])
+@api_bp.route('/api/truck/route', methods=['POST'])
+@jwt_required()
+def driver_truck_route():
+    data = request.get_json(silent=True) or {}
+    origin, origin_label = _route_point_from_request(
+        data,
+        ['origin', 'start', 'starting_point', 'from'],
+        ['origin_lat', 'start_lat', 'latitude'],
+        ['origin_lng', 'origin_lon', 'start_lng', 'start_lon', 'longitude'],
+    )
+    destination, destination_label = _route_point_from_request(
+        data,
+        ['destination', 'dest', 'to'],
+        ['destination_lat', 'dest_lat'],
+        ['destination_lng', 'destination_lon', 'dest_lng', 'dest_lon'],
+    )
+    if not origin or not destination:
+        return jsonify({
+            'success': False,
+            'error': 'Origin and destination are required. Send either address text or lat/lng coordinates.',
+        }), 400
+
+    departure_time = _first_present(data, ['departure_time', 'departureTime'])
+    cost_inputs = _route_cost_inputs()
+    if cost_inputs is None:
+        return jsonify({
+            'success': False,
+            'error': 'No Quoteinput pricing row found for route cost analysis.',
+        }), 500
+    normal_routes, normal_error = _fetch_google_routes(origin, destination, 'normal', avoid_tolls=False, departure_time=departure_time)
+    toll_avoidance_routes, toll_error = _fetch_google_routes(origin, destination, 'toll_avoidance', avoid_tolls=True, departure_time=departure_time)
+    normal_routes = _attach_costs_to_routes(normal_routes, cost_inputs)
+    toll_avoidance_routes = _attach_costs_to_routes(toll_avoidance_routes, cost_inputs)
+    favored_route, selection_reason = _choose_favored_route(normal_routes, toll_avoidance_routes)
+
+    if favored_route is None:
+        return jsonify({
+            'success': False,
+            'error': 'No truck route candidates could be calculated.',
+            'provider_errors': {
+                'normal': normal_error,
+                'toll_avoidance': toll_error,
+            },
+        }), 502
+
+    return jsonify({
+        'success': True,
+        'provider': 'google_routes',
+        'travel_mode': 'DRIVE',
+        'truck_note': 'Google Routes API does not apply truck-specific restrictions; returned routes are driving routes for local toll analysis.',
+        'origin': origin_label,
+        'destination': destination_label,
+        'cost_inputs': cost_inputs,
+        'favored_route': favored_route,
+        'selection_reason': selection_reason,
+        'candidate_routes': {
+            'normal': normal_routes,
+            'toll_avoidance': toll_avoidance_routes,
+        },
+        'provider_errors': {
+            'normal': normal_error,
+            'toll_avoidance': toll_error,
+        },
+    }), 200
 
 
 def _dispatch_route_payload(order, driver_name, data):

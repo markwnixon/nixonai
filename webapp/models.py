@@ -1916,7 +1916,7 @@ class Bills(db.Model):
     MethList = db.Column('MethList', db.String(200))
     Pcache = db.Column('Pcache', db.Integer)
     pMeth = db.Column('pMeth', db.String(45))
-    Reconciled = db.Column('Reconciled', db.Integer)
+    Reconciled = db.Column('Reconciled', db.Integer, default=0)
 
     def __init__(self, Jo, Pid, Company, Memo, Description, bAmount, Status, Scache, Source, Ref, Date, pDate, pAmount, pMulti, pAccount, bAccount, bType, bCat, bSubcat, Link, User, Co, Temp1, Temp2, Recurring, dDate, pAmount2, pDate2, Proof, Check, Ccache, QBi, iflag, PmtList, PacctList, RefList, MemoList, PdateList, CheckList, MethList, Pcache, pMeth, Reconciled=0):
         self.Jo = Jo
@@ -1961,7 +1961,7 @@ class Bills(db.Model):
         self.MethList = MethList
         self.Pcache = Pcache
         self.pMeth = pMeth
-        self.Reconciled = Reconciled
+        self.Reconciled = Reconciled or 0
 
     def Bal(self):
         try:

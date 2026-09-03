@@ -8502,6 +8502,276 @@ def DepreciationSchedules():
     )
 
 
+@main.route('/AssetPurchase', methods=['GET', 'POST'])
+@login_required
+@financial_mfa_required
+def AssetPurchase():
+    def ensure_depreciation_schema():
+        if db.engine.dialect.name != 'mysql':
+            DepreciationAsset.__table__.create(bind=db.engine, checkfirst=True)
+            return
+        columns = {
+            'SourceTable': 'VARCHAR(45)',
+            'SourceId': 'INT',
+            'Company': 'VARCHAR(2)',
+            'AssetName': 'VARCHAR(100)',
+            'AssetIdentifier': 'VARCHAR(100)',
+            'AssetAccount': 'VARCHAR(50)',
+            'AccumDepAccount': 'VARCHAR(50)',
+            'DepExpenseAccount': 'VARCHAR(50)',
+            'InServiceDate': 'DATE',
+            'CostBasis': 'INT',
+            'SalvageValue': 'INT',
+            'BookMethod': 'VARCHAR(45)',
+            'BookLifeMonths': 'INT',
+            'TaxMethod': 'VARCHAR(45)',
+            'TaxClass': 'VARCHAR(45)',
+            'TaxLifeMonths': 'INT',
+            'Section179': 'INT',
+            'BonusDepreciation': 'INT',
+            'PriorBookAccum': 'INT',
+            'PriorTaxAccum': 'INT',
+            'Status': 'VARCHAR(25)',
+            'CreatedAt': 'DATETIME',
+            'UpdatedAt': 'DATETIME',
+        }
+        with db.engine.begin() as conn:
+            create_columns = ',\n                '.join([f'`{name}` {definition}' for name, definition in columns.items()])
+            conn.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS `depreciation_assets` (
+                    `id` INT NOT NULL AUTO_INCREMENT,
+                    {create_columns},
+                    PRIMARY KEY (`id`)
+                )
+            """))
+            existing_columns = {row[0] for row in conn.execute(text('SHOW COLUMNS FROM `depreciation_assets`'))}
+            for name, definition in columns.items():
+                if name not in existing_columns:
+                    conn.execute(text(f'ALTER TABLE `depreciation_assets` ADD COLUMN `{name}` {definition}'))
+
+    def parse_date(value):
+        try:
+            return datetime.datetime.strptime(value, '%Y-%m-%d').date()
+        except:
+            return None
+
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            if clean in ['', '-']:
+                return 0
+            return int((Decimal(clean) * Decimal('100')).quantize(Decimal('1')))
+        except:
+            return None
+
+    def money(cents):
+        return "${:,.2f}".format((cents or 0) / 100)
+
+    ensure_depreciation_schema()
+    today_value = datetime.date.today().strftime('%Y-%m-%d')
+    err = []
+    selected = {
+        'company': request.values.get('company', cmpdata[10]),
+        'purchase_date': request.values.get('purchase_date', today_value),
+        'vendor_id': request.values.get('vendor_id', ''),
+        'asset_name': request.values.get('asset_name', ''),
+        'asset_identifier': request.values.get('asset_identifier', ''),
+        'asset_account': request.values.get('asset_account', ''),
+        'funding_account': request.values.get('funding_account', ''),
+        'purchase_amount': request.values.get('purchase_amount', ''),
+        'purchase_ref': request.values.get('purchase_ref', ''),
+        'source_vehicle_id': request.values.get('source_vehicle_id', ''),
+        'create_vehicle': request.values.get('create_vehicle') == 'on',
+        'unit': request.values.get('unit', ''),
+        'vehicle_type': request.values.get('vehicle_type', 'Trailer'),
+        'year': request.values.get('year', ''),
+        'make': request.values.get('make', ''),
+        'model': request.values.get('model', ''),
+        'vin': request.values.get('vin', ''),
+        'plate': request.values.get('plate', ''),
+        'title': request.values.get('title', ''),
+        'accum_dep_account': request.values.get('accum_dep_account', ''),
+        'dep_expense_account': request.values.get('dep_expense_account', ''),
+        'book_life_months': request.values.get('book_life_months', '60'),
+        'tax_life_months': request.values.get('tax_life_months', '60'),
+        'tax_class': request.values.get('tax_class', ''),
+        'section179': request.values.get('section179', '0.00'),
+        'bonus_depreciation': request.values.get('bonus_depreciation', '0.00'),
+    }
+
+    if request.method == 'POST':
+        purchase_date = parse_date(selected['purchase_date'])
+        purchase_amount = money_to_cents(selected['purchase_amount'])
+        section179 = money_to_cents(selected['section179'])
+        bonus_depreciation = money_to_cents(selected['bonus_depreciation'])
+        try:
+            book_life_months = int(selected['book_life_months'])
+            tax_life_months = int(selected['tax_life_months'])
+        except:
+            book_life_months, tax_life_months = 0, 0
+
+        company_code = selected['company'].strip()
+        vendor = People.query.get(selected['vendor_id'] or 0)
+        asset_account = Accounts.query.filter(
+            (Accounts.Name == selected['asset_account']) &
+            (Accounts.Co == company_code) &
+            (
+                (Accounts.Type.contains('Asset')) |
+                (Accounts.Category == 'Assets')
+            )
+        ).first()
+        funding_account = Accounts.query.filter((Accounts.Name == selected['funding_account']) & (Accounts.Co == company_code)).first()
+
+        if purchase_date is None:
+            err.append('Purchase date is invalid.')
+        if purchase_amount is None or purchase_amount <= 0:
+            err.append('Purchase amount must be greater than zero.')
+        if vendor is None:
+            err.append('Choose the vendor/seller.')
+        if asset_account is None:
+            err.append('Choose a valid asset account for this company.')
+        if funding_account is None:
+            err.append('Choose the bank, loan, payable, or funding account.')
+        if not selected['asset_name'].strip():
+            err.append('Asset name is required.')
+        if book_life_months <= 0 or tax_life_months <= 0:
+            err.append('Book and tax lives must be positive month counts.')
+        if section179 is None or bonus_depreciation is None:
+            err.append('Section 179 and bonus depreciation must be valid amounts.')
+        if not selected['source_vehicle_id'] and not selected['create_vehicle']:
+            err.append('Choose an existing vehicle/asset or check Create Vehicle Asset.')
+
+        if not err:
+            source_table = 'Vehicles'
+            source_id = int(selected['source_vehicle_id']) if selected['source_vehicle_id'] else None
+            if selected['create_vehicle']:
+                vehicle = Vehicles(
+                    Unit=selected['unit'].strip(),
+                    Year=selected['year'].strip(),
+                    Make=selected['make'].strip(),
+                    Model=selected['model'].strip(),
+                    Color=None,
+                    VIN=selected['vin'].strip(),
+                    Title=selected['title'].strip(),
+                    Plate=selected['plate'].strip(),
+                    EmpWeight=None,
+                    GrossWt=None,
+                    DOTNum=None,
+                    ExpDate=None,
+                    Odometer=None,
+                    Owner=None,
+                    Status='Active',
+                    Ezpassxponder=None,
+                    Portxponder=None,
+                    ServStr=purchase_date,
+                    ServStp=None,
+                    Active=1,
+                    Type=selected['vehicle_type'].strip() or 'Trailer',
+                    Regpdf=None,
+                    Titpdf=None,
+                    Rcache=0,
+                    Tcache=0,
+                )
+                db.session.add(vehicle)
+                db.session.flush()
+                source_id = vehicle.id
+
+            now = datetime.datetime.now()
+            asset_identifier = selected['asset_identifier'].strip() or selected['vin'].strip() or selected['unit'].strip()
+            asset = DepreciationAsset(
+                SourceTable=source_table,
+                SourceId=source_id,
+                Company=company_code,
+                AssetName=selected['asset_name'].strip(),
+                AssetIdentifier=asset_identifier,
+                AssetAccount=asset_account.Name,
+                AccumDepAccount=selected['accum_dep_account'].strip(),
+                DepExpenseAccount=selected['dep_expense_account'].strip(),
+                InServiceDate=purchase_date,
+                CostBasis=purchase_amount,
+                SalvageValue=0,
+                BookMethod='Straight Line',
+                BookLifeMonths=book_life_months,
+                TaxMethod='Straight Line',
+                TaxClass=selected['tax_class'].strip(),
+                TaxLifeMonths=tax_life_months,
+                Section179=section179,
+                BonusDepreciation=bonus_depreciation,
+                PriorBookAccum=0,
+                PriorTaxAccum=0,
+                Status='Active',
+                CreatedAt=now,
+                UpdatedAt=now,
+            )
+            db.session.add(asset)
+            db.session.flush()
+
+            journal_id = f'ASSET-PURCHASE-{asset.id}'
+            tcode = f'FA{asset.id}'
+            post_err = post_balanced_journal([
+                {'debit': purchase_amount, 'credit': 0, 'account': asset_account.Name, 'aid': asset_account.id,
+                 'source': vendor.Company, 'sid': vendor.id, 'type': 'AD', 'tcode': tcode, 'com': company_code,
+                 'recorded': now, 'date': purchase_date, 'ref': selected['purchase_ref'].strip()},
+                {'debit': 0, 'credit': purchase_amount, 'account': funding_account.Name, 'aid': funding_account.id,
+                 'source': vendor.Company, 'sid': vendor.id, 'type': 'AC', 'tcode': tcode, 'com': company_code,
+                 'recorded': now, 'date': purchase_date, 'ref': selected['purchase_ref'].strip()},
+            ], journal_id=journal_id,
+                journal_memo=f'Asset purchase {asset.AssetName} from {vendor.Company}',
+                posted_by=session.get('username', 'class8'),
+                source_table='DepreciationAsset',
+                source_id=asset.id)
+            if post_err:
+                db.session.rollback()
+                err.extend(post_err)
+            else:
+                db.session.commit()
+                flash(f'Asset purchase posted for {asset.AssetName}.', 'success')
+                return redirect(url_for('main.AssetPurchase'))
+
+    company_code = selected['company']
+    vendors = People.query.filter(People.Ptype == 'Vendor').order_by(People.Company).all()
+    asset_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (
+            (Accounts.Type.contains('Asset')) |
+            (Accounts.Category == 'Assets')
+        ) &
+        (~Accounts.Type.in_(['Bank', 'Exch']))
+    ).order_by(Accounts.Type, Accounts.Name).all()
+    funding_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (Accounts.Type.in_(['Bank', 'Asset', 'Current Liability', 'Long Term Liability', 'Credit', 'Exch']))
+    ).order_by(Accounts.Type, Accounts.Name).all()
+    accum_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        ((Accounts.Name.contains('Depreciation')) | (Accounts.Type.in_(['Asset', 'Current Liability', 'Equity'])))
+    ).order_by(Accounts.Name).all()
+    expense_accounts = Accounts.query.filter(
+        (Accounts.Co == company_code) & (Accounts.Type == 'Expense')
+    ).order_by(Accounts.Name).all()
+    vehicle_options = Vehicles.query.filter(Vehicles.Active == 1).order_by(Vehicles.Type, Vehicles.Unit, Vehicles.id).all()
+    recent_assets = DepreciationAsset.query.filter(
+        DepreciationAsset.Company == company_code
+    ).order_by(DepreciationAsset.id.desc()).limit(25).all()
+    for asset in recent_assets:
+        asset.cost_fmt = money(asset.CostBasis)
+
+    return render_template(
+        'asset_purchase.html',
+        cmpdata=cmpdata,
+        scac=scac,
+        selected=selected,
+        vendors=vendors,
+        asset_accounts=asset_accounts,
+        funding_accounts=funding_accounts,
+        accum_accounts=accum_accounts,
+        expense_accounts=expense_accounts,
+        vehicle_options=vehicle_options,
+        recent_assets=recent_assets,
+        err='\n'.join(err),
+    )
+
+
 @main.route('/Banking', methods=['GET', 'POST'])
 @login_required
 @financial_mfa_required
