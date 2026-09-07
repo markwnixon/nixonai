@@ -4091,6 +4091,22 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
         tablesetup = eval(f'{thistable}_setup')
         table = tablesetup['table']
 
+        if table == 'Orders' and task_focus == 'ClearHolds':
+            cleared = 0
+            unchanged = 0
+            for sid in tids[jx]:
+                odat = Orders.query.get(sid)
+                if odat is None:
+                    continue
+                if hasinput(odat.HoldType):
+                    odat.HoldType = ''
+                    cleared += 1
+                else:
+                    unchanged += 1
+            db.session.commit()
+            err.append(f'Cleared holds for {cleared} job(s). {unchanged} job(s) already had no hold.')
+            continue
+
         #Convert to allow on single item undo:
         if len(tids[jx]) > 1:
             err.append('Too Many Selections')

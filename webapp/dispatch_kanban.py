@@ -1402,7 +1402,7 @@ def kanban_options():
             customers.add(clean_text(company))
     options['customers'] = sorted(customers)
     options['columns'] = [{'key': key, 'label': label} for key, label in KANBAN_COLUMNS]
-    options['hold_types'] = ['', 'ECCES', 'Line Hold', 'Custom Hold', 'Other Hold', 'Line and Customs Hold']
+    options['hold_types'] = ['', 'Unavailable', 'Before ERD', 'Past Cutoff', 'ECCES', 'Line Hold', 'Custom Hold', 'Other Hold', 'Line and Customs Hold']
     options['delivery_types'] = ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder']
     options['ranges'] = [
         {'key': 'today', 'label': 'Today'},

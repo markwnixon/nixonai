@@ -36,7 +36,7 @@ Trucking_genre = {'table': 'Orders',
                                                   'Receive by Acct', 'Deposit Undeposited']},
                                  {'View Docs': ['Source', 'Proof', 'Manifest', 'Interchange', 'Invoice',
                                                 'Paid Invoice', 'Package']},
-                                 {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment', 'Undo Docs', 'Undo Docs xSource', 'Undo Proof', 'Undo 2nd Proof', 'Undo RateCon']},
+                                 {'Undo': ['Delete Item', 'Undo Invoice', 'Undo Payment', 'Undo Docs', 'Undo Docs xSource', 'Undo Proof', 'Undo 2nd Proof', 'Undo RateCon', 'Clear Holds']},
                                  {'Tasks': ['Street Turn', 'Unpulled Containers', 'Exports Pulled', 'Exports Returned', 'Exports Bk Diff', 'Imports Out', 'Update Emails', 'Update RC Needed']}],
                   'container_types': ['40\' GP 9\'6\"', '40\' RS 9\'6\"', '40\' GP 8\'6\"', '40\' RS 8\'6\"', '40\' FR',
                                       '20\' GP 8\'6\"', '20\' VH 8\'6\"', '45\' GP 9\'6\"', '45\' VH 9\'6\"', '40\' UT 9\'6\"', '40\' UT 8\'6\"',
@@ -45,7 +45,7 @@ Trucking_genre = {'table': 'Orders',
                   'haul_types': ['Dray Import', 'Dray Export', 'Dray Import DP', 'Dray Export DP', 'Dray Import 2T', 'Dray Export 2T', 'Import Extra Stop', 'Export Extra Stop', 'OTR', 'Box Truck', 'Transload Only', 'Dray-Transload', 'Transload-Deliver', 'Dray-Transload-Deliver', 'Dray Transfer'],
                   'load_types': ['Load In', 'Load Out', 'Empty In', 'Empty Out', 'Dray Out', 'Dray In'],
                   'delivery_types': ['Hard Time', 'Soft Time', 'Day Window', 'Upon Notice', 'Placeholder'],
-                  'hold_types': ['', 'ECCES', 'Line Hold', 'Custom Hold', 'Other Hold', 'Line and Customs Hold'],
+                  'hold_types': ['', 'Unavailable', 'Before ERD', 'Past Cutoff', 'ECCES', 'Line Hold', 'Custom Hold', 'Other Hold', 'Line and Customs Hold'],
                   'rc_needed_flags': ['0', '1', '2', '3'],
                   'no_proof_options': ['0', '1'],
                   'document_profiles'  : {
@@ -144,7 +144,8 @@ Trucking_genre = {'table': 'Orders',
                                           'Undo Docs xSource': ['All_Item_Selection', 'Undo', 'DocsNotSource'],
                                           'Undo Proof': ['All_Item_Selection', 'Undo', 'xProof'],
                                           'Undo 2nd Proof': ['All_Item_Selection', 'Undo', 'yProof'],
-                                          'Undo RateCon': ['All_Item_Selection', 'Undo', 'xRateCon']
+                                          'Undo RateCon': ['All_Item_Selection', 'Undo', 'xRateCon'],
+                                          'Clear Holds': ['All_Item_Selection', 'Undo', 'ClearHolds']
                                         },
                                     'Tasks':
                                         {
