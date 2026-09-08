@@ -12,6 +12,9 @@ from webapp.report_maker import reportmaker
 from webapp.viewfuncs import d2s
 from webapp.CCC_system_setup import scac
 
+BANK_DEPOSIT_TYPES = ['DD', 'XD']
+BANK_WITHDRAWAL_TYPES = ['PC', 'XC', 'AC']
+
 def reset_trial(ix, bankacct=None, ledger_ids=None):
     query = Gledger.query.filter(Gledger.Reconciled == 25)
     if bankacct is not None:
@@ -199,9 +202,9 @@ def baseline_reconciliation(bankacct, cutoff_date, trusted_balance):
     deposits = 0
     withdrawals = 0
     for row in rows:
-        if row.Type in ['DD', 'XD']:
+        if row.Type in BANK_DEPOSIT_TYPES:
             deposits += row.Debit or 0
-        if row.Type in ['PC', 'XC']:
+        if row.Type in BANK_WITHDRAWAL_TYPES:
             withdrawals += row.Credit or 0
         row.Reconciled = cutoff_date.month
 
@@ -348,10 +351,10 @@ def recon_totals(bankacct):
     gdata = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25)).all()
     for gdat in gdata:
         type = gdat.Type
-        if type == 'DD' or type == 'XD':
+        if type in BANK_DEPOSIT_TYPES:
             totald = totald + gdat.Debit
             dlist.append(gdat.id)
-        if type == 'PC' or type == 'XC':
+        if type in BANK_WITHDRAWAL_TYPES:
             totalc = totalc + gdat.Credit
             wlist.append(gdat.id)
 
@@ -383,12 +386,12 @@ def banktotals(bankacct, statement_values=None):
     gdata = Gledger.query.filter(Gledger.Account==bankacct).all()
     for gdat in gdata:
         type = gdat.Type
-        if type == 'DD' or type == 'XD':
+        if type in BANK_DEPOSIT_TYPES:
             totald = totald + gdat.Debit
             if gdat.Reconciled==0 or gdat.Reconciled==25:
                 totald_U = totald_U + gdat.Debit
 
-        if type == 'PC' or type == 'XC':
+        if type in BANK_WITHDRAWAL_TYPES:
             totalc = totalc + gdat.Credit
             if gdat.Reconciled==0 or gdat.Reconciled==25:
                 totalc_U = totalc_U + gdat.Credit

@@ -8707,7 +8707,9 @@ def AssetPurchase():
             db.session.flush()
 
             journal_id = f'ASSET-PURCHASE-{asset.id}'
-            tcode = f'FA{asset.id}'
+            tcode = newjo(f'{company_code}A', purchase_date.strftime('%Y-%m-%d'))
+            while Gledger.query.filter(Gledger.Tcode == tcode).first() is not None:
+                tcode = newjo(f'{company_code}A', purchase_date.strftime('%Y-%m-%d'))
             post_err = post_balanced_journal([
                 {'debit': purchase_amount, 'credit': 0, 'account': asset_account.Name, 'aid': asset_account.id,
                  'source': vendor.Company, 'sid': vendor.id, 'type': 'AD', 'tcode': tcode, 'com': company_code,
