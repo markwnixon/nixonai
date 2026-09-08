@@ -25,6 +25,20 @@ today_now = datetime.datetime.now()
 today = today_now.date()
 timenow = today_now.time()
 
+def money_value(value):
+    try:
+        clean = str(value or '').replace('$', '').replace(',', '').strip()
+        if clean in ['', 'None', 'none']:
+            return 0.0
+        return float(clean)
+    except:
+        return 0.0
+
+
+def paid_total(odata):
+    return sum(money_value(odat.PaidAmt) for odat in (odata or []))
+
+
 def isoPay():
     username = session['username'].capitalize()
     exitnow = request.values.get('exitPay')
@@ -53,26 +67,26 @@ def isoPay():
             task = 'include details'
             pdata = PaymentsRec.query.all()
             odata = Orders.query.filter(Orders.QBi == this_id).all()
-            tot = 0.00
-            for odat in odata:
-                tot = tot + float(odat.PaidAmt)
+            tot = paid_total(odata)
 
     else:
         iter = 1
         username = session['username'].capitalize()
         this_id = 0
         task = 'payments'
-        pdata = PaymentsRec.query.all()
+        pdata = PaymentsRec.query.order_by(PaymentsRec.Date.asc(), PaymentsRec.id.asc()).all()
         odata = None
+        tot = 0.00
 
-    if this_id == 0:
+    if this_id == 0 and pdata:
         plen = len(pdata)
         pdat = pdata[plen-1]
         this_id = pdat.id
         odata = Orders.query.filter(Orders.QBi == this_id).all()
+        tot = paid_total(odata)
+    elif this_id == 0:
+        odata = []
         tot = 0.00
-        for odat in odata:
-            tot = tot + float(odat.PaidAmt)
 
     #Save all the session variables that may have been updated...
     iter = iter + 1
