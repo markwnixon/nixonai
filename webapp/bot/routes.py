@@ -10,12 +10,13 @@ from webapp.extensions import db
 from webapp.models import Orders, People, Drops, Terminals
 from webapp.bot_skills import get_bot_skill_setting
 from webapp.bot_usage import record_usage_events
+import json
 
 # adjust these imports to match your app
 from webapp.viewfuncs import newjo
 from webapp.class8_tasks import next_business_day, Order_Addresses_Update, Add_New_Drop
 import os
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 
 
 
@@ -365,6 +366,8 @@ def scheduler_order_payload(order):
         'customer': order.Shipper,
         'delivery_location': order.Company2,
         'delivery_address': order.Dropblock2,
+        'delivery_type': order.Delivery,
+        'delivery_status': order.DelStat,
         'delivery_date': _scheduler_date(order.Date3),
         'delivery_time': order.Time3,
         'pull_date': _scheduler_date(order.Date),
@@ -378,14 +381,123 @@ def scheduler_order_payload(order):
         'hstat': order.Hstat,
         'driver': order.Driver,
         'truck': order.Truck,
+        'proof': order.Proof,
+        'driver_proof': order.DrvProof,
         'notes': order.Description,
     }
+
+
+def _scheduler_parse_datetime(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
+    except ValueError:
+        raise ValueError(f'Invalid ISO date or datetime: {value}')
+
+
+def _scheduler_same_datetime(left, right):
+    left = left.replace(tzinfo=None) if left else None
+    right = right.replace(tzinfo=None) if right else None
+    return left == right
+
+
+def ensure_scheduler_audit_table():
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS scheduler_port_update_audit (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            OrderId INT NOT NULL,
+            OldDate4 DATETIME,
+            NewDate4 DATETIME,
+            OldDate5 DATETIME,
+            NewDate5 DATETIME,
+            Source VARCHAR(500),
+            StatusSnapshot TEXT,
+            BotIdentity VARCHAR(200),
+            CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_scheduler_port_order (OrderId),
+            INDEX idx_scheduler_port_created (CreatedAt)
+        )
+    """))
+
+
+@bot_bp.route('/bot/scheduler/port-updates', methods=['POST'])
+@bot_token_required(required_scopes={'write:orders'})
+def bot_scheduler_port_updates():
+    payload = request.get_json(silent=True) or {}
+    updates = payload.get('updates')
+    if not isinstance(updates, list) or not updates or len(updates) > 500:
+        return jsonify({'ok': False, 'error': 'updates must contain 1 to 500 items'}), 400
+
+    prepared = []
+    try:
+        for item in updates:
+            order_id = int(item.get('order_id'))
+            order = Orders.query.get(order_id)
+            if order is None:
+                raise ValueError(f'Order {order_id} not found')
+            if order.Hstat is not None and int(order.Hstat) >= 1:
+                raise ValueError(f'Order {order_id} is no longer eligible for a port refresh')
+
+            expected_start = _scheduler_parse_datetime(item.get('expected_port_window_start'))
+            expected_end = _scheduler_parse_datetime(item.get('expected_port_window_end'))
+            if not _scheduler_same_datetime(order.Date4, expected_start):
+                raise ValueError(f'Order {order_id} anticipated availability/early return changed during refresh')
+            if not _scheduler_same_datetime(order.Date5, expected_end):
+                raise ValueError(f'Order {order_id} LFD/cutoff changed during refresh')
+
+            new_start = _scheduler_parse_datetime(item.get('port_window_start'))
+            new_end = _scheduler_parse_datetime(item.get('port_window_end'))
+            prepared.append((order, new_start, new_end, item))
+    except (TypeError, ValueError) as exc:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': str(exc)}), 409
+
+    ensure_scheduler_audit_table()
+    changed = []
+    identity = str(get_jwt_identity())
+    for order, new_start, new_end, item in prepared:
+        if _scheduler_same_datetime(order.Date4, new_start) and _scheduler_same_datetime(order.Date5, new_end):
+            continue
+        old_start = order.Date4
+        old_end = order.Date5
+        order.Date4 = new_start
+        order.Date5 = new_end
+        db.session.execute(text("""
+            INSERT INTO scheduler_port_update_audit
+                (OrderId, OldDate4, NewDate4, OldDate5, NewDate5, Source,
+                 StatusSnapshot, BotIdentity, CreatedAt)
+            VALUES
+                (:order_id, :old_date4, :new_date4, :old_date5, :new_date5,
+                 :source, :snapshot, :identity, CURRENT_TIMESTAMP)
+        """), {
+            'order_id': order.id,
+            'old_date4': old_start,
+            'new_date4': new_start,
+            'old_date5': old_end,
+            'new_date5': new_end,
+            'source': str(item.get('source') or '')[:500],
+            'snapshot': json.dumps(item.get('status_snapshot') or {}, sort_keys=True),
+            'identity': identity[:200],
+        })
+        changed.append({
+            'order_id': order.id,
+            'jo': order.Jo,
+            'container': order.Container,
+            'booking': order.Booking,
+            'old_port_window_start': _scheduler_date(old_start),
+            'new_port_window_start': _scheduler_date(new_start),
+            'old_port_window_end': _scheduler_date(old_end),
+            'new_port_window_end': _scheduler_date(new_end),
+        })
+    db.session.commit()
+    return jsonify({'ok': True, 'changed_count': len(changed), 'changes': changed}), 200
 
 
 @bot_bp.route('/bot/scheduler/jobs', methods=['GET'])
 @bot_token_required(required_scopes={'read:orders'})
 def bot_scheduler_jobs():
-    """Return unfinished jobs whose appointment or port constraints touch a range."""
+    """Return the complete unfinished population for a scheduling run."""
     start_text = request.args.get('start')
     end_text = request.args.get('end')
     try:
@@ -403,20 +515,7 @@ def bot_scheduler_jobs():
     if range_end < range_start or (range_end - range_start).days > 31:
         return jsonify({'ok': False, 'error': 'date range must be 1 to 32 days'}), 400
 
-    start_at = datetime.combine(range_start, datetime.min.time())
-    end_at = datetime.combine(range_end + timedelta(days=1), datetime.min.time())
-    appointment_in_range = (Orders.Date3 >= start_at) & (Orders.Date3 < end_at)
-    port_window_overlaps = (
-        (Orders.Date4 < end_at) &
-        (Orders.Date5 >= start_at)
-    )
-    other_constraint_in_range = or_(
-        (Orders.Date4 >= start_at) & (Orders.Date4 < end_at),
-        (Orders.Date5 >= start_at) & (Orders.Date5 < end_at),
-        (Orders.Date7 >= start_at) & (Orders.Date7 < end_at),
-    )
-    overlaps_range = or_(appointment_in_range, port_window_overlaps, other_constraint_in_range)
-    unfinished = or_(Orders.Hstat == None, Orders.Hstat < 2)
+    unfinished = Orders.Hstat <= 1
     status_text = func.lower(func.coalesce(Orders.Status, ''))
     active_status = ~or_(*[
         status_text.like(f'%{word}%') for word in ['cancel', 'closed', 'complete', 'void']
@@ -425,8 +524,7 @@ def bot_scheduler_jobs():
         Orders.query
         .filter(unfinished)
         .filter(active_status)
-        .filter(overlaps_range)
-        .order_by(Orders.Date3.asc(), Orders.Date5.asc(), Orders.id.asc())
+        .order_by(Orders.Hstat.desc(), Orders.Date3.asc(), Orders.Date5.asc(), Orders.id.asc())
         .limit(1000)
         .all()
     )
