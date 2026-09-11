@@ -500,6 +500,9 @@ def bot_scheduler_jobs():
     """Return the complete unfinished population for a scheduling run."""
     start_text = request.args.get('start')
     end_text = request.args.get('end')
+    lookback_days = request.args.get('lookback_days', default=30, type=int)
+    if lookback_days is None or lookback_days < 1 or lookback_days > 365:
+        return jsonify({'ok': False, 'error': 'lookback_days must be between 1 and 365'}), 400
     try:
         today = datetime.now().date()
         range_start = (
@@ -516,6 +519,20 @@ def bot_scheduler_jobs():
         return jsonify({'ok': False, 'error': 'date range must be 1 to 32 days'}), 400
 
     unfinished = Orders.Hstat <= 1
+    lookback_start = datetime.combine(
+        datetime.now().date() - timedelta(days=lookback_days),
+        datetime.min.time(),
+    )
+    operationally_relevant = or_(
+        Orders.Date >= lookback_start,
+        Orders.Date2 >= lookback_start,
+        Orders.Date3 >= lookback_start,
+        Orders.Date4 >= lookback_start,
+        Orders.Date5 >= lookback_start,
+        Orders.Date6 >= lookback_start,
+        Orders.Date7 >= lookback_start,
+        Orders.Date8 >= lookback_start,
+    )
     status_text = func.lower(func.coalesce(Orders.Status, ''))
     active_status = ~or_(*[
         status_text.like(f'%{word}%') for word in ['cancel', 'closed', 'complete', 'void']
@@ -524,6 +541,7 @@ def bot_scheduler_jobs():
         Orders.query
         .filter(unfinished)
         .filter(active_status)
+        .filter(operationally_relevant)
         .order_by(Orders.Hstat.desc(), Orders.Date3.asc(), Orders.Date5.asc(), Orders.id.asc())
         .limit(1000)
         .all()
@@ -533,6 +551,8 @@ def bot_scheduler_jobs():
         'ok': True,
         'start': range_start.isoformat(),
         'end': range_end.isoformat(),
+        'lookback_days': lookback_days,
+        'lookback_start': lookback_start.date().isoformat(),
         'count': len(jobs),
         'jobs': jobs,
     }), 200
