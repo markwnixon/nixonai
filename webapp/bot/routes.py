@@ -344,6 +344,101 @@ def bot_order_detail(order_id):
         "hstat": odat.Hstat
     }), 200
 
+
+def _scheduler_date(value):
+    return value.isoformat() if value else None
+
+
+def scheduler_order_payload(order):
+    """Expose dispatch constraints without changing the order or calendar."""
+    return {
+        'id': order.id,
+        'jo': order.Jo,
+        'haul_type': order.HaulType,
+        'status': order.Status,
+        'workflow_status': order.DisStatus,
+        'terminal': order.Company,
+        'container': order.Container,
+        'container_type': order.Type,
+        'booking': order.Booking,
+        'bol': order.BOL,
+        'customer': order.Shipper,
+        'delivery_location': order.Company2,
+        'delivery_address': order.Dropblock2,
+        'delivery_date': _scheduler_date(order.Date3),
+        'delivery_time': order.Time3,
+        'pull_date': _scheduler_date(order.Date),
+        'return_date': _scheduler_date(order.Date2),
+        'port_window_start': _scheduler_date(order.Date4),
+        'port_window_end': _scheduler_date(order.Date5),
+        'ship_arrival': _scheduler_date(order.Date6),
+        'due_back': _scheduler_date(order.Date7),
+        'secondary_action_date': _scheduler_date(order.Date8),
+        'hold_type': order.HoldType,
+        'hstat': order.Hstat,
+        'driver': order.Driver,
+        'truck': order.Truck,
+        'notes': order.Description,
+    }
+
+
+@bot_bp.route('/bot/scheduler/jobs', methods=['GET'])
+@bot_token_required(required_scopes={'read:orders'})
+def bot_scheduler_jobs():
+    """Return unfinished jobs whose appointment or port constraints touch a range."""
+    start_text = request.args.get('start')
+    end_text = request.args.get('end')
+    try:
+        today = datetime.now().date()
+        range_start = (
+            datetime.strptime(start_text, '%Y-%m-%d').date()
+            if start_text else today - timedelta(days=today.weekday())
+        )
+        range_end = (
+            datetime.strptime(end_text, '%Y-%m-%d').date()
+            if end_text else range_start + timedelta(days=6)
+        )
+    except ValueError:
+        return jsonify({'ok': False, 'error': 'start and end must use YYYY-MM-DD'}), 400
+    if range_end < range_start or (range_end - range_start).days > 31:
+        return jsonify({'ok': False, 'error': 'date range must be 1 to 32 days'}), 400
+
+    start_at = datetime.combine(range_start, datetime.min.time())
+    end_at = datetime.combine(range_end + timedelta(days=1), datetime.min.time())
+    appointment_in_range = (Orders.Date3 >= start_at) & (Orders.Date3 < end_at)
+    port_window_overlaps = (
+        (Orders.Date4 < end_at) &
+        (Orders.Date5 >= start_at)
+    )
+    other_constraint_in_range = or_(
+        (Orders.Date4 >= start_at) & (Orders.Date4 < end_at),
+        (Orders.Date5 >= start_at) & (Orders.Date5 < end_at),
+        (Orders.Date7 >= start_at) & (Orders.Date7 < end_at),
+    )
+    overlaps_range = or_(appointment_in_range, port_window_overlaps, other_constraint_in_range)
+    unfinished = or_(Orders.Hstat == None, Orders.Hstat < 2)
+    status_text = func.lower(func.coalesce(Orders.Status, ''))
+    active_status = ~or_(*[
+        status_text.like(f'%{word}%') for word in ['cancel', 'closed', 'complete', 'void']
+    ])
+    rows = (
+        Orders.query
+        .filter(unfinished)
+        .filter(active_status)
+        .filter(overlaps_range)
+        .order_by(Orders.Date3.asc(), Orders.Date5.asc(), Orders.id.asc())
+        .limit(1000)
+        .all()
+    )
+    jobs = [scheduler_order_payload(row) for row in rows]
+    return jsonify({
+        'ok': True,
+        'start': range_start.isoformat(),
+        'end': range_end.isoformat(),
+        'count': len(jobs),
+        'jobs': jobs,
+    }), 200
+
 @bot_bp.route('/bot/orders/by_container', methods=['GET'])
 @bot_token_required(required_scopes={'read:orders'})
 def bot_orders_by_container():
