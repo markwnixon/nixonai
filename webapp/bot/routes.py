@@ -4,7 +4,7 @@ from webapp.bot.decorators import bot_token_required
 from webapp.services.api_data_service import api_call
 from webapp.CCC_system_setup import scac, companydata, addpath, tpath
 import datetime
-from datetime import datetime, timedelta
+from datetime import date as datetime_date, datetime, timedelta
 
 from webapp.extensions import db
 from webapp.models import Orders, People, Drops, Terminals
@@ -397,8 +397,17 @@ def _scheduler_parse_datetime(value):
 
 
 def _scheduler_same_datetime(left, right):
-    left = left.replace(tzinfo=None) if left else None
-    right = right.replace(tzinfo=None) if right else None
+    def normalized(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.replace(tzinfo=None)
+        if isinstance(value, datetime_date):
+            return datetime.combine(value, datetime.min.time())
+        return value
+
+    left = normalized(left)
+    right = normalized(right)
     return left == right
 
 

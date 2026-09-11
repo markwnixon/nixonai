@@ -55,5 +55,6 @@ def test_scheduler_order_payload_includes_appointment_and_port_constraints():
 def test_scheduler_port_update_comparison_accepts_date_and_datetime_values():
     stored = datetime.datetime(2026, 9, 14)
     assert _scheduler_same_datetime(stored, _scheduler_parse_datetime('2026-09-14'))
+    assert _scheduler_same_datetime(datetime.date(2026, 9, 14), stored)
     assert _scheduler_same_datetime(stored, _scheduler_parse_datetime('2026-09-14T00:00:00'))
     assert not _scheduler_same_datetime(stored, _scheduler_parse_datetime('2026-09-15'))
