@@ -768,70 +768,86 @@ $('.dataTables_length').addClass('bs-select');
 
 
 
+function class8ColumnIndex(tableSelector, headerText) {
+    var target = headerText.toLowerCase();
+    var found = -1;
+    $(tableSelector + ' thead th').each(function(index) {
+        if ($(this).text().trim().toLowerCase() === target) {
+            found = index;
+            return false;
+        }
+    });
+    return found;
+}
+
+function class8TimeSortValue(value) {
+    var text = String(value || '').replace(/<[^>]*>/g, '').trim();
+    if (!text) return 9999;
+    var match = text.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    if (!match) return text.toLowerCase();
+    var hour = parseInt(match[1], 10);
+    var minute = parseInt(match[2] || '0', 10);
+    var meridian = (match[3] || '').toUpperCase();
+    if (meridian === 'PM' && hour < 12) hour += 12;
+    if (meridian === 'AM' && hour === 12) hour = 0;
+    return hour * 60 + minute;
+}
+
+if ($.fn.dataTable) {
+    $.fn.dataTable.ext.type.order['class8-time-pre'] = class8TimeSortValue;
+}
+
+function class8TruckingTableOptions(tableSelector, fallbackOrder, scrollY) {
+    var deliveryColumn = class8ColumnIndex(tableSelector, 'Delivery');
+    var timeColumn = class8ColumnIndex(tableSelector, 'DelTime');
+    var order = deliveryColumn >= 0 ? [[deliveryColumn, 'desc']] : fallbackOrder;
+    var columnDefs = [];
+    if (deliveryColumn >= 0 && timeColumn >= 0) {
+        order.push([timeColumn, 'desc']);
+        columnDefs.push({ targets: deliveryColumn, orderData: [deliveryColumn, timeColumn] });
+        columnDefs.push({ targets: timeColumn, type: 'class8-time' });
+    }
+    return {
+        "order": order,
+        "columnDefs": columnDefs,
+        "scrollX": true,
+        "scrollY": scrollY,
+        "stateSave": true,
+        "stateLoadParams": function(settings, data) {
+            data.order = order;
+        },
+        "paging": false
+    };
+}
+
 $(document).ready(function () {
-$('#dtTrucking').DataTable({
-"aaSorting": [[15, "desc" ]],
-"scrollX": true,
-"scrollY": 750,
-"stateSave": true,
-"paging": false // false to disable pagination (or any other option)
-});
+$('#dtTrucking').DataTable(class8TruckingTableOptions('#dtTrucking', [[15, "desc" ]], 750));
 $('.dataTables_length').addClass('bs-select');
 });
 
 $(document).ready(function () {
-$('#dtTrucking1').DataTable({
-"aaSorting": [[1, "desc" ]],
-"scrollX": true,
-"scrollY": 800,
-"stateSave": true,
-"paging": false // false to disable pagination (or any other option)
-});
+$('#dtTrucking1').DataTable(class8TruckingTableOptions('#dtTrucking1', [[1, "desc" ]], 800));
 $('.dataTables_length').addClass('bs-select');
 });
 
 $(document).ready(function () {
-$('#dtTrucking9').DataTable({
-"aaSorting": [[4, "desc" ]],
-"scrollX": true,
-"scrollY": 800,
-"stateSave": true,
-"paging": false // false to disable pagination (or any other option)
-});
+$('#dtTrucking9').DataTable(class8TruckingTableOptions('#dtTrucking9', [[4, "desc" ]], 800));
 $('.dataTables_length').addClass('bs-select');
 });
 
 
 $(document).ready(function () {
-$('#dtTrucking_200').DataTable({
-"aaSorting": [[15, "desc" ]],
-"scrollX": true,
-"scrollY": 300,
-"stateSave": true,
-"paging": false // false to disable pagination (or any other option)
-});
+$('#dtTrucking_200').DataTable(class8TruckingTableOptions('#dtTrucking_200', [[15, "desc" ]], 300));
 $('.dataTables_length').addClass('bs-select');
 });
 
 $(document).ready(function () {
-$('#dtTrucking1_200').DataTable({
-"aaSorting": [[1, "desc" ]],
-"scrollX": true,
-"scrollY": 200,
-"stateSave": true,
-"paging": false // false to disable pagination (or any other option)
-});
+$('#dtTrucking1_200').DataTable(class8TruckingTableOptions('#dtTrucking1_200', [[1, "desc" ]], 200));
 $('.dataTables_length').addClass('bs-select');
 });
 
 $(document).ready(function () {
-$('#dtTrucking9_200').DataTable({
-"aaSorting": [[9, "desc" ]],
-"scrollX": true,
-"scrollY": 200,
-"stateSave": true,
-"paging": false // false to disable pagination (or any other option)
-});
+$('#dtTrucking9_200').DataTable(class8TruckingTableOptions('#dtTrucking9_200', [[9, "desc" ]], 200));
 $('.dataTables_length').addClass('bs-select');
 });
 
