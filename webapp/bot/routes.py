@@ -355,6 +355,7 @@ def scheduler_order_payload(order):
     return {
         'id': order.id,
         'jo': order.Jo,
+        'order_number': order.Order,
         'haul_type': order.HaulType,
         'status': order.Status,
         'workflow_status': order.DisStatus,
@@ -364,6 +365,10 @@ def scheduler_order_payload(order):
         'booking': order.Booking,
         'bol': order.BOL,
         'customer': order.Shipper,
+        'customer_emails': [
+            value for value in (order.Emailjp, order.Emailoa, order.Emailap)
+            if value
+        ],
         'delivery_location': order.Company2,
         'delivery_address': order.Dropblock2,
         'delivery_type': order.Delivery,

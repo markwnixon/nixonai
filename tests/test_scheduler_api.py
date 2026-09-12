@@ -11,6 +11,7 @@ def test_scheduler_order_payload_includes_appointment_and_port_constraints():
     class Order:
         id = 42
         Jo = 'E4200'
+        Order = 'CUSTOMER-1001'
         HaulType = 'Dray Import'
         Status = 'Active'
         DisStatus = 'upcoming_deliveries'
@@ -20,6 +21,9 @@ def test_scheduler_order_payload_includes_appointment_and_port_constraints():
         Booking = '123456'
         BOL = 'BOL123'
         Shipper = 'Example Customer'
+        Emailjp = 'operations@example.com'
+        Emailoa = ''
+        Emailap = None
         Company2 = 'Example Warehouse'
         Dropblock2 = 'Baltimore, MD'
         Delivery = 'Hard Time'
@@ -46,6 +50,8 @@ def test_scheduler_order_payload_includes_appointment_and_port_constraints():
     assert payload['delivery_date'] == '2026-09-15T00:00:00'
     assert payload['delivery_time'] == '08:30'
     assert payload['delivery_type'] == 'Hard Time'
+    assert payload['order_number'] == 'CUSTOMER-1001'
+    assert payload['customer_emails'] == ['operations@example.com']
     assert payload['delivery_status'] == 0
     assert payload['port_window_start'] == '2026-09-14T00:00:00'
     assert payload['port_window_end'] == '2026-09-16T00:00:00'

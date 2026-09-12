@@ -6,6 +6,7 @@ from webapp.models import BotSkillSetting
 
 QUOTE_SKILL_KEY = 'quote-request-extraction'
 DELIVERY_ORDER_SKILL_KEY = 'delivery-order-creation'
+SCHEDULER_SKILL_KEY = 'scheduler'
 SKILL_DEFINITIONS = {
     QUOTE_SKILL_KEY: {
         'name': 'Quote automation',
@@ -14,6 +15,10 @@ SKILL_DEFINITIONS = {
     DELIVERY_ORDER_SKILL_KEY: {
         'name': 'Work-order creation',
         'description': 'Create database orders from messages placed in the Work Orders mailbox.',
+    },
+    SCHEDULER_SKILL_KEY: {
+        'name': 'Scheduler',
+        'description': 'Refresh port dates and prepare morning and next-day dispatch plans.',
     },
 }
 

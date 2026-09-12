@@ -6,6 +6,7 @@ from webapp.bot.routes import bot_bp
 from webapp.bot_skills import (
     DELIVERY_ORDER_SKILL_KEY,
     QUOTE_SKILL_KEY,
+    SCHEDULER_SKILL_KEY,
     bot_skill_rows,
     get_bot_skill_setting,
     set_bot_skill_enabled,
@@ -44,6 +45,8 @@ def test_quote_skill_defaults_enabled_and_can_be_disabled():
         assert rows[0]['enabled'] is False
         assert rows[1]['key'] == DELIVERY_ORDER_SKILL_KEY
         assert rows[1]['enabled'] is True
+        assert rows[2]['key'] == SCHEDULER_SKILL_KEY
+        assert rows[2]['enabled'] is True
 
 
 def test_unknown_skill_is_rejected():
@@ -165,6 +168,7 @@ def test_admin_can_render_and_toggle_bot_skill_page():
     assert b'AI usage' in response.data
     assert b'Cost by skill' in response.data
     assert b'Work-order creation' in response.data
+    assert b'Scheduler' in response.data
 
     response = client.post(
         '/admin/bot-skills',
