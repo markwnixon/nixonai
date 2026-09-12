@@ -3190,6 +3190,12 @@ def get_new_Jo(input):
     return newjo(input, sdate)
 
 
+def normalize_entry_value(table, field_name, value):
+    if table == 'Orders' and field_name == 'RCneeded' and not hasinput(value):
+        return 0
+    return value
+
+
 def unique_key_candidate(model, key_name, proposed, exclude_id=None):
     """Return an unused key for the target table, preserving existing JO-style codes."""
     base = str(proposed or '').strip()
@@ -3304,6 +3310,7 @@ def make_new_entry(tablesetup,holdvec):
                         err.append(f'{table} {ukey} {thisvalue} already exists; assigned {unique_value} instead.')
                         thisvalue = unique_value
                         holdvec[jx] = unique_value
+                thisvalue = normalize_entry_value(table, entry[0], thisvalue)
                 setattr(dat, f'{entry[0]}', thisvalue)
         db.session.commit()
         for jx, entry in enumerate(hiddendata):
@@ -3934,7 +3941,7 @@ def Edit_task(genre, task_iter, tablesetup, task_focus, checked_data, thistable,
                     if entry[4] is not None and (entry[9] == 'Always' or entry[9] in form_show):
                         if entry[0] not in creators:
                             #print(f'Setting entry {entry[0]} to {holdvec[jx]}')
-                            setattr(olddat, f'{entry[0]}', holdvec[jx])
+                            setattr(olddat, f'{entry[0]}', normalize_entry_value(table, entry[0], holdvec[jx]))
                 db.session.commit()
                 if table == 'Accounts':
                     new_account_name = getattr(olddat, 'Name', None)
