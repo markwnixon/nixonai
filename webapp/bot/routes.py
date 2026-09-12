@@ -16,7 +16,7 @@ import json
 from webapp.viewfuncs import newjo
 from webapp.class8_tasks import next_business_day, Order_Addresses_Update, Add_New_Drop
 import os
-from sqlalchemy import func, or_, text
+from sqlalchemy import and_, func, or_, text
 
 
 
@@ -547,6 +547,11 @@ def bot_scheduler_jobs():
         Orders.Date7 >= lookback_start,
         Orders.Date8 >= lookback_start,
     )
+    scheduling_relevant = or_(
+        and_(Orders.Hstat < 1, operationally_relevant),
+        and_(Orders.Hstat == 1, Orders.Date >= lookback_start),
+        and_(Orders.Hstat == 1, Orders.Date.is_(None), operationally_relevant),
+    )
     status_text = func.lower(func.coalesce(Orders.Status, ''))
     active_status = ~or_(*[
         status_text.like(f'%{word}%') for word in ['cancel', 'closed', 'complete', 'void']
@@ -555,7 +560,7 @@ def bot_scheduler_jobs():
         Orders.query
         .filter(unfinished)
         .filter(active_status)
-        .filter(operationally_relevant)
+        .filter(scheduling_relevant)
         .order_by(Orders.Hstat.desc(), Orders.Date3.asc(), Orders.Date5.asc(), Orders.id.asc())
         .limit(1000)
         .all()
