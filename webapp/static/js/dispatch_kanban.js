@@ -9,6 +9,7 @@
     const message = document.getElementById('dispatch-kanban-message');
     const modal = $('#dispatch-kanban-modal');
     const pinModal = $('#dispatch-kanban-pin-modal');
+    const pinQueueModal = $('#dispatch-kanban-pin-queue-modal');
     const jobsUrl = page.dataset.jobsUrl;
     const moveUrlTemplate = page.dataset.moveUrlTemplate;
     const updateUrlTemplate = page.dataset.updateUrlTemplate;
@@ -17,10 +18,17 @@
     const makePinOptionsUrlTemplate = page.dataset.makePinOptionsUrlTemplate;
     const makePinUrlTemplate = page.dataset.makePinUrlTemplate;
     const activatePinUrlTemplate = page.dataset.activatePinUrlTemplate;
+    const updatePinUrlTemplate = page.dataset.updatePinUrlTemplate;
     const deletePinUrlTemplate = page.dataset.deletePinUrlTemplate;
     const jobsById = new Map();
     const pinCandidatesById = new Map();
+    const selectedPinJobIds = new Set();
     let columns = [];
+    let pinQueueOptions = {timeslots: [], drivers: [], trucks: []};
+    let activeSelectedPinIds = [];
+    let currentPinQueueJobs = [];
+    let currentPinQueueLabel = 'Pin Queue';
+    let currentPinQueueDate = '';
 
 
     function showMessage(text, type) {
@@ -43,6 +51,12 @@
 
     function endpoint(template, id) {
         return template.replace('/0/', `/${id}/`);
+    }
+
+    function localDateString(date) {
+        const month = `${date.getMonth() + 1}`.padStart(2, '0');
+        const day = `${date.getDate()}`.padStart(2, '0');
+        return `${date.getFullYear()}-${month}-${day}`;
     }
 
     function filterParams() {
@@ -68,18 +82,95 @@
         return `<div class="dispatch-kanban-card-line">${label}: ${escapeHtml(job.release)}</div>`;
     }
 
+    function pinDirection(job) {
+        return Number(job.haul_status || 0) >= 1 ? 'in' : 'out';
+    }
+
+    function pinMoveText(job, direction) {
+        const container = job.container || '';
+        const booking = job.booking || '';
+        const context = [job.container_type, job.delivery_city_state || job.delivery_location].filter(Boolean).join(' | ');
+        const suffix = context ? ` (${context})` : '';
+        if (direction === 'in') {
+            return job.is_import ? `Empty In: ${container}${suffix}` : `Load In: ${booking} ${container}${suffix}`;
+        }
+        return job.is_import ? `Load Out: ${booking.slice(-4)} ${container}${suffix}` : `Empty Out: ${booking}${suffix}`;
+    }
+
+    function selectedPinJobs() {
+        return Array.from(selectedPinJobIds)
+            .map((id) => jobsById.get(String(id)))
+            .filter(Boolean);
+    }
+
+    function updatePinSelectionUI() {
+        document.querySelectorAll('.kanban-pin-select-checkbox').forEach((checkbox) => {
+            checkbox.checked = selectedPinJobIds.has(String(checkbox.value));
+        });
+        document.querySelectorAll('.dispatch-kanban-card-shell').forEach((shell) => {
+            shell.classList.toggle('dispatch-kanban-card-selected', selectedPinJobIds.has(String(shell.dataset.id)));
+        });
+        const buttons = [
+            document.getElementById('kanban-pin-selected-open'),
+            document.getElementById('kanban-pin-selected-open-top'),
+        ].filter(Boolean);
+        const count = selectedPinJobIds.size;
+        buttons.forEach((button) => {
+            button.textContent = count ? `Make Pin (${count})` : 'Make Pin';
+            button.disabled = count < 1 || count > 2;
+        });
+    }
+
+    function togglePinSelection(jobId, checked) {
+        const id = String(jobId);
+        if (checked && selectedPinJobIds.size >= 2 && !selectedPinJobIds.has(id)) {
+            showMessage('Select no more than two jobs for one pin pairing.', 'warning');
+            updatePinSelectionUI();
+            return;
+        }
+        if (checked) {
+            selectedPinJobIds.add(id);
+        } else {
+            selectedPinJobIds.delete(id);
+        }
+        updatePinSelectionUI();
+    }
+
     function renderCard(job) {
         if (job.item_type === 'pin_pairing') {
             return renderPinPairingCard(job);
         }
+        const selectableForPin = job.workflow_status !== 'future_jobs';
+        const pinQueue = job.pin_queue || {};
+        const shell = document.createElement('div');
+        shell.className = selectableForPin ? 'dispatch-kanban-card-shell' : 'dispatch-kanban-card-shell dispatch-kanban-card-shell-no-pin';
+        shell.dataset.id = job.id;
+        shell.dataset.status = job.workflow_status;
+        if (selectableForPin) {
+            if (pinQueue.queued) {
+                const tabLabel = pinQueue.pin || (pinQueue.state === 'active' ? 'ACT' : 'QUE');
+                shell.innerHTML = `
+                    <div class="dispatch-kanban-pin-tab dispatch-kanban-pin-tab-${escapeHtml(pinQueue.state || 'queued')}" title="In pin queue">
+                        <span>${escapeHtml(tabLabel)}</span>
+                    </div>
+                `;
+            } else {
+                shell.innerHTML = `
+                    <label class="dispatch-kanban-pin-select" title="Select for pin queue">
+                        <input type="checkbox" class="kanban-pin-select-checkbox" value="${escapeHtml(job.id)}">
+                        <span>PIN</span>
+                    </label>
+                `;
+            }
+        }
         const card = document.createElement('div');
         card.className = 'dispatch-kanban-card';
-        if (job.drop_pick_pulled) {
-            card.classList.add('dispatch-kanban-card-dp-pulled');
+        if (Number(job.haul_status || 0) === 1) {
+            card.classList.add('dispatch-kanban-card-hstat-pulled');
         }
         card.dataset.id = job.id;
         card.dataset.status = job.workflow_status;
-        if (job.workflow_status === 'new_orders') {
+        if (job.workflow_status === 'future_jobs') {
             card.innerHTML = `
                 <div class="dispatch-kanban-card-title">${escapeHtml(cardTitle(job))}</div>
                 <div class="dispatch-kanban-card-line">${escapeHtml(job.customer || job.shipper || 'No customer')}</div>
@@ -90,7 +181,8 @@
                 <div class="dispatch-kanban-card-line">LFD: ${escapeHtml(job.last_free_day || '-')}</div>
             `;
             card.addEventListener('click', () => openModal(job.id));
-            return card;
+            shell.appendChild(card);
+            return shell;
         }
         const dateLine = job.hold_status
             ? `LFD: ${escapeHtml(job.last_free_day || '-')}`
@@ -106,6 +198,8 @@
             ${releaseLine(job)}
             ${job.hold_status ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.hold_status)}</div>` : ''}
             ${dropPickAlert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(dropPickAlert)}</div>` : ''}
+            ${job.drop_pick_picked_up ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">DP Picked Up</div>` : ''}
+            ${job.empty_return_alert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.empty_return_message || 'Empty Return')}</div>` : ''}
             ${job.delivered_alert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.delivered_message || 'Delivered')}</div>` : ''}
             ${job.pull_today_alert ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.pull_today_message || 'Pull Today')}</div>` : ''}
             ${job.placeholder_delivery_date_alert && job.workflow_status !== 'drop_pick' ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-warning">${escapeHtml(job.placeholder_delivery_date_message || 'Update Placeholder Delivery Date')}</div>` : ''}
@@ -113,32 +207,102 @@
             ${job.hold_status ? '' : `<div class="dispatch-kanban-card-line">Pull: ${escapeHtml(job.pull_date || '-')} | Return: ${escapeHtml(job.return_date || '-')}</div>`}
         `;
         card.addEventListener('click', () => openModal(job.id));
-        return card;
+        shell.appendChild(card);
+        if (selectableForPin && !pinQueue.queued) {
+            shell.querySelector('.kanban-pin-select-checkbox').addEventListener('change', (event) => togglePinSelection(job.id, event.target.checked));
+        }
+        return shell;
     }
 
     function renderPinPairingCard(pin) {
-        const card = document.createElement('div');
-        card.className = 'dispatch-kanban-card dispatch-kanban-pin-card';
-        card.dataset.id = pin.id;
-        card.dataset.pinId = pin.pin_id;
-        card.dataset.status = 'pin_assigned';
-        card.innerHTML = `
-            <div class="dispatch-kanban-card-title">${escapeHtml(pin.timeslot || 'No time')} | ${escapeHtml(pin.driver || 'No driver')}</div>
-            <div class="dispatch-kanban-card-line">${escapeHtml(pin.truck || 'No truck')}${pin.tag ? ` | ${escapeHtml(pin.tag)}` : ''}</div>
-            <div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml(pin.pin_date || '')} | ${escapeHtml(pin.status_label || 'Pending')}</div>
-            <div class="dispatch-kanban-card-line">${escapeHtml(pin.in_text || 'No in move')}</div>
-            <div class="dispatch-kanban-card-line">${escapeHtml(pin.out_text || 'No out move')}</div>
-            ${pin.notes ? `<div class="dispatch-kanban-card-line dispatch-kanban-card-muted">${escapeHtml(pin.notes)}</div>` : ''}
-            <div class="dispatch-kanban-card-actions mt-2">
-                ${pin.active ? '' : '<button type="button" class="btn btn-sm btn-outline-success kanban-pin-activate">Activate</button>'}
-                <button type="button" class="btn btn-sm btn-outline-secondary kanban-pin-copy">Copy Dispatch</button>
-                <button type="button" class="btn btn-sm btn-outline-danger kanban-pin-delete">Delete</button>
-            </div>
+        const row = document.createElement('tr');
+        const locked = pin.out_pin && pin.out_pin !== '0';
+        row.className = 'dispatch-kanban-pin-row';
+        row.dataset.id = pin.id;
+        row.dataset.pinId = pin.pin_id;
+        row.dataset.status = 'pin_queue';
+        const driverOptions = ['<option value="">Driver</option>'].concat((pinQueueOptions.drivers || []).map((driver) => {
+            const value = driver.name || '';
+            return `<option value="${escapeHtml(value)}" ${value === pin.driver ? 'selected' : ''}>${escapeHtml(value)}</option>`;
+        })).join('');
+        const truckOptions = ['<option value="">Truck</option>'].concat((pinQueueOptions.trucks || []).map((truck) => {
+            const value = truck.unit || '';
+            const label = [truck.unit, truck.type, truck.plate].filter(Boolean).join(' | ');
+            return `<option value="${escapeHtml(value)}" ${value === pin.truck ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+        })).join('');
+        const timeslotOptions = ['<option value="Hold Getting">Hold Getting</option>'].concat((pinQueueOptions.timeslots || []).map((slot) => {
+            return `<option value="${escapeHtml(slot)}" ${slot === pin.timeslot ? 'selected' : ''}>${escapeHtml(slot)}</option>`;
+        })).join('');
+        const hasPin = (pin.in_pin && pin.in_pin !== '0') || (pin.out_pin && pin.out_pin !== '0');
+        const missingTimeslot = !pin.timeslot || pin.timeslot === 'Hold Getting';
+        const readyExceptTimeslot = !hasPin && !pin.active && missingTimeslot && pin.driver && pin.truck && pin.in_chassis;
+        const pinMoveClass = hasPin
+            ? 'dispatch-kanban-pin-move-pinned'
+            : (pin.active ? 'dispatch-kanban-pin-move-active' : (readyExceptTimeslot ? 'dispatch-kanban-pin-move-ready' : ''));
+        row.innerHTML = `
+            <td class="dispatch-kanban-pin-move ${pinMoveClass}">
+                <div>${escapeHtml(pin.in_text || 'No in move')}</div>
+                <div>${escapeHtml(pin.out_text || 'No out move')}</div>
+                ${pin.notes ? `<div class="dispatch-kanban-pin-note">${escapeHtml(pin.notes)}</div>` : ''}
+                <div class="dispatch-kanban-pin-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary kanban-pin-update">Update</button>
+                    ${pin.active ? '' : '<button type="button" class="btn btn-sm btn-outline-success kanban-pin-activate">Activate</button>'}
+                    <button type="button" class="btn btn-sm btn-outline-secondary kanban-pin-copy">Copy</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger kanban-pin-delete">Delete</button>
+                </div>
+            </td>
+            <td><select class="form-control form-control-sm kanban-pin-timeslot">${timeslotOptions}</select></td>
+            <td><select class="form-control form-control-sm kanban-pin-driver" ${locked ? 'disabled' : ''}>${driverOptions}</select></td>
+            <td><select class="form-control form-control-sm kanban-pin-truck" ${locked ? 'disabled' : ''}>${truckOptions}</select></td>
+            <td><input class="form-control form-control-sm kanban-pin-inchas" value="${escapeHtml(pin.in_chassis || '')}" placeholder="Chassis" ${locked ? 'disabled' : ''}></td>
+            <td class="dispatch-kanban-pin-status">
+                <div>${escapeHtml(pin.pin_id || '')}</div>
+                <div>${escapeHtml(pin.status_label || 'Pending')}</div>
+                ${pin.tag ? `<div>${escapeHtml(pin.tag)}</div>` : ''}
+            </td>
         `;
-        card.querySelector('.kanban-pin-activate')?.addEventListener('click', () => activatePin(pin.pin_id));
-        card.querySelector('.kanban-pin-copy').addEventListener('click', () => copyDispatchText(pin.dispatch_text || ''));
-        card.querySelector('.kanban-pin-delete').addEventListener('click', () => deletePin(pin.pin_id));
-        return card;
+        row.querySelector('.kanban-pin-update').addEventListener('click', () => updatePin(pin.pin_id, row));
+        row.querySelector('.kanban-pin-activate')?.addEventListener('click', () => activatePin(pin.pin_id, row));
+        row.querySelector('.kanban-pin-copy').addEventListener('click', () => copyDispatchText(pin.dispatch_text || ''));
+        row.querySelector('.kanban-pin-delete').addEventListener('click', () => deletePin(pin.pin_id));
+        return row;
+    }
+
+    function renderPinQueueTable(target, pinJobs) {
+        target.innerHTML = '';
+        if (!pinJobs.length) {
+            target.innerHTML = '<div class="dispatch-kanban-empty-note">No pin assignments for the actionable date.</div>';
+            return;
+        }
+        const tableWrap = document.createElement('div');
+        tableWrap.className = 'dispatch-kanban-pin-table-wrap';
+        const table = document.createElement('table');
+        table.className = 'table table-sm mb-0 dispatch-kanban-pin-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Move</th>
+                    <th>Slot</th>
+                    <th>Driver</th>
+                    <th>Unit</th>
+                    <th>Chassis</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+        pinJobs.forEach((pin) => {
+            tbody.appendChild(renderPinPairingCard(pin));
+        });
+        tableWrap.appendChild(table);
+        target.appendChild(tableWrap);
+    }
+
+    function openPinQueueModal() {
+        document.getElementById('dispatch-kanban-pin-queue-title').textContent = currentPinQueueLabel;
+        renderPinQueueTable(document.getElementById('dispatch-kanban-pin-queue-body'), currentPinQueueJobs);
+        pinQueueModal.modal('show');
     }
 
     function renderBoard(data) {
@@ -164,7 +328,7 @@
             });
             board.appendChild(columnEl);
 
-            if (window.Sortable && column.key !== 'pin_assigned') {
+            if (window.Sortable) {
                 new Sortable(list, {
                     group: 'dispatch-kanban',
                     animation: 150,
@@ -173,6 +337,30 @@
                 });
             }
         });
+        Array.from(selectedPinJobIds).forEach((id) => {
+            const job = jobsById.get(String(id));
+            if (!job || (job.pin_queue && job.pin_queue.queued)) {
+                selectedPinJobIds.delete(String(id));
+            }
+        });
+        const pinQueue = data.pin_queue || {};
+        pinQueueOptions = {
+            timeslots: pinQueue.timeslots || [],
+            drivers: pinQueue.drivers || [],
+            trucks: pinQueue.trucks || [],
+        };
+        currentPinQueueJobs = pinQueue.jobs || [];
+        currentPinQueueDate = pinQueue.date || localDateString(new Date());
+        currentPinQueueLabel = pinQueue.date_label ? `Pin Queue for ${pinQueue.date_label}` : (pinQueue.label || 'Pin Queue');
+        document.getElementById('dispatch-kanban-pin-queue-title').textContent = currentPinQueueLabel;
+        const queueButton = document.getElementById('kanban-pin-queue-open');
+        if (queueButton) {
+            queueButton.textContent = `Pin Queue (${currentPinQueueJobs.length})`;
+        }
+        if (pinQueueModal.hasClass('show')) {
+            renderPinQueueTable(document.getElementById('dispatch-kanban-pin-queue-body'), currentPinQueueJobs);
+        }
+        updatePinSelectionUI();
         if (!window.Sortable) {
             showMessage('Kanban cards loaded. Drag/drop is disabled because SortableJS did not load.', 'warning');
         }
@@ -215,13 +403,35 @@
         return {response, data};
     }
 
-    async function activatePin(pinId) {
+    async function activatePin(pinId, row) {
+        const timeslot = row?.querySelector('.kanban-pin-timeslot')?.value || '';
+        if (!timeslot || timeslot === 'Hold Getting') {
+            showMessage('Select a time slot before activating this pin row.', 'warning');
+            row?.querySelector('.kanban-pin-timeslot')?.focus();
+            return;
+        }
         const {response, data} = await postJson(endpoint(activatePinUrlTemplate, pinId), {});
         if (!response.ok || !data.ok) {
             showMessage(data.error || 'Unable to activate pin.', 'warning');
             return;
         }
         showMessage(data.message || 'Pin activated.', 'success');
+        loadBoard();
+    }
+
+    async function updatePin(pinId, row) {
+        const payload = {
+            driver: row.querySelector('.kanban-pin-driver')?.value || '',
+            truck: row.querySelector('.kanban-pin-truck')?.value || '',
+            timeslot: row.querySelector('.kanban-pin-timeslot')?.value || 'Hold Getting',
+            in_chassis: row.querySelector('.kanban-pin-inchas')?.value || '',
+        };
+        const {response, data} = await postJson(endpoint(updatePinUrlTemplate, pinId), payload);
+        if (!response.ok || !data.ok) {
+            showMessage(data.error || 'Unable to update pin assignment.', 'warning');
+            return;
+        }
+        showMessage(data.message || 'Pin assignment updated.', 'success');
         loadBoard();
     }
 
@@ -379,13 +589,12 @@
             return;
         }
         const isPlanningReviewStatus = [
-            'new_orders',
-            'on_call',
+            'future_jobs',
             'upcoming_deliveries',
             'port_today',
             'drop_pick',
-            'pin_assigned',
-            'in_progress',
+            'ready_for_delivery',
+            'return_to_port',
             'completed',
         ].includes(job.workflow_status);
         document.getElementById('kanban-modal-order-id').value = job.id;
@@ -458,7 +667,9 @@
         document.getElementById('kanban-modal-notes').value = job.notes || '';
         document.getElementById('kanban-modal-override-pin').checked = false;
         document.getElementById('kanban-modal-no-proof-needed').checked = Boolean(job.proof_none_required);
-        const showProofUpload = ['in_progress', 'completed'].includes(job.workflow_status)
+        document.getElementById('kanban-modal-dp-picked-up').checked = Boolean(job.drop_pick_picked_up);
+        document.getElementById('kanban-modal-dp-picked-panel').classList.toggle('d-none', !job.is_drop_pick);
+        const showProofUpload = ['ready_for_delivery', 'return_to_port', 'completed'].includes(job.workflow_status)
             && !job.has_delivery_proof
             && !job.proof_none_required;
         document.getElementById('kanban-proof-upload-panel').classList.toggle('d-none', !showProofUpload);
@@ -496,6 +707,7 @@
     }
 
     async function openMakePinModal() {
+        activeSelectedPinIds = [];
         const jobId = document.getElementById('kanban-modal-order-id').value;
         const response = await fetch(endpoint(makePinOptionsUrlTemplate, jobId));
         const data = await response.json();
@@ -543,6 +755,64 @@
         pinModal.modal('show');
     }
 
+    function openSelectedPinModal() {
+        const jobs = selectedPinJobs();
+        if (jobs.length < 1 || jobs.length > 2) {
+            showMessage('Select one or two jobs for the pin queue.', 'warning');
+            return;
+        }
+        const inJobs = jobs.filter((job) => pinDirection(job) === 'in');
+        const outJobs = jobs.filter((job) => pinDirection(job) === 'out');
+        if (inJobs.length > 1 || outJobs.length > 1) {
+            showMessage('A pin pairing can have only one going-in job and one coming-out job.', 'warning');
+            return;
+        }
+        const inJob = inJobs[0] || null;
+        const outJob = outJobs[0] || null;
+        activeSelectedPinIds = jobs.map((job) => job.id);
+        pinCandidatesById.clear();
+        document.getElementById('kanban-pin-in-order-id').value = inJob ? inJob.id : (outJob ? outJob.id : jobs[0].id);
+        document.getElementById('kanban-pin-date').value = currentPinQueueDate || localDateString(new Date());
+        fillPinSelect(
+            'kanban-pin-timeslot',
+            (pinQueueOptions.timeslots || []).map((slot) => ({value: slot})),
+            'value',
+            (row) => row.value,
+            'Select time'
+        );
+        fillPinSelect(
+            'kanban-pin-driver',
+            pinQueueOptions.drivers || [],
+            'name',
+            (row) => row.truck ? `${row.name} | ${row.truck}` : row.name,
+            'Select driver'
+        );
+        fillPinSelect(
+            'kanban-pin-truck',
+            pinQueueOptions.trucks || [],
+            'unit',
+            (row) => [row.unit, row.type, row.plate].filter(Boolean).join(' | '),
+            'Select truck'
+        );
+        const outSelect = document.getElementById('kanban-pin-out-order');
+        outSelect.innerHTML = '<option value="">No selected out job</option>';
+        if (outJob) {
+            pinCandidatesById.set(String(outJob.id), {
+                id: outJob.id,
+                text: pinMoveText(outJob, 'out'),
+            });
+            const option = document.createElement('option');
+            option.value = outJob.id;
+            option.textContent = renderPinCandidateOption(outJob);
+            option.selected = true;
+            outSelect.appendChild(option);
+        }
+        document.getElementById('kanban-pin-in-summary').textContent = inJob ? pinMoveText(inJob, 'in') : 'No selected going-in job';
+        document.getElementById('kanban-pin-preview-in').textContent = inJob ? pinMoveText(inJob, 'in') : '';
+        document.getElementById('kanban-pin-preview-out').textContent = outJob ? pinMoveText(outJob, 'out') : '';
+        pinModal.modal('show');
+    }
+
     document.getElementById('dispatch-kanban-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const jobId = document.getElementById('kanban-modal-order-id').value;
@@ -560,15 +830,20 @@
             notes: document.getElementById('kanban-modal-notes').value,
             override_pin: document.getElementById('kanban-modal-override-pin').checked,
             no_proof_needed: document.getElementById('kanban-modal-no-proof-needed').checked,
+            drop_pick_picked_up: document.getElementById('kanban-modal-dp-picked-up').checked,
         };
-        const {response, data} = await postJson(endpoint(updateUrlTemplate, jobId), payload);
-        if (!response.ok || !data.ok) {
-            showMessage(data.error || 'Unable to save dispatch job.', 'warning');
-            return;
+        try {
+            const {response, data} = await postJson(endpoint(updateUrlTemplate, jobId), payload);
+            if (!response.ok || !data.ok) {
+                showMessage(data.error || 'Unable to save dispatch job.', 'warning');
+                return;
+            }
+            modal.modal('hide');
+            showMessage('Dispatch job saved.', 'success');
+            loadBoard();
+        } catch (error) {
+            showMessage('Unable to save dispatch job. Check the server log for details.', 'warning');
         }
-        modal.modal('hide');
-        showMessage('Dispatch job saved.', 'success');
-        loadBoard();
     });
 
     document.getElementById('kanban-proof-upload-button').addEventListener('click', async () => {
@@ -600,6 +875,8 @@
     });
 
     document.getElementById('kanban-make-pin-open').addEventListener('click', openMakePinModal);
+    document.getElementById('kanban-pin-selected-open-top').addEventListener('click', openSelectedPinModal);
+    document.getElementById('kanban-pin-queue-open').addEventListener('click', openPinQueueModal);
 
     document.getElementById('kanban-pin-out-order').addEventListener('change', updatePinPreview);
 
@@ -613,12 +890,17 @@
             driver: document.getElementById('kanban-pin-driver').value,
             truck: document.getElementById('kanban-pin-truck').value,
         };
+        if (activeSelectedPinIds.length) {
+            payload.selected_order_ids = activeSelectedPinIds;
+        }
         const {response, data} = await postJson(endpoint(makePinUrlTemplate, jobId), payload);
         if (!response.ok || !data.ok) {
             showMessage(data.error || 'Unable to create pin row.', 'warning');
             return;
         }
         pinModal.modal('hide');
+        activeSelectedPinIds = [];
+        selectedPinJobIds.clear();
         showMessage(data.message || 'Pin row created.', 'success');
         loadBoard();
     });

@@ -12,6 +12,7 @@
      data-make-pin-options-url-template="{{ url_for('main.DispatchKanbanMakePinOptions', order_id=0) }}"
      data-make-pin-url-template="{{ url_for('main.DispatchKanbanMakePin', order_id=0) }}"
      data-activate-pin-url-template="{{ url_for('main.DispatchKanbanActivatePin', pin_id=0) }}"
+     data-update-pin-url-template="{{ url_for('main.DispatchKanbanUpdatePin', pin_id=0) }}"
      data-delete-pin-url-template="{{ url_for('main.DispatchKanbanDeletePin', pin_id=0) }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <div>
@@ -67,6 +68,17 @@
                     <option value="tomorrow">Tomorrow</option>
                     <option value="7">Next 7 Days</option>
                 </select>
+            </div>
+            <div class="form-group col-md-2">
+                <label>&nbsp;</label>
+                <div class="btn-group btn-block" role="group">
+                    <button type="button" id="kanban-pin-selected-open-top" class="btn btn-sm btn-outline-primary" disabled>
+                        Make Pin
+                    </button>
+                    <button type="button" id="kanban-pin-queue-open" class="btn btn-sm btn-outline-secondary">
+                        Pin Queue
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -166,13 +178,17 @@
                         <label for="kanban-modal-notes">Notes</label>
                         <textarea id="kanban-modal-notes" class="form-control" rows="2"></textarea>
                     </div>
-                    <div class="form-check kanban-modal-pin-field">
+                    <div class="form-check kanban-modal-pin-field d-none">
                         <input type="checkbox" class="form-check-input" id="kanban-modal-override-pin">
                         <label class="form-check-label" for="kanban-modal-override-pin">Allow PIN Assigned without PIN</label>
                     </div>
                     <div class="form-check mt-2">
                         <input type="checkbox" class="form-check-input" id="kanban-modal-no-proof-needed">
                         <label class="form-check-label" for="kanban-modal-no-proof-needed">No Proof Needed</label>
+                    </div>
+                    <div class="form-check mt-2 d-none" id="kanban-modal-dp-picked-panel">
+                        <input type="checkbox" class="form-check-input" id="kanban-modal-dp-picked-up">
+                        <label class="form-check-label" for="kanban-modal-dp-picked-up">Drop-Pick Picked Up</label>
                     </div>
                     <div id="kanban-proof-upload-panel" class="dispatch-kanban-proof-upload mt-3 d-none">
                         <label for="kanban-proof-file" class="mb-1">Upload Proof PDF</label>
@@ -194,6 +210,25 @@
                     <button type="submit" class="btn btn-primary">Save Job</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="dispatch-kanban-pin-queue-modal" tabindex="-1" role="dialog" aria-labelledby="dispatch-kanban-pin-queue-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl dispatch-kanban-pin-queue-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dispatch-kanban-pin-queue-title">Pin Queue</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div id="dispatch-kanban-pin-queue-body" class="modal-body">
+                <div class="dispatch-kanban-empty-note">Loading pin queue...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>

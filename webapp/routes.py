@@ -76,6 +76,7 @@ from webapp.dispatch_kanban import (
     make_pin_candidates,
     move_job as kanban_move_job,
     review_logs_for_order as kanban_review_logs,
+    update_pin_pairing,
     update_job as kanban_update_job,
     upload_proof as kanban_upload_proof,
 )
@@ -1657,6 +1658,14 @@ def DispatchKanbanMakePin(order_id):
 @login_required
 def DispatchKanbanActivatePin(pin_id):
     result, status_code = activate_pin_pairing(pin_id)
+    return jsonify(result), status_code
+
+
+@main.route('/api/dispatch/kanban/pin/<int:pin_id>/update', methods=['POST'])
+@login_required
+def DispatchKanbanUpdatePin(pin_id):
+    payload = request.get_json(silent=True) or {}
+    result, status_code = update_pin_pairing(pin_id, payload)
     return jsonify(result), status_code
 
 

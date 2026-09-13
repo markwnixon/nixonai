@@ -38,6 +38,12 @@
             }, 4500);
         }
 
+        function localDateString(date) {
+            const month = `${date.getMonth() + 1}`.padStart(2, '0');
+            const day = `${date.getDate()}`.padStart(2, '0');
+            return `${date.getFullYear()}-${month}-${day}`;
+        }
+
         function filterParams() {
             const params = new URLSearchParams();
             document.querySelectorAll('.collection-filter').forEach((field) => {
@@ -226,6 +232,12 @@
             `;
             document.getElementById('collection-modal-rate-con-stage').value = String(job.rate_con_stage || 0);
             document.getElementById('collection-modal-rate-con-amount').value = job.rate_con_amount || '';
+            const manualSentRow = document.getElementById('collection-manual-sent-row');
+            const manualSentCheckbox = document.getElementById('collection-modal-manual-sent');
+            const manualSentDate = document.getElementById('collection-modal-manual-sent-date');
+            manualSentCheckbox.checked = false;
+            manualSentDate.value = job.invoice_date || localDateString(new Date());
+            manualSentRow.classList.toggle('d-none', job.status !== 'ready_to_send');
             const rateConUploadRow = document.getElementById('collection-rate-con-upload-row');
             const rateConFile = document.getElementById('collection-rate-con-file');
             const rateConStatus = document.getElementById('collection-rate-con-upload-status');
@@ -339,6 +351,8 @@
             const payload = {
                 rate_con_stage: document.getElementById('collection-modal-rate-con-stage').value,
                 rate_con_amount: document.getElementById('collection-modal-rate-con-amount').value,
+                invoice_package_sent: document.getElementById('collection-modal-manual-sent').checked,
+                invoice_package_sent_date: document.getElementById('collection-modal-manual-sent-date').value,
             };
             const {response, data} = await postJson(endpoint(updateUrlTemplate, jobId), payload);
             if (!response.ok || !data.ok) {

@@ -100,6 +100,16 @@ def format_date(value):
     return date_value.strftime('%Y-%m-%d') if date_value else ''
 
 
+def parse_date(value):
+    value = clean_text(value)
+    if not value:
+        return None
+    try:
+        return datetime.datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
 def days_since(value, today=None):
     date_value = order_date(value)
     if not date_value:
@@ -527,6 +537,16 @@ def update_collection_job(order_id, data):
     if 'rate_con_amount' in data:
         amount = clean_text(data.get('rate_con_amount'))
         order.RCAmount = money_text(amount) if amount else None
+    if data.get('invoice_package_sent'):
+        if collection_status(order) != 'ready_to_send':
+            return {'ok': False, 'error': 'Manual sent can only be marked from Ready To Send.'}, 400
+        invoice_date = parse_date(data.get('invoice_package_sent_date')) or datetime.date.today()
+        order.InvoDate = datetime.datetime.combine(invoice_date, datetime.time.min)
+        current_istat = int_value(order.Istat, 0)
+        if current_istat == 6:
+            order.Istat = 7
+        elif current_istat < 3:
+            order.Istat = 3
     update_order_broker_emails(order, data)
     db.session.commit()
     return {'ok': True, 'job': collection_card(order)}, 200
