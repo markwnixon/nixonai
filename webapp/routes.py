@@ -6297,7 +6297,15 @@ def IntercompanyEntries():
             'date': entry_date,
             'ref': ref,
             'match_aid': True,
+            'allow_tcode_fallback': False,
         }
+
+    def new_transfer_tcode(transfer_date):
+        date_text = transfer_date.strftime('%Y-%m-%d')
+        tcode = newjo('XF', date_text)
+        while Gledger.query.filter(Gledger.Tcode == tcode).first() is not None:
+            tcode = newjo('XF', date_text)
+        return tcode
 
     def transfer_journal_lines(amount, from_account, to_account, tcode, entry_date, ref, owner_transfer_treatment):
         if from_account.Co == to_account.Co:
@@ -6342,36 +6350,185 @@ def IntercompanyEntries():
             build_transfer_line(amount, False, due_in_to_company, from_account, 'IL', tcode, entry_date, ref),
         ], []
 
+    def legacy_transfer_key(tcode):
+        return f'LEGACY-XFER-{tcode}'
+
+    def is_legacy_transfer_key(selection_key):
+        return (selection_key or '').startswith('LEGACY-XFER-')
+
+    def legacy_transfer_tcode(selection_key):
+        return (selection_key or '').replace('LEGACY-XFER-', '', 1)
+
+    def is_legacy_transfer_line(line):
+        return (
+            line is not None and
+            line.Type in ['XD', 'XC'] and
+            line.SourceTable not in ['AccountTransfer', 'IntercompanyEntry']
+        )
+
     def transfer_lines_for_journal(journal_id):
         if not journal_id:
             return []
+        if is_legacy_transfer_key(journal_id):
+            return Gledger.query.filter(
+                (Gledger.Tcode == legacy_transfer_tcode(journal_id)) &
+                (Gledger.Type.in_(['XD', 'XC'])) &
+                ((Gledger.SourceTable.is_(None)) | (~Gledger.SourceTable.in_(['AccountTransfer', 'IntercompanyEntry'])))
+            ).order_by(Gledger.id).all()
         return Gledger.query.filter(
             (Gledger.JournalId == journal_id) &
             (Gledger.SourceTable == 'AccountTransfer')
         ).order_by(Gledger.JournalSeq, Gledger.id).all()
 
-    def has_final_reconciliation(lines):
-        return any(line.Reconciled not in [None, 0, 25] for line in lines)
+    def final_reconciliation_value(value):
+        return value not in [None, 0, 25]
+
+    def reconciliation_ids(value):
+        try:
+            parsed = json.loads(value or '')
+        except:
+            return set(), False
+        if isinstance(parsed, list):
+            ids = set()
+            for item in parsed:
+                try:
+                    ids.add(int(item))
+                except:
+                    pass
+            return ids, True
+        if isinstance(parsed, dict):
+            ids = set()
+            for group in ['first', 'last']:
+                for item in parsed.get(group, []) or []:
+                    try:
+                        ids.add(int(item))
+                    except:
+                        pass
+            return ids, False
+        return set(), False
+
+    def reconciliation_contains_line(rdat, line, require_explicit=False):
+        deposit_ids, deposit_complete = reconciliation_ids(rdat.DepositList)
+        withdraw_ids, withdraw_complete = reconciliation_ids(rdat.WithdrawList)
+        explicit_ids = deposit_ids | withdraw_ids
+        explicit_complete = deposit_complete or withdraw_complete
+        if explicit_ids:
+            if line.id in explicit_ids:
+                return True
+            if explicit_complete:
+                return False
+        if require_explicit:
+            return False
+        if explicit_complete:
+            return False
+
+        if rdat.Rdate is None or line.Date is None:
+            return False
+        line_date = line.Date.date() if isinstance(line.Date, datetime.datetime) else line.Date
+        reconciliation_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
+        try:
+            reconciled_month = int(line.Reconciled or 0)
+        except:
+            return False
+        if reconciled_month != reconciliation_date.month:
+            return False
+        return line_date <= reconciliation_date
 
     def line_has_final_reconciliation(line):
-        return line is not None and line.Reconciled not in [None, 0, 25]
+        if line is None or not final_reconciliation_value(line.Reconciled):
+            return False
+        reconciliations = Reconciliations.query.filter(
+            (Reconciliations.Account == line.Account) &
+            (Reconciliations.Status == 1)
+        ).all()
+        return any(reconciliation_contains_line(rdat, line) for rdat in reconciliations)
+
+    def finalized_reconciliation_for_line(line):
+        if line is None or line.Date is None:
+            return None
+        line_date = line.Date.date() if isinstance(line.Date, datetime.datetime) else line.Date
+        reconciliations = Reconciliations.query.filter(
+            (Reconciliations.Account == line.Account) &
+            (Reconciliations.Status == 1) &
+            (Reconciliations.Rdate.isnot(None))
+        ).order_by(Reconciliations.Rdate.asc()).all()
+        for rdat in reconciliations:
+            reconciliation_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
+            if line_date <= reconciliation_date:
+                return rdat
+        return None
+
+    def restore_transfer_reconciliation(line):
+        rdat = finalized_reconciliation_for_line(line)
+        if rdat is None:
+            return False, 'No finalized reconciliation statement was found for that account/date.'
+        line.Reconciled = rdat.Rdate.month
+        db.session.commit()
+        return True, f'Restored reconciliation flag using finalized statement dated {rdat.Rdate.strftime("%Y-%m-%d")}.'
+
+    def clear_stale_transfer_reconciliation(lines):
+        cleared = 0
+        for line in lines:
+            if final_reconciliation_value(line.Reconciled) and not line_has_final_reconciliation(line):
+                line.Reconciled = 0
+                cleared += 1
+        if cleared:
+            db.session.commit()
+        return cleared
+
+    def has_final_reconciliation(lines):
+        return any(line_has_final_reconciliation(line) for line in lines)
+
+    def transfer_debit_line(lines):
+        return (
+            next((line for line in lines if (line.Debit or 0) > 0 and line.Type == 'XD'), None) or
+            next((line for line in lines if (line.Debit or 0) > 0 and line.Type in ['XD', 'IA', 'OD']), None) or
+            next((line for line in lines if line.Type == 'XD'), None)
+        )
+
+    def transfer_credit_line(lines):
+        return (
+            next((line for line in lines if (line.Credit or 0) > 0 and line.Type == 'XC'), None) or
+            next((line for line in lines if (line.Credit or 0) > 0 and line.Type in ['XC', 'IL', 'OC']), None) or
+            next((line for line in lines if line.Type == 'XC'), None)
+        )
+
+    def transfer_line_side(line):
+        if line is None:
+            return ''
+        if (line.Credit or 0) > 0:
+            return 'Pay From'
+        if (line.Debit or 0) > 0:
+            return 'Pay To'
+        if line.Type == 'XC':
+            return 'Pay From'
+        if line.Type == 'XD':
+            return 'Pay To'
+        return 'Other side'
 
     def transfer_lock_state(lines):
-        debit_line = next((line for line in lines if line.Type == 'XD'), None)
-        credit_line = next((line for line in lines if line.Type == 'XC'), None)
+        debit_line = transfer_debit_line(lines)
+        credit_line = transfer_credit_line(lines)
+        from_locked = line_has_final_reconciliation(credit_line)
+        to_locked = line_has_final_reconciliation(debit_line)
+        locked_sides = []
+        if from_locked:
+            locked_sides.append('Pay From')
+        if to_locked:
+            locked_sides.append('Pay To')
         return {
-            'transfer_from_locked': line_has_final_reconciliation(credit_line),
-            'transfer_to_locked': line_has_final_reconciliation(debit_line),
-            'transfer_core_locked': has_final_reconciliation(lines),
+            'transfer_from_locked': from_locked,
+            'transfer_to_locked': to_locked,
+            'transfer_core_locked': from_locked or to_locked,
             'transfer_partial_lock_message': (
-                'One side of this transfer has been reconciled. Only unreconciled account-side repairs are allowed.'
-                if has_final_reconciliation(lines) else ''
+                f"{' and '.join(locked_sides)} side reconciled. Only unreconciled account-side repairs are allowed."
+                if locked_sides else ''
             ),
         }
 
     def transfer_selection_from_lines(lines):
-        debit_line = next((line for line in lines if line.Type == 'XD'), None)
-        credit_line = next((line for line in lines if line.Type == 'XC'), None)
+        debit_line = transfer_debit_line(lines)
+        credit_line = transfer_credit_line(lines)
         if debit_line is None or credit_line is None:
             return None
 
@@ -6385,7 +6542,7 @@ def IntercompanyEntries():
             owner_transfer_treatment = 'loan'
 
         return {
-            'edit_transfer_journal_id': debit_line.JournalId or credit_line.JournalId or '',
+            'edit_transfer_journal_id': debit_line.JournalId or credit_line.JournalId or legacy_transfer_key(debit_line.Tcode or credit_line.Tcode),
             'transfer_date': line_date.strftime('%Y-%m-%d') if line_date else datetime.date.today().strftime('%Y-%m-%d'),
             'transfer_from_account_id': str(credit_line.Aid or ''),
             'transfer_to_account_id': str(debit_line.Aid or ''),
@@ -6405,8 +6562,8 @@ def IntercompanyEntries():
         return line_date == transfer_date
 
     def update_open_transfer_side(existing_lines, from_account, to_account, transfer_date, amount, ref, memo):
-        debit_line = next((line for line in existing_lines if line.Type == 'XD'), None)
-        credit_line = next((line for line in existing_lines if line.Type == 'XC'), None)
+        debit_line = transfer_debit_line(existing_lines)
+        credit_line = transfer_credit_line(existing_lines)
         if debit_line is None or credit_line is None or len(existing_lines) != 2:
             return ['Partially reconciled transfer repair is only supported for standard two-line account transfers.']
 
@@ -6595,16 +6752,38 @@ def IntercompanyEntries():
         if not lines:
             err.append('Choose an account transfer to edit.')
         else:
+            cleared = clear_stale_transfer_reconciliation(lines)
             transfer_selected = transfer_selection_from_lines(lines)
             if transfer_selected is None:
                 err.append('The selected transfer could not be loaded because its ledger lines are incomplete.')
             else:
                 selected.update(transfer_selected)
                 msg = f'Loaded transfer {lines[0].Tcode} for editing.'
+                if cleared:
+                    msg += f' Cleared {cleared} stale reconciliation flag(s) not tied to a finalized statement.'
+
+    if request.method == 'POST' and request.values.get('clear_transfer'):
+        selected.update({
+            'transfer_date': datetime.date.today().strftime('%Y-%m-%d'),
+            'transfer_from_account_id': '',
+            'transfer_to_account_id': '',
+            'transfer_amount': '',
+            'transfer_ref': '',
+            'transfer_memo': '',
+            'owner_transfer_treatment': '',
+            'edit_transfer_journal_id': '',
+            'transfer_from_locked': False,
+            'transfer_to_locked': False,
+            'transfer_core_locked': False,
+            'transfer_partial_lock_message': '',
+        })
+        msg = 'Ready for a new account transfer.'
 
     if request.method == 'POST' and request.values.get('delete_transfer'):
         journal_id = request.values.get('selected_transfer_journal_id', '').strip()
         lines = transfer_lines_for_journal(journal_id)
+        if lines:
+            clear_stale_transfer_reconciliation(lines)
         if not lines:
             err.append('Choose an account transfer to delete.')
         elif has_final_reconciliation(lines):
@@ -6616,6 +6795,57 @@ def IntercompanyEntries():
             db.session.commit()
             selected['edit_transfer_journal_id'] = ''
             msg = f'Deleted account transfer {tcode}.'
+
+    if request.method == 'POST' and (
+        request.values.get('clear_transfer_pay_to_reconciliation') or
+        request.values.get('clear_transfer_pay_from_reconciliation')
+    ):
+        journal_id = request.values.get('selected_transfer_journal_id', '').strip()
+        lines = transfer_lines_for_journal(journal_id)
+        if not lines:
+            err.append('Choose an account transfer to repair.')
+        else:
+            if request.values.get('clear_transfer_pay_to_reconciliation'):
+                line = transfer_debit_line(lines)
+                side_label = 'Pay To'
+            else:
+                line = transfer_credit_line(lines)
+                side_label = 'Pay From'
+            if line is None:
+                err.append(f'The {side_label} side could not be found for the selected transfer.')
+            elif not final_reconciliation_value(line.Reconciled):
+                msg = f'{side_label} side for transfer {line.Tcode} is already unreconciled.'
+            else:
+                old_value = line.Reconciled
+                line.Reconciled = 0
+                db.session.commit()
+                msg = f'Cleared {side_label} reconciliation flag for transfer {line.Tcode} on {line.Account}; old value was {old_value}.'
+                selected['edit_transfer_journal_id'] = journal_id
+
+    if request.method == 'POST' and (
+        request.values.get('restore_transfer_pay_to_reconciliation') or
+        request.values.get('restore_transfer_pay_from_reconciliation')
+    ):
+        journal_id = request.values.get('selected_transfer_journal_id', '').strip()
+        lines = transfer_lines_for_journal(journal_id)
+        if not lines:
+            err.append('Choose an account transfer to repair.')
+        else:
+            if request.values.get('restore_transfer_pay_to_reconciliation'):
+                line = transfer_debit_line(lines)
+                side_label = 'Pay To'
+            else:
+                line = transfer_credit_line(lines)
+                side_label = 'Pay From'
+            if line is None:
+                err.append(f'The {side_label} side could not be found for the selected transfer.')
+            else:
+                ok, detail = restore_transfer_reconciliation(line)
+                if ok:
+                    msg = f'Restored {side_label} reconciliation flag for transfer {line.Tcode} on {line.Account}. {detail}'
+                else:
+                    err.append(f'Could not restore {side_label} reconciliation flag: {detail}')
+                selected['edit_transfer_journal_id'] = journal_id
 
     if request.method == 'POST' and request.values.get('create_transfer'):
         transfer_date = parse_date(request.values.get('transfer_date'))
@@ -6648,6 +6878,7 @@ def IntercompanyEntries():
         if edit_journal_id and not existing_transfer_lines:
             err.append('The transfer being edited could not be found.')
         if existing_transfer_lines:
+            clear_stale_transfer_reconciliation(existing_transfer_lines)
             selected.update(transfer_lock_state(existing_transfer_lines))
 
         if not err:
@@ -6655,7 +6886,7 @@ def IntercompanyEntries():
                 tcode = existing_transfer_lines[0].Tcode
                 journal_id = existing_transfer_lines[0].JournalId or f'TRANSFER-{tcode}'
             else:
-                tcode = newjo('XF', transfer_date.strftime('%Y-%m-%d'))
+                tcode = new_transfer_tcode(transfer_date)
                 journal_id = f'TRANSFER-{tcode}'
             journal_memo = memo or f'Transfer from {from_account.Name} to {to_account.Name}'
             lines, transfer_err = transfer_journal_lines(amount, from_account, to_account, tcode, transfer_date, ref, owner_transfer_treatment)
@@ -6667,7 +6898,7 @@ def IntercompanyEntries():
                     err.extend(repair_err)
                 else:
                     msg = f'Updated unreconciled side of account transfer {tcode}.'
-                    selected.update(transfer_selection_from_lines(transfer_lines_for_journal(journal_id)) or {})
+                    selected.update(transfer_selection_from_lines(existing_transfer_lines) or {})
             else:
                 for existing_line in existing_transfer_lines:
                     db.session.delete(existing_line)
@@ -6734,15 +6965,34 @@ def IntercompanyEntries():
             setup_warnings.append(f'No cash/bank account is configured for {company_label(code)}.')
 
     raw_recent = Gledger.query.filter(
-        Gledger.SourceTable.in_(['IntercompanyEntry', 'AccountTransfer'])
+        or_(
+            Gledger.SourceTable.in_(['IntercompanyEntry', 'AccountTransfer']),
+            (
+                Gledger.Type.in_(['XD', 'XC']) &
+                ((Gledger.SourceTable.is_(None)) | (~Gledger.SourceTable.in_(['AccountTransfer', 'IntercompanyEntry'])))
+            )
+        )
     ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(120).all()
+    stale_recent_count = 0
+    for line in raw_recent:
+        if (
+            (line.SourceTable == 'AccountTransfer' or is_legacy_transfer_line(line)) and
+            final_reconciliation_value(line.Reconciled) and
+            not line_has_final_reconciliation(line)
+        ):
+            line.Reconciled = 0
+            stale_recent_count += 1
+    if stale_recent_count:
+        db.session.commit()
+        setup_warnings.append(f'Cleared {stale_recent_count} stale transfer reconciliation flag(s) not tied to a finalized statement.')
     journal_map = {}
     for line in raw_recent:
-        key = line.JournalId or line.Tcode
+        legacy_transfer = is_legacy_transfer_line(line)
+        key = line.JournalId or (legacy_transfer_key(line.Tcode) if legacy_transfer else line.Tcode)
         item = journal_map.setdefault(key, {
             'journal_id': key,
-            'entry_kind': 'Transfer' if line.SourceTable == 'AccountTransfer' else 'Intercompany',
-            'source_table': line.SourceTable,
+            'entry_kind': 'Transfer' if line.SourceTable == 'AccountTransfer' or legacy_transfer else 'Intercompany',
+            'source_table': 'LegacyTransfer' if legacy_transfer else line.SourceTable,
             'date': line.Date,
             'tcode': line.Tcode,
             'memo': line.JournalMemo,
@@ -6753,14 +7003,17 @@ def IntercompanyEntries():
             'credit': 0,
             'bank_amount': 0,
             'reconciled': False,
+            'reconciliation_badges': [],
         })
-        if line.SourceTable == 'AccountTransfer':
+        if line.SourceTable == 'AccountTransfer' or legacy_transfer:
             item['entry_kind'] = 'Transfer'
         item['companies'].add(line.Com)
         item['debit'] += line.Debit or 0
         item['credit'] += line.Credit or 0
         if line.Reconciled not in [None, 0, 25]:
             item['reconciled'] = True
+            if line.SourceTable == 'AccountTransfer' or legacy_transfer:
+                item['reconciliation_badges'].append(f'{transfer_line_side(line)} reconciled')
         if line.Type in ['PC', 'DD', 'XD', 'XC']:
             item['bank_amount'] = (line.Debit or line.Credit or 0)
     recent_entries = sorted(journal_map.values(), key=lambda item: item['date'] or datetime.datetime.min, reverse=True)
@@ -6768,6 +7021,7 @@ def IntercompanyEntries():
         item['companies'] = ', '.join(sorted(item['companies']))
         item['amount_fmt'] = money(item['bank_amount'] or max(item['debit'], item['credit']))
         item['balanced'] = item['debit'] == item['credit']
+        item['reconciliation_badges'] = list(dict.fromkeys(item['reconciliation_badges']))
 
     due_accounts = Accounts.query.filter(
         (Accounts.Co.in_(allowed_companies)) &

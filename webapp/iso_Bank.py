@@ -609,7 +609,8 @@ def isoBank():
                 print('hv[1]', hv[1])
                 for oder in odervec:
                     gdat = Gledger.query.get(oder)
-                    gdat.Reconciled=25
+                    if gdat is not None and gdat.Account == acname:
+                        gdat.Reconciled=25
                 db.session.commit()
                 acctinfo = banktotals(acname)
                 hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname)
@@ -663,7 +664,8 @@ def isoBank():
             odervec = selected_bank_ids(odata)
             for oder in odervec:
                 gdat = Gledger.query.get(oder)
-                gdat.Reconciled=0
+                if gdat is not None and gdat.Account == acname:
+                    gdat.Reconciled=0
                 db.session.commit()
                 acctinfo = banktotals(acname)
 # ____________________________________________________________________________________________________________________B.Modify.General

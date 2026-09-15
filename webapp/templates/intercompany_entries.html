@@ -97,6 +97,11 @@
                             onclick="return confirm('Record this account transfer?');">
                         {% if selected.edit_transfer_journal_id %}Save Transfer Changes{% else %}Record Transfer{% endif %}
                     </button>
+                    {% if selected.edit_transfer_journal_id %}
+                        <button type="submit" name="clear_transfer" value="1" class="btn btn-outline-secondary btn-block mt-2">
+                            New Transfer
+                        </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -123,6 +128,22 @@
                 <h5>Recent Entries and Transfers</h5>
                 <div class="mb-2">
                     <button type="submit" name="load_transfer" value="1" class="btn btn-primary btn-sm">Edit Selected Transfer</button>
+                    <button type="submit" name="clear_transfer_pay_to_reconciliation" value="1" class="btn btn-warning btn-sm"
+                            onclick="return confirm('Clear the Pay To reconciliation flag on the selected transfer? Use only when that account side has not actually been reconciled.');">
+                        Clear Pay To Recon
+                    </button>
+                    <button type="submit" name="clear_transfer_pay_from_reconciliation" value="1" class="btn btn-warning btn-sm"
+                            onclick="return confirm('Clear the Pay From reconciliation flag on the selected transfer? Use only when that account side has not actually been reconciled.');">
+                        Clear Pay From Recon
+                    </button>
+                    <button type="submit" name="restore_transfer_pay_from_reconciliation" value="1" class="btn btn-info btn-sm"
+                            onclick="return confirm('Restore the Pay From reconciliation flag from that account’s finalized statement?');">
+                        Restore Pay From Recon
+                    </button>
+                    <button type="submit" name="restore_transfer_pay_to_reconciliation" value="1" class="btn btn-info btn-sm"
+                            onclick="return confirm('Restore the Pay To reconciliation flag from that account’s finalized statement?');">
+                        Restore Pay To Recon
+                    </button>
                     <button type="submit" name="delete_transfer" value="1" class="btn btn-danger btn-sm"
                             onclick="return confirm('Delete the selected account transfer?');">
                         Delete Selected Transfer
@@ -148,7 +169,7 @@
                             {% for item in recent_entries %}
                                 <tr>
                                     <td class="text-center">
-                                        {% if item.source_table == 'AccountTransfer' %}
+                                        {% if item.source_table in ['AccountTransfer', 'LegacyTransfer'] %}
                                             <input type="radio" name="selected_transfer_journal_id" value="{{ item.journal_id }}"
                                                    {% if selected.edit_transfer_journal_id == item.journal_id %}checked{% endif %}>
                                         {% endif %}
@@ -162,7 +183,13 @@
                                     <td class="text-right">{{ item.amount_fmt }}</td>
                                     <td>
                                         {% if item.balanced %}Yes{% else %}No{% endif %}
-                                        {% if item.reconciled %}<span class="badge badge-secondary ml-1">Reconciled</span>{% endif %}
+                                        {% if item.reconciliation_badges %}
+                                            {% for badge in item.reconciliation_badges %}
+                                                <span class="badge badge-secondary ml-1">{{ badge }}</span>
+                                            {% endfor %}
+                                        {% elif item.reconciled %}
+                                            <span class="badge badge-secondary ml-1">Reconciled</span>
+                                        {% endif %}
                                     </td>
                                     <td>{{ item.memo or '' }}</td>
                                 </tr>

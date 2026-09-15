@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from webapp import db
 from webapp.CCC_system_setup import apikeys, scac
-from webapp.models import Accounts, Bills, People, PlaidAccount, PlaidItem, PlaidTransaction, PlaidVendorRule
+from webapp.models import Accounts, Bills, Gledger, People, PlaidAccount, PlaidItem, PlaidTransaction, PlaidVendorRule
 from webapp.class8_tasks_gledger import gledger_write, post_balanced_journal
 from webapp.viewfuncs import newjo
 
@@ -738,7 +738,16 @@ def build_transfer_line(amount, debit, account, source_account, line_type, tcode
         'date': entry_date,
         'ref': ref,
         'match_aid': True,
+        'allow_tcode_fallback': False,
     }
+
+
+def new_transfer_tcode(transfer_date):
+    date_text = transfer_date.strftime('%Y-%m-%d')
+    tcode = newjo('XF', date_text)
+    while Gledger.query.filter(Gledger.Tcode == tcode).first() is not None:
+        tcode = newjo('XF', date_text)
+    return tcode
 
 
 def transfer_journal_lines(amount, from_account, to_account, tcode, entry_date, ref, owner_transfer_treatment):
@@ -805,7 +814,7 @@ def create_transfer_from_plaid_transaction(transaction_id, other_account_id, own
         return ['Choose whether this owner transfer is repayable or owner equity.'], None
 
     transfer_date = tx.Date or datetime.date.today()
-    tcode = newjo('XF', transfer_date.strftime('%Y-%m-%d'))
+    tcode = new_transfer_tcode(transfer_date)
     journal_id = f'TRANSFER-{tcode}'
     ref = (tx.TransactionId or '')[:50]
     memo = f'Plaid transfer: {tx.Name or from_account.Name}'

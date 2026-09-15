@@ -63,6 +63,9 @@ def find_existing_journal_line(line, journal_id=None, source_table=None, source_
         if existing is not None:
             return existing
 
+    if line.get('allow_tcode_fallback', True) is False:
+        return None
+
     query = Gledger.query.filter(
         (Gledger.Tcode == line['tcode']) &
         (Gledger.Type == line['type'])
