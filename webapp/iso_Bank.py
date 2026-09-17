@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Income, Accounts, users, JO, Gledger, Reconciliations, Orders
+from webapp.models import Income, Accounts, users, JO, Gledger, Reconciliations, Orders, Bills
 from flask import session, logging, request
 import datetime
 import calendar
@@ -56,6 +56,46 @@ def mark_reconciled_payment_jobs(ledger_ids):
         if order.Istat != 9:
             order.Istat = 9
             updated += 1
+    if updated:
+        db.session.commit()
+    return updated
+
+def sync_bills_for_ledger_ids(ledger_ids):
+    if not ledger_ids:
+        return 0
+    ledger_rows = Gledger.query.filter(Gledger.id.in_(ledger_ids)).all()
+    tcodes = {row.Tcode for row in ledger_rows if row.Tcode}
+    if not tcodes:
+        return 0
+
+    updated = 0
+    payment_types = ['PD', 'PC', 'DD', 'QD', 'QC']
+    for tcode in tcodes:
+        bills = Bills.query.filter(Bills.Jo == tcode).all()
+        if not bills:
+            continue
+        reconciled_rows = Gledger.query.filter(
+            (Gledger.Tcode == tcode) &
+            (Gledger.Type.in_(payment_types)) &
+            (Gledger.Reconciled.isnot(None)) &
+            (~Gledger.Reconciled.in_([0, 25]))
+        ).all()
+        values = []
+        for row in reconciled_rows:
+            try:
+                values.append(int(row.Reconciled or 0))
+            except:
+                pass
+        reconciled_value = max(values) if values else 0
+        for bill in bills:
+            current_value = getattr(bill, 'Reconciled', None) or 0
+            try:
+                current_value = int(current_value)
+            except:
+                current_value = 0
+            if current_value != reconciled_value:
+                bill.Reconciled = reconciled_value
+                updated += 1
     if updated:
         db.session.commit()
     return updated
@@ -296,10 +336,14 @@ def reopen_reconciliation(bankacct, rdate):
         return 0, f'No finalized reconciliation was found for {bankacct} on or before {rdate.strftime("%Y-%m-%d")}.'
 
     rows = rows_for_reconciliation(rdat)
+    row_ids = [row.id for row in rows]
     for row in rows:
         row.Reconciled = 0
     rdat.Status = 0
     db.session.commit()
+    synced_bills = sync_bills_for_ledger_ids(row_ids)
+    if synced_bills:
+        return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) and {synced_bills} bill row(s) are now unreconciled.'
     return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) are now unreconciled.'
 
 def selected_bank_ids(odata):
@@ -320,12 +364,48 @@ def selected_bank_ids(odata):
                     pass
     return selected
 
-def dataget_Bank(thismuch,bankacct):
+def statement_cutoff_datetime(statement_date):
+    if statement_date in [None, '']:
+        return None
+    if isinstance(statement_date, datetime.datetime):
+        return statement_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    if isinstance(statement_date, datetime.date):
+        return datetime.datetime.combine(statement_date, datetime.time.max)
+    try:
+        parsed_date = datetime.datetime.strptime(str(statement_date), "%Y-%m-%d").date()
+        return datetime.datetime.combine(parsed_date, datetime.time.max)
+    except:
+        return None
+
+def ledger_date_after_cutoff(ledger_date, cutoff):
+    if cutoff is None or ledger_date in [None, '']:
+        return False
+    if isinstance(ledger_date, datetime.datetime):
+        compare_date = ledger_date
+    elif isinstance(ledger_date, datetime.date):
+        compare_date = datetime.datetime.combine(ledger_date, datetime.time.min)
+    else:
+        try:
+            compare_date = datetime.datetime.strptime(str(ledger_date)[:10], "%Y-%m-%d")
+        except:
+            return False
+    return compare_date > cutoff
+
+def dataget_Bank(thismuch, bankacct, statement_date=None):
     # 0=order,#1=proofs,#2=interchange,#3=people/services
     today = datetime.date.today()
     stopdate = today-datetime.timedelta(days=60)
     if thismuch == '1':
-        odata = Gledger.query.filter((Gledger.Account==bankacct) & ( (Gledger.Reconciled==0) | (Gledger.Reconciled==25) )).all()
+        query = Gledger.query.filter(
+            (Gledger.Account == bankacct) &
+            ((Gledger.Reconciled == 0) | (Gledger.Reconciled == 25))
+        )
+        cutoff = statement_cutoff_datetime(statement_date)
+        if cutoff is not None:
+            # Reconciliation works against a statement date. Rows after that date
+            # must not be available for selection or stale form submission.
+            query = query.filter(Gledger.Date <= cutoff)
+        odata = query.all()
     elif thismuch == '5':
         odata = Gledger.query.filter((Gledger.Account==bankacct) & (Gledger.Reconciled==25)).all()
     elif thismuch == '2':
@@ -549,7 +629,7 @@ def isoBank():
 # ____________________________________________________________________________________________________________________B.GetData.General
         #odata = Income.query.all()
         print('acname=',acname)
-        odata = dataget_Bank(thismuch,acname)
+        odata = dataget_Bank(thismuch, acname, hv[0])
         hv[1] = trial_ids(odata)
         acctinfo = banktotals(acname, statement_values)
 # ____________________________________________________________________________________________________________________B.Search.General
@@ -565,7 +645,7 @@ def isoBank():
                 err[1] = f'Marked {row_count} ledger rows reconciled; deposits ${deposits}; withdrawals ${withdrawals}'
                 err[2] = f'Beginning balance for future reconciliation defaults to ${trusted}'
                 thismuch = '1'
-                odata = dataget_Bank(thismuch, acname)
+                odata = dataget_Bank(thismuch, acname, hv[0])
                 acctinfo = banktotals(acname)
             except Exception as exc:
                 err[0] = f'Baseline failed: {exc}'
@@ -577,7 +657,7 @@ def isoBank():
                 err[0] = reopen_msg
                 if row_count:
                     thismuch = '1'
-                    odata = dataget_Bank(thismuch, acname)
+                    odata = dataget_Bank(thismuch, acname, hv[0])
                     hv[1] = trial_ids(odata)
                     acctinfo = banktotals(acname)
             except Exception as exc:
@@ -602,7 +682,20 @@ def isoBank():
                 #if recothese is not None: recmo = 25 #Do not record month until reconciliation final
                 bkchargeid = 0
 
-                odervec = selected_bank_ids(odata)
+                selected_odervec = selected_bank_ids(odata)
+                cutoff = statement_cutoff_datetime(rdate)
+                odervec = []
+                skipped_future = []
+                for selected_id in selected_odervec:
+                    selected_row = Gledger.query.get(selected_id)
+                    if selected_row is not None and ledger_date_after_cutoff(selected_row.Date, cutoff):
+                        skipped_future.append(selected_id)
+                    else:
+                        odervec.append(selected_id)
+                if skipped_future:
+                    err.append(
+                        f'Skipped {len(skipped_future)} item(s) dated after statement date {rdate}.'
+                    )
                 print('bkid=',bkchargeid)
                 if bkchargeid > 0 and bkchargeid not in odervec: odervec.append(bkchargeid)
                 hv[1] = odervec
@@ -616,13 +709,14 @@ def isoBank():
                 hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname)
                 print(hv[2],hv[3])
                 save_trial_reconciliation(acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5])
-                odata = dataget_Bank(thismuch, acname)
+                odata = dataget_Bank(thismuch, acname, hv[0])
 
                 if finalize is not None and abs(parse_money(acctinfo[5])) > .01:
                     err.append(f'Cannot finalize because the statement is out of balance by ${acctinfo[5]}.')
 
                 if finalize is not None and abs(parse_money(acctinfo[5])) <= .01:
                     reset_trial(recmo, acname, odervec)
+                    synced_bills = sync_bills_for_ledger_ids(odervec)
                     reconciled_jobs = mark_reconciled_payment_jobs(odervec)
                     hv[1] = [0]
                     rdat = Reconciliations.query.filter((Reconciliations.Rdate == hv[0]) & (Reconciliations.Account == acname)).first()
@@ -653,6 +747,8 @@ def isoBank():
                         rdat.Diff = acctinfo[5]
                         db.session.commit()
                     err.append(f'Reconciliation data saved for Account {acname} Date: {hv[0]}')
+                    if synced_bills:
+                        err.append(f'Marked {synced_bills} bill payment row(s) as bank reconciled')
                     if reconciled_jobs:
                         err.append(f'Marked {reconciled_jobs} paid job(s) as bank reconciled')
 
@@ -668,6 +764,9 @@ def isoBank():
                     gdat.Reconciled=0
                 db.session.commit()
                 acctinfo = banktotals(acname)
+            synced_bills = sync_bills_for_ledger_ids(odervec)
+            if synced_bills:
+                err.append(f'Updated reconciliation status for {synced_bills} bill row(s).')
 # ____________________________________________________________________________________________________________________B.Modify.General
         if (modify is not None or vmod is not None) and numchecked==1 :
             modlink=1
@@ -786,7 +885,7 @@ def isoBank():
         defaults = statement_defaults(bankacct, today_str)
         hv[0] = defaults['rdate']
         acctinfo = banktotals(bankacct)
-        odata = dataget_Bank(thismuch,bankacct)
+        odata = dataget_Bank(thismuch, bankacct, hv[0])
         hv[1] = trial_ids(odata)
 
 

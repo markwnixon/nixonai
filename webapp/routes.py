@@ -6615,6 +6615,12 @@ def IntercompanyEntries():
 
         return ['This transfer could not be repaired.']
 
+    today_date = datetime.date.today()
+    default_transfer_to = today_date.strftime('%Y-%m-%d')
+    default_transfer_from = (today_date - datetime.timedelta(days=60)).strftime('%Y-%m-%d')
+    transfer_filter_date_from = request.values.get('transfer_filter_date_from') or default_transfer_from
+    transfer_filter_date_to = request.values.get('transfer_filter_date_to') or default_transfer_to
+
     selected = {
         'entry_date': datetime.date.today().strftime('%Y-%m-%d'),
         'entry_type': request.values.get('entry_type', 'Expense'),
@@ -6637,9 +6643,29 @@ def IntercompanyEntries():
         'source': request.values.get('source', ''),
         'ref': request.values.get('ref', ''),
         'memo': request.values.get('memo', ''),
+        'transfer_filter_date_from': transfer_filter_date_from,
+        'transfer_filter_date_to': transfer_filter_date_to,
     }
     err = []
     msg = ''
+    transfer_filter_start = parse_date(transfer_filter_date_from)
+    transfer_filter_end = parse_date(transfer_filter_date_to)
+    if transfer_filter_start is None:
+        transfer_filter_date_from = default_transfer_from
+        selected['transfer_filter_date_from'] = transfer_filter_date_from
+        transfer_filter_start = parse_date(transfer_filter_date_from)
+        err.append('Invalid transfer From date; reset to default.')
+    if transfer_filter_end is None:
+        transfer_filter_date_to = default_transfer_to
+        selected['transfer_filter_date_to'] = transfer_filter_date_to
+        transfer_filter_end = parse_date(transfer_filter_date_to)
+        err.append('Invalid transfer To date; reset to default.')
+    if transfer_filter_start and transfer_filter_end and transfer_filter_start > transfer_filter_end:
+        transfer_filter_start, transfer_filter_end = transfer_filter_end, transfer_filter_start
+        selected['transfer_filter_date_from'] = transfer_filter_start.strftime('%Y-%m-%d')
+        selected['transfer_filter_date_to'] = transfer_filter_end.strftime('%Y-%m-%d')
+        err.append('Transfer date range was reversed; dates were swapped.')
+    transfer_filter_end = transfer_filter_end.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     if request.method == 'POST' and request.values.get('create_entry'):
         entry_date = parse_date(request.values.get('entry_date'))
@@ -6965,6 +6991,8 @@ def IntercompanyEntries():
             setup_warnings.append(f'No cash/bank account is configured for {company_label(code)}.')
 
     raw_recent = Gledger.query.filter(
+        (Gledger.Date >= transfer_filter_start) &
+        (Gledger.Date <= transfer_filter_end) &
         or_(
             Gledger.SourceTable.in_(['IntercompanyEntry', 'AccountTransfer']),
             (
@@ -6972,7 +7000,7 @@ def IntercompanyEntries():
                 ((Gledger.SourceTable.is_(None)) | (~Gledger.SourceTable.in_(['AccountTransfer', 'IntercompanyEntry'])))
             )
         )
-    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).limit(120).all()
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
     stale_recent_count = 0
     for line in raw_recent:
         if (
@@ -7055,7 +7083,7 @@ def IntercompanyEntries():
         err='\n'.join(err),
         msg=msg,
         setup_warnings=setup_warnings,
-        recent_entries=recent_entries[:40],
+        recent_entries=recent_entries,
         due_balances=due_balances,
     )
 

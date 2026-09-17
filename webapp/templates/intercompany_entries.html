@@ -125,7 +125,20 @@
                     </div>
                 {% endif %}
 
-                <h5>Recent Entries and Transfers</h5>
+                <div class="d-flex flex-wrap align-items-end justify-content-between mb-2">
+                    <h5 class="mb-2">Recent Entries and Transfers</h5>
+                    <div class="form-inline mb-2">
+                        <label for="transfer_filter_date_from" class="mr-2">From</label>
+                        <input type="date" class="form-control form-control-sm mr-2" id="transfer_filter_date_from"
+                               name="transfer_filter_date_from" value="{{ selected.transfer_filter_date_from }}">
+                        <label for="transfer_filter_date_to" class="mr-2">To</label>
+                        <input type="date" class="form-control form-control-sm mr-2" id="transfer_filter_date_to"
+                               name="transfer_filter_date_to" value="{{ selected.transfer_filter_date_to }}">
+                        <button type="submit" name="apply_transfer_date_filter" value="1" class="btn btn-secondary btn-sm">
+                            Apply Range
+                        </button>
+                    </div>
+                </div>
                 <div class="mb-2">
                     <button type="submit" name="load_transfer" value="1" class="btn btn-primary btn-sm">Edit Selected Transfer</button>
                     <button type="submit" name="clear_transfer_pay_to_reconciliation" value="1" class="btn btn-warning btn-sm"
