@@ -37,8 +37,8 @@
 
     {% for tabrow in data1 %}
         {% set outer_loop = loop %}
-            <input type = "hidden" {% if data1id[outer_loop.index - 1] in avec %} value="on" {% endif %} name="{{ thistable }}{{data1id[outer_loop.index-1]}}">
+        {% if data1id[outer_loop.index - 1] in avec %}
+            <input type="hidden" value="on" name="{{ thistable }}{{ data1id[outer_loop.index - 1] }}">
+        {% endif %}
     {% endfor %}
 {% endfor %}
-
-
