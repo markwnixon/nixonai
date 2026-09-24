@@ -1,5 +1,5 @@
 from webapp import db
-from webapp.models import Trucklog, DriverAssign, Invoices, JO, Income, Bills, Accounts, Bookings, OverSeas, Autos, People, Interchange, Drivers, ChalkBoard, Orders, Drops, Services, Quotes, Divisions
+from webapp.models import Trucklog, DriverAssign, Invoices, JO, Income, Bills, Accounts, Bookings, OverSeas, Autos, People, Interchange, Drivers, ChalkBoard, Orders, Drops, Services, Quotes, Divisions, SumInv
 from webapp.models import Taxmap, QBaccounts, Accttypes, IEroll, Broll, StreetTurns, Gledger, Adjusting
 from flask import session, logging, request
 import datetime
@@ -325,6 +325,33 @@ def jovec(jo):
         k=k+1
     return jolist
 
+def jo_code_has_operational_history(code):
+    if not code:
+        return False
+    if Gledger.query.filter(
+        (Gledger.Tcode == code) |
+        (Gledger.JournalId.like(f'%{code}%'))
+    ).first() is not None:
+        return True
+
+    checks = [
+        (Orders, 'Jo'),
+        (Bills, 'Jo'),
+        (Income, 'Jo'),
+        (Income, 'SubJo'),
+        (Invoices, 'Jo'),
+        (OverSeas, 'Jo'),
+        (Autos, 'Jo'),
+        (Interchange, 'Jo'),
+        (Services, 'Jo'),
+        (SumInv, 'Jo'),
+    ]
+    for model, field_name in checks:
+        if hasattr(model, field_name):
+            if model.query.filter(getattr(model, field_name) == code).first() is not None:
+                return True
+    return False
+
 def newjo(jtype,sdate):
     dt = datetime.datetime.strptime(sdate, '%Y-%m-%d')
     year= str(dt.year)
@@ -343,7 +370,10 @@ def newjo(jtype,sdate):
     eval=str(nextid%100).zfill(2)
     nextjo = jtype+month+day2+year[3]+eval
     attempts = 0
-    while JO.query.filter(JO.jo == nextjo).first() is not None:
+    while (
+        JO.query.filter(JO.jo == nextjo).first() is not None or
+        jo_code_has_operational_history(nextjo)
+    ):
         nextid = nextid + 1
         attempts = attempts + 1
         eval = str(nextid % 100).zfill(2) if attempts <= 100 else str(nextid).zfill(3)

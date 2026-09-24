@@ -48,6 +48,15 @@ def bill_payment_ledger_entries(bill):
         return []
 
     jo = bill.Jo
+    if getattr(bill, 'id', None):
+        linked_rows = Gledger.query.filter(
+            (Gledger.SourceTable == 'Bills') &
+            (Gledger.SourceId == bill.id) &
+            (Gledger.Type.in_(BILL_PAYMENT_LEDGER_TYPES))
+        ).all()
+        if linked_rows:
+            return linked_rows
+
     ledger_filter = or_(
         (Gledger.Tcode == jo) & (Gledger.Type.in_(BILL_PAYMENT_LEDGER_TYPES)),
         (Gledger.Tcode.like(f'{jo}-%')) & (Gledger.Type.in_(BILL_PAYMENT_LEDGER_TYPES)),
@@ -162,16 +171,32 @@ def sync_bills_reconciled_status():
         LEFT JOIN (
             SELECT b2.id AS BillId, MAX(g.Reconciled) AS ReconciledValue
             FROM bills b2
+            JOIN gledger g ON (g.SourceTable = 'Bills' AND g.SourceId = b2.id)
+            WHERE g.Type IN ('PD', 'PC', 'DD', 'QD', 'QC')
+              AND g.Reconciled IS NOT NULL
+              AND g.Reconciled NOT IN (0, 25)
+            GROUP BY b2.id
+            UNION ALL
+            SELECT b2.id AS BillId, MAX(g.Reconciled) AS ReconciledValue
+            FROM bills b2
             JOIN gledger g ON (
-                (g.SourceTable = 'Bills' AND g.SourceId = b2.id)
-                OR g.Tcode = b2.Jo
-                OR g.Tcode LIKE CONCAT(b2.Jo, '-%')
-                OR g.JournalId = CONCAT('PAYBILL-', b2.Jo)
-                OR g.JournalId LIKE CONCAT('PAYBILL-', b2.Jo, '-%')
+                (
+                    g.Tcode = b2.Jo
+                    OR g.Tcode LIKE CONCAT(b2.Jo, '-%')
+                    OR g.JournalId = CONCAT('PAYBILL-', b2.Jo)
+                    OR g.JournalId LIKE CONCAT('PAYBILL-', b2.Jo, '-%')
+                )
             )
             WHERE g.Type IN ('PD', 'PC', 'DD', 'QD', 'QC')
               AND g.Reconciled IS NOT NULL
               AND g.Reconciled NOT IN (0, 25)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM gledger linked
+                  WHERE linked.SourceTable = 'Bills'
+                    AND linked.SourceId = b2.id
+                    AND linked.Type IN ('PD', 'PC', 'DD', 'QD', 'QC')
+              )
             GROUP BY b2.id
         ) r ON r.BillId = b.id
         SET b.Reconciled = COALESCE(r.ReconciledValue, 0)
@@ -3222,6 +3247,40 @@ def unique_key_candidate(model, key_name, proposed, exclude_id=None):
             candidate = f"{base}-{attempt + 1}"
 
 
+def key_has_ledger_history(value):
+    if not value:
+        return False
+    return Gledger.query.filter(
+        or_(
+            Gledger.Tcode == value,
+            Gledger.Tcode.like(f'{value}-%'),
+            Gledger.JournalId == f'PAYBILL-{value}',
+            Gledger.JournalId.like(f'PAYBILL-{value}-%'),
+            Gledger.JournalId == f'BILL-{value}',
+            Gledger.JournalId.like(f'BILL-{value}-%'),
+        )
+    ).first() is not None
+
+
+def unique_bill_key_candidate(model, key_name, proposed, exclude_id=None):
+    candidate = unique_key_candidate(model, key_name, proposed, exclude_id)
+    base = str(candidate or proposed or '').strip()
+    if not base:
+        return candidate
+
+    match = re.match(r'^([A-Za-z]+)(\d+)$', base)
+    attempt = 0
+    while key_has_ledger_history(candidate):
+        attempt += 1
+        if match:
+            prefix, digits = match.groups()
+            candidate = f"{prefix}{int(digits) + attempt:0{len(digits)}d}"
+        else:
+            candidate = f"{base}-{attempt + 1}"
+        candidate = unique_key_candidate(model, key_name, candidate, exclude_id)
+    return candidate
+
+
 def make_new_entry(tablesetup,holdvec):
     table = tablesetup['table']
     entrydata = tablesetup['entry data']
@@ -3267,7 +3326,10 @@ def make_new_entry(tablesetup,holdvec):
             creation = [ix for ix in creators if ix == entry[0]][0]
             holdvec[jx] = eval(f"get_new_{creation}('{entry[3]}')")
             if entry[0] == ukey:
-                unique_value = unique_key_candidate(model, ukey, holdvec[jx])
+                if table == 'Bills':
+                    unique_value = unique_bill_key_candidate(model, ukey, holdvec[jx])
+                else:
+                    unique_value = unique_key_candidate(model, ukey, holdvec[jx])
                 if unique_value != holdvec[jx]:
                     err.append(f'{table} {ukey} {holdvec[jx]} already exists; assigned {unique_value} instead.')
                     holdvec[jx] = unique_value
@@ -3305,7 +3367,10 @@ def make_new_entry(tablesetup,holdvec):
                 #print(f'Data going in is:{entry[0]} {holdvec[jx]}')
                 thisvalue = holdvec[jx]
                 if entry[0] == ukey:
-                    unique_value = unique_key_candidate(model, ukey, thisvalue, exclude_id=id)
+                    if table == 'Bills':
+                        unique_value = unique_bill_key_candidate(model, ukey, thisvalue, exclude_id=id)
+                    else:
+                        unique_value = unique_key_candidate(model, ukey, thisvalue, exclude_id=id)
                     if unique_value != thisvalue:
                         err.append(f'{table} {ukey} {thisvalue} already exists; assigned {unique_value} instead.')
                         thisvalue = unique_value
