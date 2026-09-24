@@ -6446,15 +6446,13 @@ def IntercompanyEntries():
     def finalized_reconciliation_for_line(line):
         if line is None or line.Date is None:
             return None
-        line_date = line.Date.date() if isinstance(line.Date, datetime.datetime) else line.Date
         reconciliations = Reconciliations.query.filter(
             (Reconciliations.Account == line.Account) &
             (Reconciliations.Status == 1) &
             (Reconciliations.Rdate.isnot(None))
         ).order_by(Reconciliations.Rdate.asc()).all()
         for rdat in reconciliations:
-            reconciliation_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
-            if line_date <= reconciliation_date:
+            if reconciliation_contains_line(rdat, line, require_explicit=True):
                 return rdat
         return None
 
