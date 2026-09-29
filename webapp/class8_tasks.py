@@ -653,6 +653,25 @@ def populate(tables_on,tabletitle,tfilters,jscripts):
             #print(f'Exiting with all keydata: {keydata}')
     return tabletitle, table_data, checked_data, jscripts, keydata, labpassvec
 
+
+def bill_pay_account_filter_options():
+    rows = (
+        db.session.query(Bills.pAccount)
+        .filter(Bills.pAccount.isnot(None), Bills.pAccount != '')
+        .distinct()
+        .order_by(Bills.pAccount)
+        .all()
+    )
+    accounts = [row[0] for row in rows if hasinput(row[0])]
+    return ['Show All'] + accounts
+
+
+def apply_billing_filter_options(table_filters):
+    for filter_group in table_filters:
+        if 'Pay Account' in filter_group:
+            filter_group['Pay Account'] = bill_pay_account_filter_options()
+            break
+
 def reset_state_soft(task_boxes):
     tboxes={}
     # Default time filter on entry into table is last 60 days:
@@ -2430,6 +2449,8 @@ def Table_maker(genre):
     table_filters = eval(f"{genre}_genre['table_filters']")
     task_boxes = eval(f"{genre}_genre['task_boxes']")
     task_box_map = eval(f"{genre}_genre['task_box_map']")
+    if genre == 'Billing':
+        apply_billing_filter_options(table_filters)
 
     #print(f'The genre is {genre} and the genre tables are: {genre_tables}')
 
@@ -2546,6 +2567,8 @@ def Table_maker(genre):
                 if tfilters['Haul Filter'] == 'Show All': tfilters['Haul Filter'] = None
             if 'Shipper Filter' in tfilters:
                 if tfilters['Shipper Filter'] == 'Show All': tfilters['Shipper Filter'] = None
+            if 'Pay Account' in tfilters:
+                if tfilters['Pay Account'] == 'Show All': tfilters['Pay Account'] = None
             if 'Color Filter' in tfilters:
                 if tfilters['Color Filter'] == 'Haul' or tfilters['Color Filter'] == 'Invoice':
                     #Provide filter consistency: if an invoice filter is selected make sure invoice colors are shown:
@@ -2575,7 +2598,7 @@ def Table_maker(genre):
         #session['table_defaults'] = tables_on
         #session['table_removed'] = []
         # Default time filter on entry into table is last 60 days:
-        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 45 Days', 'Pay Filter': None, 'Haul Filter': None, 'Color Filter': 'Both', 'Viewer': '8x4'}
+        tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 45 Days', 'Pay Filter': None, 'Pay Account': None, 'Haul Filter': None, 'Color Filter': 'Both', 'Viewer': '8x4'}
         jscripts = ['dtTrucking']
         taskon, task_iter, task_focus, tasktype = None, None, None, None
         package_order_id = request.args.get('collection_package_order_id')
@@ -2642,11 +2665,10 @@ def Table_maker(genre):
     #Apply shortcut for filters for various tasks
     current_view = tfilters['Viewer']
     if invoicehit is not None: tfilters = {'Shipper Filter': None, 'Date Filter': 'Last 60 Days', 'Pay Filter': 'Unsent', 'Haul Filter': 'Completed', 'Color Filter': 'Both', 'Viewer':current_view}
-    if genre == 'Billing':
+    if genre == 'Billing' and request.values.get('Sync Bill Reconciliation') is not None:
         try:
             synced_count = sync_bills_reconciled_status()
-            if synced_count:
-                err.append(f'Synced reconciliation status for {synced_count} bill payment(s).')
+            err.append(f'Synced reconciliation status for {synced_count} bill payment(s).')
         except Exception as exc:
             db.session.rollback()
             err.append(f'Could not sync bill reconciliation status: {exc}')
@@ -3129,6 +3151,12 @@ def get_dbdata(table_setup, tfilters):
             if stest is not None and stest != 'Show All' and 'Shipper' in filteron:
                 sfilter = f"{table}.{shipper_filter_field}.contains('{stest}')"
                 query_adds.append(sfilter)
+
+        if table == 'Bills' and 'Pay Account' in tfilters:
+            account_filter = tfilters['Pay Account']
+            if account_filter is not None and account_filter != 'Show All':
+                safe_account_filter = str(account_filter).replace("\\", "\\\\").replace("'", "\\'")
+                query_adds.append(f"{table}.pAccount == '{safe_account_filter}'")
 
     # Determine if haul filter applies to query:
     if 'Driver Filter' in tfilters:
