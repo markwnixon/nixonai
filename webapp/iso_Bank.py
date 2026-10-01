@@ -391,14 +391,88 @@ def ledger_date_after_cutoff(ledger_date, cutoff):
             return False
     return compare_date > cutoff
 
+def reconciliation_explicit_ids(value):
+    try:
+        parsed = json.loads(value or '')
+    except:
+        return set(), False
+    if isinstance(parsed, list):
+        ids = set()
+        for item in parsed:
+            try:
+                ids.add(int(item))
+            except:
+                pass
+        return ids, True
+    if isinstance(parsed, dict):
+        ids = set()
+        for group in ['first', 'last']:
+            for item in parsed.get(group, []) or []:
+                try:
+                    ids.add(int(item))
+                except:
+                    pass
+        return ids, False
+    return set(), False
+
+def reconciliation_contains_ledger_line(rdat, line):
+    deposit_ids, deposit_complete = reconciliation_explicit_ids(rdat.DepositList)
+    withdraw_ids, withdraw_complete = reconciliation_explicit_ids(rdat.WithdrawList)
+    explicit_ids = deposit_ids | withdraw_ids
+    explicit_complete = deposit_complete or withdraw_complete
+    if explicit_ids:
+        if line.id in explicit_ids:
+            return True
+        if explicit_complete:
+            return False
+    if explicit_complete:
+        return False
+
+    if rdat.Rdate is None or line.Date is None:
+        return False
+    line_date = line.Date.date() if isinstance(line.Date, datetime.datetime) else line.Date
+    reconciliation_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
+    try:
+        reconciled_month = int(line.Reconciled or 0)
+    except:
+        return False
+    if reconciled_month != reconciliation_date.month:
+        return False
+    return line_date <= reconciliation_date
+
+def line_has_final_reconciliation(line):
+    if line is None or line.Reconciled in [None, 0, 25]:
+        return False
+    reconciliations = Reconciliations.query.filter(
+        (Reconciliations.Account == line.Account) &
+        (Reconciliations.Status == 1)
+    ).all()
+    return any(reconciliation_contains_ledger_line(rdat, line) for rdat in reconciliations)
+
+def clear_stale_reconciliation_flags(bankacct):
+    rows = Gledger.query.filter(
+        (Gledger.Account == bankacct) &
+        (Gledger.Reconciled.isnot(None)) &
+        (~Gledger.Reconciled.in_([0, 25]))
+    ).all()
+    cleared = 0
+    for row in rows:
+        if not line_has_final_reconciliation(row):
+            row.Reconciled = 0
+            cleared += 1
+    if cleared:
+        db.session.commit()
+    return cleared
+
 def dataget_Bank(thismuch, bankacct, statement_date=None):
     # 0=order,#1=proofs,#2=interchange,#3=people/services
+    clear_stale_reconciliation_flags(bankacct)
     today = datetime.date.today()
     stopdate = today-datetime.timedelta(days=60)
     if thismuch == '1':
         query = Gledger.query.filter(
             (Gledger.Account == bankacct) &
-            ((Gledger.Reconciled == 0) | (Gledger.Reconciled == 25))
+            ((Gledger.Reconciled.is_(None)) | (Gledger.Reconciled == 0) | (Gledger.Reconciled == 25))
         )
         cutoff = statement_cutoff_datetime(statement_date)
         if cutoff is not None:
