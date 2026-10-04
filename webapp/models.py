@@ -680,6 +680,12 @@ class Orders(db.Model):
     DelStat = db.Column('DelStat', db.Integer)
     DisStatus = db.Column('DisStatus', db.String(45))
     HoldType = db.Column('HoldType', db.String(45))
+    DisBillDate = db.Column('DisBillDate', db.Date)
+    DispatchBilled = db.Column('DispatchBilled', db.Integer, default=0)
+    PartnerJob = db.Column('PartnerJob', db.Integer, default=0)
+    PartnerAccount = db.Column('PartnerAccount', db.String(100))
+    PartnerAmount = db.Column('PartnerAmount', db.String(45))
+    PartnerEarned = db.Column('PartnerEarned', db.String(45))
 
     def __init__(self, Status, Jo, HaulType, Order, Company, Location, BOL, Booking, Container, Driver, Pickup,
                  Delivery, Amount, Date, Time, Date2, Time2, Time3, PaidInvoice, Source, Description, Chassis,
@@ -688,7 +694,8 @@ class Orders(db.Model):
                  Scache, Pcache, Icache, Mcache, Pkcache, QBi, InvoTotal, Truck, Dropblock3, Location3, Date3,
                  Date4, Date5, Date6, Date7, Date8, InvoDate, PaidDate, PaidAmt, PayRef, PayMeth, PayAcct, BalDue, Payments,
                  Quote, RateCon, Rcache, Proof2, Pcache2, Emailjp, Emailoa, Emailap, Saljp, Saloa, Salap, SSCO, Ship, Voyage, UserMod, DelStat,
-                 DrvProof, DrvSeal, D1cache, D2cache, HoldType=None, RCneeded=0, RCAmount=None, DisStatus=None):
+                 DrvProof, DrvSeal, D1cache, D2cache, HoldType=None, RCneeded=0, RCAmount=None, DisStatus=None,
+                 DisBillDate=None, DispatchBilled=0, PartnerJob=0, PartnerAccount=None, PartnerAmount=None, PartnerEarned=None):
         self.Status = Status
         self.Jo = Jo
         self.HaulType = HaulType
@@ -778,6 +785,12 @@ class Orders(db.Model):
         self.DelStat = DelStat
         self.DisStatus = DisStatus
         self.HoldType = HoldType
+        self.DisBillDate = DisBillDate
+        self.DispatchBilled = DispatchBilled or 0
+        self.PartnerJob = PartnerJob or 0
+        self.PartnerAccount = PartnerAccount
+        self.PartnerAmount = PartnerAmount
+        self.PartnerEarned = PartnerEarned
         self.DrvProof = DrvProof
         self.DrvSeal = DrvSeal
         self.D1cache = D1cache

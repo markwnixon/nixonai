@@ -7480,6 +7480,9 @@ def IncomeExpenseReview():
     def money_number(cents):
         return float(cents or 0) / 100
 
+    def money_number(cents):
+        return float(cents or 0) / 100
+
     def build_rollup_rows(account_summaries):
         rows = []
         for section in ['Income', 'Expense']:
@@ -7780,7 +7783,7 @@ def IncomeExpenseReview():
     )
 
 
-@main.route('/BalanceSheet', methods=['GET'])
+@main.route('/BalanceSheet', methods=['GET', 'POST'])
 @login_required
 @financial_mfa_required
 def BalanceSheet():
@@ -7795,22 +7798,447 @@ def BalanceSheet():
     def money(cents):
         return "${:,.2f}".format((cents or 0) / 100)
 
+    def money_to_cents(value):
+        try:
+            clean = str(value).replace('$', '').replace(',', '').strip()
+            if clean in ['', '-']:
+                return 0
+            return int((Decimal(clean) * 100).quantize(Decimal('1')))
+        except Exception:
+            return 0
+
+    def date_only(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        return value
+
+    def account_is_credit_card(account):
+        account_type = (account.Type or '').lower()
+        account_name = (account.Name or '').lower()
+        account_description = (account.Description or '').lower()
+        return (
+            'credit card' in account_type or
+            'credit card' in account_name or
+            'credit card' in account_description
+        )
+
+    def account_is_accounts_payable(account):
+        account_type = (account.Type or '').lower()
+        account_name = (account.Name or '').lower()
+        account_description = (account.Description or '').lower()
+        return (
+            'accounts payable' in account_name or
+            'account payable' in account_name or
+            'accounts payable' in account_type or
+            'accounts payable' in account_description
+        )
+
+    def account_is_accounts_receivable(account):
+        account_type = (account.Type or '').lower()
+        account_name = (account.Name or '').lower()
+        account_description = (account.Description or '').lower()
+        return (
+            'accounts receivable' in account_name or
+            'account receivable' in account_name or
+            'accounts receivable' in account_type or
+            'accounts receivable' in account_description
+        )
+
+    def account_is_undeposited_funds(account):
+        return (account.Name or '').strip().lower() == 'undeposited funds'
+
+    def account_display_category(account):
+        if account_is_accounts_receivable(account):
+            return 'Assets'
+        if account_is_accounts_payable(account):
+            return 'Liabilities'
+        if account_is_credit_card(account):
+            return 'Liabilities'
+        return account.Category or ''
+
+    def account_display_subcategory(account):
+        if account_is_accounts_receivable(account):
+            return 'Current Assets'
+        if account_is_accounts_payable(account):
+            return 'Current Liabilities'
+        if account_is_credit_card(account):
+            return 'Current Liabilities'
+        return account.Subcategory or ''
+
     def account_section(account):
         account_type = account.Type or ''
-        category = account.Category or ''
-        if account_type in ['Bank', 'Asset', 'Exch'] or category == 'Assets':
+        category = account_display_category(account)
+        account_type_lower = account_type.lower()
+        category_lower = category.lower()
+        if account_is_accounts_receivable(account):
             return 'Assets'
-        if 'Liability' in account_type or category == 'Liabilities':
+        if account_is_accounts_payable(account):
+            return 'Liabilities'
+        if account_is_credit_card(account):
+            return 'Liabilities'
+        if (
+            account_type in ['Bank', 'Asset', 'Exch'] or
+            account_type_lower in ['cash', 'current asset', 'current assets'] or
+            'asset' in account_type_lower or
+            category == 'Assets' or
+            'asset' in category_lower
+        ):
+            return 'Assets'
+        if 'liability' in account_type_lower or category == 'Liabilities' or 'liability' in category_lower:
             return 'Liabilities'
         if account_type == 'Equity' or category == 'Equity':
             return 'Equity'
         return 'Other Balance Accounts'
 
     def account_balance(account, debit, credit):
+        if account is not None and account_is_credit_card(account):
+            return debit - credit
         section = account_section(account)
         if section in ['Liabilities', 'Equity']:
             return credit - debit
         return debit - credit
+
+    def balance_sheet_order_rank(item):
+        name = (item.get('account') or '').lower()
+        account_type = (item.get('type') or '').lower()
+        category = (item.get('category') or '').lower()
+        subcategory = (item.get('subcategory') or '').lower()
+        text = ' '.join([name, account_type, category, subcategory])
+        section = item.get('section')
+        if section == 'Assets':
+            if any(term in text for term in ['cash', 'checking', 'bank of america', 'bank ', 'savings']):
+                return 10
+            if 'undeposited' in text:
+                return 20
+            if 'accounts receivable' in text or 'receivable' in text:
+                return 30
+            if any(term in text for term in ['prepaid', 'inventory', 'current asset']):
+                return 40
+            if any(term in text for term in ['fixed', 'vehicle', 'truck', 'trailer', 'equipment', 'asset']):
+                return 70
+            if 'accumulated depreciation' in text or 'depreciation' in text:
+                return 90
+            return 60
+        if section == 'Liabilities':
+            if 'accounts payable' in text or 'payable' in text:
+                return 10
+            if 'credit card' in text or any(term in text for term in ['visa', 'mastercard', 'american express', 'amex', 'capitol one', 'capital one', 'chase']):
+                return 20
+            if any(term in text for term in ['payroll', 'tax', 'current liability']):
+                return 30
+            if any(term in text for term in ['loan', 'note', 'sba']):
+                return 70
+            if 'long' in text:
+                return 90
+            return 50
+        if section == 'Equity':
+            if name == 'retained earnings':
+                return 10
+            if name == 'current year earnings':
+                return 20
+            return 30
+        return 99
+
+    def build_balance_sheet_report_rows(account_summaries):
+        rows = []
+        for section in ['Assets', 'Liabilities', 'Equity']:
+            section_items = [
+                item for item in account_summaries
+                if item['section'] == section and item['balance'] != 0
+            ]
+            if not section_items:
+                continue
+            rows.append({'level': 0, 'label': section.upper(), 'amount': None, 'kind': 'section'})
+            for item in section_items:
+                rows.append({
+                    'level': 1,
+                    'label': item['account'],
+                    'amount': item['balance'],
+                    'kind': 'account',
+                    'category': item['category'],
+                    'subcategory': item['subcategory'],
+                })
+            section_total = sum(item['balance'] for item in section_items)
+            rows.append({'level': 1, 'label': f'Total {section}', 'amount': section_total, 'kind': 'total'})
+            rows.append({'level': 0, 'label': '', 'amount': None, 'kind': 'blank'})
+        liabilities_total = sum(item['balance'] for item in account_summaries if item['section'] == 'Liabilities')
+        equity_total = sum(item['balance'] for item in account_summaries if item['section'] == 'Equity')
+        rows.append({
+            'level': 0,
+            'label': 'TOTAL LIABILITIES AND EQUITY',
+            'amount': liabilities_total + equity_total,
+            'kind': 'grand_total',
+        })
+        return rows
+
+    def export_balance_sheet_xlsx(report_rows, filters):
+        from io import BytesIO
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill
+
+        output = BytesIO()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Balance Sheet'
+        ws['A1'] = 'Balance Sheet'
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A2'] = f"As Of: {filters['as_of']}"
+        ws['A3'] = f"Company: {filters['com'] or 'All'}"
+        ws.append([])
+        ws.append(['Description', 'Amount'])
+        header_row = ws.max_row
+        for cell in ws[header_row]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill('solid', fgColor='D9EAF7')
+
+        for row in report_rows:
+            label = ('    ' * row['level']) + row['label']
+            ws.append([label, money_number(row['amount']) if row['amount'] is not None else None])
+            excel_row = ws.max_row
+            if row['kind'] in ['section', 'total', 'grand_total']:
+                ws.cell(excel_row, 1).font = Font(bold=True)
+                ws.cell(excel_row, 2).font = Font(bold=True)
+            if row['kind'] == 'section':
+                ws.cell(excel_row, 1).fill = PatternFill('solid', fgColor='E2F0D9')
+                ws.cell(excel_row, 2).fill = PatternFill('solid', fgColor='E2F0D9')
+            if row['kind'] == 'grand_total':
+                ws.cell(excel_row, 1).fill = PatternFill('solid', fgColor='FFF2CC')
+                ws.cell(excel_row, 2).fill = PatternFill('solid', fgColor='FFF2CC')
+            if row['amount'] is not None:
+                ws.cell(excel_row, 2).number_format = '$#,##0.00;[Red]($#,##0.00)'
+
+        ws.column_dimensions['A'].width = 52
+        ws.column_dimensions['B'].width = 18
+        for row in ws.iter_rows(min_col=2, max_col=2):
+            for cell in row:
+                cell.alignment = Alignment(horizontal='right')
+        wb.save(output)
+        output.seek(0)
+        filename = f"balance_sheet_{filters['com'] or 'all'}_{filters['as_of']}.xlsx".replace('/', '-')
+        return send_file(output, as_attachment=True, download_name=filename, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    def export_balance_sheet_pdf(report_rows, filters):
+        from io import BytesIO
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+        output = BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+        styles = getSampleStyleSheet()
+        story = [
+            Paragraph('Balance Sheet', styles['Title']),
+            Paragraph(f"As Of: {filters['as_of']} &nbsp;&nbsp; Company: {filters['com'] or 'All'}", styles['Normal']),
+            Spacer(1, 12),
+        ]
+        table_data = [['Description', 'Amount']]
+        row_styles = []
+        for row in report_rows:
+            table_data.append([('    ' * row['level']) + row['label'], money(row['amount']) if row['amount'] is not None else ''])
+            idx = len(table_data) - 1
+            if row['kind'] in ['section', 'total', 'grand_total']:
+                row_styles.append(('FONTNAME', (0, idx), (-1, idx), 'Helvetica-Bold'))
+            if row['kind'] == 'section':
+                row_styles.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor('#E2F0D9')))
+            if row['kind'] == 'grand_total':
+                row_styles.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor('#FFF2CC')))
+        table = Table(table_data, colWidths=[380, 120])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#D9EAF7')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -1), .25, colors.lightgrey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ] + row_styles))
+        story.append(table)
+        doc.build(story)
+        output.seek(0)
+        filename = f"balance_sheet_{filters['com'] or 'all'}_{filters['as_of']}.pdf".replace('/', '-')
+        return send_file(output, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+    def open_undeposited_fund_rows(account, as_of_next_date, anchor_date=None):
+        receipt_rows = Gledger.query.filter(
+            (Gledger.Account == 'Undeposited Funds') &
+            (Gledger.Type.in_(['ID', 'DD'])) &
+            (Gledger.Date < as_of_next_date)
+        )
+        if anchor_date is not None:
+            receipt_rows = receipt_rows.filter(Gledger.Date >= datetime.datetime.combine(
+                anchor_date + datetime.timedelta(days=1),
+                datetime.time.min,
+            ))
+        if account.Co:
+            receipt_rows = receipt_rows.filter(Gledger.Com == account.Co)
+        receipt_rows = receipt_rows.order_by(Gledger.Date.asc(), Gledger.id.asc()).all()
+
+        open_total = 0
+        detail_rows = []
+        for receipt in receipt_rows:
+            receipt_amount = receipt.Debit or 0
+            if receipt_amount <= 0:
+                continue
+            clearing_credit = db.session.query(func.coalesce(func.sum(Gledger.Credit), 0)).filter(
+                (Gledger.SourceTable == 'CounterDepositItem') &
+                (Gledger.SourceId == receipt.id) &
+                (Gledger.Account == 'Undeposited Funds') &
+                (Gledger.Type == 'XC') &
+                (Gledger.Date < as_of_next_date)
+            )
+            if account.Co:
+                clearing_credit = clearing_credit.filter(Gledger.Com == account.Co)
+            clearing_credit = clearing_credit.scalar() or 0
+            if clearing_credit <= 0:
+                bank_deposit = Gledger.query.filter(
+                    (Gledger.SourceTable == 'CounterDepositItem') &
+                    (Gledger.SourceId == receipt.id) &
+                    (Gledger.Type == 'XD') &
+                    (Gledger.Date < as_of_next_date)
+                )
+                if account.Co:
+                    bank_deposit = bank_deposit.filter(Gledger.Com == account.Co)
+                bank_deposit = bank_deposit.first()
+                if bank_deposit is not None:
+                    clearing_credit = min(receipt_amount, bank_deposit.Debit or 0)
+            open_amount = receipt_amount - clearing_credit
+            if open_amount <= 0:
+                continue
+            open_total += open_amount
+            detail_rows.append({
+                'date': receipt.Date.strftime('%Y-%m-%d') if receipt.Date else '',
+                'tcode': receipt.Tcode or '',
+                'source': receipt.Source or '',
+                'ref': receipt.Ref or '',
+                'debit_fmt': money(receipt_amount),
+                'credit_fmt': money(clearing_credit),
+                'amount_fmt': money(open_amount),
+                'memo': receipt.JournalMemo or 'Received check not yet included in a counter deposit',
+            })
+        return open_total, detail_rows
+
+    def latest_balance_anchor(account, as_of_datetime):
+        anchor_date = None
+        anchor_balance = None
+        anchor_basis = None
+        as_of_day = date_only(as_of_datetime)
+        as_of_cutoff = datetime.datetime.combine(as_of_day + datetime.timedelta(days=1), datetime.time.min)
+        account_name_key = (account.Name or '').strip().lower()
+        reconciliation = Reconciliations.query.filter(
+            (func.lower(func.trim(Reconciliations.Account)) == account_name_key) &
+            (Reconciliations.Status == 1) &
+            (Reconciliations.Rdate.isnot(None)) &
+            (Reconciliations.Rdate < as_of_cutoff)
+        ).order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).first()
+
+        if reconciliation is not None:
+            reconciled_date = date_only(reconciliation.Rdate)
+            if reconciled_date:
+                anchor_date = reconciled_date
+                anchor_balance = money_to_cents(reconciliation.Ebal)
+                anchor_basis = 'Reconciled'
+
+        baseline = db.session.execute(text("""
+            SELECT id, BaselineDate, BalanceCents
+            FROM balance_sheet_account_baselines
+            WHERE Active = 1
+              AND AccountId = :account_id
+              AND BaselineDate <= :as_of_date
+            ORDER BY BaselineDate DESC, id DESC
+            LIMIT 1
+        """), {
+            'account_id': account.id,
+            'as_of_date': as_of_datetime.date(),
+        }).mappings().first()
+
+        if baseline is not None:
+            baseline_date = date_only(baseline['BaselineDate'])
+            if anchor_date is None or (baseline_date is not None and baseline_date > anchor_date):
+                anchor_date = baseline_date
+                anchor_balance = baseline['BalanceCents'] or 0
+                anchor_basis = 'Known Balance'
+
+        return anchor_date, anchor_balance, anchor_basis
+
+    def ensure_balance_sheet_baseline_table():
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS balance_sheet_account_baselines (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                AccountId INT NULL,
+                AccountName VARCHAR(120) NOT NULL,
+                Co VARCHAR(12) NULL,
+                BaselineDate DATE NOT NULL,
+                BalanceCents BIGINT NOT NULL DEFAULT 0,
+                Notes TEXT NULL,
+                Active TINYINT NOT NULL DEFAULT 1,
+                CreatedAt DATETIME NOT NULL,
+                UpdatedAt DATETIME NOT NULL,
+                INDEX idx_bs_baseline_account_date (AccountId, BaselineDate),
+                INDEX idx_bs_baseline_co_active (Co, Active)
+            )
+        """))
+        db.session.commit()
+
+    def baseline_rows(company_code):
+        query = """
+            SELECT id, AccountId, AccountName, Co, BaselineDate, BalanceCents, Notes
+            FROM balance_sheet_account_baselines
+            WHERE Active = 1
+        """
+        params = {}
+        if company_code:
+            query += " AND Co = :company_code"
+            params['company_code'] = company_code
+        query += " ORDER BY Co, AccountName, BaselineDate DESC, id DESC"
+        return db.session.execute(text(query), params).mappings().all()
+
+    def ensure_retained_earnings_table():
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS balance_sheet_retained_earnings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                Co VARCHAR(12) NOT NULL,
+                BaselineDate DATE NOT NULL,
+                BalanceCents BIGINT NOT NULL DEFAULT 0,
+                Notes TEXT NULL,
+                Active TINYINT NOT NULL DEFAULT 1,
+                CreatedAt DATETIME NOT NULL,
+                UpdatedAt DATETIME NOT NULL,
+                INDEX idx_bs_retained_co_date (Co, BaselineDate),
+                INDEX idx_bs_retained_active (Active)
+            )
+        """))
+        db.session.commit()
+
+    def retained_earnings_rows(company_code):
+        query = """
+            SELECT id, Co, BaselineDate, BalanceCents, Notes
+            FROM balance_sheet_retained_earnings
+            WHERE Active = 1
+        """
+        params = {}
+        if company_code:
+            query += " AND Co = :company_code"
+            params['company_code'] = company_code
+        query += " ORDER BY Co, BaselineDate DESC, id DESC"
+        return db.session.execute(text(query), params).mappings().all()
+
+    def retained_earnings_anchor(company_code, cutoff_date):
+        return db.session.execute(text("""
+            SELECT id, Co, BaselineDate, BalanceCents, Notes
+            FROM balance_sheet_retained_earnings
+            WHERE Active = 1
+              AND Co = :company_code
+              AND BaselineDate <= :cutoff_date
+            ORDER BY BaselineDate DESC, id DESC
+            LIMIT 1
+        """), {
+            'company_code': company_code,
+            'cutoff_date': cutoff_date,
+        }).mappings().first()
+
+    ensure_balance_sheet_baseline_table()
+    ensure_retained_earnings_table()
 
     today_value = datetime.date.today().strftime('%Y-%m-%d')
     as_of_text = request.values.get('as_of', today_value).strip() or today_value
@@ -7833,15 +8261,123 @@ def BalanceSheet():
         if account.Type not in ['Income', 'Expense']
     }
 
+    messages = []
+    if request.method == 'POST':
+        if request.values.get('save_baseline') is not None:
+            account_id = request.values.get('baseline_account_id', '').strip()
+            baseline_date = parse_date(request.values.get('baseline_date', '').strip())
+            balance_cents = money_to_cents(request.values.get('baseline_balance', '').strip())
+            notes = request.values.get('baseline_notes', '').strip()
+            account = all_accounts_by_id.get(int(account_id)) if account_id.isdigit() else None
+            if account is None:
+                messages.append('Select a balance sheet account for the known balance.')
+            elif baseline_date is None:
+                messages.append('Known balance date is invalid.')
+            else:
+                now_value = datetime.datetime.now()
+                db.session.execute(text("""
+                    INSERT INTO balance_sheet_account_baselines
+                        (AccountId, AccountName, Co, BaselineDate, BalanceCents, Notes, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:account_id, :account_name, :company_code, :baseline_date, :balance_cents, :notes, 1, :created_at, :updated_at)
+                """), {
+                    'account_id': account.id,
+                    'account_name': account.Name,
+                    'company_code': account.Co,
+                    'baseline_date': baseline_date.date(),
+                    'balance_cents': balance_cents,
+                    'notes': notes,
+                    'created_at': now_value,
+                    'updated_at': now_value,
+                })
+                db.session.commit()
+                messages.append(f'Known balance saved for {account.Name}.')
+
+        if request.values.get('delete_baseline') is not None:
+            baseline_id = request.values.get('delete_baseline', '').strip()
+            if baseline_id.isdigit():
+                db.session.execute(text("""
+                    UPDATE balance_sheet_account_baselines
+                    SET Active = 0, UpdatedAt = :updated_at
+                    WHERE id = :baseline_id
+                """), {
+                    'baseline_id': int(baseline_id),
+                    'updated_at': datetime.datetime.now(),
+                })
+                db.session.commit()
+                messages.append('Known balance baseline removed.')
+
+        if request.values.get('save_retained_earnings') is not None:
+            retained_company = request.values.get('retained_company', company_filter).strip()
+            retained_date = parse_date(request.values.get('retained_date', '').strip())
+            retained_balance = money_to_cents(request.values.get('retained_balance', '').strip())
+            retained_notes = request.values.get('retained_notes', '').strip()
+            if not retained_company:
+                messages.append('Select a company for Retained Earnings.')
+            elif retained_date is None:
+                messages.append('Retained Earnings date is invalid.')
+            else:
+                now_value = datetime.datetime.now()
+                db.session.execute(text("""
+                    INSERT INTO balance_sheet_retained_earnings
+                        (Co, BaselineDate, BalanceCents, Notes, Active, CreatedAt, UpdatedAt)
+                    VALUES
+                        (:company_code, :baseline_date, :balance_cents, :notes, 1, :created_at, :updated_at)
+                """), {
+                    'company_code': retained_company,
+                    'baseline_date': retained_date.date(),
+                    'balance_cents': retained_balance,
+                    'notes': retained_notes,
+                    'created_at': now_value,
+                    'updated_at': now_value,
+                })
+                db.session.commit()
+                messages.append(f'Retained Earnings baseline saved for {retained_company}.')
+
+        if request.values.get('delete_retained_earnings') is not None:
+            retained_id = request.values.get('delete_retained_earnings', '').strip()
+            if retained_id.isdigit():
+                db.session.execute(text("""
+                    UPDATE balance_sheet_retained_earnings
+                    SET Active = 0, UpdatedAt = :updated_at
+                    WHERE id = :retained_id
+                """), {
+                    'retained_id': int(retained_id),
+                    'updated_at': datetime.datetime.now(),
+                })
+                db.session.commit()
+                messages.append('Retained Earnings baseline removed.')
+
     ledger_query = Gledger.query.filter(Gledger.Date < as_of_next)
     if company_filter:
         ledger_query = ledger_query.filter(Gledger.Com == company_filter)
     entries = ledger_query.all()
 
     grouped = {}
-    income_total = 0
-    expense_total = 0
+    fiscal_year_start = datetime.datetime(as_of_date.year, 1, 1)
+    earnings_by_company = {}
     row_count = 0
+
+    for account in balance_accounts_by_id.values():
+        grouped[(account.Co, account.Name)] = {
+            'company': account.Co,
+            'account': account.Name,
+            'type': account.Type or '',
+            'category': account_display_category(account),
+            'subcategory': account_display_subcategory(account),
+            'section': account_section(account),
+            'debit': 0,
+            'credit': 0,
+            'ledger_balance': 0,
+            'reconciled_balance': None,
+            'reconciled_date': None,
+            'unreconciled_summary': 0,
+            'unreconciled_lines': [],
+            'balance': 0,
+            'rows': 0,
+            'balance_basis': 'General Ledger',
+        }
+
     for entry in entries:
         account = balance_accounts_by_id.get(entry.Aid) or balance_accounts_by_company_name.get((entry.Com, entry.Account))
         debit = entry.Debit or 0
@@ -7851,10 +8387,23 @@ def BalanceSheet():
             income_expense_account = all_accounts_by_id.get(entry.Aid) or all_accounts_by_company_name.get((entry.Com, entry.Account))
             if income_expense_account is None:
                 continue
+            company_key = entry.Com or company_filter or ''
+            earnings = earnings_by_company.setdefault(company_key, {
+                'retained_income': 0,
+                'retained_expense': 0,
+                'current_income': 0,
+                'current_expense': 0,
+            })
             if income_expense_account.Type == 'Income':
-                income_total += credit - debit
+                if entry.Date and entry.Date < fiscal_year_start:
+                    earnings['retained_income'] += credit - debit
+                else:
+                    earnings['current_income'] += credit - debit
             else:
-                expense_total += debit - credit
+                if entry.Date and entry.Date < fiscal_year_start:
+                    earnings['retained_expense'] += debit - credit
+                else:
+                    earnings['current_expense'] += debit - credit
             continue
 
         key = (account.Co, account.Name)
@@ -7862,13 +8411,19 @@ def BalanceSheet():
             'company': account.Co,
             'account': account.Name,
             'type': account.Type or '',
-            'category': account.Category or '',
-            'subcategory': account.Subcategory or '',
+            'category': account_display_category(account),
+            'subcategory': account_display_subcategory(account),
             'section': account_section(account),
             'debit': 0,
             'credit': 0,
+            'ledger_balance': 0,
+            'reconciled_balance': None,
+            'reconciled_date': None,
+            'unreconciled_summary': 0,
+            'unreconciled_lines': [],
             'balance': 0,
             'rows': 0,
+            'balance_basis': 'General Ledger',
         })
         group['debit'] += debit
         group['credit'] += credit
@@ -7877,32 +8432,157 @@ def BalanceSheet():
 
     for group in grouped.values():
         account = balance_accounts_by_company_name.get((group['company'], group['account']))
-        group['balance'] = account_balance(account, group['debit'], group['credit'])
+        group['ledger_balance'] = account_balance(account, group['debit'], group['credit'])
+        group['balance'] = group['ledger_balance']
 
-    current_earnings = income_total - expense_total
-    if current_earnings:
-        grouped[('__earnings__', company_filter or 'All')] = {
-            'company': company_filter or 'All',
-            'account': 'Current Earnings',
-            'type': 'Equity',
-            'category': 'Equity',
-            'subcategory': '',
-            'section': 'Equity',
-            'debit': expense_total,
-            'credit': income_total,
-            'balance': current_earnings,
-            'rows': 0,
-        }
+        if account is not None and account_is_undeposited_funds(account):
+            anchor_date, anchor_balance, anchor_basis = latest_balance_anchor(account, as_of_date)
+            open_total, open_lines = open_undeposited_fund_rows(account, as_of_next, anchor_date)
+            group['ledger_balance'] = open_total
+            if anchor_date is not None:
+                group['reconciled_balance'] = anchor_balance
+                group['reconciled_date'] = anchor_date.strftime('%Y-%m-%d')
+                group['balance_basis'] = anchor_basis
+            group['unreconciled_summary'] = open_total
+            group['unreconciled_lines'] = open_lines
+            group['balance'] = (anchor_balance or 0) + open_total if anchor_date is not None else open_total
+            if anchor_date is None:
+                group['balance_basis'] = 'Open Checks'
+            continue
+
+        if account is not None and group['section'] in ['Assets', 'Liabilities']:
+            anchor_date, anchor_balance, anchor_basis = latest_balance_anchor(account, as_of_date)
+
+            if anchor_date is not None:
+                group['reconciled_balance'] = anchor_balance
+                group['reconciled_date'] = anchor_date.strftime('%Y-%m-%d')
+                group['balance_basis'] = anchor_basis
+
+                roll_query = Gledger.query.filter(
+                    (Gledger.Date < as_of_next) &
+                    (or_(Gledger.Aid == account.id, Gledger.Account == account.Name))
+                )
+                if account.Co:
+                    roll_query = roll_query.filter(Gledger.Com == account.Co)
+                roll_query = roll_query.filter(Gledger.Date >= datetime.datetime.combine(
+                    anchor_date + datetime.timedelta(days=1),
+                    datetime.time.min,
+                ))
+
+                roll_debit = 0
+                roll_credit = 0
+                roll_lines = []
+                for line in roll_query.all():
+                    line_debit = line.Debit or 0
+                    line_credit = line.Credit or 0
+                    line_amount = account_balance(account, line_debit, line_credit)
+                    roll_debit += line_debit
+                    roll_credit += line_credit
+                    roll_lines.append({
+                        'date': line.Date.strftime('%Y-%m-%d') if line.Date else '',
+                        'tcode': line.Tcode or '',
+                        'source': line.Source or '',
+                        'ref': line.Ref or '',
+                        'debit_fmt': money(line_debit),
+                        'credit_fmt': money(line_credit),
+                        'amount_fmt': money(line_amount),
+                        'memo': line.JournalMemo or '',
+                    })
+                group['unreconciled_summary'] = account_balance(account, roll_debit, roll_credit)
+                group['unreconciled_lines'] = roll_lines
+                group['balance'] = anchor_balance + group['unreconciled_summary']
+
+    retained_companies = set(earnings_by_company.keys())
+    retained_companies.update(row.Co for row in retained_earnings_rows(company_filter))
+    if company_filter:
+        retained_companies.add(company_filter)
+    for company_code in sorted(company for company in retained_companies if company):
+        earnings = earnings_by_company.setdefault(company_code, {
+            'retained_income': 0,
+            'retained_expense': 0,
+            'current_income': 0,
+            'current_expense': 0,
+        })
+        retained_income = earnings['retained_income']
+        retained_expense = earnings['retained_expense']
+        retained_basis = 'Prior Earnings'
+        retained_date = ''
+        retained_anchor = retained_earnings_anchor(company_code, fiscal_year_start.date())
+        if retained_anchor is not None:
+            retained_date_obj = date_only(retained_anchor['BaselineDate'])
+            retained_date = retained_date_obj.strftime('%Y-%m-%d') if retained_date_obj else ''
+            retained_basis = 'Retained Earnings Baseline'
+            retained_balance = retained_anchor['BalanceCents'] or 0
+            if retained_date_obj is not None:
+                retained_start = datetime.datetime.combine(retained_date_obj + datetime.timedelta(days=1), datetime.time.min)
+                retained_income = 0
+                retained_expense = 0
+                for entry in entries:
+                    if entry.Com != company_code or not entry.Date or entry.Date < retained_start or entry.Date >= fiscal_year_start:
+                        continue
+                    income_expense_account = all_accounts_by_id.get(entry.Aid) or all_accounts_by_company_name.get((entry.Com, entry.Account))
+                    if income_expense_account is None:
+                        continue
+                    if income_expense_account.Type == 'Income':
+                        retained_income += (entry.Credit or 0) - (entry.Debit or 0)
+                    elif income_expense_account.Type == 'Expense':
+                        retained_expense += (entry.Debit or 0) - (entry.Credit or 0)
+                retained_balance += retained_income - retained_expense
+        else:
+            retained_balance = retained_income - retained_expense
+
+        current_earnings = earnings['current_income'] - earnings['current_expense']
+        if retained_balance:
+            grouped[('__retained_earnings__', company_code)] = {
+                'company': company_code,
+                'account': 'Retained Earnings',
+                'type': 'Equity',
+                'category': 'Equity',
+                'subcategory': '',
+                'section': 'Equity',
+                'debit': retained_expense,
+                'credit': retained_income,
+                'ledger_balance': retained_balance,
+                'reconciled_balance': retained_anchor['BalanceCents'] if retained_anchor is not None else None,
+                'reconciled_date': retained_date,
+                'unreconciled_summary': retained_balance - (retained_anchor['BalanceCents'] or 0) if retained_anchor is not None else 0,
+                'unreconciled_lines': [],
+                'balance': retained_balance,
+                'rows': 0,
+                'balance_basis': retained_basis,
+            }
+        if current_earnings:
+            grouped[('__current_year_earnings__', company_code)] = {
+                'company': company_code,
+                'account': 'Current Year Earnings',
+                'type': 'Equity',
+                'category': 'Equity',
+                'subcategory': '',
+                'section': 'Equity',
+                'debit': earnings['current_expense'],
+                'credit': earnings['current_income'],
+                'ledger_balance': current_earnings,
+                'reconciled_balance': None,
+                'reconciled_date': '',
+                'unreconciled_summary': 0,
+                'unreconciled_lines': [],
+                'balance': current_earnings,
+                'rows': 0,
+                'balance_basis': f'Current Year Earnings {as_of_date.year}',
+            }
 
     section_order = ['Assets', 'Liabilities', 'Equity', 'Other Balance Accounts']
     account_summaries = sorted(
         grouped.values(),
         key=lambda item: (section_order.index(item['section']) if item['section'] in section_order else 99,
-                          item['company'], item['category'], item['account'])
+                          balance_sheet_order_rank(item), item['company'], item['category'], item['account'])
     )
     for item in account_summaries:
         item['debit_fmt'] = money(item['debit'])
         item['credit_fmt'] = money(item['credit'])
+        item['ledger_balance_fmt'] = money(item['ledger_balance'])
+        item['reconciled_balance_fmt'] = money(item['reconciled_balance']) if item['reconciled_balance'] is not None else ''
+        item['unreconciled_summary_fmt'] = money(item['unreconciled_summary'])
         item['balance_fmt'] = money(item['balance'])
 
     section_summaries = []
@@ -7968,6 +8648,13 @@ def BalanceSheet():
         'row_count': row_count,
         'account_count': len(account_summaries),
     }
+    balance_sheet_report_rows = build_balance_sheet_report_rows(account_summaries)
+
+    export_type = request.values.get('export')
+    if export_type == 'xlsx':
+        return export_balance_sheet_xlsx(balance_sheet_report_rows, filters)
+    if export_type == 'pdf':
+        return export_balance_sheet_pdf(balance_sheet_report_rows, filters)
 
     return render_template(
         'balance_sheet.html',
@@ -7976,9 +8663,15 @@ def BalanceSheet():
         filters=filters,
         totals=totals,
         companies=companies,
+        messages=messages,
+        baseline_accounts=[account for account in all_account_rows if account.Type not in ['Income', 'Expense']],
+        baseline_rows=baseline_rows(company_filter),
+        retained_earnings_rows=retained_earnings_rows(company_filter),
+        money=money,
         section_summaries=section_summaries,
         category_summaries=category_summaries,
         account_summaries=account_summaries,
+        balance_sheet_report_rows=balance_sheet_report_rows,
     )
 
 

@@ -1,6 +1,11 @@
 {% extends 'A_layout_portal.html' %}
 
 {% block body %}
+<style>
+    .balance-sheet-detail-modal {
+        max-width: 66.6667vw;
+    }
+</style>
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-sm-12">
@@ -26,9 +31,156 @@
             </div>
             <div class="form-group col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm btn-block">Apply</button>
+                <div class="btn-group btn-block mt-1" role="group">
+                    <button type="submit" name="export" value="xlsx" class="btn btn-outline-success btn-sm">Excel</button>
+                    <button type="submit" name="export" value="pdf" class="btn btn-outline-secondary btn-sm">PDF</button>
+                </div>
             </div>
         </div>
     </form>
+
+    {% if messages %}
+        <div class="alert alert-info py-2">
+            {% for message in messages %}
+                <div>{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="border rounded p-3 mb-3">
+        <h5 class="mb-3">Known Balance Baselines</h5>
+        <form action="{{ url_for('main.BalanceSheet') }}" method="post" class="mb-3">
+            <input type="hidden" name="as_of" value="{{ filters.as_of }}">
+            <input type="hidden" name="com" value="{{ filters.com }}">
+            <div class="form-row align-items-end">
+                <div class="form-group col-md-4">
+                    <label for="baseline_account_id">Account</label>
+                    <select class="form-control form-control-sm" id="baseline_account_id" name="baseline_account_id">
+                        <option value="">Select Account</option>
+                        {% for account in baseline_accounts %}
+                            <option value="{{ account.id }}">{{ account.Co }} - {{ account.Name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="baseline_date">Known Date</label>
+                    <input type="date" class="form-control form-control-sm" id="baseline_date" name="baseline_date" value="{{ filters.as_of }}">
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="baseline_balance">Known Balance</label>
+                    <input type="text" class="form-control form-control-sm text-right" id="baseline_balance" name="baseline_balance" placeholder="0.00">
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="baseline_notes">Notes</label>
+                    <input type="text" class="form-control form-control-sm" id="baseline_notes" name="baseline_notes">
+                </div>
+                <div class="form-group col-md-1">
+                    <button type="submit" name="save_baseline" value="1" class="btn btn-primary btn-sm btn-block">Save</button>
+                </div>
+            </div>
+        </form>
+
+        {% if baseline_rows %}
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Company</th>
+                            <th>Account</th>
+                            <th>Known Date</th>
+                            <th class="text-right">Known Balance</th>
+                            <th>Notes</th>
+                            <th class="text-center">Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in baseline_rows %}
+                            <tr>
+                                <td>{{ row.Co }}</td>
+                                <td>{{ row.AccountName }}</td>
+                                <td>{{ row.BaselineDate }}</td>
+                                <td class="text-right">{{ money(row.BalanceCents) }}</td>
+                                <td>{{ row.Notes }}</td>
+                                <td class="text-center">
+                                    <form action="{{ url_for('main.BalanceSheet') }}" method="post" class="mb-0">
+                                        <input type="hidden" name="as_of" value="{{ filters.as_of }}">
+                                        <input type="hidden" name="com" value="{{ filters.com }}">
+                                        <button type="submit" name="delete_baseline" value="{{ row.id }}" class="btn btn-outline-danger btn-sm">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="border rounded p-3 mb-3">
+        <h5 class="mb-3">Retained Earnings Baselines</h5>
+        <form action="{{ url_for('main.BalanceSheet') }}" method="post" class="mb-3">
+            <input type="hidden" name="as_of" value="{{ filters.as_of }}">
+            <input type="hidden" name="com" value="{{ filters.com }}">
+            <div class="form-row align-items-end">
+                <div class="form-group col-md-2">
+                    <label for="retained_company">Company</label>
+                    <select class="form-control form-control-sm" id="retained_company" name="retained_company">
+                        {% for company in companies %}
+                            <option value="{{ company }}" {% if filters.com == company %}selected{% endif %}>{{ company }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="retained_date">Known Date</label>
+                    <input type="date" class="form-control form-control-sm" id="retained_date" name="retained_date" value="{{ filters.as_of[:4] }}-01-01">
+                </div>
+                <div class="form-group col-md-2">
+                    <label for="retained_balance">Retained Earnings</label>
+                    <input type="text" class="form-control form-control-sm text-right" id="retained_balance" name="retained_balance" placeholder="0.00">
+                </div>
+                <div class="form-group col-md-5">
+                    <label for="retained_notes">Notes</label>
+                    <input type="text" class="form-control form-control-sm" id="retained_notes" name="retained_notes">
+                </div>
+                <div class="form-group col-md-1">
+                    <button type="submit" name="save_retained_earnings" value="1" class="btn btn-primary btn-sm btn-block">Save</button>
+                </div>
+            </div>
+        </form>
+
+        {% if retained_earnings_rows %}
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Company</th>
+                            <th>Known Date</th>
+                            <th class="text-right">Retained Earnings</th>
+                            <th>Notes</th>
+                            <th class="text-center">Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in retained_earnings_rows %}
+                            <tr>
+                                <td>{{ row.Co }}</td>
+                                <td>{{ row.BaselineDate }}</td>
+                                <td class="text-right">{{ money(row.BalanceCents) }}</td>
+                                <td>{{ row.Notes }}</td>
+                                <td class="text-center">
+                                    <form action="{{ url_for('main.BalanceSheet') }}" method="post" class="mb-0">
+                                        <input type="hidden" name="as_of" value="{{ filters.as_of }}">
+                                        <input type="hidden" name="com" value="{{ filters.com }}">
+                                        <button type="submit" name="delete_retained_earnings" value="{{ row.id }}" class="btn btn-outline-danger btn-sm">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
 
     <div class="row mb-3">
         <div class="col-md-3 mb-2">
@@ -116,10 +268,10 @@
                     <th>Type</th>
                     <th>Category</th>
                     <th>Subcategory</th>
-                    <th class="text-right">Debits</th>
-                    <th class="text-right">Credits</th>
+                    <th class="text-right">Known/Reconciled Balance</th>
+                    <th>Known/Reconciled Date</th>
+                    <th class="text-right">Unreconciled Summary</th>
                     <th class="text-right">Balance</th>
-                    <th class="text-right">Rows</th>
                 </tr>
             </thead>
             <tbody>
@@ -131,15 +283,75 @@
                         <td>{{ item.type }}</td>
                         <td>{{ item.category }}</td>
                         <td>{{ item.subcategory }}</td>
-                        <td class="text-right">{{ item.debit_fmt }}</td>
-                        <td class="text-right">{{ item.credit_fmt }}</td>
+                        <td class="text-right">{{ item.reconciled_balance_fmt }}</td>
+                        <td>{{ item.reconciled_date }}</td>
+                        <td class="text-right">
+                            {% if item.unreconciled_lines %}
+                                <a href="#" data-toggle="modal" data-target="#unreconciledModal{{ loop.index }}">
+                                    {{ item.unreconciled_summary_fmt }}
+                                </a>
+                            {% else %}
+                                {{ item.unreconciled_summary_fmt }}
+                            {% endif %}
+                        </td>
                         <td class="text-right">{{ item.balance_fmt }}</td>
-                        <td class="text-right">{{ item.rows }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    {% for item in account_summaries %}
+        {% if item.unreconciled_lines %}
+            <div class="modal fade" id="unreconciledModal{{ loop.index }}" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-xl balance-sheet-detail-modal" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ item.account }} Unreconciled Detail</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped table-bordered mb-0">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Tcode</th>
+                                            <th>Source</th>
+                                            <th>Ref</th>
+                                            <th class="text-right">Debit</th>
+                                            <th class="text-right">Credit</th>
+                                            <th class="text-right">Amount</th>
+                                            <th>Memo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for line in item.unreconciled_lines %}
+                                            <tr>
+                                                <td>{{ line.date }}</td>
+                                                <td>{{ line.tcode }}</td>
+                                                <td>{{ line.source }}</td>
+                                                <td>{{ line.ref }}</td>
+                                                <td class="text-right">{{ line.debit_fmt }}</td>
+                                                <td class="text-right">{{ line.credit_fmt }}</td>
+                                                <td class="text-right">{{ line.amount_fmt }}</td>
+                                                <td>{{ line.memo }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
 </div>
 
 <script>

@@ -29,6 +29,47 @@ def cents(value):
     except:
         return 0
 
+def partner_clearing_accounts(company_code):
+    return Accounts.query.filter(
+        (Accounts.Co == company_code) &
+        (~Accounts.Type.in_(['Income', 'Expense']))
+    ).order_by(Accounts.Name).all()
+
+def update_partner_invoice_fields(order, invoice_total):
+    partner_on = request.values.get('partner_job') is not None
+    partner_account = (request.values.get('partner_account') or '').strip()
+    partner_amount = request.values.get('partner_amount')
+    if partner_amount is None:
+        partner_amount = order.PartnerAmount or ''
+    invoice_cents = cents(invoice_total)
+    partner_cents = cents(partner_amount) if partner_on else 0
+    earned_cents = invoice_cents - partner_cents
+
+    order.PartnerJob = 1 if partner_on else 0
+    order.PartnerAccount = partner_account if partner_on else None
+    order.PartnerAmount = d2s(partner_cents / 100) if partner_on else None
+    order.PartnerEarned = d2s(earned_cents / 100) if partner_on else None
+    return partner_on, partner_account, partner_cents, earned_cents
+
+def validate_partner_invoice(order, invoice_total):
+    if getattr(order, 'PartnerJob', 0) != 1:
+        return []
+    errors = []
+    invoice_cents = cents(invoice_total)
+    partner_cents = cents(order.PartnerAmount)
+    if not hasinput(order.PartnerAccount):
+        errors.append('Partner job requires a Partner Clearing Account.')
+    elif Accounts.query.filter(
+        (Accounts.Name == order.PartnerAccount) &
+        (Accounts.Co == order.Jo[0])
+    ).first() is None:
+        errors.append(f'Partner Clearing Account {order.PartnerAccount} was not found.')
+    if partner_cents <= 0:
+        errors.append('Partner Owed Amount must be greater than zero.')
+    if partner_cents > invoice_cents:
+        errors.append('Partner Owed Amount cannot exceed the invoice total.')
+    return errors
+
 def addr2break(adv):
     ai = ''
     for ad in adv:
@@ -79,6 +120,9 @@ def loginvo_m(odat,ix):
                 aoder = nonone(aoder)
                 thisodat = Orders.query.get(aoder)
                 amtinvo = thisodat.InvoTotal
+                partner_errors = validate_partner_invoice(thisodat, amtinvo)
+                if partner_errors:
+                    return partner_errors
                 #print(aoder,thisodat.Istat)
                 jo = thisodat.Jo
                 gledger_write(['invoice',amtinvo], jo, 0, 0, 0)
@@ -87,6 +131,9 @@ def loginvo_m(odat,ix):
     else:
         jo = odat.Jo
         amtinvo = odat.InvoTotal
+        partner_errors = validate_partner_invoice(odat, amtinvo)
+        if partner_errors:
+            return partner_errors
         err = gledger_write(['invoice', amtinvo], jo, 0, 0, 0)
         set_invoice_record_status(odat, ix)
         db.session.commit()
@@ -537,6 +584,7 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
             odata1.InvoTotal = d2s(itotal)
             odata1.BalDue = d2s(itotal)
             odata1.Payments = '0.00'
+            update_partner_invoice_fields(odata1, itotal)
 
             db.session.commit()
 
@@ -568,6 +616,11 @@ def MakeInvoice_task(genre, task_iter, tablesetup, task_focus, checked_data, thi
         err.append(f'Viewing {docref}')
         err.append('Hit Finished to End Viewing and Return to Table View')
         holdvec[2] = Services.query.order_by(Services.Service).all()
+        holdvec[17] = partner_clearing_accounts(odata1.Jo[0])
+        holdvec[18] = getattr(odata1, 'PartnerJob', 0) == 1
+        holdvec[19] = getattr(odata1, 'PartnerAccount', '') or ''
+        holdvec[20] = getattr(odata1, 'PartnerAmount', '') or ''
+        holdvec[21] = getattr(odata1, 'PartnerEarned', '') or ''
 
         loginvo = request.values.get('logInvo')
         if loginvo is not None:

@@ -21,25 +21,47 @@
 
 <div class="card-body">
 
-    <div class="p-0">
+    <div class="p-0 d-flex flex-wrap align-items-center">
         <select class="mdb-select md-form" name="invoserv" onchange="this.form.submit()">
             <option value="" disabled selected>Add Services to Invoice</option>
             {% for sd in sdata %}
                 <option value="{{ sd.id }}">{{ sd.Service }} ${{ sd.Price }}</option>
             {% endfor %}
         </select>
-        <select class="mdb-select md-form" name="invoicestyle" onchange="this.form.submit()">
+        <select class="mdb-select md-form ml-2" name="invoicestyle" onchange="this.form.submit()">
             <option value="" disabled selected>Change Invoice Style</option>
             {% for ld in invdata %}
                 <option {% if holdvec[16] == ld %} selected {% endif %} value="{{ ld }}">{{ ld }}</option>
             {% endfor %}
         </select>
+        <div class="form-check ml-3 mt-2">
+            <input class="form-check-input" type="checkbox" id="partner_job" name="partner_job" value="1" {% if holdvec[18] %}checked{% endif %} onchange="togglePartnerInvoiceFields(); updatePartnerEarned();">
+            <label class="form-check-label" for="partner_job">Partner Settlement Split</label>
+        </div>
     </div>
 
 
 <table class="table table-condensed table-hover">
 <tbody>
 <tr><td><div class="input-group-text">Invoice Date:</div></td><td colspan="3"><input class="form-control" type="date" value={{invodate}} name="invodate"></td></tr>
+
+<tr class="partner-settlement-row" {% if not holdvec[18] %}style="display: none;"{% endif %}>
+    <td><div class="input-group-text">Partner Clearing Account:</div></td>
+    <td colspan="3">
+        <select class="form-control" id="partner_account" name="partner_account">
+            <option value="">Select Partner Clearing Account</option>
+            {% for account in holdvec[17] %}
+                <option value="{{ account.Name }}" {% if holdvec[19] == account.Name %}selected{% endif %}>{{ account.Name }}</option>
+            {% endfor %}
+        </select>
+    </td>
+</tr>
+<tr class="partner-settlement-row" id="partner_amount_row" {% if not holdvec[18] %}style="display: none;"{% endif %}>
+    <td><div class="input-group-text">Partner Owed Amount:</div></td>
+    <td><input class="form-control" type="text" id="partner_amount" name="partner_amount" value="{{ holdvec[20] }}" oninput="updatePartnerEarned();"></td>
+    <td><div class="input-group-text">Company Earned Amount:</div></td>
+    <td><input class="form-control" type="text" id="partner_earned" name="partner_earned_display" value="{{ holdvec[21] }}" readonly></td>
+</tr>
 
 {% for data in entrydata %}
     <tr><td colspan="4'"></td></tr>
@@ -69,3 +91,45 @@
 <input type = "hidden" name ="invo" value= {{invo}}>
 <input type = "hidden" name ="odor" value= {{odor}}>
 <input type = "hidden" name ="cache" value= {{cache}}>
+
+<script>
+function parseInvoiceMoney(value) {
+    var parsed = parseFloat(String(value || '0').replace(/[$,]/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
+}
+function currentInvoiceTotal() {
+    var total = 0;
+    document.querySelectorAll('input[name^="cost"]').forEach(function (costInput) {
+        var id = costInput.name.replace('cost', '');
+        var qtyInput = document.querySelector('input[name="qty' + id + '"]');
+        total += parseInvoiceMoney(costInput.value) * parseInvoiceMoney(qtyInput ? qtyInput.value : 1);
+    });
+    return total;
+}
+function updatePartnerEarned() {
+    var earnedInput = document.getElementById('partner_earned');
+    if (!earnedInput) {
+        return;
+    }
+    var earned = currentInvoiceTotal() - parseInvoiceMoney(document.getElementById('partner_amount').value);
+    earnedInput.value = earned.toFixed(2);
+}
+function togglePartnerInvoiceFields() {
+    var checked = document.getElementById('partner_job').checked;
+    var account = document.getElementById('partner_account');
+    var amount = document.getElementById('partner_amount');
+    document.querySelectorAll('.partner-settlement-row').forEach(function (row) {
+        row.style.display = checked ? '' : 'none';
+    });
+    if (account) {
+        account.disabled = !checked;
+    }
+    if (amount) {
+        amount.disabled = !checked;
+    }
+}
+document.addEventListener('DOMContentLoaded', function () {
+    togglePartnerInvoiceFields();
+    updatePartnerEarned();
+});
+</script>

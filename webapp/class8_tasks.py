@@ -672,6 +672,17 @@ def apply_billing_filter_options(table_filters):
             filter_group['Pay Account'] = bill_pay_account_filter_options()
             break
 
+def selected_unbillable_order_jobs(checked_data):
+    job_numbers = []
+    for table_name, _numchecked, selected_ids in checked_data or []:
+        if table_name != 'Orders':
+            continue
+        for sid in selected_ids:
+            order = Orders.query.get(sid)
+            if order is not None and getattr(order, 'Istat', None) == -2:
+                job_numbers.append(order.Jo or str(order.id))
+    return job_numbers
+
 def reset_state_soft(task_boxes):
     tboxes={}
     # Default time filter on entry into table is last 60 days:
@@ -2682,6 +2693,21 @@ def Table_maker(genre):
     if launch_update_emails_order_id:
         checked_data = [['Orders', 1, [launch_update_emails_order_id]]]
 
+    if taskon in ['MakeInvoice', 'MakeSummary', 'MakePackage']:
+        unbillable_jobs = selected_unbillable_order_jobs(checked_data)
+        if unbillable_jobs:
+            action_label = {
+                'MakeInvoice': 'Edit Invoice',
+                'MakeSummary': 'Edit Summary Invoice',
+                'MakePackage': 'Send Package',
+            }.get(taskon, taskon)
+            err.append(
+                f'Cannot open {action_label}. Job(s) marked Unbillable: '
+                + ', '.join(unbillable_jobs)
+                + '.'
+            )
+            taskon, task_focus, task_iter, tasktype = None, None, None, None
+
     # Remove the checks during reset of tables
     if resethit is not None or resetmod is not None:
         for check in checked_data:  check[2] = []
@@ -3244,7 +3270,7 @@ def get_new_Jo(input):
 
 
 def normalize_entry_value(table, field_name, value):
-    if table == 'Orders' and field_name == 'RCneeded' and not hasinput(value):
+    if table == 'Orders' and field_name in ['RCneeded', 'DispatchBilled'] and not hasinput(value):
         return 0
     return value
 
@@ -4207,6 +4233,22 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
             err.append(f'Cleared holds for {cleared} job(s). {unchanged} job(s) already had no hold.')
             continue
 
+        if table == 'Orders' and task_focus == 'MarkUnbillable':
+            updated = 0
+            unchanged = 0
+            for sid in tids[jx]:
+                odat = Orders.query.get(sid)
+                if odat is None:
+                    continue
+                if getattr(odat, 'Istat', None) != -2:
+                    odat.Istat = -2
+                    updated += 1
+                else:
+                    unchanged += 1
+            db.session.commit()
+            err.append(f'Marked {updated} job(s) unbillable. {unchanged} job(s) were already marked unbillable.')
+            continue
+
         #Convert to allow on single item undo:
         if len(tids[jx]) > 1:
             err.append('Too Many Selections')
@@ -4472,7 +4514,7 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
 
                     db.session.commit()
 
-                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'DocsNotSource' or task_focus == 'xProof' or task_focus == 'yProof' or task_focus == 'xRateCon' or task_focus == 'xDrvProof' or task_focus == 'xDrvSeal'):
+                elif table == 'Orders' and (task_focus == 'Docs' or task_focus == 'xSource' or task_focus == 'xProof' or task_focus == 'yProof' or task_focus == 'xRateCon' or task_focus == 'xDrvProof' or task_focus == 'xDrvSeal'):
                     rstring = f'{table}.query.get({sid})'
                     odat = eval(rstring)
                     source = addpath(tpath(f'{thistable}-Source',odat.Source))
@@ -4510,6 +4552,14 @@ def Undo_task(genre, task_focus, task_iter, nc, tids, tabs):
                             err.append(f'File {odat.RateCon} not found')
                         #print(f'Setting Proof for sid {sid} with value {odat.Proof} to None')
                         odat.RateCon = None
+                        db.session.commit()
+
+                    elif task_focus == 'xSource':
+                        if hasinput(odat.Source):
+                            err.append(f'Removed source document reference for {odat.Jo}: {odat.Source}')
+                        else:
+                            err.append(f'No source document reference found for {odat.Jo}.')
+                        odat.Source = None
                         db.session.commit()
 
                     elif task_focus == 'xDrvProof':

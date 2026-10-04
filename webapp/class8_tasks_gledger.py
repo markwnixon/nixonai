@@ -320,14 +320,30 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
             pid=idat.Pid
             date = idat.Date
             co = get_company(pid)
+            odat = Orders.query.filter(Orders.Jo == jo).first()
 
             adb=Accounts.query.filter((Accounts.Name==acctdb) & (Accounts.Co ==cc)).first()
             acr=Accounts.query.filter((Accounts.Name==acctcr) & (Accounts.Co ==cc)).first()
+            partner_account = None
+            partner_amt = 0
+            company_earned_amt = amt
+            partner_job = odat is not None and getattr(odat, 'PartnerJob', 0) == 1
+            if partner_job:
+                partner_amt = cents(getattr(odat, 'PartnerAmount', 0))
+                company_earned_amt = amt - partner_amt
+                partner_account = Accounts.query.filter(
+                    (Accounts.Name == getattr(odat, 'PartnerAccount', None)) &
+                    (Accounts.Co == cc)
+                ).first()
 
             if adb is None:
                 err.append(f'Error: Do not have an Account:{acctdb} for Company:{cc}')
             elif acr is None:
                 err.append(f'Error: Do not have an Account:{acctcr} for Company:{cc}')
+            elif partner_job and partner_account is None:
+                err.append(f'Error: Do not have Partner Clearing Account:{getattr(odat, "PartnerAccount", None)} for Company:{cc}')
+            elif partner_job and (partner_amt < 0 or partner_amt > amt):
+                err.append(f'Error: Partner amount must be between 0 and invoice total for {jo}')
             else:
 
                 gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type=='VD')).first()
@@ -339,14 +355,23 @@ def gledger_write(busvec,jo,acctdb,acctcr,refid):
                     input1 = Gledger(Debit=amt,Credit=0,Account=acctdb,Aid=adb.id,Source=co,Sid=pid,Type='VD',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=None)
                     db.session.add(input1)
                 db.session.commit()
-                gdat = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type=='VC')).first()
-                if gdat is not None:
-                    gdat.Credit=amt
-                    gdat.Recorded=dt
-                    gdat.Date = date
-                else:
-                    input2 = Gledger(Debit=0,Credit=amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='VC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=None)
+
+                existing_credit_lines = Gledger.query.filter((Gledger.Tcode==jo) & (Gledger.Type=='VC')).all()
+                if any(line.Reconciled not in [None, 0, 25] for line in existing_credit_lines):
+                    err.append(f'Error: Invoice credit ledger rows for {jo} are reconciled and cannot be refreshed.')
+                    return err
+                for line in existing_credit_lines:
+                    db.session.delete(line)
+                db.session.flush()
+
+                if company_earned_amt > 0:
+                    input2 = Gledger(Debit=0,Credit=company_earned_amt,Account=acctcr,Aid=acr.id,Source=co,Sid=pid,Type='VC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=None,
+                                     JournalMemo='Company earned portion' if partner_job else None)
                     db.session.add(input2)
+                if partner_job and partner_amt > 0:
+                    input3 = Gledger(Debit=0,Credit=partner_amt,Account=partner_account.Name,Aid=partner_account.id,Source=co,Sid=pid,Type='VC',Tcode=jo,Com=cc,Recorded=dt,Reconciled=0,Date=date,Ref=None,
+                                     JournalMemo='Partner payable portion')
+                    db.session.add(input3)
                 db.session.commit()
 
         if bus=='income':
