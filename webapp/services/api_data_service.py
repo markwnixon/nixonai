@@ -75,7 +75,7 @@ def repair_dates(today, odata):
     return
 
 
-def api_call(scac, now, data_needed, arglist):
+def api_call(scac, now, data_needed, arglist, user_authority=None):
     print(f'Inside api_call with data_needed={data_needed}, arglist={arglist}')
     if data_needed == 'shipper_containers_out':
 
@@ -676,6 +676,8 @@ def api_call(scac, now, data_needed, arglist):
         return weekdays
 
     elif data_needed == 'financials':
+        if str(user_authority or '').strip().lower() == 'driver':
+            return []
         fin_id = 0
         ret_data = []
         odata = Openi.query.order_by(Openi.Open.desc()).all()

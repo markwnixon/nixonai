@@ -55,6 +55,36 @@ def _api_driver_identity(data, authenticated_username):
     return udat, driver_name, display_name
 
 
+def _api_user_for_identity(authenticated_username):
+    if not authenticated_username:
+        return None
+    return users.query.filter(users.username == authenticated_username).first()
+
+
+def _is_open_balance_report_request(data_needed):
+    key = str(data_needed or '').strip().lower().replace('-', '_').replace(' ', '_')
+    compact = key.replace('_', '')
+    explicit_keys = {
+        'open_balance',
+        'open_balances',
+        'open_balance_report',
+        'open_balances_report',
+        'ar_open_balance',
+        'ar_open_balances',
+        'accounts_receivable_open_balance',
+        'accounts_receivable_open_balances',
+        'open_invoices',
+        'receivables',
+        'accounts_receivable',
+    }
+    return (
+        key in explicit_keys or
+        ('open' in compact and 'balance' in compact) or
+        ('balance' in compact and 'report' in compact) or
+        ('receivable' in compact and 'open' in compact)
+    )
+
+
 def _api_driver_aliases(driver_name, udat=None):
     aliases = []
     for value in [driver_name, getattr(udat, 'name', None), getattr(udat, 'username', None)]:
@@ -1532,7 +1562,15 @@ def handle_data():
         arglist = request.args.get('arglist')
         print(f'Was able to get the payload data for arglist:{arglist}:')
 
-        data_return = api_call(scac, now, data_needed, arglist)
+        api_user = _api_user_for_identity(current_user)
+        if (
+            api_user is not None and
+            (api_user.authority or '').strip().lower() == 'driver' and
+            _is_open_balance_report_request(data_needed)
+        ):
+            return jsonify([])
+
+        data_return = api_call(scac, now, data_needed, arglist, user_authority=getattr(api_user, 'authority', None))
         return jsonify(data_return)
 
     else:
