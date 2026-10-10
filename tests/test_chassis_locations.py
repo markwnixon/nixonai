@@ -9,7 +9,7 @@ from flask import Flask
 from flask_jwt_extended import create_access_token
 
 from webapp.bot.routes import bot_bp
-from webapp.chassis_locations import age_label
+from webapp.chassis_locations import age_label, chassis_location_rows
 from webapp.extensions import db, jwt
 from webapp.models import ChassisLocationObservation, Vehicles
 
@@ -127,6 +127,29 @@ def test_chassis_location_endpoint_rejects_crossed_tag_mapping():
 
     assert response.status_code == 400
     assert 'not assigned' in response.get_json()['error']
+
+
+def test_blank_title_disables_chassis_tracking_and_hides_it_from_page():
+    app = make_app()
+    with app.app_context():
+        seed_chassis()
+        db.session.execute(Vehicles.__table__.insert().values(
+            Unit='OSLM002', Title='', Type='Chassis', Active=1,
+        ))
+        db.session.commit()
+    token = token_for(app, ['write:orders'])
+    response = app.test_client().post('/bot/chassis/locations', json={'observations': [{
+        'chassis_id': 'OSLM002',
+        'airtag_name': 'Unassigned AirTag',
+        'latitude': 39.29,
+        'longitude': -76.61,
+        'observed_at': '2026-10-10T12:15:00Z',
+    }]}, headers={'Authorization': f'Bearer {token}'})
+
+    assert response.status_code == 400
+    assert 'not configured' in response.get_json()['error']
+    with app.app_context():
+        assert [row['vehicle'].Unit for row in chassis_location_rows()] == ['OSLM001']
 
 
 def test_age_labels_are_operationally_readable():

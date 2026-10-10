@@ -55,7 +55,9 @@ def import_observations(payloads):
         if vehicle is None:
             raise ValueError(f'unknown active chassis: {chassis_id}')
         configured_tag = (vehicle.Title or '').strip()
-        if configured_tag and configured_tag.casefold() != airtag_name.casefold():
+        if not configured_tag:
+            raise ValueError(f'chassis {chassis_id} is not configured for AirTag tracking')
+        if configured_tag.casefold() != airtag_name.casefold():
             raise ValueError(f'AirTag {airtag_name!r} is not assigned to chassis {chassis_id}')
         observed_at = parse_observed_at(payload.get('observed_at'))
         latitude = parse_coordinate(payload.get('latitude'), 'latitude', Decimal('-90'), Decimal('90'))
@@ -99,6 +101,8 @@ def chassis_location_rows(now=None):
     ).filter(
         Vehicles.Type == 'Chassis',
         Vehicles.Active == 1,
+        Vehicles.Title.isnot(None),
+        func.trim(Vehicles.Title) != '',
     ).order_by(Vehicles.Unit, Vehicles.id).all()
 
     output = []
