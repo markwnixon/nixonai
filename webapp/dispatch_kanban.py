@@ -1,8 +1,14 @@
 import datetime
 import os
+import base64
+from io import BytesIO
 
 from sqlalchemy import inspect, or_, text
 from werkzeug.utils import secure_filename
+from PIL import Image
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 from webapp import db
 from webapp.CCC_system_setup import addpath, tpath
@@ -50,6 +56,43 @@ PIN_TIMESLOTS = ['06:00-07:00', '07:00-08:00', '08:00-09:00', '09:00-10:00', '10
 def normalize_workflow_status(status):
     status = clean_text(status)
     return LEGACY_STATUS_MAP.get(status, status)
+
+
+def write_pasted_image_as_letter_pdf(data_url, output_path):
+    if not data_url or ',' not in data_url:
+        return False
+    header, encoded = data_url.split(',', 1)
+    if 'image/' not in header:
+        return False
+
+    image = Image.open(BytesIO(base64.b64decode(encoded)))
+    if image.mode not in ('RGB', 'L'):
+        image = image.convert('RGB')
+
+    page_width, page_height = letter
+    margin = 36
+    max_width = page_width - (2 * margin)
+    max_height = page_height - (2 * margin)
+    image_width, image_height = image.size
+    scale = min(max_width / image_width, max_height / image_height)
+    draw_width = image_width * scale
+    draw_height = image_height * scale
+    draw_x = (page_width - draw_width) / 2
+    draw_y = (page_height - draw_height) / 2
+
+    pdf = canvas.Canvas(output_path, pagesize=letter)
+    pdf.drawImage(
+        ImageReader(image),
+        draw_x,
+        draw_y,
+        width=draw_width,
+        height=draw_height,
+        preserveAspectRatio=True,
+        mask='auto',
+    )
+    pdf.showPage()
+    pdf.save()
+    return True
 
 
 def short_workday_label(day):
@@ -1314,7 +1357,7 @@ def update_job(order_id, data, username=None):
     return {'ok': True, 'job': kanban_job_card(order, state_row(order.id), workflow_status)}, 200
 
 
-def upload_proof(order_id, file_storage, username=None):
+def upload_proof(order_id, file_storage, username=None, pasted_screenshot_data=None):
     order = Orders.query.get(order_id)
     if order is None:
         return {'ok': False, 'error': 'Order not found.'}, 404
@@ -1324,12 +1367,17 @@ def upload_proof(order_id, file_storage, username=None):
         return {'ok': False, 'error': 'Proof uploads are only available for active dispatch or Completed Need Proof jobs.'}, 400
     if has_delivery_proof(order) or proof_none_required(order):
         return {'ok': False, 'error': 'This job already has proof or is marked No Proof Needed.'}, 400
-    if file_storage is None or not clean_text(getattr(file_storage, 'filename', '')):
+    has_pasted_screenshot = bool(clean_text(pasted_screenshot_data))
+    if not has_pasted_screenshot and (file_storage is None or not clean_text(getattr(file_storage, 'filename', ''))):
         return {'ok': False, 'error': 'Select a proof PDF to upload.'}, 400
 
-    original_name = clean_text(file_storage.filename)
-    _, extension = os.path.splitext(original_name)
-    if extension.lower() != '.pdf':
+    if file_storage is not None and clean_text(getattr(file_storage, 'filename', '')):
+        original_name = clean_text(file_storage.filename)
+        _, extension = os.path.splitext(original_name)
+    else:
+        extension = '.pdf'
+
+    if not has_pasted_screenshot and extension.lower() != '.pdf':
         return {'ok': False, 'error': 'Proof upload must be a PDF file.'}, 400
 
     try:
@@ -1342,7 +1390,11 @@ def upload_proof(order_id, file_storage, username=None):
     filename = f'Proof_Jo_{safe_job_key}_c{new_cache}.pdf'
     output_path = addpath(tpath('Orders-Proof', filename))
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    file_storage.save(output_path)
+    if has_pasted_screenshot:
+        if not write_pasted_image_as_letter_pdf(pasted_screenshot_data, output_path):
+            return {'ok': False, 'error': 'Could not read pasted screenshot.'}, 400
+    else:
+        file_storage.save(output_path)
 
     order.Proof = filename
     order.Pcache = new_cache

@@ -1642,7 +1642,12 @@ def DispatchKanbanUpdate(order_id):
 @login_required
 def DispatchKanbanUploadProof(order_id):
     username = getattr(current_user, 'username', None) or getattr(current_user, 'name', None) or 'dispatch'
-    result, status_code = kanban_upload_proof(order_id, request.files.get('proof_pdf'), username=username)
+    result, status_code = kanban_upload_proof(
+        order_id,
+        request.files.get('proof_pdf'),
+        username=username,
+        pasted_screenshot_data=request.form.get('pasted_screenshot_data'),
+    )
     return jsonify(result), status_code
 
 

@@ -53,6 +53,79 @@
         return template.replace('/0/', `/${id}/`);
     }
 
+    function clearProofPaste() {
+        const pasteInput = document.getElementById('kanban-proof-pasted-data');
+        const preview = document.getElementById('kanban-proof-paste-preview');
+        const instructions = document.getElementById('kanban-proof-paste-instructions');
+        const pasteBox = document.getElementById('kanban-proof-paste-box');
+        if (pasteInput) {
+            pasteInput.value = '';
+        }
+        if (preview) {
+            preview.innerHTML = '';
+        }
+        if (instructions) {
+            instructions.textContent = 'Click here, then paste a screenshot with Ctrl+V.';
+        }
+        if (pasteBox) {
+            pasteBox.classList.remove('border-primary', 'bg-light');
+        }
+    }
+
+    function setProofPasteActive(active) {
+        const pasteBox = document.getElementById('kanban-proof-paste-box');
+        const instructions = document.getElementById('kanban-proof-paste-instructions');
+        const pasteInput = document.getElementById('kanban-proof-pasted-data');
+        if (!pasteBox) {
+            return;
+        }
+        pasteBox.classList.toggle('border-primary', Boolean(active));
+        pasteBox.classList.toggle('bg-light', Boolean(active));
+        if (instructions && pasteInput && !pasteInput.value) {
+            instructions.innerHTML = active
+                ? '<strong>Ready for paste.</strong> Press Ctrl+V to add the screenshot.'
+                : 'Click here, then paste a screenshot with Ctrl+V.';
+        }
+    }
+
+    function setProofPastePreview(dataUrl) {
+        const pasteInput = document.getElementById('kanban-proof-pasted-data');
+        const preview = document.getElementById('kanban-proof-paste-preview');
+        const instructions = document.getElementById('kanban-proof-paste-instructions');
+        if (pasteInput) {
+            pasteInput.value = dataUrl;
+        }
+        if (instructions) {
+            instructions.innerHTML = '<strong>Screenshot ready.</strong> Click Upload Proof PDF to save it.';
+        }
+        if (preview) {
+            preview.innerHTML = '';
+            const image = document.createElement('img');
+            image.src = dataUrl;
+            image.alt = 'Pasted proof screenshot preview';
+            image.style.maxWidth = '100%';
+            image.style.maxHeight = '220px';
+            image.className = 'border bg-light';
+            preview.appendChild(image);
+        }
+    }
+
+    function normalizeScreenshotDataUrl(dataUrl, callback) {
+        const image = new Image();
+        image.onload = () => {
+            const maxWidth = 1700;
+            const maxHeight = 2200;
+            const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(image.width * scale);
+            canvas.height = Math.round(image.height * scale);
+            const context = canvas.getContext('2d');
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            callback(canvas.toDataURL('image/png'));
+        };
+        image.src = dataUrl;
+    }
+
     function localDateString(date) {
         const month = `${date.getMonth() + 1}`.padStart(2, '0');
         const day = `${date.getDate()}`.padStart(2, '0');
@@ -140,7 +213,7 @@
         if (job.item_type === 'pin_pairing') {
             return renderPinPairingCard(job);
         }
-        const selectableForPin = job.workflow_status !== 'future_jobs';
+        const selectableForPin = !['future_jobs', 'completed'].includes(job.workflow_status);
         const pinQueue = job.pin_queue || {};
         const shell = document.createElement('div');
         shell.className = selectableForPin ? 'dispatch-kanban-card-shell' : 'dispatch-kanban-card-shell dispatch-kanban-card-shell-no-pin';
@@ -674,6 +747,7 @@
             && !job.proof_none_required;
         document.getElementById('kanban-proof-upload-panel').classList.toggle('d-none', !showProofUpload);
         document.getElementById('kanban-proof-file').value = '';
+        clearProofPaste();
         document.getElementById('kanban-make-pin-open').classList.toggle('d-none', !canMakePin(job));
         modal.modal('show');
     }
@@ -846,20 +920,56 @@
         }
     });
 
+    const proofPasteBox = document.getElementById('kanban-proof-paste-box');
+    const proofPasteClear = document.getElementById('kanban-proof-paste-clear');
+    if (proofPasteBox) {
+        proofPasteBox.addEventListener('focus', () => setProofPasteActive(true));
+        proofPasteBox.addEventListener('blur', () => setProofPasteActive(false));
+        proofPasteBox.addEventListener('click', () => proofPasteBox.focus());
+        proofPasteBox.addEventListener('paste', (event) => {
+            const items = (event.clipboardData || window.clipboardData || {}).items || [];
+            for (let i = 0; i < items.length; i += 1) {
+                if (items[i].type && items[i].type.indexOf('image/') === 0) {
+                    const file = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (readerEvent) => {
+                        normalizeScreenshotDataUrl(readerEvent.target.result, setProofPastePreview);
+                    };
+                    reader.readAsDataURL(file);
+                    event.preventDefault();
+                    break;
+                }
+            }
+        });
+    }
+    if (proofPasteClear) {
+        proofPasteClear.addEventListener('click', () => {
+            clearProofPaste();
+            if (proofPasteBox) {
+                proofPasteBox.focus();
+            }
+        });
+    }
+
     document.getElementById('kanban-proof-upload-button').addEventListener('click', async () => {
         const jobId = document.getElementById('kanban-modal-order-id').value;
         const fileInput = document.getElementById('kanban-proof-file');
         const file = fileInput.files && fileInput.files[0];
-        if (!file) {
-            showMessage('Select a proof PDF to upload.', 'warning');
+        const pastedScreenshot = document.getElementById('kanban-proof-pasted-data').value;
+        if (!file && !pastedScreenshot) {
+            showMessage('Select a proof PDF or paste a screenshot.', 'warning');
             return;
         }
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
+        if (file && !file.name.toLowerCase().endsWith('.pdf')) {
             showMessage('Proof upload must be a PDF file.', 'warning');
             return;
         }
         const formData = new FormData();
-        formData.append('proof_pdf', file);
+        if (pastedScreenshot) {
+            formData.append('pasted_screenshot_data', pastedScreenshot);
+        } else {
+            formData.append('proof_pdf', file);
+        }
         const response = await fetch(endpoint(uploadProofUrlTemplate, jobId), {
             method: 'POST',
             body: formData,

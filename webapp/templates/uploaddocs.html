@@ -13,20 +13,30 @@
             <p>
             <input type="file" name="docupload" autocomplete="off">
             </p>
-        </dl><p>
-        <input type="submit" name="uploadnow" id="uploadnow" value="Upload Now">
-        {% if viewport[4] != '0' %} <input type="submit" name="cancel" id="cancel" value="Cancel"> {% endif %}
-        </p>
+        </dl>
+    </div>
+    <div class="card-body" align="left">
+        Option 2: Paste Screenshot
+        <div id="paste-screenshot-box" class="border rounded p-3 mb-2" tabindex="0" style="min-height: 120px; cursor: text;">
+            <div id="paste-screenshot-instructions">Click here, then paste a screenshot with Ctrl+V. The pasted image will be saved as an 8.5 x 11 PDF.</div>
+            <div id="paste-screenshot-preview" class="mt-2"></div>
+        </div>
+        <button type="button" id="clear-pasted-screenshot" class="btn btn-sm btn-outline-secondary">Clear Pasted Screenshot</button>
+        <input type="hidden" name="pasted_screenshot_data" id="pasted_screenshot_data">
     </div>
     {% if modlink != 4 %}
     <div class="card-body" align = "left">
-        Option 2: Upload {{ task_focus }} Document Using Drag and Drop
+        Option 3: Upload {{ task_focus }} Document Using Drag and Drop
         <div class="container" align="center">
             <div class="droparea" align="center">(Optional) Drop Here</div>
             <div class="tablearea" id="tablearea" align="center"></div>
         </div>
     </div>
     {% endif %}
+    <div class="card-footer" align="left">
+        <input type="submit" name="uploadnow" id="uploadnow" value="Upload Now" class="btn btn-primary">
+        {% if viewport[4] != '0' %} <input type="submit" name="cancel" id="cancel" value="Cancel" class="btn btn-secondary"> {% endif %}
+    </div>
 </div>
 
 
@@ -34,3 +44,101 @@
 <input type = "hidden" name="passoder" value="{{oder}}">
 <input type = "hidden" name="uploadtype" id="uploadtype" value="source">
 <input type = "hidden" name="username" id="username" value="{{ username }}">
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var pasteBox = document.getElementById('paste-screenshot-box');
+    var pasteInput = document.getElementById('pasted_screenshot_data');
+    var preview = document.getElementById('paste-screenshot-preview');
+    var clearButton = document.getElementById('clear-pasted-screenshot');
+    var instructions = document.getElementById('paste-screenshot-instructions');
+
+    if (!pasteBox || !pasteInput || !preview) {
+        return;
+    }
+
+    function setPasteBoxActive(active) {
+        if (active) {
+            pasteBox.classList.add('border-primary', 'bg-light');
+            if (instructions && !pasteInput.value) {
+                instructions.innerHTML = '<strong>Ready for paste.</strong> Press Ctrl+V to add the screenshot.';
+            }
+        } else {
+            pasteBox.classList.remove('border-primary', 'bg-light');
+            if (instructions && !pasteInput.value) {
+                instructions.textContent = 'Click here, then paste a screenshot with Ctrl+V. The pasted image will be saved as an 8.5 x 11 PDF.';
+            }
+        }
+    }
+
+    function setPreview(dataUrl) {
+        preview.innerHTML = '';
+        if (instructions) {
+            instructions.innerHTML = '<strong>Screenshot ready.</strong> Click Upload Now below to save it as a PDF.';
+        }
+        var image = document.createElement('img');
+        image.src = dataUrl;
+        image.alt = 'Pasted screenshot preview';
+        image.style.maxWidth = '100%';
+        image.style.maxHeight = '260px';
+        image.className = 'border bg-light';
+        preview.appendChild(image);
+    }
+
+    function normalizeScreenshotDataUrl(dataUrl, callback) {
+        var image = new Image();
+        image.onload = function () {
+            var maxWidth = 1700;
+            var maxHeight = 2200;
+            var scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.round(image.width * scale);
+            canvas.height = Math.round(image.height * scale);
+            var context = canvas.getContext('2d');
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            callback(canvas.toDataURL('image/png'));
+        };
+        image.src = dataUrl;
+    }
+
+    pasteBox.addEventListener('focus', function () {
+        setPasteBoxActive(true);
+    });
+
+    pasteBox.addEventListener('blur', function () {
+        setPasteBoxActive(false);
+    });
+
+    pasteBox.addEventListener('click', function () {
+        pasteBox.focus();
+    });
+
+    pasteBox.addEventListener('paste', function (event) {
+        var items = (event.clipboardData || window.clipboardData || {}).items || [];
+        for (var i = 0; i < items.length; i += 1) {
+            if (items[i].type && items[i].type.indexOf('image/') === 0) {
+                var file = items[i].getAsFile();
+                var reader = new FileReader();
+                reader.onload = function (readerEvent) {
+                    normalizeScreenshotDataUrl(readerEvent.target.result, function (dataUrl) {
+                        pasteInput.value = dataUrl;
+                        setPreview(dataUrl);
+                    });
+                };
+                reader.readAsDataURL(file);
+                event.preventDefault();
+                break;
+            }
+        }
+    });
+
+    clearButton.addEventListener('click', function () {
+        pasteInput.value = '';
+        preview.innerHTML = '';
+        if (instructions) {
+            instructions.innerHTML = '<strong>Ready for paste.</strong> Press Ctrl+V to add the screenshot.';
+        }
+        pasteBox.focus();
+    });
+});
+</script>

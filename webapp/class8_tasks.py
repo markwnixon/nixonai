@@ -31,6 +31,13 @@ import subprocess
 import json
 import numbers
 import re
+import base64
+import shutil
+from io import BytesIO
+from PIL import Image
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 #Python functions that require database access
 from webapp.class8_utils import *
@@ -41,6 +48,69 @@ from sqlalchemy import or_
 
 
 BILL_PAYMENT_LEDGER_TYPES = ['PD', 'PC', 'DD', 'QD', 'QC']
+
+
+def pasted_screenshot_data():
+    data_url = request.values.get('pasted_screenshot_data')
+    if not data_url:
+        return None
+    if ',' not in data_url:
+        return None
+    header, encoded = data_url.split(',', 1)
+    if 'image/' not in header:
+        return None
+    return encoded
+
+
+def write_image_data_as_letter_pdf(encoded_image, output_path):
+    image_bytes = base64.b64decode(encoded_image)
+    image = Image.open(BytesIO(image_bytes))
+    if image.mode not in ('RGB', 'L'):
+        image = image.convert('RGB')
+
+    page_width, page_height = letter
+    margin = 36
+    max_width = page_width - (2 * margin)
+    max_height = page_height - (2 * margin)
+    image_width, image_height = image.size
+    scale = min(max_width / image_width, max_height / image_height)
+    draw_width = image_width * scale
+    draw_height = image_height * scale
+    draw_x = (page_width - draw_width) / 2
+    draw_y = (page_height - draw_height) / 2
+
+    pdf = canvas.Canvas(output_path, pagesize=letter)
+    pdf.drawImage(
+        ImageReader(image),
+        draw_x,
+        draw_y,
+        width=draw_width,
+        height=draw_height,
+        preserveAspectRatio=True,
+        mask='auto',
+    )
+    pdf.showPage()
+    pdf.save()
+
+
+def uploaded_file_and_extension(field_name='docupload'):
+    pasted_image = pasted_screenshot_data()
+    if pasted_image:
+        return None, '.pdf', True, pasted_image
+
+    file = request.files.get(field_name)
+    if file is None or file.filename == '':
+        return file, '', False, None
+
+    name, exto = os.path.splitext(file.filename)
+    return file, exto.lower(), False, None
+
+
+def save_uploaded_or_pasted_pdf(file, pasted_image, output_path):
+    if pasted_image:
+        write_image_data_as_letter_pdf(pasted_image, output_path)
+    else:
+        file.save(output_path)
 
 
 def bill_payment_ledger_entries(bill):
@@ -2277,13 +2347,13 @@ def run_driver_upload(checked_data, upload):
 
             if uploadnow is not None:
                 viewport[0] = 'show_doc_right'
-                file = request.files['docupload']
-                if file.filename == '':
+                file, ext, pasted_file, pasted_image = uploaded_file_and_extension()
+                if not pasted_file and (file is None or file.filename == ''):
                     err.append('No file selected for uploading')
+                    completed = True
+                    holdvec[140] = ''
+                    return holdvec, entrydata, err, viewport, completed
 
-
-                name, exto = os.path.splitext(file.filename)
-                ext = exto.lower()
                 if upload == 'CDLpdf':
                     sname = 'Ccache'
                 elif upload == 'MEDpdf':
@@ -2326,16 +2396,8 @@ def run_driver_upload(checked_data, upload):
                 # filename1 is for browser display which must maintain new file names to overcome caching
                 # filename2 is for the api display which need to avoid the caching suffix
 
-                # Assuming 'file' is your uploaded file object
-                file_data = file.read()  # read the uploaded file content
-
-                # Save first copy
-                with open(output1, 'wb') as f1:
-                    f1.write(file_data)
-
-                # Save second copy
-                with open(output2, 'wb') as f2:
-                    f2.write(file_data)
+                save_uploaded_or_pasted_pdf(file, pasted_image, output1)
+                shutil.copy(output1, output2)
 
                 viewport[2] = '/'+tpath(f'Drivers-Compliance', filename1)
 
@@ -2405,13 +2467,14 @@ def run_truck_upload(checked_data, upload):
 
             if uploadnow is not None:
                 viewport[0] = 'show_doc_right'
-                file = request.files['docupload']
-                if file.filename == '':
+                file, ext, pasted_file, pasted_image = uploaded_file_and_extension()
+                if not pasted_file and (file is None or file.filename == ''):
                     err.append('No file selected for uploading')
+                    completed = True
+                    holdvec[141] = ''
+                    return holdvec, entrydata, err, viewport, completed
 
                 unit = f'Unit_{dat.Unit}'
-                name, exto = os.path.splitext(file.filename)
-                ext = exto.lower()
                 if upload == 'Regpdf':
                     sname = 'Rcache'
                 elif upload == 'Titpdf':
@@ -2433,7 +2496,7 @@ def run_truck_upload(checked_data, upload):
                     output1 = addpath(tpath(f'Trucks-Tit', filename1))
                 #print(f'output1 = {output1}')
 
-                file.save(output1)
+                save_uploaded_or_pasted_pdf(file, pasted_image, output1)
                 viewport[2] = '/'+tpath(f'Drivers-Compliance', filename1)
 
                 setattr(dat, upload, filename1)
@@ -5117,12 +5180,12 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
 
             if uploadnow is not None:
                 viewport[0] = 'show_doc_right'
-                file = request.files['docupload']
-                if file.filename == '':
+                file, ext, pasted_file, pasted_image = uploaded_file_and_extension()
+                if not pasted_file and (file is None or file.filename == ''):
                     err.append('No file selected for uploading')
+                    completed = True
+                    return holdvec, entrydata, err, viewport, completed
 
-                name, exto = os.path.splitext(file.filename)
-                ext = exto.lower()
                 if task_focus == 'Source':
                     sname = 'Scache'
                 elif task_focus == 'Proof':
@@ -5162,12 +5225,12 @@ def Upload_task(genre, task_iter, tablesetup, task_focus, checked_data, thistabl
                     filename1 = f'{task_focus}_{fileout}{ext}'
                     output1 = addpath(document_storage_path(thistable, task_focus, filename1))
 
-                file.save(output1)
+                save_uploaded_or_pasted_pdf(file, pasted_image, output1)
                 viewport[2] = document_view_url(thistable, task_focus, filename1)
 
                 if bn > 0:
                     if thistable == 'Orders':
-                        oldfile = f'{task_focus}_{fileout}_c{str(sn)}{exto}'
+                        oldfile = f'{task_focus}_{fileout}_c{str(sn)}{ext}'
                         oldoutput = addpath(tpath(f'{thistable}-{task_focus}', oldfile))
                         #print(f'the old file is {oldfile}')
 

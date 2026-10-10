@@ -23,12 +23,54 @@ from PyPDF2 import PdfReader
 from webapp.page_merger import pagemergerx
 from PIL import Image
 
+try:
+    import pikepdf
+except ImportError:
+    pikepdf = None
+
 
 NO_PROOF_MARKERS = ['none required', 'no proof needed']
 
 
 def proof_is_marker(value):
     return str(value or '').strip().lower() in NO_PROOF_MARKERS
+
+
+def normalize_pdf_for_package(filepath, cache_key, item_index):
+    """Rewrite a package source PDF so broken metadata cannot stop pdfunite."""
+    if not filepath or not os.path.isfile(filepath):
+        return filepath
+
+    processing_dir = addpath(f'static/{scac}/data/processing')
+    os.makedirs(processing_dir, exist_ok=True)
+    clean_path = os.path.join(processing_dir, f'package_clean_{cache_key}_{item_index}.pdf')
+
+    if pikepdf is not None:
+        try:
+            with pikepdf.open(filepath) as pdf:
+                pdf.save(clean_path)
+            return clean_path
+        except Exception as exc:
+            print(f'Could not normalize package PDF with pikepdf {filepath}: {exc}')
+
+    try:
+        reader = PdfReader(filepath, strict=False)
+        if getattr(reader, 'is_encrypted', False):
+            try:
+                reader.decrypt('')
+            except Exception:
+                return filepath
+
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+
+        with open(clean_path, 'wb') as clean_file:
+            writer.write(clean_file)
+        return clean_path
+    except Exception as exc:
+        print(f'Could not normalize package PDF {filepath}: {exc}')
+        return filepath
 
 
 def existing_order_pdf(folder, filename):
@@ -396,8 +438,20 @@ def makepackage(genre, odat, task_iter, document_types, stamplist, stampdata, ep
     #print('stampdata final:', stampdata)
 
     if len(packitems) >= 1:
-        pdflist = ['pdfunite'] + packitems + [addpath(docref)]
-        tes = subprocess.check_output(pdflist)
+        normalized_items = [
+            normalize_pdf_for_package(packitem, cache2, jx)
+            for jx, packitem in enumerate(packitems)
+        ]
+        try:
+            pdflist = ['pdfunite'] + normalized_items + [addpath(docref)]
+            tes = subprocess.check_output(pdflist)
+        finally:
+            for clean_file in normalized_items:
+                if clean_file not in packitems:
+                    try:
+                        os.remove(clean_file)
+                    except:
+                        pass
     else:
         err.append('No documents available for this selection')
 
