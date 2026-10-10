@@ -46,4 +46,6 @@ one to four hours old, and red is over four hours old or missing.
 
 Apple does not provide a public owner-location API for AirTags. This pilot reads
 the cache written by Find My on this Mac and can require adjustment after macOS
-updates. The collector fails closed when cache access or parsing is unavailable.
+updates. macOS 26 encrypts this cache, so a compatible decrypted-cache or
+accessory-key export step is required on that version. The collector fails
+closed when cache access, decryption, or parsing is unavailable.

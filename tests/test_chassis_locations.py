@@ -5,6 +5,7 @@ import plistlib
 import sys
 from pathlib import Path
 
+import pytest
 from flask import Flask
 from flask_jwt_extended import create_access_token
 
@@ -85,6 +86,17 @@ def test_collector_reads_find_my_json_cache(tmp_path):
 
     assert items['Chassis OSLM001']['longitude'] == -76.6122
     assert items['Chassis OSLM001']['observed_at'].endswith('Z')
+
+
+def test_collector_reports_encrypted_find_my_cache(tmp_path):
+    cache_path = tmp_path / 'Items.data'
+    cache_path.write_bytes(plistlib.dumps({
+        'encryptedData': b'encrypted payload',
+        'signature': b'signature',
+    }))
+
+    with pytest.raises(RuntimeError, match='Items.data is encrypted'):
+        collector.load_cache(cache_path)
 
 
 def test_chassis_location_endpoint_authenticates_validates_and_deduplicates():

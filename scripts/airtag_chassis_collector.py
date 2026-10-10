@@ -26,7 +26,13 @@ def load_cache(path: Path):
         ) from exc
     for loader in (plistlib.loads, lambda value: json.loads(value.decode('utf-8'))):
         try:
-            return loader(raw)
+            cache = loader(raw)
+            if isinstance(cache, dict) and isinstance(cache.get('encryptedData'), bytes):
+                raise RuntimeError(
+                    'Find My Items.data is encrypted on this macOS version; '
+                    'a decrypted cache or supported accessory-key export is required'
+                )
+            return cache
         except (ValueError, TypeError, UnicodeDecodeError, plistlib.InvalidFileException):
             continue
     raise RuntimeError(f'Unsupported Find My cache format: {path}')
