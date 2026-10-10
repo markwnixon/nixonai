@@ -118,6 +118,26 @@ def trial_reconciliation(bankacct):
         (Reconciliations.Status == 25)
     ).order_by(Reconciliations.Rdate.desc()).first()
 
+def reconciliation_date_bounds(value):
+    if isinstance(value, datetime.datetime):
+        start = datetime.datetime.combine(value.date(), datetime.time.min)
+    elif isinstance(value, datetime.date):
+        start = datetime.datetime.combine(value, datetime.time.min)
+    else:
+        start = datetime.datetime.strptime(value, "%Y-%m-%d")
+    return start, start + datetime.timedelta(days=1)
+
+def reconciliation_for_date(bankacct, rdate, statuses=None):
+    start, end = reconciliation_date_bounds(rdate)
+    query = Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Rdate >= start) &
+        (Reconciliations.Rdate < end)
+    )
+    if statuses is not None:
+        query = query.filter(Reconciliations.Status.in_(statuses))
+    return query.order_by(Reconciliations.id.desc()).first()
+
 def default_beginning_balance(bankacct):
     rdat = latest_reconciliation(bankacct)
     if rdat is not None and rdat.Ebal not in [None, '']:
@@ -200,7 +220,9 @@ def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, 
     except:
         wlists = None
 
-    rdat = trial_reconciliation(bankacct)
+    rdat = reconciliation_for_date(bankacct, rdate, [0, 25])
+    if rdat is None:
+        rdat = trial_reconciliation(bankacct)
     if rdat is None:
         rdat = Reconciliations(
             Account=bankacct,
@@ -249,10 +271,7 @@ def baseline_reconciliation(bankacct, cutoff_date, trusted_balance):
         row.Reconciled = cutoff_date.month
 
     trusted_balance = d2s(trusted_balance)
-    existing = Reconciliations.query.filter(
-        (Reconciliations.Account == bankacct) &
-        (Reconciliations.Rdate == cutoff_date)
-    ).first()
+    existing = reconciliation_for_date(bankacct, cutoff_date)
     if existing is None:
         existing = Reconciliations(
             Account=bankacct,
@@ -297,19 +316,97 @@ def reconciliation_list_ids(value):
             pass
     return ids
 
+def previous_reconciliation_before(bankacct, rdate):
+    start, _ = reconciliation_date_bounds(rdate)
+    return Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Rdate < start)
+    ).order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).first()
+
+def ledger_date_in_statement_period(ledger_date, rdate, previous_rdate=None):
+    cutoff = statement_cutoff_datetime(rdate)
+    if cutoff is None or ledger_date in [None, '']:
+        return False
+    if isinstance(ledger_date, datetime.datetime):
+        compare_date = ledger_date
+    elif isinstance(ledger_date, datetime.date):
+        compare_date = datetime.datetime.combine(ledger_date, datetime.time.min)
+    else:
+        try:
+            compare_date = datetime.datetime.strptime(str(ledger_date)[:10], "%Y-%m-%d")
+        except:
+            return False
+    if compare_date > cutoff:
+        return False
+    if previous_rdate is not None:
+        previous_cutoff = statement_cutoff_datetime(previous_rdate)
+        if previous_cutoff is not None and compare_date <= previous_cutoff:
+            return False
+    return True
+
+def ledger_datetime(value):
+    if isinstance(value, datetime.datetime):
+        return value
+    if isinstance(value, datetime.date):
+        return datetime.datetime.combine(value, datetime.time.min)
+    if value in [None, '']:
+        return None
+    try:
+        return datetime.datetime.strptime(str(value)[:10], "%Y-%m-%d")
+    except:
+        return None
+
+def finalized_statement_periods(bankacct):
+    periods = []
+    previous_rdate = None
+    rows = Reconciliations.query.filter(
+        (Reconciliations.Account == bankacct) &
+        (Reconciliations.Status == 1)
+    ).order_by(Reconciliations.Rdate, Reconciliations.id).all()
+    for row in rows:
+        end = statement_cutoff_datetime(row.Rdate)
+        previous_end = statement_cutoff_datetime(previous_rdate)
+        if end is not None:
+            periods.append((previous_end, end))
+        previous_rdate = row.Rdate
+    return periods
+
+def ledger_row_in_finalized_period(row, periods):
+    row_date = ledger_datetime(row.Date)
+    if row_date is None:
+        return False
+    for previous_end, end in periods:
+        if row_date <= end and (previous_end is None or row_date > previous_end):
+            return True
+    return False
+
+def ledger_row_effectively_unreconciled(row, periods):
+    if row.Reconciled == 25:
+        return True
+    if row.Reconciled in [None, 0]:
+        return not ledger_row_in_finalized_period(row, periods)
+    return False
+
+def filter_statement_rows(rows, rdat):
+    if rdat is None:
+        return []
+    previous = previous_reconciliation_before(rdat.Account, rdat.Rdate)
+    previous_rdate = previous.Rdate if previous is not None else None
+    return [
+        row for row in rows
+        if ledger_date_in_statement_period(row.Date, rdat.Rdate, previous_rdate)
+    ]
+
 def rows_for_reconciliation(rdat):
     row_ids = reconciliation_list_ids(rdat.DepositList) + reconciliation_list_ids(rdat.WithdrawList)
     if row_ids:
-        return Gledger.query.filter(
+        rows = Gledger.query.filter(
             (Gledger.id.in_(row_ids)) &
             (Gledger.Account == rdat.Account)
         ).all()
+        return filter_statement_rows(rows, rdat)
 
-    previous = Reconciliations.query.filter(
-        (Reconciliations.Account == rdat.Account) &
-        (Reconciliations.Status == 1) &
-        (Reconciliations.Rdate < rdat.Rdate)
-    ).order_by(Reconciliations.Rdate.desc()).first()
+    previous = previous_reconciliation_before(rdat.Account, rdat.Rdate)
 
     query = Gledger.query.filter(
         (Gledger.Account == rdat.Account) &
@@ -321,30 +418,22 @@ def rows_for_reconciliation(rdat):
     return query.all()
 
 def reopen_reconciliation(bankacct, rdate):
-    rdat = Reconciliations.query.filter(
-        (Reconciliations.Account == bankacct) &
-        (Reconciliations.Rdate == rdate) &
-        (Reconciliations.Status == 1)
-    ).first()
+    rdat = reconciliation_for_date(bankacct, rdate, [1])
     if rdat is None:
-        rdat = Reconciliations.query.filter(
-            (Reconciliations.Account == bankacct) &
-            (Reconciliations.Rdate <= rdate) &
-            (Reconciliations.Status == 1)
-        ).order_by(Reconciliations.Rdate.desc()).first()
+        rdat = reconciliation_for_date(bankacct, rdate, [0, 25])
     if rdat is None:
-        return 0, f'No finalized reconciliation was found for {bankacct} on or before {rdate.strftime("%Y-%m-%d")}.'
+        return 0, f'No finalized or reopened reconciliation was found for {bankacct} dated {rdate.strftime("%Y-%m-%d")}.'
 
     rows = rows_for_reconciliation(rdat)
     row_ids = [row.id for row in rows]
     for row in rows:
-        row.Reconciled = 0
+        row.Reconciled = 25
     rdat.Status = 0
     db.session.commit()
     synced_bills = sync_bills_for_ledger_ids(row_ids)
     if synced_bills:
-        return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) and {synced_bills} bill row(s) are now unreconciled.'
-    return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) are now unreconciled.'
+        return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) were reselected and {synced_bills} bill row(s) are now editable until finalized again.'
+    return len(rows), f'Reopened reconciliation for {bankacct} dated {rdat.Rdate.strftime("%Y-%m-%d")}. {len(rows)} ledger row(s) were reselected.'
 
 def selected_bank_ids(odata):
     selected = []
@@ -415,11 +504,31 @@ def reconciliation_explicit_ids(value):
         return ids, False
     return set(), False
 
-def reconciliation_contains_ledger_line(rdat, line):
+def reconciliation_row_ids(rdat):
+    if rdat is None:
+        return set(), False
     deposit_ids, deposit_complete = reconciliation_explicit_ids(rdat.DepositList)
     withdraw_ids, withdraw_complete = reconciliation_explicit_ids(rdat.WithdrawList)
-    explicit_ids = deposit_ids | withdraw_ids
-    explicit_complete = deposit_complete or withdraw_complete
+    return deposit_ids | withdraw_ids, deposit_complete or withdraw_complete
+
+def selected_statement_reconciliation(bankacct, statement_date):
+    if statement_date in [None, '']:
+        return None
+    return reconciliation_for_date(bankacct, statement_date, [0, 25, 1])
+
+def selected_statement_ids(bankacct, statement_date):
+    rdat = selected_statement_reconciliation(bankacct, statement_date)
+    row_ids, complete = reconciliation_row_ids(rdat)
+    if not complete or not row_ids:
+        return []
+    rows = Gledger.query.filter(
+        (Gledger.Account == bankacct) &
+        (Gledger.id.in_(row_ids))
+    ).all()
+    return [row.id for row in filter_statement_rows(rows, rdat)]
+
+def reconciliation_contains_ledger_line(rdat, line):
+    explicit_ids, explicit_complete = reconciliation_row_ids(rdat)
     if explicit_ids:
         if line.id in explicit_ids:
             return True
@@ -450,6 +559,9 @@ def line_has_final_reconciliation(line):
     return any(reconciliation_contains_ledger_line(rdat, line) for rdat in reconciliations)
 
 def clear_stale_reconciliation_flags(bankacct):
+    # This is intentionally not run on normal page load. Older reconciliation
+    # rows may have compacted DepositList/WithdrawList values, so a display page
+    # cannot always prove a ledger row is stale without risking data changes.
     rows = Gledger.query.filter(
         (Gledger.Account == bankacct) &
         (Gledger.Reconciled.isnot(None)) &
@@ -466,7 +578,6 @@ def clear_stale_reconciliation_flags(bankacct):
 
 def dataget_Bank(thismuch, bankacct, statement_date=None):
     # 0=order,#1=proofs,#2=interchange,#3=people/services
-    clear_stale_reconciliation_flags(bankacct)
     today = datetime.date.today()
     stopdate = today-datetime.timedelta(days=60)
     if thismuch == '1':
@@ -479,9 +590,26 @@ def dataget_Bank(thismuch, bankacct, statement_date=None):
             # Reconciliation works against a statement date. Rows after that date
             # must not be available for selection or stale form submission.
             query = query.filter(Gledger.Date <= cutoff)
-        odata = query.all()
+        periods = finalized_statement_periods(bankacct)
+        odata = [
+            row for row in query.all()
+            if ledger_row_effectively_unreconciled(row, periods)
+        ]
     elif thismuch == '5':
-        odata = Gledger.query.filter((Gledger.Account==bankacct) & (Gledger.Reconciled==25)).all()
+        rdat = selected_statement_reconciliation(bankacct, statement_date)
+        row_ids, explicit_complete = reconciliation_row_ids(rdat)
+        if explicit_complete and row_ids:
+            rows = Gledger.query.filter(
+                (Gledger.Account == bankacct) &
+                (Gledger.id.in_(row_ids))
+            ).all()
+            odata = filter_statement_rows(rows, rdat)
+        else:
+            query = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25))
+            cutoff = statement_cutoff_datetime(statement_date)
+            if cutoff is not None:
+                query = query.filter(Gledger.Date <= cutoff)
+            odata = query.all()
     elif thismuch == '2':
         stopdate = today-datetime.timedelta(days=45)
         odata = Gledger.query.filter((Gledger.Account==bankacct) & (Gledger.Recorded > stopdate)).all()
@@ -492,17 +620,31 @@ def dataget_Bank(thismuch, bankacct, statement_date=None):
         odata = Gledger.query.filter(Gledger.Account==bankacct ).all()
     return odata
 
-def recon_totals(bankacct):
+def recon_totals(bankacct, statement_date=None):
     # Find service charges for month:
     dlist = []
     wlist = []
-    gdat = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25) & (Gledger.Source == bankacct)).first()
+    rdat = selected_statement_reconciliation(bankacct, statement_date)
+    row_ids, explicit_complete = reconciliation_row_ids(rdat)
+    if explicit_complete and row_ids:
+        rows = Gledger.query.filter(
+            (Gledger.Account == bankacct) &
+            (Gledger.id.in_(row_ids))
+        ).all()
+        gdata = filter_statement_rows(rows, rdat)
+    else:
+        gquery = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25))
+        cutoff = statement_cutoff_datetime(statement_date)
+        if cutoff is not None:
+            gquery = gquery.filter(Gledger.Date <= cutoff)
+        gdata = gquery.all()
+
+    gdat = next((row for row in gdata if row.Source == bankacct), None)
     if gdat is not None:
         bkc = gdat.Credit
     else:
         bkc = 0
     totald, totalc = 0.0, 0.0
-    gdata = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25)).all()
     for gdat in gdata:
         type = gdat.Type
         if type in BANK_DEPOSIT_TYPES:
@@ -522,6 +664,7 @@ def banktotals(bankacct, statement_values=None):
     totalc_U = 0
     defaults = statement_defaults(bankacct, datetime.date.today().strftime('%Y-%m-%d'))
     statement_values = statement_values or request.values
+    statement_date = statement_values.get('rdate')
     endbal = statement_values.get('endbal')
     begbal = statement_values.get('begbal')
     if endbal in [None, '']:
@@ -537,20 +680,21 @@ def banktotals(bankacct, statement_values=None):
         begbal = parse_money(begbal)
     except:
         begbal=0.00
+    periods = finalized_statement_periods(bankacct)
     gdata = Gledger.query.filter(Gledger.Account==bankacct).all()
     for gdat in gdata:
         type = gdat.Type
         if type in BANK_DEPOSIT_TYPES:
             totald = totald + gdat.Debit
-            if gdat.Reconciled==0 or gdat.Reconciled==25:
+            if ledger_row_effectively_unreconciled(gdat, periods):
                 totald_U = totald_U + gdat.Debit
 
         if type in BANK_WITHDRAWAL_TYPES:
             totalc = totalc + gdat.Credit
-            if gdat.Reconciled==0 or gdat.Reconciled==25:
+            if ledger_row_effectively_unreconciled(gdat, periods):
                 totalc_U = totalc_U + gdat.Credit
 
-    trial_dr, trial_cr, bk_charge, dlist, wlist = recon_totals(bankacct)
+    trial_dr, trial_cr, bk_charge, dlist, wlist = recon_totals(bankacct, statement_date)
 
     totald = float(totald)/100
     totalc = float(totalc)/100
@@ -644,7 +788,7 @@ def isoBank():
             endbal = defaults['endbal']
         if begbal in [None, ''] or account_changed:
             begbal = defaults['begbal']
-        statement_values = {'begbal': begbal, 'endbal': endbal}
+        statement_values = {'begbal': begbal, 'endbal': endbal, 'rdate': rdate}
         recready = 1
         try:
             endbal=parse_money(endbal)
@@ -704,7 +848,7 @@ def isoBank():
         #odata = Income.query.all()
         print('acname=',acname)
         odata = dataget_Bank(thismuch, acname, hv[0])
-        hv[1] = trial_ids(odata)
+        hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
         acctinfo = banktotals(acname, statement_values)
 # ____________________________________________________________________________________________________________________B.Search.General
 
@@ -720,20 +864,26 @@ def isoBank():
                 err[2] = f'Beginning balance for future reconciliation defaults to ${trusted}'
                 thismuch = '1'
                 odata = dataget_Bank(thismuch, acname, hv[0])
-                acctinfo = banktotals(acname)
+                acctinfo = banktotals(acname, statement_values)
             except Exception as exc:
                 err[0] = f'Baseline failed: {exc}'
 
         if reopenhit is not None:
             try:
-                recdate = datetime.datetime.strptime(rdate, "%Y-%m-%d")
+                reopen_rdate = request.values.get('reopen_rdate') or rdate
+                recdate = datetime.datetime.strptime(reopen_rdate, "%Y-%m-%d")
+                hv[0] = reopen_rdate
+                rdate = reopen_rdate
                 row_count, reopen_msg = reopen_reconciliation(acname, recdate)
                 err[0] = reopen_msg
                 if row_count:
-                    thismuch = '1'
+                    thismuch = '5'
                     odata = dataget_Bank(thismuch, acname, hv[0])
-                    hv[1] = trial_ids(odata)
-                    acctinfo = banktotals(acname)
+                    hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
+                    reopened = reconciliation_for_date(acname, recdate, [0, 25, 1])
+                    if reopened is not None:
+                        statement_values = {'begbal': reopened.Bbal, 'endbal': reopened.Ebal, 'rdate': hv[0]}
+                    acctinfo = banktotals(acname, statement_values)
             except Exception as exc:
                 err[0] = f'Reopen failed: {exc}'
 
@@ -779,8 +929,8 @@ def isoBank():
                     if gdat is not None and gdat.Account == acname:
                         gdat.Reconciled=25
                 db.session.commit()
-                acctinfo = banktotals(acname)
-                hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname)
+                acctinfo = banktotals(acname, statement_values)
+                hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname, rdate)
                 print(hv[2],hv[3])
                 save_trial_reconciliation(acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5])
                 odata = dataget_Bank(thismuch, acname, hv[0])
@@ -793,7 +943,7 @@ def isoBank():
                     synced_bills = sync_bills_for_ledger_ids(odervec)
                     reconciled_jobs = mark_reconciled_payment_jobs(odervec)
                     hv[1] = [0]
-                    rdat = Reconciliations.query.filter((Reconciliations.Rdate == hv[0]) & (Reconciliations.Account == acname)).first()
+                    rdat = reconciliation_for_date(acname, hv[0])
                     try:
                         dlists = recon_list_text(dlist)
                     except:
@@ -837,7 +987,7 @@ def isoBank():
                 if gdat is not None and gdat.Account == acname:
                     gdat.Reconciled=0
                 db.session.commit()
-                acctinfo = banktotals(acname)
+                acctinfo = banktotals(acname, statement_values)
             synced_bills = sync_bills_for_ledger_ids(odervec)
             if synced_bills:
                 err.append(f'Updated reconciliation status for {synced_bills} bill row(s).')

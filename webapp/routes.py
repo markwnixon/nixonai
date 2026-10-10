@@ -9803,8 +9803,13 @@ def Banking():
         rows = query.order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).all()
         history = []
         for row in rows:
+            row_date = date_only(row.Rdate)
+            period = statement_period(account_name, row_date)
             history.append({
                 'date': row.Rdate,
+                'date_value': row_date.strftime('%Y-%m-%d') if row_date else '',
+                'period_start': period['start'],
+                'period_end': period['end'],
                 'beginning': row.Bbal or '',
                 'ending': row.Ebal or '',
                 'deposits': row.Deposits or '',
@@ -9820,6 +9825,31 @@ def Banking():
         if isinstance(value, datetime.datetime):
             return value.date()
         return value
+
+    def statement_period(account_name, statement_date):
+        statement_date = date_only(statement_date)
+        if isinstance(statement_date, str):
+            try:
+                statement_date = datetime.datetime.strptime(statement_date, '%Y-%m-%d').date()
+            except:
+                statement_date = None
+        if statement_date is None:
+            return {'start': '', 'end': ''}
+        previous = Reconciliations.query.filter(
+            (Reconciliations.Account == account_name) &
+            (Reconciliations.Rdate < datetime.datetime.combine(statement_date, datetime.time.min))
+        ).order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).first()
+        start_date = ''
+        if previous is not None and previous.Rdate is not None:
+            previous_date = date_only(previous.Rdate)
+            if previous_date is not None:
+                start_date = (previous_date + timedelta(days=1)).strftime('%Y-%m-%d')
+        return {
+            'start': start_date,
+            'end': statement_date.strftime('%Y-%m-%d'),
+        }
+
+    selected_statement_period = statement_period(acctinfo[6], hv[0])
 
     def sort_datetime(value):
         if isinstance(value, datetime.datetime):
@@ -9907,6 +9937,7 @@ def Banking():
         is_credit_reconciliation=is_credit_reconciliation_account(acctinfo[6]),
         reconciliation_history_rows=reconciliation_history_rows,
         reconciliation_history_range=reconciliation_history_range,
+        selected_statement_period=selected_statement_period,
     )
 
 
