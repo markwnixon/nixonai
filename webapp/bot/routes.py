@@ -8,6 +8,7 @@ from datetime import date as datetime_date, datetime, timedelta
 
 from webapp.extensions import db
 from webapp.models import Orders, People, Drops, Terminals
+from webapp.chassis_locations import import_observations
 from webapp.bot_skills import get_bot_skill_setting
 from webapp.bot_usage import record_usage_events
 import json
@@ -55,6 +56,26 @@ def bot_usage_create():
         db.session.rollback()
         return jsonify({'ok': False, 'error': str(exc)}), 400
     return jsonify({'ok': True, 'inserted': inserted, 'duplicates': duplicates}), 200
+
+
+@bot_bp.route('/bot/chassis/locations', methods=['POST'])
+@bot_token_required(required_scopes={'write:orders'})
+def bot_chassis_locations_create():
+    payload = request.get_json(silent=True) or {}
+    observations = payload.get('observations')
+    if not isinstance(observations, list) or not observations or len(observations) > 500:
+        return jsonify({'ok': False, 'error': 'observations must contain 1 to 500 items'}), 400
+    try:
+        inserted, duplicates, results = import_observations(observations)
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': str(exc)}), 400
+    return jsonify({
+        'ok': True,
+        'inserted': inserted,
+        'duplicates': duplicates,
+        'results': results,
+    }), 200
 
 
 

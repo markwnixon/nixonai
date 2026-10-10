@@ -1531,6 +1531,22 @@ class Vehicles(db.Model):
         self.Tcache = Tcache
 
 
+class ChassisLocationObservation(db.Model):
+    __tablename__ = 'chassis_location_observations'
+    __table_args__ = (
+        db.UniqueConstraint('VehicleId', 'ObservedAt', name='uq_chassis_location_vehicle_observed'),
+    )
+
+    id = db.Column('id', db.Integer, primary_key=True)
+    VehicleId = db.Column('VehicleId', db.Integer, nullable=False, index=True)
+    ChassisId = db.Column('ChassisId', db.String(45), nullable=False, index=True)
+    AirTagName = db.Column('AirTagName', db.String(120), nullable=False)
+    Latitude = db.Column('Latitude', db.Numeric(10, 7), nullable=False)
+    Longitude = db.Column('Longitude', db.Numeric(10, 7), nullable=False)
+    ObservedAt = db.Column('ObservedAt', db.DateTime, nullable=False, index=True)
+    ImportedAt = db.Column('ImportedAt', db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class DepreciationAsset(db.Model):
     __tablename__ = 'depreciation_assets'
     id = db.Column('id', db.Integer, primary_key=True)

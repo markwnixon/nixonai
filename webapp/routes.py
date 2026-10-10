@@ -38,6 +38,7 @@ from webapp.plaid_integration import (
 )
 from webapp.bot_skills import bot_skill_rows, set_bot_skill_enabled, SKILL_DEFINITIONS
 from webapp.bot_usage import usage_dashboard
+from webapp.chassis_locations import age_label, chassis_location_rows
 
 from decimal import Decimal
 from types import SimpleNamespace
@@ -142,6 +143,13 @@ from webapp.class8_dicts import PublicSite_setup
 cmpdata = companydata()
 
 main = Blueprint('main',__name__)
+
+
+@main.route('/ChassisLocations', methods=['GET'])
+@login_required
+def ChassisLocations():
+    rows = chassis_location_rows()
+    return render_template('chassis_locations.html', rows=rows, age_label=age_label, cmpdata=cmpdata)
 
 @main.route('/FileUpload', methods=['GET', 'POST'])
 def FileUpload():
