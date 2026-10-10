@@ -441,6 +441,7 @@ def collection_card(order):
 def filtered_orders(filters=None):
     filters = filters or {}
     query = Orders.query
+    query = query.filter(or_(Orders.Istat != -2, Orders.Istat.is_(None)))
     query = query.filter(or_(Orders.Istat <= 4, Orders.Istat.is_(None)))
     query = query.filter(or_(
         Orders.Istat >= 1,

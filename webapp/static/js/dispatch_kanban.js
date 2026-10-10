@@ -29,6 +29,7 @@
     let currentPinQueueJobs = [];
     let currentPinQueueLabel = 'Pin Queue';
     let currentPinQueueDate = '';
+    let currentBoardData = null;
 
 
     function showMessage(text, type) {
@@ -132,14 +133,47 @@
         return `${date.getFullYear()}-${month}-${day}`;
     }
 
-    function filterParams() {
-        const params = new URLSearchParams();
-        document.querySelectorAll('.kanban-filter').forEach((field) => {
-            if (field.value) {
-                params.set(field.id.replace('kanban-filter-', ''), field.value);
-            }
-        });
-        return params;
+    function cardSearchTerm() {
+        const field = document.getElementById('kanban-card-search');
+        return field ? field.value.trim().toLowerCase() : '';
+    }
+
+    function jobMatchesSearch(job, term) {
+        if (!term) {
+            return true;
+        }
+        const values = [
+            job.jo,
+            job.order,
+            job.container,
+            job.booking,
+            job.release,
+            job.customer,
+            job.shipper,
+            job.steamship_line,
+            job.container_type,
+            job.pickup_terminal,
+            job.delivery_location,
+            job.delivery_city_state,
+            job.driver,
+            job.truck,
+            job.workflow_label,
+            job.workflow_status,
+            job.hold_status,
+            job.pin_status,
+            job.billing_status,
+            job.scheduled_delivery_date,
+            job.required_delivery_date,
+            job.pull_date,
+            job.return_date,
+            job.last_free_day,
+            job.proof,
+            job.proof2,
+            job.driver_proof,
+        ];
+        return values
+            .filter((value) => value !== null && value !== undefined)
+            .some((value) => String(value).toLowerCase().includes(term));
     }
 
     function cardTitle(job) {
@@ -379,23 +413,26 @@
     }
 
     function renderBoard(data) {
+        currentBoardData = data;
+        const searchTerm = cardSearchTerm();
         columns = data.columns || [];
         jobsById.clear();
         board.innerHTML = '';
         let jobCount = 0;
         columns.forEach((column) => {
-            jobCount += (column.jobs || []).length;
+            const visibleJobs = (column.jobs || []).filter((job) => jobMatchesSearch(job, searchTerm));
+            jobCount += visibleJobs.length;
             const columnEl = document.createElement('section');
             columnEl.className = 'dispatch-kanban-column';
             columnEl.innerHTML = `
                 <div class="dispatch-kanban-column-header">
                     <span>${escapeHtml(column.label)}</span>
-                    <span class="badge badge-secondary">${(column.jobs || []).length}</span>
+                    <span class="badge badge-secondary">${visibleJobs.length}</span>
                 </div>
                 <div class="dispatch-kanban-list" data-status="${escapeHtml(column.key)}"></div>
             `;
             const list = columnEl.querySelector('.dispatch-kanban-list');
-            (column.jobs || []).forEach((job) => {
+            visibleJobs.forEach((job) => {
                 jobsById.set(String(job.id), job);
                 list.appendChild(renderCard(job));
             });
@@ -438,16 +475,15 @@
             showMessage('Kanban cards loaded. Drag/drop is disabled because SortableJS did not load.', 'warning');
         }
         if (jobCount === 0) {
-            showMessage(`No active dispatch jobs matched the current filters. API returned ${data.total_jobs || 0} jobs.`, 'info');
+            showMessage(`No active dispatch jobs matched the current search. API returned ${data.total_jobs || 0} jobs.`, 'info');
         }
     }
 
     async function loadBoard() {
-        const params = filterParams();
         board.innerHTML = '<div class="text-muted p-3">Loading dispatch jobs...</div>';
         let response;
         try {
-            response = await fetch(`${jobsUrl}?${params.toString()}`);
+            response = await fetch(jobsUrl);
         } catch (error) {
             board.innerHTML = '';
             showMessage('Unable to load Kanban jobs.', 'danger');
@@ -1015,9 +1051,14 @@
         loadBoard();
     });
 
-    document.querySelectorAll('.kanban-filter').forEach((field) => {
-        field.addEventListener('change', loadBoard);
-    });
+    const cardSearch = document.getElementById('kanban-card-search');
+    if (cardSearch) {
+        cardSearch.addEventListener('input', () => {
+            if (currentBoardData) {
+                renderBoard(currentBoardData);
+            }
+        });
+    }
 
     loadBoard();
 

@@ -6,6 +6,12 @@ import subprocess
 import shutil
 
 
+def ensure_parent_dir(filepath):
+    folder = os.path.dirname(filepath)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+
+
 def pagemerger(filelist, cache):
 
     lfs = len(filelist)-1
@@ -42,6 +48,7 @@ def pagemerger(filelist, cache):
         print('supfile=', filelist[j+1])
         print('outfile=', outfile)
 
+        ensure_parent_dir(outfile)
         with open(outfile, 'wb') as f:
             writer.write(f)
 
@@ -96,6 +103,7 @@ def pagemergerx(filelist, page, cache):
         print('supfile=', filelist[j+1])
         print('outfile=', outfile)
 
+        ensure_parent_dir(outfile)
         with open(outfile, 'wb') as f:
             writer.write(f)
 
@@ -150,6 +158,7 @@ def pagemergermp(filelist, cache, pages, multioutput):
         print('supfile=', filelist[j+1])
         print('outfile=', outfile)
 
+        ensure_parent_dir(outfile)
         with open(outfile, 'wb') as f:
             writer.write(f)
 
@@ -180,6 +189,7 @@ def pagemergermp(filelist, cache, pages, multioutput):
     for page in newpages:
         pdfcommand.append(page)
     newmultioutput = addpath(f'static/{scac}/data/vreport/newmultioutput'+str(cache)+'.pdf')
+    ensure_parent_dir(newmultioutput)
     pdfcommand.append(newmultioutput)
     tes = subprocess.check_output(pdfcommand)
 

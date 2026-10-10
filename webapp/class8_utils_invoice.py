@@ -17,6 +17,7 @@ import csv
 import math
 import datetime
 import shutil
+import os
 from webapp.CCC_system_setup import addpath, bankdata, scac
 import numbers
 from webapp.utils import *
@@ -160,6 +161,7 @@ def addpayment(file1, cache, amtowed, payment, paidon, payref, paymethod):
         #print('Already a string')
     file2 = file1.replace('.pdf', f'_Paid{cache}.pdf')
     file2 = file2.replace('/vInvoice','/vPaidInvoice')
+    os.makedirs(os.path.dirname(file2), exist_ok=True)
     c = canvas.Canvas(file2, pagesize=letter)
     c.setLineWidth(1)
     c.setFillColor('white')

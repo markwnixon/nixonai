@@ -24,52 +24,11 @@
 
     <div class="dispatch-kanban-filter-bar mb-3">
         <div class="form-row align-items-end">
-            <div class="form-group col-md-2">
-                <label for="kanban-filter-driver">Driver</label>
-                <select id="kanban-filter-driver" class="form-control form-control-sm kanban-filter">
-                    <option value="">All drivers</option>
-                    {% for driver in options.drivers %}
-                        <option value="{{ driver.Name }}">{{ driver.Name }}</option>
-                    {% endfor %}
-                </select>
+            <div class="form-group col-md-8">
+                <label for="kanban-card-search">Search Cards</label>
+                <input type="text" id="kanban-card-search" class="form-control form-control-sm" placeholder="Container, booking, customer, city, BOL, delivery, status...">
             </div>
-            <div class="form-group col-md-2">
-                <label for="kanban-filter-customer">Customer</label>
-                <select id="kanban-filter-customer" class="form-control form-control-sm kanban-filter">
-                    <option value="">All customers</option>
-                    {% for customer in options.customers %}
-                        <option value="{{ customer }}">{{ customer }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group col-md-2">
-                <label for="kanban-filter-terminal">Terminal/Port</label>
-                <select id="kanban-filter-terminal" class="form-control form-control-sm kanban-filter">
-                    <option value="">All terminals</option>
-                    {% for terminal in options.terminals %}
-                        <option value="{{ terminal }}">{{ terminal }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group col-md-2">
-                <label for="kanban-filter-status">Status</label>
-                <select id="kanban-filter-status" class="form-control form-control-sm kanban-filter">
-                    <option value="">All active statuses</option>
-                    {% for column in options.columns %}
-                        <option value="{{ column.key }}">{{ column.label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group col-md-2">
-                <label for="kanban-filter-range">Range</label>
-                <select id="kanban-filter-range" class="form-control form-control-sm kanban-filter">
-                    <option value="all_active">Recent Active</option>
-                    <option value="today">Today</option>
-                    <option value="tomorrow">Tomorrow</option>
-                    <option value="7">Next 7 Days</option>
-                </select>
-            </div>
-            <div class="form-group col-md-2">
+            <div class="form-group col-md-4">
                 <label>&nbsp;</label>
                 <div class="btn-group btn-block" role="group">
                     <button type="button" id="kanban-pin-selected-open-top" class="btn btn-sm btn-outline-primary" disabled>
