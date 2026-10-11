@@ -1432,7 +1432,14 @@ def isoBank():
         bankacct = adat.Name
         defaults = statement_defaults(bankacct, today_str)
         hv[0] = defaults['rdate']
-        acctinfo = banktotals(bankacct)
+        statement_values = {
+            'begbal': defaults['begbal'],
+            'endbal': defaults['endbal'],
+            'rdate': hv[0],
+            'statement_period_start': '',
+            'statement_period_end': '',
+        }
+        acctinfo = banktotals(bankacct, statement_values)
         odata = dataget_Bank(thismuch, bankacct, hv[0], statement_values)
         hv[1] = trial_ids(odata)
 
