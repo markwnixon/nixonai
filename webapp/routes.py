@@ -1,6 +1,7 @@
 from flask import abort, render_template, redirect, url_for, jsonify, request, send_file, flash, session, Response
 from flask import Blueprint
 import json
+import calendar
 
 from webapp.extensions import db, bcrypt
 from webapp.models import People, Gledger, Accounts, Orders, Invoices, Deposits, PaymentsRec, Bills, Vehicles, Autos, DepreciationAsset, PlaidAccount, PlaidItem, PlaidTransaction, PortClosed, Drivers, DriverAssign, Driverlog, DispatchDriverMessage, DispatchDriverAssignment, Interchange, Reconciliations, OverSeas, users
@@ -6789,15 +6790,12 @@ def IntercompanyEntries():
         if not lines:
             err.append('Choose an account transfer to edit.')
         else:
-            cleared = clear_stale_transfer_reconciliation(lines)
             transfer_selected = transfer_selection_from_lines(lines)
             if transfer_selected is None:
                 err.append('The selected transfer could not be loaded because its ledger lines are incomplete.')
             else:
                 selected.update(transfer_selected)
                 msg = f'Loaded transfer {lines[0].Tcode} for editing.'
-                if cleared:
-                    msg += f' Cleared {cleared} stale reconciliation flag(s) not tied to a finalized statement.'
 
     if request.method == 'POST' and request.values.get('clear_transfer'):
         selected.update({
@@ -6819,8 +6817,6 @@ def IntercompanyEntries():
     if request.method == 'POST' and request.values.get('delete_transfer'):
         journal_id = request.values.get('selected_transfer_journal_id', '').strip()
         lines = transfer_lines_for_journal(journal_id)
-        if lines:
-            clear_stale_transfer_reconciliation(lines)
         if not lines:
             err.append('Choose an account transfer to delete.')
         elif has_final_reconciliation(lines):
@@ -6915,7 +6911,6 @@ def IntercompanyEntries():
         if edit_journal_id and not existing_transfer_lines:
             err.append('The transfer being edited could not be found.')
         if existing_transfer_lines:
-            clear_stale_transfer_reconciliation(existing_transfer_lines)
             selected.update(transfer_lock_state(existing_transfer_lines))
 
         if not err:
@@ -7012,18 +7007,6 @@ def IntercompanyEntries():
             )
         )
     ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
-    stale_recent_count = 0
-    for line in raw_recent:
-        if (
-            (line.SourceTable == 'AccountTransfer' or is_legacy_transfer_line(line)) and
-            final_reconciliation_value(line.Reconciled) and
-            not line_has_final_reconciliation(line)
-        ):
-            line.Reconciled = 0
-            stale_recent_count += 1
-    if stale_recent_count:
-        db.session.commit()
-        setup_warnings.append(f'Cleared {stale_recent_count} stale transfer reconciliation flag(s) not tied to a finalized statement.')
     journal_map = {}
     for line in raw_recent:
         legacy_transfer = is_legacy_transfer_line(line)
@@ -9773,7 +9756,7 @@ def AssetPurchase():
 @login_required
 @financial_mfa_required
 def Banking():
-    from webapp.iso_Bank import isoBank, is_credit_reconciliation_account
+    from webapp.iso_Bank import isoBank, is_credit_reconciliation_account, legacy_reconciliation_notice
     odata, oder, err, modata, modlink, leftscreen, leftsize, today, now, docref, cache, acdata, thismuch, acctinfo, hv = isoBank()
 
     def reconciliation_history_start(range_key):
@@ -9802,8 +9785,13 @@ def Banking():
             query = query.filter(Reconciliations.Rdate >= start_date)
         rows = query.order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).all()
         history = []
+        seen_statement_dates = set()
         for row in rows:
             row_date = date_only(row.Rdate)
+            date_key = row_date.strftime('%Y-%m-%d') if row_date else f'id-{row.id}'
+            if date_key in seen_statement_dates:
+                continue
+            seen_statement_dates.add(date_key)
             period = statement_period(account_name, row_date)
             history.append({
                 'date': row.Rdate,
@@ -9835,6 +9823,16 @@ def Banking():
                 statement_date = None
         if statement_date is None:
             return {'start': '', 'end': ''}
+        if statement_date.day == 1:
+            month_end = date(
+                statement_date.year,
+                statement_date.month,
+                calendar.monthrange(statement_date.year, statement_date.month)[1],
+            )
+            return {
+                'start': statement_date.strftime('%Y-%m-%d'),
+                'end': month_end.strftime('%Y-%m-%d'),
+            }
         previous = Reconciliations.query.filter(
             (Reconciliations.Account == account_name) &
             (Reconciliations.Rdate < datetime.datetime.combine(statement_date, datetime.time.min))
@@ -9850,6 +9848,12 @@ def Banking():
         }
 
     selected_statement_period = statement_period(acctinfo[6], hv[0])
+    legacy_statement_override = legacy_reconciliation_notice(acctinfo[6], hv[0])
+    legacy_statement_notice = (
+        legacy_statement_override
+        if legacy_statement_override and legacy_statement_override.get('status') != 1
+        else None
+    )
 
     def sort_datetime(value):
         if isinstance(value, datetime.datetime):
@@ -9938,6 +9942,8 @@ def Banking():
         reconciliation_history_rows=reconciliation_history_rows,
         reconciliation_history_range=reconciliation_history_range,
         selected_statement_period=selected_statement_period,
+        legacy_statement_override=legacy_statement_override,
+        legacy_statement_notice=legacy_statement_notice,
     )
 
 

@@ -201,14 +201,9 @@ def statement_defaults(bankacct, today_str):
 
 def recon_list_text(values):
     try:
-        text = json.dumps(values)
+        return json.dumps(values)
     except:
         return None
-    if len(text) <= 290:
-        return text
-    first = values[:5]
-    last = values[-5:] if len(values) > 5 else []
-    return json.dumps({'count': len(values), 'first': first, 'last': last})
 
 def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, servicefees, dlist, wlist, diff):
     try:
@@ -220,7 +215,7 @@ def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, 
     except:
         wlists = None
 
-    rdat = reconciliation_for_date(bankacct, rdate, [0, 25])
+    rdat = reconciliation_for_date(bankacct, rdate, [0, 25, 1])
     if rdat is None:
         rdat = trial_reconciliation(bankacct)
     if rdat is None:
@@ -323,9 +318,62 @@ def previous_reconciliation_before(bankacct, rdate):
         (Reconciliations.Rdate < start)
     ).order_by(Reconciliations.Rdate.desc(), Reconciliations.id.desc()).first()
 
-def ledger_date_in_statement_period(ledger_date, rdate, previous_rdate=None):
-    cutoff = statement_cutoff_datetime(rdate)
-    if cutoff is None or ledger_date in [None, '']:
+def parse_statement_period_override(statement_values=None):
+    values = statement_values or request.values
+    start_value = values.get('statement_period_start') if values is not None else None
+    end_value = values.get('statement_period_end') if values is not None else None
+    if start_value in [None, ''] and end_value in [None, '']:
+        return None, None
+    try:
+        start = datetime.datetime.combine(
+            datetime.datetime.strptime(start_value, "%Y-%m-%d").date(),
+            datetime.time.min,
+        ) if start_value not in [None, ''] else None
+    except:
+        start = None
+    try:
+        end = datetime.datetime.combine(
+            datetime.datetime.strptime(end_value, "%Y-%m-%d").date(),
+            datetime.time.max,
+        ) if end_value not in [None, ''] else None
+    except:
+        end = None
+    return start, end
+
+def statement_period_bounds(bankacct, statement_date, statement_values=None):
+    override_start, override_end = parse_statement_period_override(statement_values)
+    if override_start is not None or override_end is not None:
+        return override_start, override_end
+    if statement_date in [None, '']:
+        return None, None
+    if isinstance(statement_date, datetime.datetime):
+        statement_day = statement_date.date()
+    elif isinstance(statement_date, datetime.date):
+        statement_day = statement_date
+    else:
+        try:
+            statement_day = datetime.datetime.strptime(str(statement_date), "%Y-%m-%d").date()
+        except:
+            return None, None
+    if statement_day.day == 1:
+        start = datetime.datetime.combine(statement_day, datetime.time.min)
+        month_end = datetime.date(
+            statement_day.year,
+            statement_day.month,
+            calendar.monthrange(statement_day.year, statement_day.month)[1],
+        )
+        return start, datetime.datetime.combine(month_end, datetime.time.max)
+    previous = previous_reconciliation_before(bankacct, statement_day)
+    if previous is not None and previous.Rdate is not None:
+        previous_end = statement_cutoff_datetime(previous.Rdate)
+        start = previous_end + datetime.timedelta(microseconds=1) if previous_end else None
+    else:
+        start = None
+    return start, statement_cutoff_datetime(statement_day)
+
+def ledger_date_in_statement_period(ledger_date, bankacct, rdate, statement_values=None):
+    start, end = statement_period_bounds(bankacct, rdate, statement_values)
+    if end is None or ledger_date in [None, '']:
         return False
     if isinstance(ledger_date, datetime.datetime):
         compare_date = ledger_date
@@ -336,12 +384,10 @@ def ledger_date_in_statement_period(ledger_date, rdate, previous_rdate=None):
             compare_date = datetime.datetime.strptime(str(ledger_date)[:10], "%Y-%m-%d")
         except:
             return False
-    if compare_date > cutoff:
+    if compare_date > end:
         return False
-    if previous_rdate is not None:
-        previous_cutoff = statement_cutoff_datetime(previous_rdate)
-        if previous_cutoff is not None and compare_date <= previous_cutoff:
-            return False
+    if start is not None and compare_date < start:
+        return False
     return True
 
 def ledger_datetime(value):
@@ -358,25 +404,22 @@ def ledger_datetime(value):
 
 def finalized_statement_periods(bankacct):
     periods = []
-    previous_rdate = None
     rows = Reconciliations.query.filter(
         (Reconciliations.Account == bankacct) &
         (Reconciliations.Status == 1)
     ).order_by(Reconciliations.Rdate, Reconciliations.id).all()
     for row in rows:
-        end = statement_cutoff_datetime(row.Rdate)
-        previous_end = statement_cutoff_datetime(previous_rdate)
+        start, end = statement_period_bounds(bankacct, row.Rdate)
         if end is not None:
-            periods.append((previous_end, end))
-        previous_rdate = row.Rdate
+            periods.append((start, end))
     return periods
 
 def ledger_row_in_finalized_period(row, periods):
     row_date = ledger_datetime(row.Date)
     if row_date is None:
         return False
-    for previous_end, end in periods:
-        if row_date <= end and (previous_end is None or row_date > previous_end):
+    for start, end in periods:
+        if row_date <= end and (start is None or row_date >= start):
             return True
     return False
 
@@ -390,21 +433,49 @@ def ledger_row_effectively_unreconciled(row, periods):
 def filter_statement_rows(rows, rdat):
     if rdat is None:
         return []
-    previous = previous_reconciliation_before(rdat.Account, rdat.Rdate)
-    previous_rdate = previous.Rdate if previous is not None else None
     return [
         row for row in rows
-        if ledger_date_in_statement_period(row.Date, rdat.Rdate, previous_rdate)
+        if ledger_date_in_statement_period(row.Date, rdat.Account, rdat.Rdate)
     ]
+
+def statement_side_rows(rdat, tx_types, list_value):
+    ids, complete = reconciliation_explicit_ids(list_value)
+    if complete and ids:
+        return Gledger.query.filter(
+            (Gledger.Account == rdat.Account) &
+            (Gledger.id.in_(ids))
+        ).all()
+
+    if ids:
+        compact_rows = compact_statement_side_rows(rdat, tx_types, list_value)
+        if compact_rows is not None:
+            return compact_rows
+
+    period_start, period_end = statement_period_bounds(rdat.Account, rdat.Rdate)
+    query = Gledger.query.filter(
+        (Gledger.Account == rdat.Account) &
+        (Gledger.Type.in_(tx_types))
+    )
+    if period_start is not None:
+        query = query.filter(Gledger.Date >= period_start)
+    if period_end is not None:
+        query = query.filter(Gledger.Date <= period_end)
+    return query.all()
+
+def statement_rows_from_saved_reconciliation(rdat):
+    if rdat is None:
+        return []
+    rows_by_id = {}
+    for row in statement_side_rows(rdat, BANK_DEPOSIT_TYPES, rdat.DepositList):
+        rows_by_id[row.id] = row
+    for row in statement_side_rows(rdat, BANK_WITHDRAWAL_TYPES, rdat.WithdrawList):
+        rows_by_id[row.id] = row
+    return list(rows_by_id.values())
 
 def rows_for_reconciliation(rdat):
     row_ids = reconciliation_list_ids(rdat.DepositList) + reconciliation_list_ids(rdat.WithdrawList)
     if row_ids:
-        rows = Gledger.query.filter(
-            (Gledger.id.in_(row_ids)) &
-            (Gledger.Account == rdat.Account)
-        ).all()
-        return filter_statement_rows(rows, rdat)
+        return statement_rows_from_saved_reconciliation(rdat)
 
     previous = previous_reconciliation_before(rdat.Account, rdat.Rdate)
 
@@ -504,12 +575,235 @@ def reconciliation_explicit_ids(value):
         return ids, False
     return set(), False
 
+def reconciliation_list_meta(value):
+    try:
+        parsed = json.loads(value or '')
+    except:
+        return None
+    if isinstance(parsed, list):
+        ids = []
+        for item in parsed:
+            try:
+                ids.append(int(item))
+            except:
+                pass
+        return {'complete': True, 'count': len(ids), 'ids': set(ids)}
+    if isinstance(parsed, dict):
+        ids = set()
+        for group in ['first', 'last']:
+            for item in parsed.get(group, []) or []:
+                try:
+                    ids.add(int(item))
+                except:
+                    pass
+        try:
+            count = int(parsed.get('count'))
+        except:
+            count = None
+        return {'complete': False, 'count': count, 'ids': ids}
+    return None
+
+def side_amount(row, tx_types):
+    if tx_types == BANK_DEPOSIT_TYPES:
+        return row.Debit or 0
+    return row.Credit or 0
+
+def find_amount_count_subset(rows, needed_count, needed_amount, tx_types):
+    if needed_count == 0:
+        return [] if needed_amount == 0 else None
+    if needed_count < 0 or needed_amount < 0:
+        return None
+    candidates = [
+        row for row in rows
+        if side_amount(row, tx_types) <= needed_amount
+    ]
+    candidates = sorted(
+        candidates,
+        key=lambda row: (
+            ledger_datetime(row.Recorded) or datetime.datetime.min,
+            ledger_datetime(row.Date) or datetime.datetime.min,
+            row.id,
+        ),
+        reverse=True,
+    )
+    suffix_amounts = [0] * (len(candidates) + 1)
+    for index in range(len(candidates) - 1, -1, -1):
+        suffix_amounts[index] = suffix_amounts[index + 1] + side_amount(candidates[index], tx_types)
+
+    def search(start_index, count_left, amount_left):
+        if count_left == 0:
+            return [] if amount_left == 0 else None
+        if amount_left < 0 or len(candidates) - start_index < count_left:
+            return None
+        if suffix_amounts[start_index] < amount_left:
+            return None
+        for index in range(start_index, len(candidates)):
+            row = candidates[index]
+            amount = side_amount(row, tx_types)
+            if amount > amount_left:
+                continue
+            tail = search(index + 1, count_left - 1, amount_left - amount)
+            if tail is not None:
+                return [row] + tail
+        return None
+
+    return search(0, needed_count, needed_amount)
+
+def compact_statement_side_rows(rdat, tx_types, list_value):
+    meta = reconciliation_list_meta(list_value)
+    if meta is None or meta.get('count') is None:
+        return None
+    period_start, period_end = statement_period_bounds(rdat.Account, rdat.Rdate)
+    query = Gledger.query.filter(
+        (Gledger.Account == rdat.Account) &
+        (Gledger.Type.in_(tx_types))
+    )
+    if period_start is not None:
+        query = query.filter(Gledger.Date >= period_start)
+    if period_end is not None:
+        query = query.filter(Gledger.Date <= period_end)
+    period_rows = query.order_by(Gledger.Date, Gledger.id).all()
+    pinned_ids = meta.get('ids') or set()
+    if pinned_ids:
+        existing_ids = {row.id for row in period_rows}
+        missing_pinned_ids = pinned_ids - existing_ids
+        if missing_pinned_ids:
+            pinned_rows = Gledger.query.filter(
+                (Gledger.Account == rdat.Account) &
+                (Gledger.Type.in_(tx_types)) &
+                (Gledger.id.in_(list(missing_pinned_ids)))
+            ).all()
+            period_rows.extend(pinned_rows)
+    target_count = meta['count']
+    target_amount = int(round(parse_money(rdat.Deposits if tx_types == BANK_DEPOSIT_TYPES else rdat.Withdraws) * 100))
+    current_amount = sum(side_amount(row, tx_types) for row in period_rows)
+    current_count = len(period_rows)
+    if current_count == target_count and current_amount == target_amount:
+        return period_rows
+
+    if current_count > target_count and current_amount > target_amount:
+        remove_count = current_count - target_count
+        remove_amount = current_amount - target_amount
+        removable = [row for row in period_rows if row.id not in pinned_ids]
+        remove_rows = find_amount_count_subset(removable, remove_count, remove_amount, tx_types)
+        if remove_rows is not None:
+            remove_ids = {row.id for row in remove_rows}
+            return [row for row in period_rows if row.id not in remove_ids]
+
+    if current_count < target_count and current_amount < target_amount:
+        add_count = target_count - current_count
+        add_amount = target_amount - current_amount
+        window_start = (period_start or statement_cutoff_datetime(rdat.Rdate)) - datetime.timedelta(days=45)
+        window_end = (period_end or statement_cutoff_datetime(rdat.Rdate)) + datetime.timedelta(days=45)
+        period_ids = {row.id for row in period_rows}
+        outside_rows = Gledger.query.filter(
+            (Gledger.Account == rdat.Account) &
+            (Gledger.Type.in_(tx_types)) &
+            (Gledger.Date >= window_start) &
+            (Gledger.Date <= window_end) &
+            (~Gledger.id.in_(list(period_ids)))
+        ).order_by(Gledger.Date, Gledger.id).all()
+        add_rows = find_amount_count_subset(outside_rows, add_count, add_amount, tx_types)
+        if add_rows is not None:
+            return period_rows + add_rows
+
+    return None
+
 def reconciliation_row_ids(rdat):
     if rdat is None:
         return set(), False
     deposit_ids, deposit_complete = reconciliation_explicit_ids(rdat.DepositList)
     withdraw_ids, withdraw_complete = reconciliation_explicit_ids(rdat.WithdrawList)
-    return deposit_ids | withdraw_ids, deposit_complete or withdraw_complete
+    return deposit_ids | withdraw_ids, deposit_complete and withdraw_complete
+
+def reconciliation_has_compacted_lists(rdat):
+    if rdat is None:
+        return False
+    deposit_ids, deposit_complete = reconciliation_explicit_ids(rdat.DepositList)
+    withdraw_ids, withdraw_complete = reconciliation_explicit_ids(rdat.WithdrawList)
+    return bool((deposit_ids and not deposit_complete) or (withdraw_ids and not withdraw_complete))
+
+def statement_saved_totals(rdat):
+    if rdat is None:
+        return None
+    return {
+        'deposits': d2s(parse_money(rdat.Deposits)),
+        'withdrawals': d2s(parse_money(rdat.Withdraws)),
+        'servicefees': d2s(parse_money(rdat.Servicefees)),
+    }
+
+def statement_row_totals(rows):
+    deposits = 0
+    withdrawals = 0
+    for row in rows:
+        if row.Type in BANK_DEPOSIT_TYPES:
+            deposits += row.Debit or 0
+        if row.Type in BANK_WITHDRAWAL_TYPES:
+            withdrawals += row.Credit or 0
+    return d2s(float(deposits) / 100), d2s(float(withdrawals) / 100)
+
+def selected_statement_saved_totals(bankacct, statement_date):
+    rdat = selected_statement_reconciliation(bankacct, statement_date)
+    if rdat is None:
+        return None
+    if rdat.Status == 1 and reconciliation_has_compacted_lists(rdat):
+        return statement_saved_totals(rdat)
+    return None
+
+def legacy_reconciliation_notice(bankacct, statement_date):
+    rdat = selected_statement_reconciliation(bankacct, statement_date)
+    if rdat is None or not reconciliation_has_compacted_lists(rdat):
+        return None
+    rows = statement_rows_from_saved_reconciliation(rdat)
+    row_deposits, row_withdrawals = statement_row_totals(rows)
+    saved = statement_saved_totals(rdat)
+    if saved is None:
+        return None
+    if row_deposits == saved['deposits'] and row_withdrawals == saved['withdrawals']:
+        return None
+    return {
+        'active': True,
+        'status': rdat.Status,
+        'deposits': saved['deposits'],
+        'withdrawals': saved['withdrawals'],
+        'row_deposits': row_deposits,
+        'row_withdrawals': row_withdrawals,
+        'message': (
+            'This finalized statement was saved with legacy compact row lists. '
+            'The saved statement totals are shown, but the exact row-level selection '
+            'cannot be reconstructed from the compact data.'
+        ),
+    }
+
+def repair_statement_reconciliation_flags(bankacct, rdate):
+    rdat = reconciliation_for_date(bankacct, rdate, [1])
+    if rdat is None:
+        return 0, f'No finalized reconciliation was found for {bankacct} dated {rdate.strftime("%Y-%m-%d")}.'
+    rows = statement_rows_from_saved_reconciliation(rdat)
+    row_deposits, row_withdrawals = statement_row_totals(rows)
+    saved = statement_saved_totals(rdat)
+    if saved is None:
+        return 0, 'This statement does not have saved reconciliation totals.'
+    if row_deposits != saved['deposits'] or row_withdrawals != saved['withdrawals']:
+        return 0, (
+            'Statement flags were not repaired because the row reconstruction does not match the finalized totals. '
+            f'Saved deposits/withdrawals ${saved["deposits"]}/${saved["withdrawals"]}; '
+            f'row deposits/withdrawals ${row_deposits}/${row_withdrawals}.'
+        )
+
+    statement_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
+    recon_value = statement_date.month
+    changed = 0
+    row_ids = []
+    for row in rows:
+        row_ids.append(row.id)
+        if row.Reconciled != recon_value:
+            row.Reconciled = recon_value
+            changed += 1
+    db.session.commit()
+    synced_bills = sync_bills_for_ledger_ids(row_ids)
+    extra = f' Synced {synced_bills} bill row(s).' if synced_bills else ''
+    return changed, f'Repaired {changed} ledger row(s) for {bankacct} statement {statement_date.strftime("%Y-%m-%d")} to Recon {recon_value}.{extra}'
 
 def selected_statement_reconciliation(bankacct, statement_date):
     if statement_date in [None, '']:
@@ -518,14 +812,7 @@ def selected_statement_reconciliation(bankacct, statement_date):
 
 def selected_statement_ids(bankacct, statement_date):
     rdat = selected_statement_reconciliation(bankacct, statement_date)
-    row_ids, complete = reconciliation_row_ids(rdat)
-    if not complete or not row_ids:
-        return []
-    rows = Gledger.query.filter(
-        (Gledger.Account == bankacct) &
-        (Gledger.id.in_(row_ids))
-    ).all()
-    return [row.id for row in filter_statement_rows(rows, rdat)]
+    return [row.id for row in statement_rows_from_saved_reconciliation(rdat)]
 
 def reconciliation_contains_ledger_line(rdat, line):
     explicit_ids, explicit_complete = reconciliation_row_ids(rdat)
@@ -576,7 +863,7 @@ def clear_stale_reconciliation_flags(bankacct):
         db.session.commit()
     return cleared
 
-def dataget_Bank(thismuch, bankacct, statement_date=None):
+def dataget_Bank(thismuch, bankacct, statement_date=None, statement_values=None):
     # 0=order,#1=proofs,#2=interchange,#3=people/services
     today = datetime.date.today()
     stopdate = today-datetime.timedelta(days=60)
@@ -585,7 +872,9 @@ def dataget_Bank(thismuch, bankacct, statement_date=None):
             (Gledger.Account == bankacct) &
             ((Gledger.Reconciled.is_(None)) | (Gledger.Reconciled == 0) | (Gledger.Reconciled == 25))
         )
-        cutoff = statement_cutoff_datetime(statement_date)
+        period_start, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
+        if period_start is not None:
+            query = query.filter(Gledger.Date >= period_start)
         if cutoff is not None:
             # Reconciliation works against a statement date. Rows after that date
             # must not be available for selection or stale form submission.
@@ -598,15 +887,13 @@ def dataget_Bank(thismuch, bankacct, statement_date=None):
     elif thismuch == '5':
         rdat = selected_statement_reconciliation(bankacct, statement_date)
         row_ids, explicit_complete = reconciliation_row_ids(rdat)
-        if explicit_complete and row_ids:
-            rows = Gledger.query.filter(
-                (Gledger.Account == bankacct) &
-                (Gledger.id.in_(row_ids))
-            ).all()
-            odata = filter_statement_rows(rows, rdat)
+        if rdat is not None and (rdat.DepositList or rdat.WithdrawList):
+            odata = statement_rows_from_saved_reconciliation(rdat)
         else:
             query = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25))
-            cutoff = statement_cutoff_datetime(statement_date)
+            period_start, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
+            if period_start is not None:
+                query = query.filter(Gledger.Date >= period_start)
             if cutoff is not None:
                 query = query.filter(Gledger.Date <= cutoff)
             odata = query.all()
@@ -620,21 +907,22 @@ def dataget_Bank(thismuch, bankacct, statement_date=None):
         odata = Gledger.query.filter(Gledger.Account==bankacct ).all()
     return odata
 
-def recon_totals(bankacct, statement_date=None):
+def recon_totals(bankacct, statement_date=None, use_saved_statement=True, statement_values=None):
     # Find service charges for month:
     dlist = []
     wlist = []
-    rdat = selected_statement_reconciliation(bankacct, statement_date)
+    rdat = selected_statement_reconciliation(bankacct, statement_date) if use_saved_statement else None
     row_ids, explicit_complete = reconciliation_row_ids(rdat)
-    if explicit_complete and row_ids:
-        rows = Gledger.query.filter(
-            (Gledger.Account == bankacct) &
-            (Gledger.id.in_(row_ids))
-        ).all()
-        gdata = filter_statement_rows(rows, rdat)
+    saved_totals = selected_statement_saved_totals(bankacct, statement_date) if use_saved_statement else None
+    if saved_totals is not None:
+        return saved_totals['deposits'], saved_totals['withdrawals'], saved_totals['servicefees'], dlist, wlist
+    if rdat is not None and (rdat.DepositList or rdat.WithdrawList):
+        gdata = statement_rows_from_saved_reconciliation(rdat)
     else:
         gquery = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25))
-        cutoff = statement_cutoff_datetime(statement_date)
+        period_start, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
+        if period_start is not None:
+            gquery = gquery.filter(Gledger.Date >= period_start)
         if cutoff is not None:
             gquery = gquery.filter(Gledger.Date <= cutoff)
         gdata = gquery.all()
@@ -657,7 +945,7 @@ def recon_totals(bankacct, statement_date=None):
     totalc = totalc - bkc
     return d2s(float(totald)/100), d2s(float(totalc)/100), d2s(float(bkc)/100), dlist, wlist
 
-def banktotals(bankacct, statement_values=None):
+def banktotals(bankacct, statement_values=None, use_saved_statement=True):
     totald=0
     totalc=0
     totald_U = 0
@@ -694,7 +982,7 @@ def banktotals(bankacct, statement_values=None):
             if ledger_row_effectively_unreconciled(gdat, periods):
                 totalc_U = totalc_U + gdat.Credit
 
-    trial_dr, trial_cr, bk_charge, dlist, wlist = recon_totals(bankacct, statement_date)
+    trial_dr, trial_cr, bk_charge, dlist, wlist = recon_totals(bankacct, statement_date, use_saved_statement, statement_values)
 
     totald = float(totald)/100
     totalc = float(totalc)/100
@@ -772,6 +1060,7 @@ def isoBank():
         undothese = request.values.get('undothese')
         baselinehit = request.values.get('baseline_reconcile')
         reopenhit = request.values.get('reopen_reconciliation')
+        repairhit = request.values.get('repair_reconciliation_flags')
         baseline_date = request.values.get('baseline_date')
         baseline_balance = request.values.get('baseline_balance')
         previous_acname = request.values.get('previous_acname')
@@ -788,7 +1077,15 @@ def isoBank():
             endbal = defaults['endbal']
         if begbal in [None, ''] or account_changed:
             begbal = defaults['begbal']
-        statement_values = {'begbal': begbal, 'endbal': endbal, 'rdate': rdate}
+        statement_period_start = request.values.get('statement_period_start')
+        statement_period_end = request.values.get('statement_period_end')
+        statement_values = {
+            'begbal': begbal,
+            'endbal': endbal,
+            'rdate': rdate,
+            'statement_period_start': statement_period_start,
+            'statement_period_end': statement_period_end,
+        }
         recready = 1
         try:
             endbal=parse_money(endbal)
@@ -847,7 +1144,7 @@ def isoBank():
 # ____________________________________________________________________________________________________________________B.GetData.General
         #odata = Income.query.all()
         print('acname=',acname)
-        odata = dataget_Bank(thismuch, acname, hv[0])
+        odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
         hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
         acctinfo = banktotals(acname, statement_values)
 # ____________________________________________________________________________________________________________________B.Search.General
@@ -863,7 +1160,7 @@ def isoBank():
                 err[1] = f'Marked {row_count} ledger rows reconciled; deposits ${deposits}; withdrawals ${withdrawals}'
                 err[2] = f'Beginning balance for future reconciliation defaults to ${trusted}'
                 thismuch = '1'
-                odata = dataget_Bank(thismuch, acname, hv[0])
+                odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
                 acctinfo = banktotals(acname, statement_values)
             except Exception as exc:
                 err[0] = f'Baseline failed: {exc}'
@@ -878,14 +1175,32 @@ def isoBank():
                 err[0] = reopen_msg
                 if row_count:
                     thismuch = '5'
-                    odata = dataget_Bank(thismuch, acname, hv[0])
+                    odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
                     hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
                     reopened = reconciliation_for_date(acname, recdate, [0, 25, 1])
                     if reopened is not None:
-                        statement_values = {'begbal': reopened.Bbal, 'endbal': reopened.Ebal, 'rdate': hv[0]}
+                        statement_values.update({'begbal': reopened.Bbal, 'endbal': reopened.Ebal, 'rdate': hv[0]})
                     acctinfo = banktotals(acname, statement_values)
             except Exception as exc:
                 err[0] = f'Reopen failed: {exc}'
+
+        if repairhit is not None:
+            try:
+                repair_rdate = request.values.get('reopen_rdate') or rdate
+                recdate = datetime.datetime.strptime(repair_rdate, "%Y-%m-%d")
+                hv[0] = repair_rdate
+                rdate = repair_rdate
+                row_count, repair_msg = repair_statement_reconciliation_flags(acname, recdate)
+                err[0] = repair_msg
+                thismuch = '5'
+                odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
+                hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
+                repaired = reconciliation_for_date(acname, recdate, [0, 25, 1])
+                if repaired is not None:
+                    statement_values.update({'begbal': repaired.Bbal, 'endbal': repaired.Ebal, 'rdate': hv[0]})
+                acctinfo = banktotals(acname, statement_values)
+            except Exception as exc:
+                err[0] = f'Repair failed: {exc}'
 
         if modlink==0:
             oder,numchecked=numcheck(1,odata,0,0,0,0,['oder'])
@@ -907,12 +1222,19 @@ def isoBank():
                 bkchargeid = 0
 
                 selected_odervec = selected_bank_ids(odata)
-                cutoff = statement_cutoff_datetime(rdate)
+                period_start, cutoff = statement_period_bounds(acname, rdate, statement_values)
                 odervec = []
                 skipped_future = []
                 for selected_id in selected_odervec:
                     selected_row = Gledger.query.get(selected_id)
-                    if selected_row is not None and ledger_date_after_cutoff(selected_row.Date, cutoff):
+                    if selected_row is not None and (
+                            ledger_date_after_cutoff(selected_row.Date, cutoff) or
+                            (
+                                    period_start is not None and
+                                    ledger_datetime(selected_row.Date) is not None and
+                                    ledger_datetime(selected_row.Date) < period_start
+                            )
+                    ):
                         skipped_future.append(selected_id)
                     else:
                         odervec.append(selected_id)
@@ -929,11 +1251,13 @@ def isoBank():
                     if gdat is not None and gdat.Account == acname:
                         gdat.Reconciled=25
                 db.session.commit()
-                acctinfo = banktotals(acname, statement_values)
-                hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname, rdate)
+                acctinfo = banktotals(acname, statement_values, use_saved_statement=False)
+                hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname, rdate, use_saved_statement=False, statement_values=statement_values)
                 print(hv[2],hv[3])
                 save_trial_reconciliation(acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5])
-                odata = dataget_Bank(thismuch, acname, hv[0])
+                thismuch = '5'
+                odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
+                hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
 
                 if finalize is not None and abs(parse_money(acctinfo[5])) > .01:
                     err.append(f'Cannot finalize because the statement is out of balance by ${acctinfo[5]}.')
@@ -1109,7 +1433,7 @@ def isoBank():
         defaults = statement_defaults(bankacct, today_str)
         hv[0] = defaults['rdate']
         acctinfo = banktotals(bankacct)
-        odata = dataget_Bank(thismuch, bankacct, hv[0])
+        odata = dataget_Bank(thismuch, bankacct, hv[0], statement_values)
         hv[1] = trial_ids(odata)
 
 

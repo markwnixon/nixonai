@@ -1819,8 +1819,8 @@ class Reconciliations(db.Model):
     Deposits = db.Column('Deposits', db.String(45))
     Withdraws = db.Column('Withdraws', db.String(45))
     Servicefees = db.Column('Servicefees', db.String(45))
-    DepositList = db.Column('DepositList', db.String(300))
-    WithdrawList = db.Column('WithdrawList', db.String(300))
+    DepositList = db.Column('DepositList', db.Text)
+    WithdrawList = db.Column('WithdrawList', db.Text)
     Status = db.Column('Status', db.Integer)
     Diff = db.Column('Diff', db.String(45))
 

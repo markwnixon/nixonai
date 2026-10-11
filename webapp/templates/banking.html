@@ -46,12 +46,12 @@
                         <div class="form-group col-6">
                             <label for="statement_period_start">Beginning Date</label>
                             <input type="date" class="form-control" id="statement_period_start"
-                                   value="{{ selected_statement_period.start }}" readonly>
+                                   name="statement_period_start" value="{{ selected_statement_period.start }}">
                         </div>
                         <div class="form-group col-6">
                             <label for="statement_period_end">Ending Date</label>
                             <input type="date" class="form-control" id="statement_period_end"
-                                   value="{{ selected_statement_period.end }}" readonly>
+                                   name="statement_period_end" value="{{ selected_statement_period.end }}">
                         </div>
                     </div>
                     <div class="form-group">
@@ -87,6 +87,10 @@
                     <button type="submit" name="reopen_reconciliation" value="1" class="btn btn-outline-danger btn-block"
                             onclick="return confirm('Reopen the selected reconciliation statement?');">
                         Reopen Selected Statement
+                    </button>
+                    <button type="submit" name="repair_reconciliation_flags" value="1" class="btn btn-outline-primary btn-block mt-2"
+                            onclick="return confirm('Repair ledger Recon values for the selected finalized statement?');">
+                        Repair Statement Flags
                     </button>
                 </div>
             </div>
@@ -145,6 +149,15 @@
                         </div>
                     </div>
                 </div>
+                {% if legacy_statement_notice %}
+                    <div class="alert alert-warning py-2">
+                        {{ legacy_statement_notice.message }}
+                        Saved totals: deposits ${{ legacy_statement_notice.deposits }},
+                        withdrawals ${{ legacy_statement_notice.withdrawals }}.
+                        Row reconstruction: deposits ${{ legacy_statement_notice.row_deposits }},
+                        withdrawals ${{ legacy_statement_notice.row_withdrawals }}.
+                    </div>
+                {% endif %}
 
                 <div class="alert alert-info banking-feedback" role="alert">
                     <pre class="mb-0">{{ err }}</pre>
@@ -225,6 +238,13 @@
                     </div>
                 </div>
 
+                <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                    <h5 class="mb-2 mb-md-0">Transactions</h5>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Transaction selection controls">
+                        <button type="button" class="btn btn-outline-primary" id="checkAllShownBankRows">Check All Shown</button>
+                        <button type="button" class="btn btn-outline-secondary" id="clearShownBankRows">Clear Shown</button>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <table id="dtBanking" class="table table-sm table-striped table-bordered table-hover nowrap" width="100%">
                         <thead class="thead-light">
@@ -389,6 +409,11 @@ document.addEventListener('DOMContentLoaded', function () {
         "paging": false
     });
     var isCreditReconciliation = {{ 'true' if is_credit_reconciliation else 'false' }};
+    var legacySelectedOverride = {% if legacy_statement_override %}{
+        active: true,
+        deposits: {{ (legacy_statement_override.deposits|string).replace(',', '')|tojson }},
+        withdrawals: {{ (legacy_statement_override.withdrawals|string).replace(',', '')|tojson }}
+    }{% else %}{ active: false }{% endif %};
 
     function moneyFromCents(cents) {
         var sign = cents < 0 ? '-' : '';
@@ -433,6 +458,11 @@ document.addEventListener('DOMContentLoaded', function () {
             ledgerRows += parseInt($('td:eq(9)', rowNode).text(), 10) || 0;
         });
 
+        if (legacySelectedOverride.active) {
+            deposits = centsFromMoney(legacySelectedOverride.deposits);
+            withdrawals = centsFromMoney(legacySelectedOverride.withdrawals);
+        }
+
         $('#selectedDeposits').text(moneyFromCents(deposits));
         $('#selectedWithdrawals').text(moneyFromCents(withdrawals));
         $('#selectedNet').text(moneyFromCents(deposits - withdrawals));
@@ -459,7 +489,23 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    $('#dtBanking tbody').on('change', 'input[type="checkbox"]', updateSelectedTotals);
+    $('#dtBanking tbody').on('change', 'input[type="checkbox"]', function () {
+        legacySelectedOverride.active = false;
+        updateSelectedTotals();
+    });
+    function setShownBankRowsChecked(isChecked) {
+        legacySelectedOverride.active = false;
+        table.rows({ search: 'applied' }).every(function () {
+            $('input[type="checkbox"]', this.node()).prop('checked', isChecked);
+        });
+        updateSelectedTotals();
+    }
+    $('#checkAllShownBankRows').on('click', function () {
+        setShownBankRowsChecked(true);
+    });
+    $('#clearShownBankRows').on('click', function () {
+        setShownBankRowsChecked(false);
+    });
     $('input[name="reopen_rdate"]').on('change', function () {
         $('#rdate').val(this.value);
         $('#statement_period_start').val($(this).data('period-start') || '');
@@ -472,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function () {
     $('#rdate').on('change', function () {
         $('#statement_period_end').val(this.value);
     });
-    $('#begbal, #endbal').on('input change', updateSelectedTotals);
+    $('#begbal, #endbal, #statement_period_start, #statement_period_end').on('input change', updateSelectedTotals);
     table.on('draw', updateSelectedTotals);
     updateSelectedTotals();
 
