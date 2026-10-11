@@ -805,6 +805,50 @@ def repair_statement_reconciliation_flags(bankacct, rdate):
     extra = f' Synced {synced_bills} bill row(s).' if synced_bills else ''
     return changed, f'Repaired {changed} ledger row(s) for {bankacct} statement {statement_date.strftime("%Y-%m-%d")} to Recon {recon_value}.{extra}'
 
+def reassign_statement_date(bankacct, old_rdate, new_rdate):
+    rdat = reconciliation_for_date(bankacct, old_rdate, [0, 25, 1])
+    if rdat is None:
+        return 0, f'No reconciliation was found for {bankacct} dated {old_rdate.strftime("%Y-%m-%d")}.'
+
+    target = reconciliation_for_date(bankacct, new_rdate, [0, 25, 1])
+    if target is not None and target.id != rdat.id:
+        return 0, (
+            f'Cannot reassign to {new_rdate.strftime("%Y-%m-%d")} because another reconciliation '
+            f'already exists for {bankacct} on that date.'
+        )
+
+    rows = statement_rows_from_saved_reconciliation(rdat)
+    saved = statement_saved_totals(rdat)
+    if saved is not None:
+        row_deposits, row_withdrawals = statement_row_totals(rows)
+        if row_deposits != saved['deposits'] or row_withdrawals != saved['withdrawals']:
+            return 0, (
+                'Statement date was not reassigned because the saved row list does not match the saved totals. '
+                f'Saved deposits/withdrawals ${saved["deposits"]}/${saved["withdrawals"]}; '
+                f'row deposits/withdrawals ${row_deposits}/${row_withdrawals}.'
+            )
+
+    old_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
+    rdat.Rdate = new_rdate
+    row_ids = []
+    if rdat.Status == 1:
+        recon_value = new_rdate.month
+    else:
+        recon_value = 25
+    changed_rows = 0
+    for row in rows:
+        row_ids.append(row.id)
+        if row.Reconciled != recon_value:
+            row.Reconciled = recon_value
+            changed_rows += 1
+    db.session.commit()
+    synced_bills = sync_bills_for_ledger_ids(row_ids)
+    extra = f' Synced {synced_bills} bill row(s).' if synced_bills else ''
+    return changed_rows, (
+        f'Reassigned statement {old_date.strftime("%Y-%m-%d")} to {new_rdate.strftime("%Y-%m-%d")} '
+        f'for {bankacct}; updated {changed_rows} ledger row(s) to Recon {recon_value}.{extra}'
+    )
+
 def selected_statement_reconciliation(bankacct, statement_date):
     if statement_date in [None, '']:
         return None
@@ -1008,6 +1052,13 @@ def banktotals(bankacct, statement_values=None, use_saved_statement=True):
 
 
 def isoBank():
+    statement_values = {
+        'begbal': '',
+        'endbal': '',
+        'rdate': '',
+        'statement_period_start': '',
+        'statement_period_end': '',
+    }
 
     if request.method == 'POST':
 # ____________________________________________________________________________________________________________________B.FormVariables.General
@@ -1061,6 +1112,8 @@ def isoBank():
         baselinehit = request.values.get('baseline_reconcile')
         reopenhit = request.values.get('reopen_reconciliation')
         repairhit = request.values.get('repair_reconciliation_flags')
+        reassignhit = request.values.get('reassign_statement_date')
+        new_statement_rdate = request.values.get('new_statement_rdate')
         baseline_date = request.values.get('baseline_date')
         baseline_balance = request.values.get('baseline_balance')
         previous_acname = request.values.get('previous_acname')
@@ -1201,6 +1254,28 @@ def isoBank():
                 acctinfo = banktotals(acname, statement_values)
             except Exception as exc:
                 err[0] = f'Repair failed: {exc}'
+
+        if reassignhit is not None:
+            try:
+                selected_rdate = request.values.get('reopen_rdate') or rdate
+                if new_statement_rdate in [None, '']:
+                    raise ValueError('corrected statement date is required')
+                old_recdate = datetime.datetime.strptime(selected_rdate, "%Y-%m-%d")
+                new_recdate = datetime.datetime.strptime(new_statement_rdate, "%Y-%m-%d")
+                row_count, reassign_msg = reassign_statement_date(acname, old_recdate, new_recdate)
+                hv[0] = new_statement_rdate
+                rdate = new_statement_rdate
+                statement_values.update({'rdate': hv[0]})
+                err[0] = reassign_msg
+                thismuch = '5'
+                odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
+                hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
+                reassigned = reconciliation_for_date(acname, new_recdate, [0, 25, 1])
+                if reassigned is not None:
+                    statement_values.update({'begbal': reassigned.Bbal, 'endbal': reassigned.Ebal, 'rdate': hv[0]})
+                acctinfo = banktotals(acname, statement_values)
+            except Exception as exc:
+                err[0] = f'Statement date reassignment failed: {exc}'
 
         if modlink==0:
             oder,numchecked=numcheck(1,odata,0,0,0,0,['oder'])

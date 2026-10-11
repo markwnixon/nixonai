@@ -9848,6 +9848,12 @@ def Banking():
         }
 
     selected_statement_period = statement_period(acctinfo[6], hv[0])
+    posted_period_start = request.values.get('statement_period_start')
+    posted_period_end = request.values.get('statement_period_end')
+    if posted_period_start not in [None, '']:
+        selected_statement_period['start'] = posted_period_start
+    if posted_period_end not in [None, '']:
+        selected_statement_period['end'] = posted_period_end
     legacy_statement_override = legacy_reconciliation_notice(acctinfo[6], hv[0])
     legacy_statement_notice = (
         legacy_statement_override
