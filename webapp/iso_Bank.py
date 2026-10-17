@@ -205,7 +205,7 @@ def recon_list_text(values):
     except:
         return None
 
-def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, servicefees, dlist, wlist, diff):
+def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, servicefees, dlist, wlist, diff, reconciliation_id=None, statement_values=None):
     try:
         dlists = recon_list_text(dlist)
     except:
@@ -215,7 +215,22 @@ def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, 
     except:
         wlists = None
 
-    rdat = reconciliation_for_date(bankacct, rdate, [0, 25, 1])
+    rdat = None
+    if reconciliation_id not in [None, '']:
+        try:
+            rdat = Reconciliations.query.get(int(reconciliation_id))
+        except:
+            rdat = None
+        if rdat is not None and rdat.Account != bankacct:
+            rdat = None
+        if rdat is not None:
+            target = reconciliation_for_date(bankacct, rdate, [0, 25, 1])
+            if target is not None and target.id != rdat.id:
+                raise ValueError(
+                    f'Another reconciliation already exists for {bankacct} dated {rdate.strftime("%Y-%m-%d")}.'
+                )
+    if rdat is None:
+        rdat = reconciliation_for_date(bankacct, rdate, [0, 25, 1])
     if rdat is None:
         rdat = trial_reconciliation(bankacct)
     if rdat is None:
@@ -245,6 +260,11 @@ def save_trial_reconciliation(bankacct, rdate, bbal, ebal, deposits, withdraws, 
         rdat.WithdrawList = wlists
         rdat.Status = 25
         rdat.Diff = diff
+    period_start, period_end = parse_statement_period_override(statement_values)
+    if period_start is not None:
+        rdat.PeriodStart = period_start.date()
+    if period_end is not None:
+        rdat.PeriodEnd = period_end.date()
     db.session.commit()
     return rdat
 
@@ -355,6 +375,11 @@ def statement_period_bounds(bankacct, statement_date, statement_values=None):
             statement_day = datetime.datetime.strptime(str(statement_date), "%Y-%m-%d").date()
         except:
             return None, None
+    saved = reconciliation_for_date(bankacct, statement_day)
+    if saved is not None and (saved.PeriodStart is not None or saved.PeriodEnd is not None):
+        start = datetime.datetime.combine(saved.PeriodStart, datetime.time.min) if saved.PeriodStart else None
+        end = datetime.datetime.combine(saved.PeriodEnd or statement_day, datetime.time.max)
+        return start, end
     if statement_day.day == 1:
         start = datetime.datetime.combine(statement_day, datetime.time.min)
         month_end = datetime.date(
@@ -805,50 +830,6 @@ def repair_statement_reconciliation_flags(bankacct, rdate):
     extra = f' Synced {synced_bills} bill row(s).' if synced_bills else ''
     return changed, f'Repaired {changed} ledger row(s) for {bankacct} statement {statement_date.strftime("%Y-%m-%d")} to Recon {recon_value}.{extra}'
 
-def reassign_statement_date(bankacct, old_rdate, new_rdate):
-    rdat = reconciliation_for_date(bankacct, old_rdate, [0, 25, 1])
-    if rdat is None:
-        return 0, f'No reconciliation was found for {bankacct} dated {old_rdate.strftime("%Y-%m-%d")}.'
-
-    target = reconciliation_for_date(bankacct, new_rdate, [0, 25, 1])
-    if target is not None and target.id != rdat.id:
-        return 0, (
-            f'Cannot reassign to {new_rdate.strftime("%Y-%m-%d")} because another reconciliation '
-            f'already exists for {bankacct} on that date.'
-        )
-
-    rows = statement_rows_from_saved_reconciliation(rdat)
-    saved = statement_saved_totals(rdat)
-    if saved is not None:
-        row_deposits, row_withdrawals = statement_row_totals(rows)
-        if row_deposits != saved['deposits'] or row_withdrawals != saved['withdrawals']:
-            return 0, (
-                'Statement date was not reassigned because the saved row list does not match the saved totals. '
-                f'Saved deposits/withdrawals ${saved["deposits"]}/${saved["withdrawals"]}; '
-                f'row deposits/withdrawals ${row_deposits}/${row_withdrawals}.'
-            )
-
-    old_date = rdat.Rdate.date() if isinstance(rdat.Rdate, datetime.datetime) else rdat.Rdate
-    rdat.Rdate = new_rdate
-    row_ids = []
-    if rdat.Status == 1:
-        recon_value = new_rdate.month
-    else:
-        recon_value = 25
-    changed_rows = 0
-    for row in rows:
-        row_ids.append(row.id)
-        if row.Reconciled != recon_value:
-            row.Reconciled = recon_value
-            changed_rows += 1
-    db.session.commit()
-    synced_bills = sync_bills_for_ledger_ids(row_ids)
-    extra = f' Synced {synced_bills} bill row(s).' if synced_bills else ''
-    return changed_rows, (
-        f'Reassigned statement {old_date.strftime("%Y-%m-%d")} to {new_rdate.strftime("%Y-%m-%d")} '
-        f'for {bankacct}; updated {changed_rows} ledger row(s) to Recon {recon_value}.{extra}'
-    )
-
 def selected_statement_reconciliation(bankacct, statement_date):
     if statement_date in [None, '']:
         return None
@@ -916,18 +897,12 @@ def dataget_Bank(thismuch, bankacct, statement_date=None, statement_values=None)
             (Gledger.Account == bankacct) &
             ((Gledger.Reconciled.is_(None)) | (Gledger.Reconciled == 0) | (Gledger.Reconciled == 25))
         )
-        period_start, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
-        if period_start is not None:
-            query = query.filter(Gledger.Date >= period_start)
+        _, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
         if cutoff is not None:
             # Reconciliation works against a statement date. Rows after that date
             # must not be available for selection or stale form submission.
             query = query.filter(Gledger.Date <= cutoff)
-        periods = finalized_statement_periods(bankacct)
-        odata = [
-            row for row in query.all()
-            if ledger_row_effectively_unreconciled(row, periods)
-        ]
+        odata = query.all()
     elif thismuch == '5':
         rdat = selected_statement_reconciliation(bankacct, statement_date)
         row_ids, explicit_complete = reconciliation_row_ids(rdat)
@@ -935,9 +910,7 @@ def dataget_Bank(thismuch, bankacct, statement_date=None, statement_values=None)
             odata = statement_rows_from_saved_reconciliation(rdat)
         else:
             query = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25))
-            period_start, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
-            if period_start is not None:
-                query = query.filter(Gledger.Date >= period_start)
+            _, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
             if cutoff is not None:
                 query = query.filter(Gledger.Date <= cutoff)
             odata = query.all()
@@ -964,9 +937,7 @@ def recon_totals(bankacct, statement_date=None, use_saved_statement=True, statem
         gdata = statement_rows_from_saved_reconciliation(rdat)
     else:
         gquery = Gledger.query.filter((Gledger.Account == bankacct) & (Gledger.Reconciled == 25))
-        period_start, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
-        if period_start is not None:
-            gquery = gquery.filter(Gledger.Date >= period_start)
+        _, cutoff = statement_period_bounds(bankacct, statement_date, statement_values)
         if cutoff is not None:
             gquery = gquery.filter(Gledger.Date <= cutoff)
         gdata = gquery.all()
@@ -1112,8 +1083,7 @@ def isoBank():
         baselinehit = request.values.get('baseline_reconcile')
         reopenhit = request.values.get('reopen_reconciliation')
         repairhit = request.values.get('repair_reconciliation_flags')
-        reassignhit = request.values.get('reassign_statement_date')
-        new_statement_rdate = request.values.get('new_statement_rdate')
+        selected_reconciliation_id = request.values.get('selected_reconciliation_id')
         baseline_date = request.values.get('baseline_date')
         baseline_balance = request.values.get('baseline_balance')
         previous_acname = request.values.get('previous_acname')
@@ -1132,6 +1102,9 @@ def isoBank():
             begbal = defaults['begbal']
         statement_period_start = request.values.get('statement_period_start')
         statement_period_end = request.values.get('statement_period_end')
+        if account_changed:
+            statement_period_start = None
+            statement_period_end = None
         statement_values = {
             'begbal': begbal,
             'endbal': endbal,
@@ -1255,28 +1228,6 @@ def isoBank():
             except Exception as exc:
                 err[0] = f'Repair failed: {exc}'
 
-        if reassignhit is not None:
-            try:
-                selected_rdate = request.values.get('reopen_rdate') or rdate
-                if new_statement_rdate in [None, '']:
-                    raise ValueError('corrected statement date is required')
-                old_recdate = datetime.datetime.strptime(selected_rdate, "%Y-%m-%d")
-                new_recdate = datetime.datetime.strptime(new_statement_rdate, "%Y-%m-%d")
-                row_count, reassign_msg = reassign_statement_date(acname, old_recdate, new_recdate)
-                hv[0] = new_statement_rdate
-                rdate = new_statement_rdate
-                statement_values.update({'rdate': hv[0]})
-                err[0] = reassign_msg
-                thismuch = '5'
-                odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
-                hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
-                reassigned = reconciliation_for_date(acname, new_recdate, [0, 25, 1])
-                if reassigned is not None:
-                    statement_values.update({'begbal': reassigned.Bbal, 'endbal': reassigned.Ebal, 'rdate': hv[0]})
-                acctinfo = banktotals(acname, statement_values)
-            except Exception as exc:
-                err[0] = f'Statement date reassignment failed: {exc}'
-
         if modlink==0:
             oder,numchecked=numcheck(1,odata,0,0,0,0,['oder'])
             group_ids = selected_bank_ids(odata)
@@ -1297,19 +1248,12 @@ def isoBank():
                 bkchargeid = 0
 
                 selected_odervec = selected_bank_ids(odata)
-                period_start, cutoff = statement_period_bounds(acname, rdate, statement_values)
+                _, cutoff = statement_period_bounds(acname, rdate, statement_values)
                 odervec = []
                 skipped_future = []
                 for selected_id in selected_odervec:
                     selected_row = Gledger.query.get(selected_id)
-                    if selected_row is not None and (
-                            ledger_date_after_cutoff(selected_row.Date, cutoff) or
-                            (
-                                    period_start is not None and
-                                    ledger_datetime(selected_row.Date) is not None and
-                                    ledger_datetime(selected_row.Date) < period_start
-                            )
-                    ):
+                    if selected_row is not None and ledger_date_after_cutoff(selected_row.Date, cutoff):
                         skipped_future.append(selected_id)
                     else:
                         odervec.append(selected_id)
@@ -1329,15 +1273,27 @@ def isoBank():
                 acctinfo = banktotals(acname, statement_values, use_saved_statement=False)
                 hv[2], hv[3], hv[4], dlist, wlist = recon_totals(acname, rdate, use_saved_statement=False, statement_values=statement_values)
                 print(hv[2],hv[3])
-                save_trial_reconciliation(acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5])
+                trial_saved = True
+                try:
+                    save_trial_reconciliation(
+                        acname, recdate, acctinfo[9], acctinfo[4], hv[2], hv[3], hv[4], dlist, wlist, acctinfo[5],
+                        selected_reconciliation_id,
+                        statement_values,
+                    )
+                except ValueError as exc:
+                    trial_saved = False
+                    err.append(str(exc))
                 thismuch = '5'
                 odata = dataget_Bank(thismuch, acname, hv[0], statement_values)
                 hv[1] = selected_statement_ids(acname, hv[0]) or trial_ids(odata)
 
-                if finalize is not None and abs(parse_money(acctinfo[5])) > .01:
+                if finalize is not None and not trial_saved:
+                    err.append('Cannot finalize because the trial reconciliation was not saved.')
+
+                if finalize is not None and trial_saved and abs(parse_money(acctinfo[5])) > .01:
                     err.append(f'Cannot finalize because the statement is out of balance by ${acctinfo[5]}.')
 
-                if finalize is not None and abs(parse_money(acctinfo[5])) <= .01:
+                if finalize is not None and trial_saved and abs(parse_money(acctinfo[5])) <= .01:
                     reset_trial(recmo, acname, odervec)
                     synced_bills = sync_bills_for_ledger_ids(odervec)
                     reconciled_jobs = mark_reconciled_payment_jobs(odervec)

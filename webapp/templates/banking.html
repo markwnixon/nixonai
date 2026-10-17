@@ -12,6 +12,8 @@
     <form action="{{ url_for('main.Banking') }}" method="post" enctype="multipart/form-data">
         <input type="hidden" name="cache" value="{{ cache }}">
         <input type="hidden" name="previous_acname" value="{{ acctinfo[6] }}">
+        <input type="hidden" id="selected_reconciliation_id" name="selected_reconciliation_id"
+               value="{{ selected_reconciliation_id or '' }}">
 
         <div class="row">
             <div class="col-lg-3 mb-3">
@@ -91,17 +93,6 @@
                     <button type="submit" name="repair_reconciliation_flags" value="1" class="btn btn-outline-primary btn-block mt-2"
                             onclick="return confirm('Repair ledger Recon values for the selected finalized statement?');">
                         Repair Statement Flags
-                    </button>
-                    <hr>
-                    <h5>Statement Date Maintenance</h5>
-                    <p class="text-muted small">Select a statement in Reconciliation History, enter the corrected statement date, then reassign it. This preserves the saved rows and totals.</p>
-                    <div class="form-group">
-                        <label for="new_statement_rdate">Corrected Statement Date</label>
-                        <input type="date" class="form-control" id="new_statement_rdate" name="new_statement_rdate">
-                    </div>
-                    <button type="submit" name="reassign_statement_date" value="1" class="btn btn-outline-warning btn-block"
-                            onclick="return confirm('Reassign the selected reconciliation statement to this corrected statement date?');">
-                        Reassign Statement Date
                     </button>
                 </div>
             </div>
@@ -209,6 +200,7 @@
                                         <td class="text-center">
                                             {% if item.date_value %}
                                                 <input type="radio" name="reopen_rdate" value="{{ item.date_value }}"
+                                                       data-reconciliation-id="{{ item.id }}"
                                                        data-period-start="{{ item.period_start }}"
                                                        data-period-end="{{ item.period_end }}"
                                                        data-begbal="{{ item.beginning }}"
@@ -519,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     $('input[name="reopen_rdate"]').on('change', function () {
         $('#rdate').val(this.value);
-        $('#new_statement_rdate').val(this.value);
+        $('#selected_reconciliation_id').val($(this).data('reconciliation-id') || '');
         $('#statement_period_start').val($(this).data('period-start') || '');
         $('#statement_period_end').val($(this).data('period-end') || this.value);
         $('#begbal').val($(this).data('begbal') || '');

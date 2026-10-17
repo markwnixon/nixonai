@@ -9794,6 +9794,7 @@ def Banking():
             seen_statement_dates.add(date_key)
             period = statement_period(account_name, row_date)
             history.append({
+                'id': row.id,
                 'date': row.Rdate,
                 'date_value': row_date.strftime('%Y-%m-%d') if row_date else '',
                 'period_start': period['start'],
@@ -9823,6 +9824,13 @@ def Banking():
                 statement_date = None
         if statement_date is None:
             return {'start': '', 'end': ''}
+        from webapp.iso_Bank import reconciliation_for_date
+        saved = reconciliation_for_date(account_name, statement_date)
+        if saved is not None and (saved.PeriodStart is not None or saved.PeriodEnd is not None):
+            return {
+                'start': saved.PeriodStart.strftime('%Y-%m-%d') if saved.PeriodStart else '',
+                'end': (saved.PeriodEnd or statement_date).strftime('%Y-%m-%d'),
+            }
         if statement_date.day == 1:
             month_end = date(
                 statement_date.year,
@@ -9850,9 +9858,10 @@ def Banking():
     selected_statement_period = statement_period(acctinfo[6], hv[0])
     posted_period_start = request.values.get('statement_period_start')
     posted_period_end = request.values.get('statement_period_end')
-    if posted_period_start not in [None, '']:
+    same_account = request.values.get('previous_acname') == acctinfo[6]
+    if same_account and posted_period_start not in [None, '']:
         selected_statement_period['start'] = posted_period_start
-    if posted_period_end not in [None, '']:
+    if same_account and posted_period_end not in [None, '']:
         selected_statement_period['end'] = posted_period_end
     legacy_statement_override = legacy_reconciliation_notice(acctinfo[6], hv[0])
     legacy_statement_notice = (
@@ -9923,6 +9932,7 @@ def Banking():
         reverse=True,
     )
     reconciliation_history_range = request.values.get('reconciliation_history_range', 'current_year')
+    selected_reconciliation_id = request.values.get('selected_reconciliation_id', '')
     reconciliation_history_rows = reconciliation_history(acctinfo[6], reconciliation_history_range)
     return render_template(
         'banking.html',
@@ -9947,6 +9957,7 @@ def Banking():
         is_credit_reconciliation=is_credit_reconciliation_account(acctinfo[6]),
         reconciliation_history_rows=reconciliation_history_rows,
         reconciliation_history_range=reconciliation_history_range,
+        selected_reconciliation_id=selected_reconciliation_id,
         selected_statement_period=selected_statement_period,
         legacy_statement_override=legacy_statement_override,
         legacy_statement_notice=legacy_statement_notice,
@@ -10371,6 +10382,17 @@ def ReceiveByAccount():
                     pass
         return ids
 
+    def selected_counter_deposit_journal_ids():
+        journal_ids = []
+        for selected in request.values.getlist('payment_batch'):
+            for value in selected.split(','):
+                value = value.strip()
+                if value.startswith('counter:'):
+                    journal_id = value.replace('counter:', '', 1).strip()
+                    if journal_id:
+                        journal_ids.append(journal_id)
+        return journal_ids
+
     def receive_success_message(holdvec):
         try:
             checked_count = sum(1 for value in holdvec[3] if value == 1)
@@ -10598,16 +10620,25 @@ def ReceiveByAccount():
 
     def undo_counter_deposit(err_list):
         original_ids = selected_payment_ledger_ids()
-        if not original_ids:
+        selected_counter_journals = selected_counter_deposit_journal_ids()
+        if not original_ids and not selected_counter_journals:
             err_list.append('Select a received payment batch with a counter deposit to undo.')
             return err_list
 
-        deposit_rows = Gledger.query.filter(
-            (Gledger.SourceTable == 'CounterDepositItem') &
-            (Gledger.SourceId.in_(original_ids)) &
-            (Gledger.Type == 'XD') &
-            (Gledger.Com == cmpdata[10])
-        ).all()
+        if original_ids:
+            deposit_rows = Gledger.query.filter(
+                (Gledger.SourceTable == 'CounterDepositItem') &
+                (Gledger.SourceId.in_(original_ids)) &
+                (Gledger.Type == 'XD') &
+                (Gledger.Com == cmpdata[10])
+            ).all()
+        else:
+            deposit_rows = Gledger.query.filter(
+                (Gledger.SourceTable == 'CounterDepositItem') &
+                (Gledger.JournalId.in_(selected_counter_journals)) &
+                (Gledger.Type == 'XD') &
+                (Gledger.Com == cmpdata[10])
+            ).all()
         if not deposit_rows:
             err_list.append('No counter deposit was found for the selected received payment batch.')
             return err_list
@@ -10651,7 +10682,10 @@ def ReceiveByAccount():
                 refresh_forwarding_payment_status(forwarding_job)
 
         db.session.commit()
-        err_list.append(f'Undid counter deposit {deposit_rows[0].Ref or deposit_rows[0].JournalId}; original payment batch is back in Undeposited Funds.')
+        if original_rows:
+            err_list.append(f'Undid counter deposit {deposit_rows[0].Ref or deposit_rows[0].JournalId}; original payment batch is back in Undeposited Funds.')
+        else:
+            err_list.append(f'Undid orphan counter deposit {deposit_rows[0].Ref or deposit_rows[0].JournalId}.')
         return err_list
 
     def update_reloaded_receive_batch(err_list):
@@ -11119,6 +11153,53 @@ def ReceiveByAccount():
             group['deposit_ref'] = counter_deposit.Ref or ''
             group['deposit_account'] = counter_deposit.Account or ''
             group['deposit_date'] = counter_deposit.Date
+
+    orphan_counter_rows = Gledger.query.filter(
+        (Gledger.SourceTable == 'CounterDepositItem') &
+        (Gledger.Type == 'XD') &
+        (Gledger.Com == cmpdata[10]) &
+        (Gledger.Date >= batch_start) &
+        (Gledger.Date < batch_end_exclusive)
+    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
+    existing_counter_journals = {
+        row.JournalId for row in counter_deposits.values() if row.JournalId
+    }
+    for row in orphan_counter_rows:
+        if row.JournalId in existing_counter_journals:
+            continue
+        original_exists = False
+        if row.SourceId:
+            original_exists = Gledger.query.filter(
+                (Gledger.id == row.SourceId) &
+                (Gledger.Type.in_(['DD', 'ID'])) &
+                (Gledger.Com == cmpdata[10])
+            ).first() is not None
+        if original_exists:
+            continue
+        key = (
+            row.JournalId or f'counter-{row.id}',
+            row.Ref or '',
+            row.Account or '',
+        )
+        group = payment_groups.setdefault(key, {
+            'date': row.Date,
+            'source': row.Source or 'Counter Deposit',
+            'ref': row.Ref or '',
+            'account': 'Orphan Counter Deposit',
+            'type': 'CounterDeposit',
+            'ids': [],
+            'amount': 0,
+            'count': 0,
+            'deposited': True,
+            'deposit_ref': row.Ref or '',
+            'deposit_account': row.Account or '',
+            'deposit_date': row.Date,
+            'highlighted': False,
+        })
+        if row.JournalId and f'counter:{row.JournalId}' not in group['ids']:
+            group['ids'].append(f'counter:{row.JournalId}')
+        group['amount'] += row.Debit or 0
+        group['count'] += 1
 
     recent_batches = sorted(
         payment_groups.values(),

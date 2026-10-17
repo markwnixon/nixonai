@@ -60,6 +60,14 @@ def create_app():
         app.config['CLASS8_BILLS_RECONCILED_CHECKED'] = True
         try:
             inspector = inspect(db.engine)
+            if inspector.has_table('reconciliations'):
+                recon_columns = {column['name'] for column in inspector.get_columns('reconciliations')}
+                for column_name in ('PeriodStart', 'PeriodEnd'):
+                    if column_name not in recon_columns:
+                        db.session.execute(text(
+                            f'ALTER TABLE reconciliations ADD COLUMN {column_name} DATE NULL'
+                        ))
+                        db.session.commit()
             if inspector.has_table('bills'):
                 columns = [column['name'] for column in inspector.get_columns('bills')]
                 if 'Reconciled' not in columns:

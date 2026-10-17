@@ -1814,6 +1814,8 @@ class Reconciliations(db.Model):
     id = db.Column('id', db.Integer, primary_key=True)
     Account = db.Column('Account', db.String(45))
     Rdate = db.Column('Rdate', db.DateTime)
+    PeriodStart = db.Column('PeriodStart', db.Date)
+    PeriodEnd = db.Column('PeriodEnd', db.Date)
     Bbal = db.Column('Bbal', db.String(45))
     Ebal = db.Column('Ebal', db.String(45))
     Deposits = db.Column('Deposits', db.String(45))
