@@ -3216,6 +3216,8 @@ def get_dbdata(table_setup, tfilters):
                     pfilter = f'({table}.Istat == None)  | ({table}.Istat < 3)'
                 elif itest == 'Unpaid':
                     pfilter = f'{table}.Istat.notin_([5, 8, 9])'
+                elif itest == 'Undeposited Funds':
+                    pfilter = f'{table}.Istat == 10'
                 elif itest == 'InvoSummaries':
                     pfilter = f'{table}.Istat.in_([6, 7, 8])'
                 query_adds.append(pfilter)
@@ -4819,7 +4821,7 @@ def forwarding_date_input(value):
 def is_undeposited_payment(paymethod=None, depoacct=None):
     method = str(paymethod or '').strip()
     account = str(depoacct or '').strip()
-    return method in ['Cash', 'Check'] or account == 'Undeposited Funds' or 'Undeposited' in account
+    return (not account and method in ['Cash', 'Check']) or 'Undeposited' in account
 
 
 def forwarding_invoice_ledger_entries(job):
@@ -5001,7 +5003,7 @@ def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_
         paymethod = request.values.get('paymethod') or 'Check'
         depoacct = request.values.get('acctfordeposit') or job.PayAcct or 'Undeposited Funds'
 
-    if paymethod in ['Cash', 'Check']:
+    if paymethod == 'Cash':
         depoacct = 'Undeposited Funds'
 
     bank_accounts = Accounts.query.filter(
@@ -5023,7 +5025,7 @@ def ForwardingReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_
         elif payment_cents <= 0:
             err.append('Enter a payment amount greater than zero.')
         else:
-            deposit_account_name = 'Undeposited Funds' if paymethod in ['Cash', 'Check'] or 'Undeposited' in depoacct else depoacct
+            deposit_account_name = 'Undeposited Funds' if paymethod == 'Cash' or 'Undeposited' in depoacct else depoacct
             deposit_type = 'ID' if deposit_account_name == 'Undeposited Funds' else 'DD'
             deposit_account = Accounts.query.filter(
                 (Accounts.Name == deposit_account_name) &
@@ -6054,7 +6056,7 @@ def ReceivePay_task(genre, task_iter, tablesetup, task_focus, checked_data, this
             paymethod = request.values.get('paymethod')
             payref = request.values.get('payref')
             depoacct = request.values.get('acctfordeposit')
-            if paymethod == 'Cash' or paymethod == 'Check': depoacct = 'Undeposited Funds'
+            if paymethod == 'Cash': depoacct = 'Undeposited Funds'
 
 
         holdvec[0] = [d2s(amtpaid), paidon, payref, paymethod]
@@ -6277,10 +6279,18 @@ def ReceiveByAccount_task(err, holdvec, task_iter):
         deps = ['Choose Pay Method First']
         acctdb = 'None'
         bank = None
-    elif depmethod == 'Cash' or depmethod == 'Check':
+    elif depmethod == 'Cash':
         deps = ['Undeposited Funds']
         acctdb = 'Undeposited Funds'
         bank = None
+    elif depmethod == 'Check':
+        deps = ['Undeposited Funds'] + [account.Name for account in Accounts.query.filter(
+            (Accounts.Type == 'Bank') | (Accounts.Type == 'Exch')
+        ).all() if account.Name != 'Undeposited Funds']
+        acctdb = request.values.get('acctfordeposit') or 'Undeposited Funds'
+        if acctdb not in deps:
+            acctdb = 'Undeposited Funds'
+        bank = acctdb if acctdb != 'Undeposited Funds' else None
     elif depmethod == 'Credit Card':
         acctdb = request.values.get('acctfordeposit')
         bank = acctdb

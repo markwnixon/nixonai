@@ -80,9 +80,9 @@ def get_revenues():
     else:
         col3 = ['Jo', 'Company', 'Container', 'Invoice Date', 'Total Amount']
         adata = Orders.query.filter(
-            (Orders.Istat > 0) & (Orders.Istat != 5) & (Orders.Istat != 8) & (Orders.InvoDate > cutoff)).order_by(
+            Orders.Istat.in_((2, 3, 4, 6, 7)) & (Orders.InvoDate > cutoff)).order_by(
             Orders.InvoDate).all()
-        title3 = adata[0].Description
+        title3 = adata[0].Description if adata else 'No open invoices'
         for adat in adata:
             try: amt = float(adat.InvoTotal)
             except: amt = 0.00

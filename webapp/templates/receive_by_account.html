@@ -4,12 +4,18 @@
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-sm-12">
-            <h2>Receive By Account</h2>
-            <p class="text-muted">Receive customer payments across multiple invoices and review prior payment batches.</p>
+            <h2>{{ 'Deposit Checks' if undeposited_only else 'Receive By Account' }}</h2>
+            <div class="mb-3">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.ReceiveByAccount') }}">Receive Payments</a>
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.ReceiveByAccount', batch_view='undeposited') }}">Undeposited Checks</a>
+            </div>
         </div>
     </div>
 
     <form action="{{ url_for('main.ReceiveByAccount') }}" method="post" enctype="multipart/form-data">
+        {% if undeposited_only %}
+            <input type="hidden" name="batch_view" value="undeposited">
+        {% endif %}
         {% if highlight_tcode %}
             <input type="hidden" name="highlight_tcode" value="{{ highlight_tcode }}">
         {% endif %}
@@ -31,7 +37,9 @@
             </div>
         {% endif %}
 
-        {% include 'c8_table_ReceiveByAccount.html' %}
+        {% if not undeposited_only %}
+            {% include 'c8_table_ReceiveByAccount.html' %}
+        {% endif %}
         {% if holdvec[21] %}
             <input type="hidden" name="reloaded_batch_ids" value="{{ holdvec[21] }}">
             <div class="alert alert-warning d-sm-flex justify-content-between align-items-center mt-3" role="alert">
@@ -46,8 +54,9 @@
 
         <hr>
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 receive-batch-toolbar">
-            <h5 class="mb-2 mb-md-0">Recent Received Payment Batches</h5>
+            <h5 class="mb-2 mb-md-0">{{ 'Undeposited Checks' if undeposited_only else 'Recent Received Payment Batches' }}</h5>
             <div class="d-flex flex-wrap justify-content-md-end align-items-center receive-batch-controls">
+                {% if not undeposited_only %}
                 <label class="mb-0" for="batch_start_date">Review</label>
                 <input type="date" id="batch_start_date" name="batch_start_date" class="form-control form-control-sm receive-date-input" value="{{ batch_start_date }}">
                 <span class="text-muted">to</span>
@@ -65,11 +74,16 @@
                         onclick="return confirm('Undo the counter deposit for the selected received payment batch? The original received payment will remain in Undeposited Funds.');">
                     Undo Deposit
                 </button>
+                {% endif %}
             </div>
         </div>
 
         <div class="border rounded p-3 mb-3 bg-light">
             <h6>Counter Deposit</h6>
+            <div class="mb-2 font-weight-bold" aria-live="polite">
+                Selected Deposit: <span id="selectedDepositTotal">$0.00</span>
+                <span class="text-muted ml-2" id="selectedDepositCount">0 batches</span>
+            </div>
             <div class="row">
                 <div class="col-md-3 mb-2">
                     <label class="small mb-1" for="counter_deposit_date">Deposit Date</label>
@@ -77,14 +91,14 @@
                 </div>
                 <div class="col-md-3 mb-2">
                     <label class="small mb-1" for="counter_deposit_ref">Deposit Reference</label>
-                    <input type="text" class="form-control form-control-sm" id="counter_deposit_ref" name="counter_deposit_ref" placeholder="Bank deposit number">
+                    <input type="text" class="form-control form-control-sm" id="counter_deposit_ref" name="counter_deposit_ref" maxlength="45" placeholder="Bank deposit number">
                 </div>
                 <div class="col-md-3 mb-2">
                     <label class="small mb-1" for="counter_deposit_account">Bank Account</label>
                     <select class="form-control form-control-sm" id="counter_deposit_account" name="counter_deposit_account">
-                        <option value="" selected>Choose Bank Account</option>
+                        <option value="" {% if not default_counter_deposit_account %}selected{% endif %}>Choose Bank Account</option>
                         {% for account in counter_deposit_accounts %}
-                            <option value="{{ account.Name }}">{{ account.Name }}</option>
+                            <option value="{{ account.Name }}" {% if account.Name == default_counter_deposit_account %}selected{% endif %}>{{ account.Name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -121,7 +135,10 @@
                                     <input class="align-middle" type="checkbox" disabled title="This row is already included in the grouped receipt above.">
                                 {% else %}
                                     {% set _ = seen_batch_ids.append(batch.id_value) %}
-                                    <input class="align-middle" type="checkbox" name="payment_batch" value="{{ batch.id_value }}">
+                                    <input class="align-middle" type="checkbox" name="payment_batch" value="{{ batch.id_value }}"
+                                           data-amount-cents="{{ batch.amount }}"
+                                           data-source-jos="{{ batch.source_jos|default([])|tojson|forceescape }}"
+                                           data-source-date="{{ batch.date.strftime('%Y-%m-%d') if batch.date else '' }}">
                                 {% endif %}
                             </td>
                             <td>{% if batch.date %}{{ batch.date.strftime('%Y-%m-%d') }}{% endif %}</td>
@@ -201,6 +218,48 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    var batchCheckboxes = Array.from(document.querySelectorAll('input[name="payment_batch"]'));
+    var depositDate = document.getElementById('counter_deposit_date');
+    var dateEdited = false;
+    var depositReference = document.getElementById('counter_deposit_ref');
+    var referenceEdited = false;
+    depositReference.addEventListener('input', function () { referenceEdited = true; });
+    depositDate.addEventListener('input', function () { dateEdited = true; });
+    depositDate.addEventListener('change', function () { dateEdited = true; });
+
+    function updateDepositSelection() {
+        var selected = batchCheckboxes.filter(function (box) { return box.checked; });
+        var totalCents = 0;
+        var latestDate = '';
+        var sourceJOs = [];
+        selected.forEach(function (box) {
+            JSON.parse(box.dataset.sourceJos || '[]').forEach(function (jo) {
+                if (sourceJOs.indexOf(jo) === -1) sourceJOs.push(jo);
+            });
+            totalCents += Number(box.dataset.amountCents) || 0;
+            if (box.dataset.sourceDate > latestDate) latestDate = box.dataset.sourceDate;
+        });
+        document.getElementById('selectedDepositTotal').textContent = (totalCents / 100).toLocaleString('en-US', {
+            style: 'currency', currency: 'USD'
+        });
+        document.getElementById('selectedDepositCount').textContent = selected.length + (selected.length === 1 ? ' batch' : ' batches');
+        if (!dateEdited && latestDate) depositDate.value = latestDate;
+        if (!referenceEdited) {
+            var reference = sourceJOs.join(', ');
+            if (reference.length > 45) {
+                var suffix = ' +' + (sourceJOs.length - 1);
+                reference = sourceJOs[0].slice(0, 45 - suffix.length) + suffix;
+            }
+            depositReference.value = reference;
+        }
+        if (!selected.length) {
+            dateEdited = false;
+            referenceEdited = false;
+        }
+    }
+    batchCheckboxes.forEach(function (box) { box.addEventListener('change', updateDepositSelection); });
+    updateDepositSelection();
+
     if (window.jQuery && $.fn.DataTable && document.getElementById('dtReceiveBatches')) {
         $('#dtReceiveBatches').DataTable({
             "aaSorting": [[1, "desc"]],

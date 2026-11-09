@@ -7794,6 +7794,9 @@ def BalanceSheet():
     def money(cents):
         return "${:,.2f}".format((cents or 0) / 100)
 
+    def money_number(cents):
+        return float(cents or 0) / 100
+
     def money_to_cents(value):
         try:
             clean = str(value).replace('$', '').replace(',', '').strip()
@@ -10288,6 +10291,7 @@ def ReceiveByAccount():
         return redirect(url_for('main.Class8Main', genre='Trucking'))
 
     highlight_tcode = (request.values.get('highlight_tcode') or '').strip()
+    undeposited_only = request.values.get('batch_view') == 'undeposited'
 
     def undeposited_rows_for_tcode(tcode):
         if not tcode:
@@ -10771,7 +10775,7 @@ def ReceiveByAccount():
         new_jos = set(new_lines.keys())
         affected_jos = old_jos | new_jos
 
-        dtype = 'ID' if deposit_account in ['Undeposited Funds'] or pay_method in ['Cash', 'Check'] else 'DD'
+        dtype = 'ID' if deposit_account == 'Undeposited Funds' else 'DD'
         debit_account = Accounts.query.filter(
             (Accounts.Name == deposit_account) &
             (Accounts.Co == cmpdata[10])
@@ -11028,8 +11032,12 @@ def ReceiveByAccount():
             elif invoice is not None:
                 amts[index] = invoice.Total
 
-        if pay_method in ['Cash', 'Check']:
+        if pay_method == 'Cash':
             deposit_accounts = ['Undeposited Funds']
+        elif pay_method == 'Check':
+            deposit_accounts = ['Undeposited Funds'] + [account.Name for account in Accounts.query.filter(
+                (Accounts.Type == 'Bank') | (Accounts.Type == 'Exch')
+            ).all() if account.Name != 'Undeposited Funds']
         elif pay_method == 'Credit Card':
             deposit_accounts = [account.Name for account in Accounts.query.filter(
                 (Accounts.Type == 'Bank') & (Accounts.Description.contains('Merchant'))
@@ -11102,12 +11110,27 @@ def ReceiveByAccount():
         )
 
     payment_groups = {}
-    rows = Gledger.query.filter(
+    receipt_query = Gledger.query.filter(
         (Gledger.Type.in_(['DD', 'ID'])) &
-        (Gledger.Com == cmpdata[10]) &
-        (Gledger.Date >= batch_start) &
-        (Gledger.Date < batch_end_exclusive)
-    ).order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
+        (Gledger.Com == cmpdata[10])
+    )
+    if undeposited_only:
+        deposited_ids = db.session.query(Gledger.SourceId).filter(
+            (Gledger.SourceTable == 'CounterDepositItem') &
+            (Gledger.Type == 'XD') &
+            (Gledger.Com == cmpdata[10]) &
+            (Gledger.SourceId.isnot(None))
+        )
+        receipt_query = receipt_query.filter(
+            (Gledger.Account == 'Undeposited Funds') &
+            (Gledger.Debit > 0) &
+            (~Gledger.id.in_(deposited_ids))
+        )
+    else:
+        receipt_query = receipt_query.filter(
+            (Gledger.Date >= batch_start) & (Gledger.Date < batch_end_exclusive)
+        )
+    rows = receipt_query.order_by(Gledger.Date.desc(), Gledger.id.desc()).all()
 
     row_ids = [row.id for row in rows]
     counter_deposits = {}
@@ -11144,6 +11167,9 @@ def ReceiveByAccount():
             'highlighted': False,
         })
         group['ids'].append(row.id)
+        group.setdefault('source_jos', [])
+        if row.Tcode and row.Tcode not in group['source_jos']:
+            group['source_jos'].append(row.Tcode)
         group['amount'] += row.Debit or 0
         group['count'] += 1
         if row.id in highlighted_payment_ids:
@@ -11165,6 +11191,8 @@ def ReceiveByAccount():
         row.JournalId for row in counter_deposits.values() if row.JournalId
     }
     for row in orphan_counter_rows:
+        if undeposited_only:
+            continue
         if row.JournalId in existing_counter_journals:
             continue
         original_exists = False
@@ -11217,6 +11245,33 @@ def ReceiveByAccount():
         (Accounts.Co == cmpdata[10])
     ).order_by(Accounts.Name.asc()).all()
 
+    bank_names = [account.Name for account in counter_deposit_accounts]
+    default_counter_deposit_account = ''
+    if bank_names:
+        bank_usage = Gledger.query.with_entities(
+            Gledger.Account, func.count(func.distinct(Gledger.JournalId)).label('deposit_count')
+        ).filter(
+            (Gledger.Com == cmpdata[10]) &
+            (Gledger.Account.in_(bank_names)) &
+            (Gledger.SourceTable == 'CounterDepositItem') &
+            (Gledger.Type == 'XD')
+        ).group_by(Gledger.Account).order_by(
+            func.count(func.distinct(Gledger.JournalId)).desc(), Gledger.Account.asc()
+        ).first()
+        if bank_usage is None:
+            bank_usage = Gledger.query.with_entities(
+                Gledger.Account, func.count(Gledger.id).label('deposit_count')
+            ).filter(
+                (Gledger.Com == cmpdata[10]) & (Gledger.Account.in_(bank_names)) &
+                (Gledger.Type.in_(['DD', 'XD'])) & (Gledger.Debit > 0)
+            ).group_by(Gledger.Account).order_by(
+                func.count(Gledger.id).desc(), Gledger.Account.asc()
+            ).first()
+        default_counter_deposit_account = bank_usage[0] if bank_usage else bank_names[0]
+        posted_bank = request.values.get('counter_deposit_account')
+        if posted_bank in bank_names:
+            default_counter_deposit_account = posted_bank
+
     return render_template(
         'receive_by_account.html',
         cmpdata=cmpdata,
@@ -11225,9 +11280,11 @@ def ReceiveByAccount():
         holdvec=holdvec,
         completed=completed,
         recent_batches=recent_batches,
+        undeposited_only=undeposited_only,
         batch_start_date=batch_start_date,
         batch_end_date=batch_end_date,
         counter_deposit_accounts=counter_deposit_accounts,
+        default_counter_deposit_account=default_counter_deposit_account,
         today_value=datetime.date.today().strftime('%Y-%m-%d'),
         highlight_tcode=highlight_tcode,
         highlight_found=bool(highlighted_payment_ids),
