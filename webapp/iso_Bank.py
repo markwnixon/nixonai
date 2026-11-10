@@ -465,7 +465,10 @@ def filter_statement_rows(rows, rdat):
 
 def statement_side_rows(rdat, tx_types, list_value):
     ids, complete = reconciliation_explicit_ids(list_value)
-    if complete and ids:
+    if complete:
+        # A saved empty list means this side has no selected transactions.
+        if not ids:
+            return []
         return Gledger.query.filter(
             (Gledger.Account == rdat.Account) &
             (Gledger.id.in_(ids))
@@ -837,7 +840,9 @@ def selected_statement_reconciliation(bankacct, statement_date):
 
 def selected_statement_ids(bankacct, statement_date):
     rdat = selected_statement_reconciliation(bankacct, statement_date)
-    return [row.id for row in statement_rows_from_saved_reconciliation(rdat)]
+    if rdat is None:
+        return []
+    return [row.id for row in statement_rows_from_saved_reconciliation(rdat)] or [0]
 
 def reconciliation_contains_ledger_line(rdat, line):
     explicit_ids, explicit_complete = reconciliation_row_ids(rdat)
@@ -1472,7 +1477,7 @@ def isoBank():
         }
         acctinfo = banktotals(bankacct, statement_values)
         odata = dataget_Bank(thismuch, bankacct, hv[0], statement_values)
-        hv[1] = trial_ids(odata)
+        hv[1] = selected_statement_ids(bankacct, hv[0]) or trial_ids(odata)
 
 
     leftsize = 8

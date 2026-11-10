@@ -63,7 +63,8 @@ def get_revenues():
         data1.append([idat.Period, intdol(idat.Mrev), intdol(idat.Mpaid), intdol(idat.O120), intdol(idat.O90), intdol(idat.O60), intdol(idat.O30), intdol(idat.U30), intdol(idat.Open)])
     for odat in odata:
         if odat.Company == 'TOTAL':
-            lastitem = [odat.Company, intdol(odat.Mrev), intdol(odat.Mpaid), intdol(odat.O120), intdol(odat.O90), intdol(odat.O60), intdol(odat.O30), intdol(odat.U30), intdol(odat.Open)]
+            under30_total = sum(row.U30 or 0 for row in odata if row.Company != 'TOTAL')
+            lastitem = [odat.Company, intdol(odat.Mrev), intdol(odat.Mpaid), intdol(odat.O120), intdol(odat.O90), intdol(odat.O60), intdol(odat.O30), intdol(under30_total), intdol(odat.Open)]
         else:
             data2.append([odat.Company, intdol(odat.Mrev), intdol(odat.Mpaid), intdol(odat.O120), intdol(odat.O90), intdol(odat.O60), intdol(odat.O30), intdol(odat.U30), intdol(odat.Open)])
     if lastitem is not None:
